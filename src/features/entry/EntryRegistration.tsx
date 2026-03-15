@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Search, Plus, Trash2, Users, AlertCircle, UserPlus, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, Trash2, Users, AlertCircle, UserPlus, FileSpreadsheet, Upload } from 'lucide-react';
+import EntryImport from './EntryImport';
 
 export default function EntryRegistration() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
@@ -15,6 +16,7 @@ export default function EntryRegistration() {
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // 選択中の種目情報
   const currentEvent = useMemo(() => events.find(e => e.eventId === selectedEventId), [events, selectedEventId]);
@@ -124,21 +126,31 @@ export default function EntryRegistration() {
           </h1>
         </div>
         
-        <div className="w-full sm:w-auto flex items-center gap-2">
-          <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">対象種目:</label>
-          <select 
-            value={selectedEventId} 
-            onChange={e => {
-                setSelectedEventId(e.target.value);
-                setSelectedPartner1(null);
-            }}
-            className="w-full sm:w-64 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-3 py-2 bg-gray-50 border outline-none font-medium"
+        <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">対象種目:</label>
+            <select 
+              value={selectedEventId} 
+              onChange={e => {
+                  setSelectedEventId(e.target.value);
+                  setSelectedPartner1(null);
+              }}
+              className="w-full sm:w-64 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-3 py-2 bg-gray-50 border outline-none font-medium"
+            >
+              <option value="">-- 種目を選択 --</option>
+              {events.map(e => (
+                <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
+              ))}
+            </select>
+          </div>
+          <button 
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+            title="Excel/CSVからエントリーデータを一括で読み込みます"
           >
-            <option value="">-- 種目を選択 --</option>
-            {events.map(e => (
-              <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
-            ))}
-          </select>
+            <Upload className="w-4 h-4 text-indigo-500" />
+            <span className="hidden md:inline">一括インポート</span>
+          </button>
         </div>
       </header>
 
@@ -292,6 +304,10 @@ export default function EntryRegistration() {
            <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
            <p className="font-semibold">上部のドロップダウンから対象種目を選択してください</p>
         </div>
+      )}
+
+      {showImportModal && (
+        <EntryImport onClose={() => setShowImportModal(false)} />
       )}
     </div>
   );
