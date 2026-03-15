@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import AppLayout from './components/layout/AppLayout'
 import DataManagement from './features/data/DataManagement'
+import EntryList from './features/entry/EntryList'
+import EntryRegistration from './features/entry/EntryRegistration'
 
 // ダミーコンポーネント（今後各Featureで実装）
 const Placeholder = ({ title }: { title: string }) => (
@@ -21,8 +23,8 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/data" replace />} />
           <Route path="data" element={<DataManagement />} />
-          <Route path="entry" element={<Placeholder title="S-02 エントリー" />} />
-          <Route path="entry-list" element={<Placeholder title="S-03 エントリーリスト" />} />
+          <Route path="entry" element={<EntryRegistration />} />
+          <Route path="entry-list" element={<EntryList />} />
           <Route path="draw-lot" element={<Placeholder title="S-04 抽選" />} />
           <Route path="draw-table" element={<Placeholder title="S-05 ドロー表" />} />
           <Route path="referee" element={<Placeholder title="S-06 対戦順・審判用紙" />} />
