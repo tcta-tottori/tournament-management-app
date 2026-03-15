@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
 import { Upload, Database as DatabaseIcon, Download, AlertCircle, PlayCircle } from 'lucide-react';
 import TournamentManager from './TournamentManager';
+import FuriganaManager from './FuriganaManager';
 
 export default function DataManagement() {
   const [loadStatus, setLoadStatus] = useState<string>('');
@@ -159,6 +160,17 @@ export default function DataManagement() {
           </div>
         </section>
       </div>
+
+      {/* ふりがなDB管理パネル */}
+      <section className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-100 flex items-center gap-2">
+          <DatabaseIcon className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-semibold text-emerald-900">ふりがなデータベース管理</h2>
+        </div>
+        <div className="p-5">
+           <FuriganaManager />
+        </div>
+      </section>
     </div>
   );
 }
