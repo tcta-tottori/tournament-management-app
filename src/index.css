@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* Premium Tennis Theme — deep court greens & tennis ball accents */
   --color-primary-50: #e8f5e9;
   --color-primary-100: #c8e6c9;
   --color-primary-500: #2e7d32;
@@ -14,8 +13,8 @@
 
   --color-accent: #c6ff00;
 
-  --color-bg-main: #f4f6f1;
-  --color-border-main: #d4dcc8;
+  --color-bg-main: #f5f7f2;
+  --color-border-main: #dce5d4;
   --color-table-stripe: #f8faf5;
   --color-success: #16a34a;
   --color-danger: #dc2626;
@@ -28,17 +27,176 @@
   }
 }
 
-/* ===== Tennis Ball Pulse Glow ===== */
+/* ===========================================================
+   ヘッダー
+   =========================================================== */
+.header-main {
+  background: linear-gradient(135deg, #1a5c2a 0%, #217a35 40%, #1d6b2f 70%, #16542a 100%);
+  box-shadow:
+    0 1px 0 0 rgba(198, 255, 0, 0.15),
+    0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* コートライン装飾 */
+.header-court-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image:
+    /* ネット（中央の縦線） */
+    linear-gradient(90deg, transparent 50%, rgba(255,255,255,1) 50%, rgba(255,255,255,1) 50.3%, transparent 50.3%),
+    /* サービスライン（横線） */
+    linear-gradient(0deg, transparent 30%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 32%, transparent 32%),
+    linear-gradient(0deg, transparent 68%, rgba(255,255,255,1) 68%, rgba(255,255,255,1) 70%, transparent 70%),
+    /* サイドライン */
+    linear-gradient(90deg, transparent 18%, rgba(255,255,255,1) 18%, rgba(255,255,255,1) 18.3%, transparent 18.3%),
+    linear-gradient(90deg, transparent 82%, rgba(255,255,255,1) 82%, rgba(255,255,255,1) 82.3%, transparent 82.3%);
+}
+
+/* テニスボール装飾 */
+.header-tennis-ball {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #e4ff54, #c6ff00 50%, #8db600 100%);
+  opacity: 0.12;
+  z-index: 1;
+}
+.header-tennis-ball::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(198,255,0,0.2), transparent 70%);
+  animation: tennis-ball-glow 4s ease-in-out infinite;
+}
+
+/* ===========================================================
+   ナビゲーションバー
+   =========================================================== */
+.nav-bar {
+  background: linear-gradient(180deg, #145224 0%, #17612b 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 2px 12px rgba(0,0,0,0.2);
+}
+
+.nav-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.55);
+  transition: color 0.2s, background 0.2s;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.nav-tab:hover {
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.06);
+}
+
+/* アクティブタブ：ボトムライン */
+.nav-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: #c6ff00;
+  border-radius: 2px 2px 0 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-tab:hover::after {
+  width: calc(100% - 16px);
+  left: 8px;
+}
+
+.nav-tab-active {
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.nav-tab-active::after {
+  width: calc(100% - 16px) !important;
+  left: 8px !important;
+  background: #c6ff00 !important;
+  box-shadow: 0 0 10px rgba(198, 255, 0, 0.4);
+}
+
+/* ===========================================================
+   ドロップダウンメニュー
+   =========================================================== */
+.dropdown-menu {
+  background: rgba(18, 56, 28, 0.95);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  transition: all 0.15s;
+}
+
+.dropdown-item:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.07);
+}
+
+.dropdown-item-active {
+  color: #c6ff00 !important;
+  background: rgba(198, 255, 0, 0.06);
+}
+
+/* ===========================================================
+   ページ遷移アニメーション（下から浮き上がる）
+   =========================================================== */
+@keyframes page-float-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-float-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ===========================================================
+   テニスボールグロー
+   =========================================================== */
 @keyframes tennis-ball-glow {
   0%, 100% {
-    box-shadow:
-      0 0 6px 2px rgba(198, 255, 0, 0.35),
-      0 0 16px 4px rgba(198, 255, 0, 0.10);
+    box-shadow: 0 0 6px 2px rgba(198, 255, 0, 0.15);
   }
   50% {
-    box-shadow:
-      0 0 10px 4px rgba(198, 255, 0, 0.50),
-      0 0 24px 8px rgba(198, 255, 0, 0.18);
+    box-shadow: 0 0 14px 6px rgba(198, 255, 0, 0.3);
   }
 }
 
@@ -46,94 +204,39 @@
   animation: tennis-ball-glow 3s ease-in-out infinite;
 }
 
-/* ===== Slow Pulse (kept for backward compat) ===== */
+/* ===========================================================
+   汎用ユーティリティ
+   =========================================================== */
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
 @keyframes pulse-slow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 2s ease-in-out infinite;
-}
-
-/* ===== Tennis accent badge ===== */
 .tennis-accent {
   background: linear-gradient(135deg, #c6ff00, #aeea00);
   color: #1b5e20;
 }
 
-/* ===== Court surface texture ===== */
 .court-surface {
   background-image: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 14px,
-    rgba(0, 100, 0, 0.03) 14px,
-    rgba(0, 100, 0, 0.03) 15px
+    0deg, transparent, transparent 14px,
+    rgba(0, 100, 0, 0.03) 14px, rgba(0, 100, 0, 0.03) 15px
   );
 }
 
-/* ===== Glass-morphism utility ===== */
-.glass {
-  background: rgba(15, 40, 15, 0.55);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-}
-
-/* ===== Tab underline slide-in ===== */
-.tab-underline::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  right: 50%;
-  height: 2.5px;
-  border-radius: 2px 2px 0 0;
-  background: #c6ff00;
-  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.tab-underline:hover::after,
-.tab-underline.tab-active::after {
-  left: 8px;
-  right: 8px;
-}
-
-.tab-underline.tab-active::after {
-  box-shadow: 0 0 8px 1px rgba(198, 255, 0, 0.35);
-}
-
-/* ===== Net pattern divider ===== */
-.net-divider {
-  height: 3px;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.25) 0px,
-      rgba(255, 255, 255, 0.25) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-}
-
-/* ===== Dropdown enter animation ===== */
+/* ドロップダウンアニメーション */
 @keyframes dropdown-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
 .dropdown-animate {
   animation: dropdown-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ===== Hide scrollbar utility ===== */
+/* スクロールバー非表示 */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
