@@ -1,20 +1,53 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  
+  /* テニスコート・グリーンテーマ */
+  --color-primary-50: #e8f5e9;
+  --color-primary-100: #c8e6c9;
+  --color-primary-500: #2e7d32;
+  --color-primary-600: #1b5e20;
+  --color-primary-700: #145a1e;
+
   --color-secondary-50: #fef2f2;
-  --color-secondary-500: #ef4444;
-  --color-secondary-600: #dc2626;
-  
-  --color-accent: #f9cb9c;
+  --color-secondary-500: #dc2626;
+  --color-secondary-600: #b91c1c;
+
+  --color-accent: #aeea00;
+
+  --color-bg-main: #f5f7f2;
+  --color-border-main: #dce5d4;
+  --color-table-stripe: #f8faf5;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
 }
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+    @apply bg-bg-main text-gray-900 font-sans antialiased;
   }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+.tennis-accent {
+  background: linear-gradient(135deg, #c6ff00, #aeea00);
+  color: #1b5e20;
+}
+
+.court-surface {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 14px,
+    rgba(0, 100, 0, 0.03) 14px,
+    rgba(0, 100, 0, 0.03) 15px
+  );
 }

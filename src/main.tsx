@@ -6,33 +6,38 @@ import AppLayout from './components/layout/AppLayout'
 import DataManagement from './features/data/DataManagement'
 import EntryList from './features/entry/EntryList'
 import EntryRegistration from './features/entry/EntryRegistration'
-
-// ダミーコンポーネント（今後各Featureで実装）
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center p-8 h-full">
-    <h2 className="text-2xl font-bold text-gray-500">{title} 画面 (作成中)</h2>
-  </div>
-)
+import DrawGenerator from './features/draw/DrawGenerator'
+import DrawBoard from './features/draw/DrawBoard'
+import MatchManager from './features/referee/MatchManager'
+import Scoreboard from './features/score/Scoreboard'
+import CourtSchedule from './features/schedule/CourtSchedule'
+import LiveDashboard from './features/live/LiveDashboard'
+import BackupRestore from './features/backup/BackupRestore'
+import Manual from './features/manual/Manual'
+import BroadcastPanel from './features/broadcast/BroadcastPanel'
+import CourtMap from './features/courtmap/CourtMap'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/live" element={<Placeholder title="一般公開用LIVE" />} />
-        
+        <Route path="/live" element={<LiveDashboard />} />
+
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/data" replace />} />
           <Route path="data" element={<DataManagement />} />
           <Route path="entry" element={<EntryRegistration />} />
           <Route path="entry-list" element={<EntryList />} />
-          <Route path="draw-lot" element={<Placeholder title="S-04 抽選" />} />
-          <Route path="draw-table" element={<Placeholder title="S-05 ドロー表" />} />
-          <Route path="referee" element={<Placeholder title="S-06 対戦順・審判用紙" />} />
-          <Route path="score" element={<Placeholder title="S-07 スコアボード" />} />
-          <Route path="schedule" element={<Placeholder title="S-08 コート時間割" />} />
-          <Route path="dashboard" element={<Placeholder title="S-09 ライブダッシュボード" />} />
-          <Route path="backup" element={<Placeholder title="S-10 バックアップ" />} />
-          <Route path="manual" element={<Placeholder title="S-11 マニュアル" />} />
+          <Route path="draw-lot" element={<DrawGenerator />} />
+          <Route path="draw-table" element={<DrawBoard />} />
+          <Route path="referee" element={<MatchManager />} />
+          <Route path="score" element={<Scoreboard />} />
+          <Route path="schedule" element={<CourtSchedule />} />
+          <Route path="dashboard" element={<LiveDashboard />} />
+          <Route path="backup" element={<BackupRestore />} />
+          <Route path="manual" element={<Manual />} />
+          <Route path="broadcast" element={<BroadcastPanel />} />
+          <Route path="court-map" element={<CourtMap />} />
         </Route>
       </Routes>
     </BrowserRouter>
