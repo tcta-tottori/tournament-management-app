@@ -76,8 +76,8 @@ export default function BackupRestore() {
         records.map(({ id, ...rest }) => rest as Omit<T, 'id'>);
 
       await db.transaction('rw',
-        db.tournaments, db.players, db.furiganaDict,
-        db.events, db.entries, db.draws, db.matches, db.courts,
+        [db.tournaments, db.players, db.furiganaDict,
+        db.events, db.entries, db.draws, db.matches, db.courts],
         async () => {
           await db.tournaments.clear();
           await db.players.clear();
@@ -88,14 +88,14 @@ export default function BackupRestore() {
           await db.matches.clear();
           await db.courts.clear();
 
-          if (data.tables.tournaments?.length) await db.tournaments.bulkAdd(stripId(data.tables.tournaments));
-          if (data.tables.players?.length) await db.players.bulkAdd(stripId(data.tables.players));
+          if (data.tables.tournaments?.length) await db.tournaments.bulkAdd(stripId(data.tables.tournaments) as any);
+          if (data.tables.players?.length) await db.players.bulkAdd(stripId(data.tables.players) as any);
           if (data.tables.furiganaDict?.length) await db.furiganaDict.bulkAdd(data.tables.furiganaDict);
-          if (data.tables.events?.length) await db.events.bulkAdd(stripId(data.tables.events));
-          if (data.tables.entries?.length) await db.entries.bulkAdd(stripId(data.tables.entries));
-          if (data.tables.draws?.length) await db.draws.bulkAdd(stripId(data.tables.draws));
-          if (data.tables.matches?.length) await db.matches.bulkAdd(stripId(data.tables.matches));
-          if (data.tables.courts?.length) await db.courts.bulkAdd(stripId(data.tables.courts));
+          if (data.tables.events?.length) await db.events.bulkAdd(stripId(data.tables.events) as any);
+          if (data.tables.entries?.length) await db.entries.bulkAdd(stripId(data.tables.entries) as any);
+          if (data.tables.draws?.length) await db.draws.bulkAdd(stripId(data.tables.draws) as any);
+          if (data.tables.matches?.length) await db.matches.bulkAdd(stripId(data.tables.matches) as any);
+          if (data.tables.courts?.length) await db.courts.bulkAdd(stripId(data.tables.courts) as any);
         }
       );
 
@@ -115,8 +115,8 @@ export default function BackupRestore() {
 
     try {
       await db.transaction('rw',
-        db.tournaments, db.players, db.furiganaDict,
-        db.events, db.entries, db.draws, db.matches, db.courts,
+        [db.tournaments, db.players, db.furiganaDict,
+        db.events, db.entries, db.draws, db.matches, db.courts],
         async () => {
           await db.tournaments.clear();
           await db.players.clear();

@@ -1,4 +1,4 @@
-import type { Player, Entry } from '../../db/database';
+import type { Player } from '../../db/database';
 
 export interface DrawEntry {
   position: number;      // 1-indexed (1 to drawSize)

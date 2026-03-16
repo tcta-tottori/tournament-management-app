@@ -450,7 +450,7 @@ export default function BroadcastPanel() {
           {showLog && (
             <div className="px-4 pb-3 max-h-48 overflow-auto">
               <div className="space-y-1">
-                {callLog.map((log, i) => (
+                {callLog.map((log) => (
                   <div key={`${log.matchId}-${log.timestamp.getTime()}`} className="flex items-start gap-2 text-xs text-[#6b7280] py-1 border-b border-[#f1f8e9] last:border-0">
                     <span className="font-mono text-[#111827] shrink-0">
                       {log.timestamp.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -474,7 +474,7 @@ export default function BroadcastPanel() {
 function MatchCard({
   match,
   isSpeaking,
-  lastCourtNumber,
+  lastCourtNumber: _lastCourtNumber,
   onUpdateMatch,
   onCall,
   onStop,

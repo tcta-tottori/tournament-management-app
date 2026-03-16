@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Tournament } from '../../db/database';
+import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { PlusCircle, Trash2, CheckCircle2, Circle } from 'lucide-react';
 

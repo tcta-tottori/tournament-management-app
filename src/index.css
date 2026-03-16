@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  /* テニスコート・グリーンテーマ */
+  /* Premium Tennis Theme — deep court greens & tennis ball accents */
   --color-primary-50: #e8f5e9;
   --color-primary-100: #c8e6c9;
   --color-primary-500: #2e7d32;
   --color-primary-600: #1b5e20;
-  --color-primary-700: #145a1e;
+  --color-primary-700: #0d3b12;
 
   --color-secondary-50: #fef2f2;
   --color-secondary-500: #dc2626;
   --color-secondary-600: #b91c1c;
 
-  --color-accent: #aeea00;
+  --color-accent: #c6ff00;
 
-  --color-bg-main: #f5f7f2;
-  --color-border-main: #dce5d4;
+  --color-bg-main: #f4f6f1;
+  --color-border-main: #d4dcc8;
   --color-table-stripe: #f8faf5;
   --color-success: #16a34a;
   --color-danger: #dc2626;
@@ -28,6 +28,25 @@
   }
 }
 
+/* ===== Tennis Ball Pulse Glow ===== */
+@keyframes tennis-ball-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 6px 2px rgba(198, 255, 0, 0.35),
+      0 0 16px 4px rgba(198, 255, 0, 0.10);
+  }
+  50% {
+    box-shadow:
+      0 0 10px 4px rgba(198, 255, 0, 0.50),
+      0 0 24px 8px rgba(198, 255, 0, 0.18);
+  }
+}
+
+.animate-tennis-glow {
+  animation: tennis-ball-glow 3s ease-in-out infinite;
+}
+
+/* ===== Slow Pulse (kept for backward compat) ===== */
 @keyframes pulse-slow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
@@ -37,11 +56,13 @@
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+/* ===== Tennis accent badge ===== */
 .tennis-accent {
   background: linear-gradient(135deg, #c6ff00, #aeea00);
   color: #1b5e20;
 }
 
+/* ===== Court surface texture ===== */
 .court-surface {
   background-image: repeating-linear-gradient(
     0deg,
@@ -50,4 +71,73 @@
     rgba(0, 100, 0, 0.03) 14px,
     rgba(0, 100, 0, 0.03) 15px
   );
+}
+
+/* ===== Glass-morphism utility ===== */
+.glass {
+  background: rgba(15, 40, 15, 0.55);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+/* ===== Tab underline slide-in ===== */
+.tab-underline::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  right: 50%;
+  height: 2.5px;
+  border-radius: 2px 2px 0 0;
+  background: #c6ff00;
+  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-underline:hover::after,
+.tab-underline.tab-active::after {
+  left: 8px;
+  right: 8px;
+}
+
+.tab-underline.tab-active::after {
+  box-shadow: 0 0 8px 1px rgba(198, 255, 0, 0.35);
+}
+
+/* ===== Net pattern divider ===== */
+.net-divider {
+  height: 3px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.25) 0px,
+      rgba(255, 255, 255, 0.25) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+}
+
+/* ===== Dropdown enter animation ===== */
+@keyframes dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dropdown-animate {
+  animation: dropdown-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ===== Hide scrollbar utility ===== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

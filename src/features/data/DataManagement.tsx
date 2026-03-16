@@ -2,6 +2,7 @@ import { Database as DatabaseIcon } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import FuriganaManager from './FuriganaManager';
 import DataImport from './DrawMeetingImport';
+import DataSync from './DataSync';
 
 export default function DataManagement() {
   return (
@@ -17,6 +18,11 @@ export default function DataManagement() {
           </p>
         </div>
       </header>
+
+      {/* データ同期パネル（フルwidth） */}
+      <div className="mb-6">
+        <DataSync />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ドロー会議システム読込パネル */}

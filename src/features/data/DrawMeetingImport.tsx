@@ -3,7 +3,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
-import type { ParsedDrawFile, ParsedDrawEvent, ParsedDrawPlayer } from './drawExcelParser';
+import type { ParsedDrawFile } from './drawExcelParser';
 
 // ドロー会議システムのイベントコード → 大会運営システムの種目定義
 const EVENT_MAP: Record<string, { name: string; type: 'Singles' | 'Doubles' }> = {
