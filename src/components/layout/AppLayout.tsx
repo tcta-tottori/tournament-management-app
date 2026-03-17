@@ -20,9 +20,9 @@ const ALL_MAIN_TABS = [
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-10', path: '/backup', label: 'バックアップ', icon: Save },
-  { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/broadcast', label: '放送コール', icon: Volume2 },
   { id: 'S-13', path: '/court-map', label: 'コートマップ', icon: MapPin },
+  { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
 ];
 
 // モバイルではメイン8個 + その他5個に分割
