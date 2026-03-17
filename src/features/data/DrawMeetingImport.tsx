@@ -157,6 +157,21 @@ function parseImportFile(json: any): ParsedData | null {
     };
   }
 
+  // 個別エクスポート: 大会一覧バックアップ形式 { tournaments: [...], nextId }
+  if (json.tournaments && Array.isArray(json.tournaments)) {
+    return {
+      format: 'complete-backup',
+      tournamentName: json.tournaments[0]?.name || '',
+      tournaments: json.tournaments,
+      entries: [],
+      drawResults: {},
+      confirmedEvents: {},
+      rankings: {},
+      furiganaMap: {},
+      exportedAt: json.savedAt || '',
+    };
+  }
+
   return null;
 }
 
