@@ -235,7 +235,7 @@ export default function EntryRegistration() {
   };
 
   // ===== League / Round-robin table =====
-  const renderLeagueTable = (eventId: string, slots: CheckInSlot[]) => {
+  const renderLeagueTable = (_eventId: string, slots: CheckInSlot[]) => {
     const searchMatches = getSearchMatchSet(slots);
     const hasSearch = searchQuery.length > 0;
     const playerSlots = slots.filter(s => s.entry && !(s.isBye && !s.entry));

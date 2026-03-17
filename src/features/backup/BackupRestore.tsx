@@ -150,9 +150,9 @@ export default function BackupRestore() {
       {/* ステータスメッセージ */}
       {status && (
         <div className={`p-4 rounded-xl border flex items-start gap-3 ${
-          status.type === 'success' ? 'bg-green-50 border-green-200 text-[#16a34a]' :
-          status.type === 'error' ? 'bg-red-50 border-red-200 text-[#dc2626]' :
-          'bg-primary-50 border-[#2e7d32]/30 text-primary-500'
+          status.type === 'success' ? 'bg-green-50 border-green-200 text-green-600' :
+          status.type === 'error' ? 'bg-red-50 border-red-200 text-red-600' :
+          'bg-primary-50 border-primary-500/30 text-primary-500'
         }`}>
           {status.type === 'success' ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0" /> :
            <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />}
@@ -203,7 +203,7 @@ export default function BackupRestore() {
 
       {/* データクリア */}
       <div className="bg-white rounded-xl shadow-sm border border-[#dc2626]/30 p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
-        <h2 className="font-bold text-[#dc2626] mb-2 flex items-center gap-2">
+        <h2 className="font-bold text-red-600 mb-2 flex items-center gap-2">
           <Trash2 className="w-5 h-5" />
           全データ削除
         </h2>

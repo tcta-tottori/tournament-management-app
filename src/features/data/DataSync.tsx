@@ -298,7 +298,7 @@ export default function DataSync() {
           <button
             onClick={syncFromDrawSystem}
             disabled={isSyncing}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <span>ドロー会議システムから同期</span>
             {isSyncing && <RefreshCw className="w-4 h-4 animate-spin" />}

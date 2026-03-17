@@ -134,10 +134,10 @@ export default function Manual() {
           各機能の使い方を確認できます。
         </p>
         <div className="mt-3 flex gap-2">
-          <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-50 text-primary-500 px-3 py-1 rounded-md font-medium">
+          <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-primary-500 px-3 py-1 rounded-md font-medium">
             全て開く
           </button>
-          <button onClick={closeAll} className="text-xs bg-primary-50 hover:bg-primary-50 text-primary-500 px-3 py-1 rounded-md font-medium">
+          <button onClick={closeAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-primary-500 px-3 py-1 rounded-md font-medium">
             全て閉じる
           </button>
         </div>

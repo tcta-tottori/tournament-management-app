@@ -11,13 +11,13 @@ import TournamentInfo from './TournamentInfo';
 export default function DataManagement() {
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto h-full flex flex-col">
-      <header className="mb-6 bg-white p-4 rounded-xl card-tottori border border-border-main">
+      <header className="mb-6 bg-white p-4 rounded-xl card-tottori">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <DatabaseIcon className="w-6 h-6 text-primary-500" />
             データ管理
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-1 hidden sm:block">
             ドロー会議システムからのデータ読込み、大会マスタの管理、ふりがなDBの管理を行います。
           </p>
         </div>
@@ -30,7 +30,7 @@ export default function DataManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ドロー会議システム読込パネル */}
-        <section className="bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <section className="bg-white rounded-xl card-tottori overflow-hidden">
           <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
             <DatabaseIcon className="w-5 h-5 text-primary-500" />
             <h2 className="font-semibold text-primary-600">データ読込</h2>
@@ -41,7 +41,7 @@ export default function DataManagement() {
         </section>
 
         {/* 大会マスタ管理パネル */}
-        <section className="bg-white rounded-xl card-tottori border border-border-main overflow-hidden flex flex-col h-[500px] hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <section className="bg-white rounded-xl card-tottori overflow-hidden flex flex-col h-[350px] md:h-[500px]">
           <div className="bg-primary-50 px-4 py-3 border-b border-border-main">
              <h2 className="font-semibold text-gray-900">大会マスタ管理</h2>
           </div>
@@ -52,7 +52,7 @@ export default function DataManagement() {
       </div>
 
       {/* スケジュール自動生成パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-sky px-4 py-3 border-b border-border-main flex items-center gap-2">
           <Zap className="w-5 h-5 text-ocean" />
           <h2 className="font-semibold text-ocean">スケジュール自動生成</h2>
@@ -63,7 +63,7 @@ export default function DataManagement() {
       </section>
 
       {/* 時間割インポートパネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-sky px-4 py-3 border-b border-border-main flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-ocean" />
           <h2 className="font-semibold text-ocean">時間割インポート（Excel/CSV）</h2>
@@ -74,7 +74,7 @@ export default function DataManagement() {
       </section>
 
       {/* 大会情報パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-secondary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <Info className="w-5 h-5 text-secondary-600" />
           <h2 className="font-semibold text-secondary-700">大会情報（ドロー会議システム）</h2>
@@ -85,7 +85,7 @@ export default function DataManagement() {
       </section>
 
       {/* ふりがなDB管理パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <DatabaseIcon className="w-5 h-5 text-primary-500" />
           <h2 className="font-semibold text-primary-600">ふりがなデータベース管理</h2>
@@ -96,7 +96,7 @@ export default function DataManagement() {
       </section>
 
       {/* 所属ふりがな管理パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary-500" />
           <h2 className="font-semibold text-primary-600">所属ふりがな管理</h2>

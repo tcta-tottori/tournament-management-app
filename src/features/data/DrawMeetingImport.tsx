@@ -842,7 +842,7 @@ export default function DataImport() {
           onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-[#2e7d32] transition-colors cursor-pointer"
+          className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
         >
           <FileJson className="w-10 h-10 text-primary-500 mx-auto mb-2 opacity-60" />
           <p className="text-sm font-medium text-gray-900">ドロー会議JSON / ドローExcelファイルを読込</p>
@@ -865,7 +865,7 @@ export default function DataImport() {
       {/* JSON プレビュー (既存) */}
       {parsedData && summary && (
         <div className="space-y-3">
-          <div className="bg-primary-50 rounded-lg p-3 border border-[#a5d6a7]">
+          <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
             <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
               <CheckCircle2 className="w-4 h-4" />
               データ読込成功
@@ -899,7 +899,7 @@ export default function DataImport() {
                         setEditVenue(t.venue || '');
                         setEditReserveDate(t.reserveDate || '');
                       }}
-                      className="accent-[#2e7d32]"
+                      className="accent-primary-500"
                     />
                     <span className="font-medium">{t.name}</span>
                     <span className="text-xs text-gray-500">{t.date} {t.venue}</span>
@@ -949,7 +949,7 @@ export default function DataImport() {
           </div>
 
           {/* サマリー */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-white rounded-lg border border-border-main p-3 text-center">
               <Users className="w-5 h-5 text-primary-500 mx-auto mb-1" />
               <p className="text-lg font-bold text-gray-900">{summary.playerCount}</p>
@@ -1006,7 +1006,7 @@ export default function DataImport() {
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           {confirmed ? (
-                            <span className="text-[#16a34a]">
+                            <span className="text-green-600">
                               <CheckCircle2 className="w-3.5 h-3.5 inline" />
                             </span>
                           ) : draw ? (
@@ -1034,7 +1034,7 @@ export default function DataImport() {
             <button
               onClick={handleImport}
               disabled={isImporting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Upload className="w-4 h-4" />
               {isImporting ? 'インポート中...' : 'インポート実行'}
@@ -1046,7 +1046,7 @@ export default function DataImport() {
       {/* Excel プレビュー (新規) */}
       {parsedExcel && (
         <div className="space-y-3">
-          <div className="bg-primary-50 rounded-lg p-3 border border-[#a5d6a7]">
+          <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
             <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
               <FileSpreadsheet className="w-4 h-4" />
               Excel読込成功
@@ -1099,7 +1099,7 @@ export default function DataImport() {
           </div>
 
           {/* サマリー */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-white rounded-lg border border-border-main p-3 text-center">
               <Users className="w-5 h-5 text-primary-500 mx-auto mb-1" />
               <p className="text-lg font-bold text-gray-900">{excelPlayerCount}</p>
@@ -1153,9 +1153,9 @@ export default function DataImport() {
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           {ev.isRoundRobin ? (
-                            <span className="text-[#2563eb] text-[10px] font-medium">リーグ</span>
+                            <span className="text-blue-600 text-[10px] font-medium">リーグ</span>
                           ) : (
-                            <span className="text-[#16a34a] text-[10px] font-medium">トーナメント</span>
+                            <span className="text-green-600 text-[10px] font-medium">トーナメント</span>
                           )}
                         </td>
                       </tr>
@@ -1177,7 +1177,7 @@ export default function DataImport() {
             <button
               onClick={handleExcelImport}
               disabled={isImporting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Upload className="w-4 h-4" />
               {isImporting ? 'インポート中...' : 'インポート実行'}

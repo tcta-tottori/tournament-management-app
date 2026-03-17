@@ -159,7 +159,7 @@ export default function CourtMap() {
     },
     ready: {
       bg: 'bg-blue-50',
-      border: 'border-[#2e7d32]',
+      border: 'border-primary-500',
       text: 'text-primary-500',
       glow: '',
     },
@@ -251,11 +251,11 @@ export default function CourtMap() {
                 <div className="flex-1 flex flex-col gap-3">
                   {venue.blocks.map((block, blockIdx) => {
                     const cols = block.courts.length;
-                    const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
+                    const gridCols = cols <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-6';
 
                     return (
                       <div key={blockIdx} className="w-full">
-                        <div className={`bg-primary-50 rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
+                        <div className={`bg-primary-50 rounded-xl border border-primary-200 p-3 shadow-sm`}>
                           <div className={`grid ${gridCols} gap-2`}>
                             {block.courts.map(courtName => {
                               const cs = courtStatusMap[courtName];
@@ -270,7 +270,7 @@ export default function CourtMap() {
                                   className={`
                                     relative rounded-lg border-2 p-2 md:p-3 transition-all cursor-pointer min-h-[80px] md:min-h-[100px]
                                     ${style.bg} ${style.border} ${style.glow}
-                                    ${isSelected ? 'ring-2 ring-[#2e7d32] ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
+                                    ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
                                     ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
                                   `}
                                 >
@@ -282,27 +282,27 @@ export default function CourtMap() {
                                   <div className={`text-xl md:text-2xl font-bold ${style.text} text-center leading-none`}>
                                     {courtName}
                                   </div>
-                                  <div className={`text-[9px] md:text-[10px] font-medium ${style.text} text-center mt-1`}>
+                                  <div className={`text-[10px] font-medium ${style.text} text-center mt-1`}>
                                     {statusLabel[cs.status]}
                                   </div>
                                   {cs.currentMatch && (
                                     <div className="mt-1.5 pt-1 border-t border-green-200 space-y-0">
-                                      <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.currentMatch.player1Name}
                                       </p>
-                                      <p className="text-[7px] md:text-[8px] text-green-600 text-center">vs</p>
-                                      <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[8px] text-green-600 text-center">vs</p>
+                                      <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.currentMatch.player2Name}
                                       </p>
                                     </div>
                                   )}
                                   {!cs.currentMatch && cs.nextMatch && (
                                     <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                      <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.nextMatch.player1Name}
                                       </p>
-                                      <p className="text-[7px] text-blue-400 text-center">vs</p>
-                                      <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[8px] text-blue-400 text-center">vs</p>
+                                      <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.nextMatch.player2Name}
                                       </p>
                                     </div>
@@ -316,9 +316,9 @@ export default function CourtMap() {
                         {/* ブロック間の通路表示 */}
                         {blockIdx < venue.blocks.length - 1 && (
                           <div className="flex items-center gap-2 my-2">
-                            <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
+                            <div className="flex-1 border-t border-dashed border-gray-300" />
                             <span className="text-[10px] text-gray-500">通路</span>
-                            <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
+                            <div className="flex-1 border-t border-dashed border-gray-300" />
                           </div>
                         )}
                       </div>
@@ -337,13 +337,13 @@ export default function CourtMap() {
             /* 通常レイアウト（ヤマタスポーツパーク等） */
             venue.blocks.map((block, blockIdx) => {
               const cols = block.courts.length;
-              const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
+              const gridCols = cols <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-6';
 
               return (
                 <div key={blockIdx} className="w-full">
                   {/* コートブロック - 緑のフィールド風 */}
                   <div className="flex items-stretch gap-3">
-                    <div className={`flex-1 bg-primary-50 rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
+                    <div className={`flex-1 bg-primary-50 rounded-xl border border-primary-200 p-3 shadow-sm`}>
                       <div className={`grid ${gridCols} gap-2`}>
                         {block.courts.map(courtName => {
                           const cs = courtStatusMap[courtName];
@@ -358,7 +358,7 @@ export default function CourtMap() {
                               className={`
                                 relative rounded-lg border-2 p-2 md:p-3 transition-all cursor-pointer min-h-[80px] md:min-h-[100px]
                                 ${style.bg} ${style.border} ${style.glow}
-                                ${isSelected ? 'ring-2 ring-[#2e7d32] ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
+                                ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
                                 ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
                               `}
                             >
@@ -370,27 +370,27 @@ export default function CourtMap() {
                               <div className={`text-xl md:text-2xl font-bold ${style.text} text-center leading-none`}>
                                 {courtName}
                               </div>
-                              <div className={`text-[9px] md:text-[10px] font-medium ${style.text} text-center mt-1`}>
+                              <div className={`text-[10px] font-medium ${style.text} text-center mt-1`}>
                                 {statusLabel[cs.status]}
                               </div>
                               {cs.currentMatch && (
                                 <div className="mt-1.5 pt-1 border-t border-green-200 space-y-0">
-                                  <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.currentMatch.player1Name}
                                   </p>
-                                  <p className="text-[7px] md:text-[8px] text-green-600 text-center">vs</p>
-                                  <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[8px] text-green-600 text-center">vs</p>
+                                  <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.currentMatch.player2Name}
                                   </p>
                                 </div>
                               )}
                               {!cs.currentMatch && cs.nextMatch && (
                                 <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                  <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.nextMatch.player1Name}
                                   </p>
-                                  <p className="text-[7px] text-blue-400 text-center">vs</p>
-                                  <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[8px] text-blue-400 text-center">vs</p>
+                                  <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.nextMatch.player2Name}
                                   </p>
                                 </div>
@@ -418,9 +418,9 @@ export default function CourtMap() {
                   {/* ブロック間の道路表示（本部表示がないブロック間） */}
                   {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
                     <div className="flex items-center gap-2 my-2">
-                      <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
+                      <div className="flex-1 border-t border-dashed border-gray-300" />
                       <span className="text-[10px] text-gray-500">通路</span>
-                      <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
+                      <div className="flex-1 border-t border-dashed border-gray-300" />
                     </div>
                   )}
                 </div>

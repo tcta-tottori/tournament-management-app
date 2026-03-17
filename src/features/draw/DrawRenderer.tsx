@@ -176,7 +176,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
               : winnerName;
 
             const bgClass = isPlaying
-              ? 'bg-[#dcfce7]'
+              ? 'bg-green-100'
               : isWinner
                 ? 'bg-white shadow'
                 : 'bg-white/60';
@@ -209,7 +209,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                         {displayName}
                       </div>
                       {matchResult?.scheduledTime && (
-                        <div className="shrink-0 bg-[#1565c0] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                        <div className="shrink-0 bg-ocean text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.scheduledTime}
                         </div>
                       )}
@@ -232,7 +232,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                     </div>
                     <div className="flex items-center gap-1">
                       {matchResult?.scheduledTime && (
-                        <div className="shrink-0 bg-[#1565c0] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                        <div className="shrink-0 bg-ocean text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.scheduledTime}
                         </div>
                       )}

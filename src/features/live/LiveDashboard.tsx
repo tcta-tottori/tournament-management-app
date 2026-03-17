@@ -78,13 +78,13 @@ export default function LiveDashboard() {
           </div>
           <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-[#16a34a]/30 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
-          <div className="flex items-center gap-2 text-[#16a34a] text-xs mb-1">
+        <div className="bg-white rounded-xl shadow-sm border border-green-600/30 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="flex items-center gap-2 text-green-600 text-xs mb-1">
             <Play className="w-3.5 h-3.5" /> 試合中
           </div>
-          <p className="text-2xl font-bold text-[#16a34a]">{stats.playing.length}</p>
+          <p className="text-2xl font-bold text-green-600">{stats.playing.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-[#2e7d32]/30 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div className="bg-white rounded-xl shadow-sm border border-primary-500/30 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
           <div className="flex items-center gap-2 text-primary-500 text-xs mb-1">
             <CheckCircle className="w-3.5 h-3.5" /> 終了
           </div>
@@ -104,13 +104,10 @@ export default function LiveDashboard() {
           <span className="text-sm font-bold text-gray-900">全体進捗</span>
           <span className="text-sm font-mono text-gray-500">{stats.progressPercent}%</span>
         </div>
-        <div className="w-full bg-[#e0e7ef] rounded-full h-3">
+        <div className="w-full bg-gray-200 rounded-full h-3">
           <div
-            className="h-3 rounded-full transition-all duration-500"
-            style={{
-              width: `${stats.progressPercent}%`,
-              background: 'linear-gradient(135deg, #2e7d32, #1b5e20)',
-            }}
+            className="bg-gradient-to-br from-primary-500 to-primary-600 h-3 rounded-full transition-all duration-500"
+            style={{ width: `${stats.progressPercent}%` }}
           />
         </div>
       </div>
@@ -125,7 +122,7 @@ export default function LiveDashboard() {
                 <div
                   key={court.courtId}
                   className={`rounded-xl shadow-sm border-2 p-4 ${
-                    currentMatch ? 'border-[#16a34a]/40 bg-green-50/50' :
+                    currentMatch ? 'border-green-600/40 bg-green-50/50' :
                     !court.isAvailable ? 'border-red-200 bg-red-50/30 opacity-60' :
                     'border-border-main bg-white'
                   }`}
@@ -135,7 +132,7 @@ export default function LiveDashboard() {
                   </div>
                   {currentMatch ? (
                     <div>
-                      <div className="text-xs text-[#16a34a] font-medium mb-1 flex items-center gap-1">
+                      <div className="text-xs text-green-600 font-medium mb-1 flex items-center gap-1">
                         <Play className="w-3 h-3" /> 試合中
                       </div>
                       <p className="text-sm font-medium whitespace-nowrap">{currentMatch.player1Name}</p>
@@ -173,7 +170,7 @@ export default function LiveDashboard() {
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-sm text-gray-900 truncate">{ep.event.name}</h3>
                     {ep.playing > 0 && (
-                      <span className="text-xs bg-green-100 text-[#16a34a] px-1.5 py-0.5 rounded-full font-medium">
+                      <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full font-medium">
                         {ep.playing}試合中
                       </span>
                     )}
@@ -182,7 +179,7 @@ export default function LiveDashboard() {
                     <span>{ep.finished} / {ep.total} 完了</span>
                     <span>{ep.percent}%</span>
                   </div>
-                  <div className="w-full bg-[#e0e7ef] rounded-full h-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-primary-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${ep.percent}%` }}

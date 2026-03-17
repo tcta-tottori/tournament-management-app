@@ -665,7 +665,7 @@ ${printableMatches.map(m => {
             <ClipboardList className="w-6 h-6 text-primary-500" />
             対戦順・審判用紙
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-1 hidden sm:block">
             ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
           </p>
         </div>
@@ -821,10 +821,10 @@ ${printableMatches.map(m => {
                                     </td>
                                     <td className="py-2 px-2 text-center">
                                       <div className="flex items-center gap-1 justify-center">
-                                        <button onClick={() => saveResult(m)} className="p-1 text-green-600 hover:bg-green-100 rounded" title="保存">
+                                        <button onClick={() => saveResult(m)} className="p-2 text-green-600 hover:bg-green-100 rounded" title="保存">
                                           <Check className="w-4 h-4" />
                                         </button>
-                                        <button onClick={cancelEdit} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="キャンセル">
+                                        <button onClick={cancelEdit} className="p-2 text-gray-400 hover:bg-gray-100 rounded" title="キャンセル">
                                           <X className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -834,7 +834,7 @@ ${printableMatches.map(m => {
                               }
 
                               return (
-                                <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${idx % 2 === 1 ? 'bg-[#f9fafb]' : ''}`}>
+                                <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
                                   <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
                                   <td className="py-2 px-2">
                                     <div className="flex items-center gap-1">
@@ -865,7 +865,7 @@ ${printableMatches.map(m => {
                                     {hasPlayers && !isWalkover && (
                                       <button
                                         onClick={() => startEdit(m)}
-                                        className="p-1 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
+                                        className="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
                                         title="結果入力"
                                       >
                                         <Edit3 className="w-3.5 h-3.5" />

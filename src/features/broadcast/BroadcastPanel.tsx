@@ -362,7 +362,7 @@ export default function BroadcastPanel() {
             <button
               onClick={handleLoadFromDB}
               disabled={dbLoading}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#1565c0] text-white rounded-lg text-sm font-medium hover:bg-[#0d47a1] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 bg-ocean text-white rounded-lg text-sm font-medium hover:bg-blue-900 transition-colors disabled:opacity-50"
             >
               <Database className="w-4 h-4" />
               {dbLoading ? '読込中...' : '試合データから読込'}
@@ -391,7 +391,7 @@ export default function BroadcastPanel() {
               {dataType === 'doubles' ? 'ダブルス' : 'シングルス'}
             </span>
             <span>{matches.length}試合読込</span>
-            <span className="text-[#16a34a] font-medium">
+            <span className="text-green-600 font-medium">
               {matches.filter(m => m.status === 'done').length}件コール済
             </span>
           </div>
@@ -523,7 +523,7 @@ export default function BroadcastPanel() {
             <button
               onClick={handleLoadFromDB}
               disabled={dbLoading}
-              className="flex items-center gap-2 px-6 py-3 bg-[#1565c0] text-white rounded-lg text-base font-medium hover:bg-[#0d47a1] transition-colors disabled:opacity-50 mb-6"
+              className="flex items-center gap-2 px-6 py-3 bg-ocean text-white rounded-lg text-base font-medium hover:bg-blue-900 transition-colors disabled:opacity-50 mb-6"
             >
               <Database className="w-5 h-5" />
               {dbLoading ? '読込中...' : '試合データから読込'}
@@ -543,7 +543,7 @@ export default function BroadcastPanel() {
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-dashed border-border-main rounded-lg text-sm text-gray-500 hover:border-[#2e7d32] hover:bg-primary-50 transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-2 px-4 py-2 border border-dashed border-border-main rounded-lg text-sm text-gray-500 hover:border-primary-500 hover:bg-primary-50 transition-colors cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
                 CSVファイルをドラッグ＆ドロップ / クリックで選択
@@ -607,7 +607,7 @@ export default function BroadcastPanel() {
                   {doneMatches.map(match => (
                     <div
                       key={match.id}
-                      className="bg-[#FFF8F0] rounded-xl border border-[#F9CB9C] p-3 opacity-70"
+                      className="bg-amber-50 rounded-xl border border-amber-200 p-3 opacity-70"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -657,7 +657,7 @@ export default function BroadcastPanel() {
             <div className="px-4 pb-3 max-h-48 overflow-auto">
               <div className="space-y-1">
                 {callLog.map((log) => (
-                  <div key={`${log.matchId}-${log.timestamp.getTime()}`} className="flex items-start gap-2 text-xs text-gray-500 py-1 border-b border-[#f1f8e9] last:border-0">
+                  <div key={`${log.matchId}-${log.timestamp.getTime()}`} className="flex items-start gap-2 text-xs text-gray-500 py-1 border-b border-primary-50 last:border-0">
                     <span className="font-mono text-gray-900 shrink-0">
                       {log.timestamp.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
@@ -693,7 +693,7 @@ function MatchCard({
   onStop: () => void;
 }) {
   const bgClass = isSpeaking
-    ? 'bg-[#FFF3CD] border-[#FFD93D] animate-pulse'
+    ? 'bg-amber-100 border-amber-300 animate-pulse'
     : 'bg-white border-border-main';
 
   // コート番号が未設定で前回の値がある場合、自動設定
@@ -784,7 +784,7 @@ function MatchCard({
             disabled={!match.courtNumber}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               match.courtNumber
-                ? 'bg-[#16a34a] text-white hover:bg-[#15803d]'
+                ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >

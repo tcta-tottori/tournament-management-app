@@ -297,7 +297,7 @@ export default function DrawBoard() {
               <button
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges || isSaving}
-                className="flex items-center gap-2 bg-[#16a34a] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? '保存中...' : '変更を保存'}
@@ -306,7 +306,7 @@ export default function DrawBoard() {
           </div>
 
           {selectedPosition !== null && (
-            <div className="bg-primary-50 border border-[#2e7d32]/30 rounded-md px-4 py-2 text-sm text-primary-600 font-medium shrink-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-md px-4 py-2 text-sm text-primary-600 font-medium shrink-0">
               スロット #{selectedPosition} を選択中 -- 入れ替え先のスロットをタップしてください
             </div>
           )}

@@ -60,7 +60,6 @@
     0 1px 0 0 rgba(212, 225, 87, 0.1),
     0 4px 24px rgba(15, 51, 38, 0.35),
     0 1px 3px rgba(139, 94, 47, 0.1);
-  overflow: hidden;
 }
 
 /* ヘッダー下部はSVGウェーブ（AppLayout.tsx側）で装飾 */
@@ -95,6 +94,12 @@
   opacity: 0.15;
   z-index: 1;
   box-shadow: 0 0 12px 4px rgba(212, 225, 87, 0.15);
+}
+
+@media (max-width: 639px) {
+  .header-tennis-ball {
+    display: none;
+  }
 }
 
 .header-tennis-ball::after {
@@ -132,7 +137,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 12px 14px;
+  min-height: 44px;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -167,15 +173,15 @@
   left: 8px;
 }
 
-.nav-tab-active {
-  color: #fff !important;
+.nav-bar .nav-tab-active {
+  color: #fff;
   font-weight: 600;
 }
 
-.nav-tab-active::after {
-  width: calc(100% - 16px) !important;
-  left: 8px !important;
-  background: linear-gradient(90deg, #d4e157, #c4956a) !important;
+.nav-bar .nav-tab-active::after {
+  width: calc(100% - 16px);
+  left: 8px;
+  background: linear-gradient(90deg, #d4e157, #c4956a);
   box-shadow: 0 0 10px rgba(212, 225, 87, 0.3), 0 0 4px rgba(196, 149, 106, 0.2);
 }
 
@@ -191,6 +197,8 @@
   box-shadow:
     0 12px 48px rgba(15, 51, 38, 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.04);
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .dropdown-item {
@@ -248,22 +256,6 @@
   }
 }
 
-.animate-tennis-glow {
-  animation: tennis-ball-glow 4s ease-in-out infinite;
-}
-
-/* ===========================================================
-   シマーアニメーション（アクティブ要素用）
-   =========================================================== */
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
 /* ===========================================================
    汎用ユーティリティ
    =========================================================== */
@@ -276,49 +268,10 @@
   50% { opacity: 0.82; }
 }
 
-/* テニスアクセント */
-.tennis-accent {
-  background: linear-gradient(135deg, #d4e157, #c4d14a);
-  color: #0f3326;
-}
-
-/* コートサーフェス（洗練されたテクスチャ） */
-.court-surface {
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 18px,
-      rgba(45, 106, 79, 0.025) 18px,
-      rgba(45, 106, 79, 0.025) 19px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 60px,
-      rgba(45, 106, 79, 0.012) 60px,
-      rgba(45, 106, 79, 0.012) 61px
-    );
-}
-
-/* 砂丘テクスチャ */
-.sand-texture {
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(240, 217, 181, 0.15), transparent 50%),
-    radial-gradient(ellipse at 80% 30%, rgba(196, 149, 106, 0.08), transparent 40%),
-    linear-gradient(170deg, rgba(253, 248, 240, 0.5) 0%, rgba(249, 236, 216, 0.3) 100%);
-}
-
-/* 日本海ブルーアクセント */
-.ocean-accent {
-  background: linear-gradient(135deg, #3d7ea6, #5a9ec4);
-  color: #fff;
-}
-
 /* 鳥取カードスタイル */
 .card-tottori {
   background: #fff;
-  border: 1px solid #e5ddd3;
+  border: 1px solid var(--color-border-main);
   border-radius: 12px;
   box-shadow:
     0 1px 3px rgba(139, 94, 47, 0.06),
@@ -330,7 +283,6 @@
   box-shadow:
     0 2px 6px rgba(139, 94, 47, 0.08),
     0 8px 24px rgba(139, 94, 47, 0.07);
-  transform: translateY(-1px);
 }
 
 /* ドロップダウンアニメーション */

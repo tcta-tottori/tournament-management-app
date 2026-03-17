@@ -280,13 +280,13 @@ export default function ScheduleImport() {
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[#1976d2] rounded-lg hover:bg-[#1565c0] transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-ocean rounded-lg hover:bg-blue-800 transition-colors"
         >
           <Upload className="w-4 h-4" />
           <span>ファイルを選択</span>
         </button>
         {fileName && (
-          <div className="mt-2 flex items-center gap-1.5 text-sm text-[#374151]">
+          <div className="mt-2 flex items-center gap-1.5 text-sm text-gray-700">
             <FileSpreadsheet className="w-4 h-4 text-primary-500" />
             <span>{fileName}</span>
           </div>
@@ -339,7 +339,7 @@ export default function ScheduleImport() {
           <button
             onClick={handleImport}
             disabled={isImporting}
-            className="mt-3 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="mt-3 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>{isImporting ? 'インポート中...' : 'インポート実行'}</span>

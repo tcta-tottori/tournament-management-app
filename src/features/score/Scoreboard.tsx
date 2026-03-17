@@ -189,7 +189,7 @@ export default function Scoreboard() {
       </header>
 
       {!selectedEventId ? (
-        <div className="flex items-center justify-center p-8 bg-white rounded-xl border border-border-main shadow-sm h-64">
+        <div className="flex items-center justify-center p-8 bg-white rounded-xl border border-border-main shadow-sm min-h-64">
           <p className="font-semibold text-gray-500">種目を選択してください</p>
         </div>
       ) : (
@@ -197,16 +197,16 @@ export default function Scoreboard() {
           {/* 試合中 */}
           {activeMatches.length > 0 && (
             <section>
-              <h2 className="text-sm font-bold text-[#16a34a] uppercase tracking-wider mb-3 flex items-center gap-2">
+              <h2 className="text-sm font-bold text-green-600 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Play className="w-4 h-4" /> 進行中 ({activeMatches.length})
               </h2>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {activeMatches.map(m => (
-                  <div key={m.matchId} className="bg-white rounded-xl shadow-sm border-2 border-[#16a34a]/40 p-4">
+                  <div key={m.matchId} className="bg-white rounded-xl shadow-sm border-2 border-green-600/40 p-4">
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-xs font-mono text-gray-500">#{m.matchOrder} R{m.round}</span>
                       {m.courtId && <span className="text-xs bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">{getCourtName(m.courtId)}</span>}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.status === 'playing' ? 'bg-green-100 text-[#16a34a]' : 'bg-primary-50 text-primary-500'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.status === 'playing' ? 'bg-green-100 text-green-600' : 'bg-primary-50 text-primary-500'}`}>
                         {m.status === 'playing' ? '試合中' : '準備完了'}
                       </span>
                     </div>
@@ -257,12 +257,12 @@ export default function Scoreboard() {
                     ) : (
                       <div className="mt-3 pt-3 border-t border-border-main flex gap-2">
                         {m.status === 'ready' && (
-                          <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing} className="text-xs bg-[#16a34a] text-white px-3 py-1 rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50">
+                          <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing} className="text-xs bg-green-600 text-white px-3 py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50">
                             開始
                           </button>
                         )}
                         {m.status === 'playing' && (
-                          <button onClick={() => { setEditingMatchId(m.matchId); setScoreInput(''); }} className="text-xs bg-primary-500 text-white px-3 py-1 rounded-md font-medium hover:bg-primary-600">
+                          <button onClick={() => { setEditingMatchId(m.matchId); setScoreInput(''); }} className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600">
                             <Check className="w-3 h-3 inline mr-1" />結果入力
                           </button>
                         )}
@@ -280,7 +280,7 @@ export default function Scoreboard() {
               <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
                 待機中 ({waitingMatches.length})
               </h2>
-              <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-primary-50 text-xs font-semibold text-gray-900">
                     <tr>
@@ -292,7 +292,7 @@ export default function Scoreboard() {
                   </thead>
                   <tbody>
                     {waitingMatches.map((m, idx) => (
-                      <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
+                      <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
                         <td className="py-2 px-3 font-mono text-gray-500">{m.matchOrder}</td>
                         <td className="py-2 px-3">
                           <span className="font-medium whitespace-nowrap">{m.player1Name}</span>
@@ -315,7 +315,7 @@ export default function Scoreboard() {
                           <button
                             onClick={() => handleReadyMatch(m.matchId)}
                             disabled={isProcessing}
-                            className="text-xs bg-primary-500 text-white px-3 py-1 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50"
+                            className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50"
                           >
                             準備完了
                           </button>
@@ -334,7 +334,7 @@ export default function Scoreboard() {
               <h2 className="text-sm font-bold text-primary-500 uppercase tracking-wider mb-3">
                 終了 ({finishedMatches.length})
               </h2>
-              <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead className="bg-primary-50 text-xs font-semibold text-gray-900">
                     <tr>
@@ -351,13 +351,13 @@ export default function Scoreboard() {
                       const winner = isP1Winner ? m.player1Name : m.player2Name;
                       const loser = isP1Winner ? m.player2Name : m.player1Name;
                       return (
-                        <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
+                        <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
                           <td className="py-2 px-3 font-mono text-gray-500">{m.matchOrder}</td>
                           <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">{winner}</td>
                           <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{loser || 'BYE'}</td>
                           <td className="py-2 px-3 font-mono">{m.score || (m.status === 'walkover' ? 'W/O' : '-')}</td>
                           <td className="py-2 px-3">
-                            <button onClick={() => handleResetMatch(m.matchId)} disabled={isProcessing} className="text-gray-500 hover:text-gray-900 disabled:opacity-50" title="リセット">
+                            <button onClick={() => handleResetMatch(m.matchId)} disabled={isProcessing} className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-50" title="リセット">
                               <RotateCcw className="w-3.5 h-3.5" />
                             </button>
                           </td>

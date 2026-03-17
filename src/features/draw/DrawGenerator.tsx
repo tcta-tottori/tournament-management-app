@@ -200,7 +200,7 @@ export default function DrawGenerator() {
               </div>
 
               {savedDraw ? (
-                <div className="bg-green-50 text-[#16a34a] px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-green-200">
+                <div className="bg-green-50 text-green-600 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-green-200">
                   <Save className="w-4 h-4" />
                   保存済みドローあり
                 </div>
@@ -225,7 +225,7 @@ export default function DrawGenerator() {
                 <button
                   onClick={handleSaveDraw}
                   disabled={!generatedDraw || isSaving}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#16a34a] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   {isSaving ? '保存中...' : '確定して保存'}
@@ -242,7 +242,7 @@ export default function DrawGenerator() {
                   ドロー生成プレビュー <span className="text-sm font-normal text-gray-500">(サイズ: {generatedDraw.drawSize})</span>
                 </h3>
               </div>
-              <div className="overflow-auto p-0 flex-1 bg-[#f6f9fc]/50">
+              <div className="overflow-auto p-0 flex-1 bg-gray-50/50">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-primary-50 text-sm font-semibold text-gray-900 sticky top-0">
                     <tr>
@@ -261,7 +261,7 @@ export default function DrawGenerator() {
                         <tr
                           key={index}
                           className={`
-                            ${d.isBye ? 'bg-primary-50/70 text-gray-500 italic' : index % 2 === 0 ? 'bg-white' : 'bg-[#f6f9fc]'}
+                            ${d.isBye ? 'bg-primary-50/70 text-gray-500 italic' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                             ${isMatchBottom ? 'border-b-2 border-border-main' : 'border-b border-border-main'}
                             hover:bg-primary-50 transition-colors
                           `}

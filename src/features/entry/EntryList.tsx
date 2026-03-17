@@ -106,7 +106,7 @@ export default function EntryList() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-6">
-      <header className="bg-white p-5 rounded-xl shadow-sm border border-border-main">
+      <header className="bg-white p-5 rounded-xl card-tottori">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -123,7 +123,7 @@ export default function EntryList() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* 左ペイン: 種目管理 */}
         <div className="col-span-1 space-y-4">
-          <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+          <div className="bg-white rounded-xl card-tottori overflow-hidden">
             <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex justify-between items-center">
               <h2 className="font-bold text-primary-600">種目 (Events)</h2>
               <button
@@ -180,7 +180,7 @@ export default function EntryList() {
                       >
                         <span className="truncate pr-2">{event.name}</span>
                         {selectedEventId === event.eventId && (
-                          <span className="shrink-0 text-[#dc2626] md:opacity-0 md:group-hover:opacity-100 hover:bg-red-100 p-1 rounded"
+                          <span className="shrink-0 text-red-600 md:opacity-0 md:group-hover:opacity-100 hover:bg-red-100 p-1 rounded"
                                 onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id!, event.eventId); }}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </span>
@@ -196,7 +196,7 @@ export default function EntryList() {
 
         {/* 右ペイン: エントリー一覧 */}
         <div className="col-span-1 md:col-span-3">
-          <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden h-[600px] flex flex-col">
+          <div className="bg-white rounded-xl card-tottori overflow-hidden h-[calc(100vh-280px)] md:h-[600px] flex flex-col">
             <div className="bg-primary-50 px-4 py-3 border-b-2 border-border-main flex justify-between items-center">
               <h2 className="font-bold text-gray-900">
                 {selectedEventId ? `エントリー一覧 - ${(events?.find(e => e.eventId === selectedEventId))?.name}` : '種目を選択してください'}
@@ -208,7 +208,7 @@ export default function EntryList() {
               )}
             </div>
 
-            <div className="flex-1 overflow-auto bg-[#f6f9fc]/50 p-4">
+            <div className="flex-1 overflow-auto bg-gray-50/50 p-4">
               {!selectedEventId ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-500">
                   <Settings className="w-12 h-12 mb-3 opacity-20" />
@@ -242,7 +242,7 @@ export default function EntryList() {
                               )}
                               <span className="truncate whitespace-nowrap max-w-[200px]">{activePlayer?.name || '不明な選手'}</span>
                               {entry.status === 'withdrawn' && (
-                                <span className="text-[10px] bg-red-100 text-[#dc2626] px-1.5 py-0.5 rounded uppercase font-semibold">WD</span>
+                                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-semibold">WD</span>
                               )}
                             </div>
                             <div className="text-xs text-gray-500 mt-0.5">
@@ -284,7 +284,7 @@ export default function EntryList() {
                             </button>
                             <button
                               onClick={() => handleDeleteEntry(entry.id!)}
-                              className="p-1.5 text-[#dc2626] hover:bg-red-50 rounded-md transition-colors"
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
                               title="エントリー削除"
                             >
                               <Trash2 className="w-4 h-4" />

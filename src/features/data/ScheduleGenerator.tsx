@@ -239,9 +239,9 @@ export default function ScheduleGenerator() {
             value={courtNamesInput}
             onChange={e => setCourtNamesInput(e.target.value)}
             placeholder="1,2,3,4,5,6"
-            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-ocean focus:ring-[3px] focus:ring-ocean/15 outline-none"
           />
-          <p className="text-[10px] text-[#9ca3af] mt-1">例: 1,2,3,4,5,6 または A-1,A-2,B-1</p>
+          <p className="text-[10px] text-gray-400 mt-1">例: 1,2,3,4,5,6 または A-1,A-2,B-1</p>
         </div>
 
         <div>
@@ -252,7 +252,7 @@ export default function ScheduleGenerator() {
             max={120}
             value={matchDuration}
             onChange={e => setMatchDuration(parseInt(e.target.value) || 40)}
-            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-ocean focus:ring-[3px] focus:ring-ocean/15 outline-none"
           />
         </div>
 
@@ -262,7 +262,7 @@ export default function ScheduleGenerator() {
             type="time"
             value={startTime}
             onChange={e => setStartTime(e.target.value)}
-            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-ocean focus:ring-[3px] focus:ring-ocean/15 outline-none"
           />
         </div>
       </div>
@@ -271,14 +271,14 @@ export default function ScheduleGenerator() {
         <button
           onClick={handleGenerate}
           disabled={isGenerating || !currentTournamentId}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#1565c0] rounded-md hover:bg-[#0d47a1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-ocean rounded-md hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Zap className="w-4 h-4" />
           {isGenerating ? '生成中...' : '自動生成'}
         </button>
 
         {!currentTournamentId && (
-          <p className="text-xs text-[#dc2626]">大会が選択されていません。</p>
+          <p className="text-xs text-red-600">大会が選択されていません。</p>
         )}
       </div>
 

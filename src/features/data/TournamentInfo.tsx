@@ -94,7 +94,7 @@ export default function TournamentInfo() {
         <p className="text-xs text-gray-500">ドロー会議システムから大会情報を取得します。</p>
         <button
           onClick={loadInfo}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-md hover:bg-[#1b5e20] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-primary-500 rounded-md hover:bg-primary-700 transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           情報を取得
@@ -111,12 +111,12 @@ export default function TournamentInfo() {
       {loaded && tournamentData && tournamentData.length > 0 && (
         <div className="space-y-3">
           {tournamentData.map((t, idx) => (
-            <div key={idx} className="bg-primary-50 rounded-lg p-3 border border-[#c8e6c9]">
+            <div key={idx} className="bg-primary-50 rounded-lg p-3 border border-primary-100">
               <h3 className="font-bold text-primary-600 text-sm mb-2 flex items-center gap-1.5">
                 <Info className="w-4 h-4" />
                 {t.name}
               </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <div>
                   <span className="text-gray-500">開催日:</span>
                   <span className="ml-1 font-medium text-gray-900">{t.date} {t.dayOfWeek && `(${t.dayOfWeek})`}</span>
@@ -174,7 +174,7 @@ export default function TournamentInfo() {
                   <td className="px-3 py-1.5 text-right text-gray-500">{s.drawSize}</td>
                   <td className="px-3 py-1.5 text-center">
                     {s.confirmed ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#16a34a] inline" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600 inline" />
                     ) : (
                       <span className="text-warning text-[10px]">未確定</span>
                     )}

@@ -101,13 +101,13 @@ export default function TournamentManager() {
               <button 
                 type="button" 
                 onClick={() => setIsAdding(false)}
-                className="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-3 py-2 text-xs text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 キャンセル
               </button>
               <button 
                 type="submit"
-                className="px-3 py-1.5 text-xs text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                className="px-3 py-2 text-xs text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 保存
               </button>
@@ -157,7 +157,7 @@ export default function TournamentManager() {
                       e.stopPropagation();
                       handleDelete(t.id!, t.tournamentId);
                     }}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

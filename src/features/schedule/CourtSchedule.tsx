@@ -93,7 +93,7 @@ export default function CourtSchedule() {
   const statusColor: Record<string, string> = {
     waiting: 'bg-gray-100 text-gray-500',
     ready: 'bg-primary-50 text-primary-500',
-    playing: 'bg-green-100 text-[#16a34a]',
+    playing: 'bg-green-100 text-green-600',
     finished: 'bg-primary-50 text-primary-600',
     walkover: 'bg-amber-100 text-warning',
   };
@@ -160,14 +160,14 @@ export default function CourtSchedule() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => c.id && handleToggleAvailable(c.id, c.isAvailable)}
-                        className={`w-6 h-6 rounded-full ${c.isAvailable ? 'bg-[#16a34a]' : 'bg-danger'}`}
+                        className={`w-8 h-8 rounded-full ${c.isAvailable ? 'bg-green-600' : 'bg-danger'}`}
                         title={c.isAvailable ? '利用可能' : '使用不可'}
                       />
                       <span className="font-medium text-sm">{c.name}</span>
                     </div>
                     <button
                       onClick={() => c.id && handleDeleteCourt(c.id)}
-                      className="text-gray-500 hover:text-[#dc2626]"
+                      className="p-2 text-gray-500 hover:text-red-600"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -217,7 +217,7 @@ export default function CourtSchedule() {
                   <div key={c.courtId} className={`bg-white rounded-xl shadow-sm border-2 ${c.isAvailable ? 'border-border-main' : 'border-red-200 opacity-60'} flex flex-col`}>
                     <div className="px-4 py-3 border-b border-border-main flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${c.isAvailable ? 'bg-[#16a34a]' : 'bg-danger'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full ${c.isAvailable ? 'bg-green-600' : 'bg-danger'}`} />
                         <h3 className="font-bold text-gray-900">{c.name}</h3>
                       </div>
                       <span className="text-xs text-gray-500">{courtMatches.length}試合</span>
