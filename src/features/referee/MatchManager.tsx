@@ -280,397 +280,360 @@ export default function MatchManager() {
     const tournamentName = tournament?.name || '';
     const tournamentDate = tournament?.date || '';
     const games = currentEvent?.gameRules?.games ?? 6;
-    const gameMethod = `${games}ゲームマッチ \n（${games}-${games}タイブレーク）`;
+    const gameMethod = `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
 
     const roundName = (round: number) => getRoundName(round, totalRounds);
+
+    // Excel column structure: 38 columns (A-AL)
+    // Col A = 3.29 width, Cols B-AL = 8.43 width each (37 cols)
+    // Total = 3.29 + 37*8.43 = 315.20
+    // Percentage: A = 1.044%, each B-AL = 2.674%
+    // We define 38 <col> elements matching the Excel columns exactly.
+    const colA = (3.29 / 315.20 * 100).toFixed(3); // ~1.044%
+    const colN = (8.43 / 315.20 * 100).toFixed(3); // ~2.674%
+
+    const colgroup = `<colgroup>
+      <col style="width:${colA}%">` + /* col A (1) */
+      Array.from({length: 37}, () => `<col style="width:${colN}%">`).join('') + /* cols B-AL (2-38) */
+      `</colgroup>`;
+
+    // Row heights from Excel (in points, converted proportionally).
+    // Total: 16.5+21+22.5+18.75*4+37.5*2+7.5+18.75*2+16.5*6+39.75*3+25.5 = 418.5pt
+    // We'll use these as fixed heights summing to 190mm.
+    // Scale factor: 190mm / 418.5pt
+    const rowHeights = [16.5, 21, 22.5, 18.75, 18.75, 18.75, 18.75, 37.5, 37.5, 7.5, 18.75, 18.75, 16.5, 16.5, 16.5, 16.5, 16.5, 16.5, 39.75, 39.75, 39.75, 25.5];
+    const totalPt = rowHeights.reduce((a, b) => a + b, 0);
+    const rh = rowHeights.map(h => (h / totalPt * 190).toFixed(2) + 'mm');
+    // rh[0]=R1, rh[1]=R2, ... rh[21]=R22
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>審判用紙 - ${eventName}</title>
 <style>
   @page { size: A4 landscape; margin: 5mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'MS Gothic', 'ＭＳ ゴシック', 'Yu Gothic', 'Hiragino Sans', sans-serif; color: #000; }
+  body {
+    font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', 'Hiragino Sans', monospace;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .sheet {
-    page-break-after: always;
     width: 287mm;
     height: 190mm;
-    padding: 0;
+    page-break-after: always;
+    overflow: hidden;
     position: relative;
   }
   .sheet:last-child { page-break-after: auto; }
 
-  /* メインテーブル - Excel構造を忠実に再現 */
   .ref-table {
     width: 100%;
     height: 100%;
-    border-collapse: collapse;
     table-layout: fixed;
+    border-collapse: collapse;
   }
-  .ref-table td, .ref-table th {
-    vertical-align: middle;
+
+  .ref-table td {
     padding: 0;
+    margin: 0;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  /* Row 1-2: タイトル「審　判　用　紙」 */
-  .title-cell {
-    text-align: center;
-    font-size: 32px;
-    font-weight: bold;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    height: 37px;
-    letter-spacing: 0.5em;
-  }
+  /* ====== Shared font families ====== */
+  .fg { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', monospace; }
+  .fp { font-family: 'MS PGothic', 'MS Pゴシック', 'Yu Gothic', sans-serif; }
+  .ft { font-family: 'Times New Roman', serif; }
 
-  /* Row 3: 大会名 + 日付 */
-  .tourney-name {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border-bottom: 2px solid #000;
-    height: 22px;
-  }
-  .tourney-date {
-    text-align: right;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border-bottom: 2px solid #000;
-    padding-right: 4px;
-    height: 22px;
-  }
-
-  /* Row 4-7: 種目/回戦 */
-  .label-cell {
-    text-align: center;
-    font-size: 16px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-    border-top: 2px solid #000;
-  }
-  .event-cell {
-    text-align: center;
-    font-size: 19px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-top: 2px solid #000;
-  }
-  .round-label-cell {
-    text-align: center;
-    font-size: 16px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-top: 2px solid #000;
-  }
-  .round-value-cell {
-    text-align: center;
-    font-size: 24px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-top: 2px solid #000;
-    border-right: 2px solid #000;
-  }
-
-  /* Row 8-9: コートNo/試合方法/開始時間 */
-  .court-label {
-    text-align: center;
-    font-size: 16px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-    border-bottom: 2px solid #000;
-  }
-  .court-value {
-    text-align: center;
-    font-size: 36px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-  }
-  .method-label {
-    text-align: center;
-    font-size: 16px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-  }
-  .method-value {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-    white-space: pre-line;
-    line-height: 1.3;
-  }
-  .time-label {
-    text-align: center;
-    font-size: 16px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-  }
-  .time-value {
-    text-align: center;
-    font-size: 22px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-    border-right: 2px solid #000;
-  }
-
-  /* Row 10: 空行 */
-  .spacer-row td { height: 7px; }
-
-  /* Row 11-12: エントリーNo */
-  .entry-label {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-    border-top: 2px solid #000;
-  }
-  .entry-no-label {
-    text-align: right;
-    font-size: 20px;
-    font-family: 'Times New Roman', serif;
-    border-top: 2px solid #000;
-    border-bottom: 1px solid #000;
-    border-left: 1px solid #000;
-    padding-right: 2px;
-  }
-  .entry-no-value {
-    text-align: center;
-    font-size: 26px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border: 1px solid #000;
-    border-top: 2px solid #000;
-  }
-  .entry-no-value-right {
-    text-align: center;
-    font-size: 26px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border: 1px solid #000;
-    border-top: 2px solid #000;
-    border-right: 2px solid #000;
-  }
-
-  /* Row 13-18: 選手氏名 + 所属 */
-  .name-label {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-  }
-  .player-name-cell {
-    text-align: center;
-    font-size: 28px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border: 1px solid #000;
-    white-space: nowrap;
-  }
-  .player-name-right {
-    text-align: center;
-    font-size: 28px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border: 1px solid #000;
-    border-right: 2px solid #000;
-    white-space: nowrap;
-  }
-  .aff-open {
-    text-align: right;
-    font-size: 20px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border-left: 1px solid #000;
-    border-bottom: 1px solid #000;
-    padding-top: 0;
-  }
-  .aff-name {
-    text-align: center;
-    font-size: 20px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border-bottom: 1px solid #000;
-    padding-top: 0;
-  }
-  .aff-close {
-    text-align: left;
-    font-size: 20px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border-right: 1px solid #000;
-    border-bottom: 1px solid #000;
-    padding-top: 0;
-  }
-  .aff-close-right {
-    text-align: left;
-    font-size: 20px;
-    font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif;
-    border-right: 2px solid #000;
-    border-bottom: 1px solid #000;
-    padding-top: 0;
-  }
-
-  /* Row 19-21: スコア + TB */
-  .score-label {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-  }
-  .score-area {
-    border: 1px solid #000;
-    height: 80px;
-    font-size: 24px;
-    text-align: center;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-  }
-  .score-dash {
-    text-align: center;
-    font-size: 24px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border-top: 1px solid #000;
-  }
-  .score-area-right {
-    border: 1px solid #000;
-    border-right: 2px solid #000;
-    height: 80px;
-  }
-  .tb-label {
-    text-align: center;
-    font-size: 14px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border: 1px solid #000;
-    border-left: 2px solid #000;
-    border-bottom: 2px solid #000;
-    height: 40px;
-  }
-  .tb-area {
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-    height: 40px;
-  }
-  .tb-paren {
-    text-align: center;
-    font-size: 12px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border-bottom: 2px solid #000;
-    height: 40px;
-  }
-  .tb-area-right {
-    border: 1px solid #000;
-    border-bottom: 2px solid #000;
-    border-right: 2px solid #000;
-    height: 40px;
-  }
-
-  /* Row 22: フッター */
-  .footer-cell {
-    text-align: right;
-    font-size: 12px;
-    font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
-    border-top: 2px solid #000;
-    padding-right: 4px;
-    height: 25px;
-  }
+  /* ====== Border helpers ====== */
+  .bt  { border-top: 1px solid #000; }
+  .bb  { border-bottom: 1px solid #000; }
+  .bl  { border-left: 1px solid #000; }
+  .br  { border-right: 1px solid #000; }
+  .bt2 { border-top: 2px solid #000; }
+  .bb2 { border-bottom: 2px solid #000; }
+  .bl2 { border-left: 2px solid #000; }
+  .br2 { border-right: 2px solid #000; }
+  .ba  { border: 1px solid #000; }
 </style></head><body>
 ${printableMatches.map(m => {
       const rName = roundName(m.round);
       const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
       const courtDisplay = courtObj?.name || '';
 
+      // Find entry numbers: extract numeric part from entryId (e.g. "EN-001" -> 1)
+      // or use draw slot position if available
+      const getEntryNo = (entryId: string | null): string => {
+        if (!entryId) return '';
+        // Try to find position from draw slots
+        if (drawData) {
+          const slot = drawData.slots.find(s => s.entryId === entryId);
+          if (slot) return String(slot.position);
+        }
+        // Fallback: extract number from entryId
+        const numMatch = entryId.match(/(\d+)/);
+        return numMatch ? String(parseInt(numMatch[1], 10)) : '';
+      };
+      const entryNo1 = getEntryNo(m.player1EntryId);
+      const entryNo2 = getEntryNo(m.player2EntryId);
+
       return `
 <div class="sheet">
   <table class="ref-table">
-    <!-- Row 1-2: タイトル -->
-    <colgroup>
-      <col style="width:8.7%"><!-- A-F (6cols/38 ≈ 15.8% but A is narrow) -->
-      <col style="width:2.3%">
-      <col style="width:2.3%">
-      <col style="width:2.3%">
-      <col style="width:2.3%">
-      <col style="width:2.3%">
-      <col style="width:41.2%"><!-- G-S merged for event name -->
-      <col style="width:15.8%"><!-- T-Y for round label -->
-      <col style="width:22.6%"><!-- Z-AL for round value -->
-    </colgroup>
-    <tr>
-      <td colspan="9" class="title-cell" style="height:37px;">審　判　用　紙</td>
+    ${colgroup}
+
+    <!-- Row 1: Title top half (A1:AL2 merged, spans rows 1-2) -->
+    <tr style="height:${rh[0]};">
+      <td colspan="38" rowspan="2"
+          class="fg" style="text-align:center; font-size:32px; font-weight:bold; letter-spacing:0.5em; height:calc(${rh[0]} + ${rh[1]});">
+        審　判　用　紙
+      </td>
     </tr>
-    <!-- Row 3: 大会名 + 日付 -->
-    <tr>
-      <td style="width:18.4%;height:22px;"></td>
-      <td colspan="6" class="tourney-name">(${tournamentName})</td>
-      <td colspan="2" class="tourney-date">${tournamentDate}</td>
+
+    <!-- Row 2: consumed by rowspan -->
+    <tr style="height:${rh[1]};"></tr>
+
+    <!-- Row 3: Tournament name (H3:AD3) + Date (AE3:AL3) -->
+    <tr style="height:${rh[2]};">
+      <td colspan="7" style="height:${rh[2]};"></td>
+      <td colspan="23" class="fg bb2" style="text-align:center; font-size:14px;">
+        (${tournamentName})
+      </td>
+      <td colspan="8" class="fg bb2" style="text-align:right; font-size:14px; padding-right:4px;">
+        ${tournamentDate}
+      </td>
     </tr>
-    <!-- Row 4-7: 種目 / 回戦 -->
-    <tr>
-      <td rowspan="4" class="label-cell" style="height:75px;">種　目</td>
-      <td rowspan="4" colspan="5" style="display:none;"></td>
-      <td rowspan="4" class="event-cell">${eventName}</td>
-      <td rowspan="4" class="round-label-cell">回　戦</td>
-      <td rowspan="4" class="round-value-cell">${rName}</td>
+
+    <!-- Row 4: 種目/Event/回戦/Round (rows 4-7 merged) -->
+    <tr style="height:${rh[3]};">
+      <td colspan="6" rowspan="4"
+          class="fg bl2 bt2 br bb"
+          style="text-align:center; font-size:16px; height:calc(${rh[3]} + ${rh[4]} + ${rh[5]} + ${rh[6]});">
+        種　目
+      </td>
+      <td colspan="13" rowspan="4"
+          class="fg bt2 br bb"
+          style="text-align:center; font-size:19px; white-space:nowrap;">
+        ${eventName}
+      </td>
+      <td colspan="6" rowspan="4"
+          class="fg bt2 br bb"
+          style="text-align:center; font-size:16px;">
+        回　戦
+      </td>
+      <td colspan="13" rowspan="4"
+          class="fg bt2 br2 bb"
+          style="text-align:center; font-size:24px;">
+        ${rName}
+      </td>
     </tr>
-    <tr></tr><tr></tr><tr></tr>
-    <!-- Row 8-9: コートNo / 試合方法 / 開始時間 -->
-    <tr>
-      <td rowspan="2" class="court-label" style="height:75px;">コート№</td>
-      <td rowspan="2" colspan="1" class="court-value">${courtDisplay}</td>
-      <td rowspan="2" colspan="1" class="method-label">試合方法</td>
-      <td rowspan="2" colspan="2" class="method-value">${gameMethod}</td>
-      <td rowspan="2" colspan="1" class="time-label">開始時間</td>
-      <td rowspan="2" colspan="2" class="time-value">${m.scheduledTime || ''}</td>
+    <tr style="height:${rh[4]};"></tr>
+    <tr style="height:${rh[5]};"></tr>
+    <tr style="height:${rh[6]};"></tr>
+
+    <!-- Row 8: Court/Method/Time (rows 8-9 merged) -->
+    <tr style="height:${rh[7]};">
+      <td colspan="6" rowspan="2"
+          class="fg bl2 bt br bb2"
+          style="text-align:center; font-size:16px; height:calc(${rh[7]} + ${rh[8]});">
+        コート№
+      </td>
+      <td colspan="6" rowspan="2"
+          class="fg bt br bb2"
+          style="text-align:center; font-size:36px; font-weight:bold;">
+        ${courtDisplay}
+      </td>
+      <td colspan="5" rowspan="2"
+          class="fg bt br bb2"
+          style="text-align:center; font-size:16px;">
+        試合方法
+      </td>
+      <td colspan="9" rowspan="2"
+          class="fg bt br bb2"
+          style="text-align:center; font-size:14px; white-space:pre-line; line-height:1.3;">
+        ${gameMethod}
+      </td>
+      <td colspan="5" rowspan="2"
+          class="fg bt br bb2"
+          style="text-align:center; font-size:16px;">
+        開始時間
+      </td>
+      <td colspan="7" rowspan="2"
+          class="fg bt br2 bb2"
+          style="text-align:center; font-size:22px; font-weight:bold;">
+        ${m.scheduledTime || ''}
+      </td>
     </tr>
-    <tr></tr>
-    <!-- Row 10: 空行 -->
-    <tr class="spacer-row"><td colspan="9"></td></tr>
-    <!-- Row 11-12: エントリーNo -->
-    <tr>
-      <td rowspan="2" class="entry-label" style="height:37px;">エントリー№</td>
-      <td rowspan="2" class="entry-no-label">No.</td>
-      <td rowspan="2" colspan="2" class="entry-no-value">${m.matchOrder}</td>
-      <td rowspan="2" style="border-top:2px solid #000;border-bottom:1px solid #000;"></td>
-      <td rowspan="2" class="entry-no-label">No.</td>
-      <td rowspan="2" class="entry-no-value" style="border-right:0;">&nbsp;</td>
-      <td rowspan="2" colspan="2" class="entry-no-value-right">&nbsp;</td>
+    <tr style="height:${rh[8]};"></tr>
+
+    <!-- Row 10: Spacer -->
+    <tr style="height:${rh[9]};">
+      <td colspan="38" style="height:${rh[9]};"></td>
     </tr>
-    <tr></tr>
-    <!-- Row 13-16: 選手氏名 -->
-    <tr>
-      <td rowspan="6" class="name-label">選 手 氏 名</td>
-      <td rowspan="4" colspan="4" class="player-name-cell">${m.player1Name}</td>
-      <td rowspan="4" colspan="4" class="player-name-right">${m.player2Name}</td>
+
+    <!-- Row 11: Entry numbers (rows 11-12 merged) -->
+    <tr style="height:${rh[10]};">
+      <td colspan="6" rowspan="2"
+          class="fg bl2 bt2 br bb"
+          style="text-align:center; font-size:14px; height:calc(${rh[10]} + ${rh[11]});">
+        エントリー№
+      </td>
+      <td colspan="4" rowspan="2"
+          class="ft bt2 bb"
+          style="text-align:right; font-size:20px; padding-right:2px; border-left:1px solid #000;">
+        No.
+      </td>
+      <td colspan="12" rowspan="2"
+          class="fp bt2 bb br"
+          style="text-align:center; font-size:26px;">
+        ${entryNo1}
+      </td>
+      <td colspan="4" rowspan="2"
+          class="ft bt2 bb"
+          style="text-align:right; font-size:20px; padding-right:2px; border-left:1px solid #000;">
+        No.
+      </td>
+      <td colspan="12" rowspan="2"
+          class="fp bt2 bb br2"
+          style="text-align:center; font-size:26px;">
+        ${entryNo2}
+      </td>
     </tr>
-    <tr></tr><tr></tr><tr></tr>
-    <!-- Row 17-18: 所属 -->
-    <tr>
-      <td class="aff-open">（</td>
-      <td colspan="2" class="aff-name">${m.player1Affiliation || ''}</td>
-      <td class="aff-close">）</td>
-      <td class="aff-open">（</td>
-      <td colspan="2" class="aff-name">${m.player2Affiliation || ''}</td>
-      <td class="aff-close-right">）</td>
+    <tr style="height:${rh[11]};"></tr>
+
+    <!-- Row 13: Player names (rows 13-18, label spans all 6) -->
+    <tr style="height:${rh[12]};">
+      <td colspan="6" rowspan="6"
+          class="fg bl2 bt br bb"
+          style="text-align:center; font-size:14px; height:calc(${rh[12]} + ${rh[13]} + ${rh[14]} + ${rh[15]} + ${rh[16]} + ${rh[17]});">
+        選 手 氏 名
+      </td>
+      <!-- Player 1 name: G13:V16 (cols 7-22, rows 13-16) -->
+      <td colspan="16" rowspan="4"
+          class="fp bt br"
+          style="text-align:center; font-size:28px; white-space:nowrap; height:calc(${rh[12]} + ${rh[13]} + ${rh[14]} + ${rh[15]});">
+        ${m.player1Name}
+      </td>
+      <!-- Player 2 name: W13:AL16 (cols 23-38, rows 13-16) -->
+      <td colspan="16" rowspan="4"
+          class="fp bt br2"
+          style="text-align:center; font-size:28px; white-space:nowrap;">
+        ${m.player2Name}
+      </td>
     </tr>
-    <tr></tr>
-    <!-- Row 19-20: スコア -->
-    <tr>
-      <td rowspan="2" class="score-label" style="height:80px;">ス　コ　ア</td>
-      <td rowspan="2" colspan="3" class="score-area"></td>
-      <td rowspan="2" class="score-dash">―</td>
-      <td rowspan="2" colspan="4" class="score-area-right"></td>
+    <tr style="height:${rh[13]};"></tr>
+    <tr style="height:${rh[14]};"></tr>
+    <tr style="height:${rh[15]};"></tr>
+
+    <!-- Row 17: Affiliations (rows 17-18) -->
+    <tr style="height:${rh[16]};">
+      <!-- Player 1 affiliation: （ G17:H18, name I17:T18, ） U17:V18 -->
+      <td colspan="2" rowspan="2"
+          class="fp bl bb"
+          style="text-align:right; font-size:20px; vertical-align:top;">
+        （
+      </td>
+      <td colspan="12" rowspan="2"
+          class="fp bb"
+          style="text-align:center; font-size:20px; vertical-align:top; white-space:nowrap;">
+        ${m.player1Affiliation || ''}
+      </td>
+      <td colspan="2" rowspan="2"
+          class="fp br bb"
+          style="text-align:left; font-size:20px; vertical-align:top;">
+        ）
+      </td>
+      <!-- Player 2 affiliation: （ W17:X18, name Y17:AJ18, ） AK17:AL18 -->
+      <td colspan="2" rowspan="2"
+          class="fp bl bb"
+          style="text-align:right; font-size:20px; vertical-align:top;">
+        （
+      </td>
+      <td colspan="12" rowspan="2"
+          class="fp bb"
+          style="text-align:center; font-size:20px; vertical-align:top; white-space:nowrap;">
+        ${m.player2Affiliation || ''}
+      </td>
+      <td colspan="2" rowspan="2"
+          class="fp br2 bb"
+          style="text-align:left; font-size:20px; vertical-align:top;">
+        ）
+      </td>
     </tr>
-    <tr></tr>
-    <!-- Row 21: TB -->
-    <tr>
-      <td class="tb-label">（ＴＢ）</td>
-      <td colspan="2" class="tb-area"></td>
-      <td colspan="2" class="tb-paren">（　　　）</td>
-      <td colspan="4" class="tb-area-right"></td>
+    <tr style="height:${rh[17]};"></tr>
+
+    <!-- Row 19: Score (rows 19-20 merged) -->
+    <tr style="height:${rh[18]};">
+      <td colspan="6" rowspan="2"
+          class="fg bl2 bt br"
+          style="text-align:center; font-size:14px; height:calc(${rh[18]} + ${rh[19]});">
+        ス　コ　ア
+      </td>
+      <!-- Score area left: G19:U20 (cols 7-21) -->
+      <td colspan="15" rowspan="2"
+          class="fg bt bl br"
+          style="text-align:center; font-size:24px;">
+      </td>
+      <!-- Dash: V19:W20 (cols 22-23) -->
+      <td colspan="2" rowspan="2"
+          class="fg bt"
+          style="text-align:center; font-size:24px;">
+        ―
+      </td>
+      <!-- Score area right: X19:AL20 (cols 24-38) -->
+      <td colspan="15" rowspan="2"
+          class="fg bt bl br2"
+          style="text-align:center; font-size:24px;">
+      </td>
     </tr>
-    <!-- Row 22: フッター -->
-    <tr>
-      <td colspan="5"></td>
-      <td colspan="4" class="footer-cell">鳥取市テニス協会</td>
+    <tr style="height:${rh[19]};"></tr>
+
+    <!-- Row 21: Tiebreak -->
+    <tr style="height:${rh[20]};">
+      <td colspan="6"
+          class="fg bl2 bt br bb2"
+          style="text-align:center; font-size:14px; height:${rh[20]};">
+        （ＴＢ）
+      </td>
+      <!-- TB area left: cols 7-19 (13 cols) -->
+      <td colspan="13"
+          class="fg bl br bb2"
+          style="height:${rh[20]};">
+      </td>
+      <!-- Paren area: T21:U21 (cols 20-21) -->
+      <td colspan="2"
+          class="fg bb2"
+          style="text-align:center; font-size:12px;">
+        （
+      </td>
+      <!-- Space: V21:W21 (cols 22-23) -->
+      <td colspan="2"
+          class="fg bb2"
+          style="text-align:center; font-size:12px;">
+      </td>
+      <!-- Close paren: X21:Y21 (cols 24-25) -->
+      <td colspan="2"
+          class="fg bb2"
+          style="text-align:center; font-size:12px;">
+        ）
+      </td>
+      <!-- TB area right: cols 26-38 (13 cols) -->
+      <td colspan="13"
+          class="fg bl br2 bb2"
+          style="height:${rh[20]};">
+      </td>
+    </tr>
+
+    <!-- Row 22: Footer -->
+    <tr style="height:${rh[21]};">
+      <td colspan="25" style="height:${rh[21]};"></td>
+      <td colspan="13"
+          class="fg bt2"
+          style="text-align:right; font-size:12px; padding-right:4px;">
+        鳥取市テニス協会
+      </td>
     </tr>
   </table>
 </div>`;

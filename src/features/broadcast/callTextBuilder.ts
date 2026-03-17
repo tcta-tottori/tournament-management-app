@@ -1,31 +1,61 @@
 import type { MatchCall } from './types';
 
-export function buildCallText(match: MatchCall, courtNumber: string, startTime: string): string {
+/**
+ * 所属名をふりがなに変換する（マップにあれば）
+ */
+function resolveAffiliation(affiliation: string, furiganaMap: Record<string, string>): string {
+  if (!affiliation) return '';
+  const reading = furiganaMap[affiliation];
+  return reading || affiliation;
+}
+
+/**
+ * テキストから "#" を除去する
+ */
+function removeHash(text: string): string {
+  return text.replace(/#/g, '');
+}
+
+export function buildCallText(
+  match: MatchCall,
+  courtNumber: string,
+  startTime: string,
+  affiliationFuriganaMap: Record<string, string> = {},
+): string {
   const younger = match.numberA < match.numberB
     ? { num: match.numberA, name: match.nameA }
     : { num: match.numberB, name: match.nameB };
 
   const parts: string[] = [];
 
-  // 種目・回線
-  parts.push(`${match.eventName}、${match.round}。`);
+  // 種目・回線（#を除去）
+  parts.push(`${match.eventName}、${removeHash(match.round)}。`);
 
-  // 選手情報
+  // 選手情報（所属はふりがなマップで変換）
   if (match.type === 'doubles') {
-    parts.push(`${match.numberA}番、${match.nameA}さん、${match.pairNameA}さん ペア、${match.affA}。`);
-    parts.push(`${match.numberB}番、${match.nameB}さん、${match.pairNameB}さん ペア、${match.affB}。`);
+    const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
+    const pairAffA = resolveAffiliation(match.pairAffA || '', affiliationFuriganaMap);
+    const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
+    const pairAffB = resolveAffiliation(match.pairAffB || '', affiliationFuriganaMap);
+    // ダブルスの所属表示：ペア所属が異なる場合は両方、同じなら1つ
+    const affTextA = pairAffA && pairAffA !== affA ? `${affA}、${pairAffA}` : affA;
+    const affTextB = pairAffB && pairAffB !== affB ? `${affB}、${pairAffB}` : affB;
+    parts.push(`${match.numberA}番、${match.nameA}さん、${match.pairNameA}さん ペア、${affTextA}。`);
+    parts.push(`${match.numberB}番、${match.nameB}さん、${match.pairNameB}さん ペア、${affTextB}。`);
   } else {
-    parts.push(`${match.numberA}番、${match.nameA}さん、${match.affA}。`);
-    parts.push(`${match.numberB}番、${match.nameB}さん、${match.affB}。`);
+    const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
+    const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
+    parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
+    parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
   }
 
-  // コート指定
+  // コート指定（「行ってください」→「おこなってください」）
   let courtText = `この試合を、${courtNumber}番コートで`;
   if (startTime) {
     const [h, m] = startTime.split(':');
     courtText += `、${parseInt(h)}時${parseInt(m)}分より`;
   }
-  courtText += '、行ってください。';
+  courtText += '、おこなってください。';
   parts.push(courtText);
 
   // ボール受け取り指示

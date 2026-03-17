@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { VoiceSettings } from './types';
 
+const MAX_REPEATS = 2; // 最大繰り返し回数（初回を除く）
+
 function selectJapaneseVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
   return (
@@ -36,11 +38,19 @@ export function useSpeechSynthesis() {
     const voice = selectJapaneseVoice();
 
     // Chrome長文バグ対策：句点で分割
-    const chunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
+    const baseChunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
+
+    // 繰り返し用に「繰り返します。」を先頭に追加したチャンク
+    const repeatChunks = ['繰り返します。', ...baseChunks];
+
+    // 繰り返し回数は最大2回（初回含め計3回）に制限
+    const effectiveRepeatCount = Math.min(settings.repeatCount, MAX_REPEATS + 1);
 
     let repeatCount = 0;
 
     function speakChunks() {
+      // 初回はbaseChunks、繰り返し時はrepeatChunksを使用
+      const chunks = repeatCount === 0 ? baseChunks : repeatChunks;
       let index = 0;
 
       function speakNext() {
@@ -50,7 +60,7 @@ export function useSpeechSynthesis() {
         }
         if (index >= chunks.length) {
           repeatCount++;
-          if (repeatCount < settings.repeatCount) {
+          if (repeatCount < effectiveRepeatCount) {
             // 繰り返し間ポーズ
             setTimeout(() => {
               if (!cancelledRef.current) speakChunks();

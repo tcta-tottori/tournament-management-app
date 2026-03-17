@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, List, Dices, Trophy,
-  ClipboardList, MonitorPlay, CalendarDays, BarChart2,
+  ClipboardList, MonitorPlay, BarChart2,
   Save, HelpCircle, MoreHorizontal, Volume2, MapPin
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -18,7 +18,6 @@ const ALL_MAIN_TABS = [
   { id: 'S-05', path: '/draw-table', label: 'ドロー表', icon: Trophy },
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
-  { id: 'S-08', path: '/schedule', label: '時間割', icon: CalendarDays },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-10', path: '/backup', label: 'バックアップ', icon: Save },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },

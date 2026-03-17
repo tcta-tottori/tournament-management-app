@@ -234,7 +234,7 @@ export default function EntryRegistration() {
     });
   };
 
-  // ===== Table-based draw view (like 抽選シート) =====
+  // ===== Table-based draw view with bracket lines =====
   const renderDrawTable = (eventId: string, slots: CheckInSlot[]) => {
     const draw = drawMap.get(eventId);
     const searchMatches = getSearchMatchSet(slots);
@@ -253,22 +253,26 @@ export default function EntryRegistration() {
     const topHalf = slots.slice(0, halfSize);
     const bottomHalf = slots.slice(halfSize);
 
-    const renderSlotRow = (slot: CheckInSlot) => {
+    // halfSlots内の相対index(0始まり)でペア判定
+    const renderSlotRow = (slot: CheckInSlot, idxInHalf: number) => {
       const isOriginalBye = slot.isBye && !slot.entry;
       const isWithdrawn = slot.entry?.status === 'withdrawn';
       const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
       const isDimmed = hasSearch && !isOriginalBye && slot.entry && !searchMatches.has(slot.drawPosition);
       const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+      const isTopOfPair = idxInHalf % 2 === 0;
+      const isBottomOfPair = idxInHalf % 2 === 1;
+      const matchNum = Math.floor(idxInHalf / 2) + 1;
 
       let rowBg = '';
       let statusBadge: React.ReactNode = null;
 
       if (isWithdrawn) {
-        rowBg = 'bg-red-50';
+        rowBg = 'bg-red-50/60';
         statusBadge = <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">BYE</span>;
       } else if (isConfirmed) {
-        rowBg = 'bg-green-50';
-        statusBadge = <span className="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">受付済</span>;
+        rowBg = 'bg-emerald-50/60';
+        statusBadge = <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">受付済</span>;
       } else if (slot.entry) {
         statusBadge = <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">未確認</span>;
       }
@@ -276,10 +280,11 @@ export default function EntryRegistration() {
       return (
         <tr
           key={`slot-${slot.drawPosition}`}
-          className={`border-b border-gray-100 transition-colors hover:bg-blue-50/30
+          className={`transition-colors hover:bg-primary-50/30
             ${rowBg}
             ${isDimmed ? 'opacity-25' : ''}
             ${isHighlighted ? 'ring-1 ring-inset ring-blue-400 bg-blue-50/50' : ''}
+            ${isBottomOfPair ? 'border-b-2 border-b-gray-200' : 'border-b border-b-gray-100'}
           `}
         >
           {/* No */}
@@ -287,20 +292,20 @@ export default function EntryRegistration() {
           {/* Seed */}
           <td className="py-2 px-1 text-center w-8">
             {slot.seed > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">{slot.seed}</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm">{slot.seed}</span>
             )}
           </td>
           {/* Name */}
-          <td className="py-2 px-2">
+          <td className="py-2 px-3">
             {isOriginalBye ? (
               <span className="text-sm text-gray-400 italic">BYE</span>
             ) : slot.entry ? (
               <button
                 onClick={() => handleCheckIn(slot)}
-                className={`text-left w-full group ${isWithdrawn ? 'cursor-pointer' : 'cursor-pointer'}`}
+                className="text-left w-full group"
                 title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
               >
-                <span className={`text-sm font-medium ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-blue-600'}`}>
+                <span className={`text-sm font-medium ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
                   {slot.playerName}
                   {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
                 </span>
@@ -318,7 +323,7 @@ export default function EntryRegistration() {
             {statusBadge}
           </td>
           {/* Actions */}
-          <td className="py-2 px-1 text-center w-12">
+          <td className="py-2 px-1 text-center w-10">
             {slot.entry && !isOriginalBye && (
               isWithdrawn ? (
                 <button
@@ -339,30 +344,72 @@ export default function EntryRegistration() {
               )
             )}
           </td>
+          {/* Bracket line */}
+          <td
+            className="w-8 p-0 relative"
+            style={{
+              borderRight: '2px solid #1b4d3e',
+              ...(isTopOfPair ? { borderBottom: '2px solid #1b4d3e' } : {}),
+              ...(isBottomOfPair ? { borderTop: '2px solid #1b4d3e' } : {}),
+            }}
+          >
+            {/* Match number label between pairs */}
+            {isTopOfPair && (
+              <span
+                className="absolute text-[9px] font-bold text-primary-600 whitespace-nowrap"
+                style={{ right: -18, top: '100%', transform: 'translateY(-50%)' }}
+              >
+                {matchNum}
+              </span>
+            )}
+          </td>
         </tr>
       );
     };
 
-    const renderHalfTable = (title: string, halfSlots: CheckInSlot[]) => (
+    const renderHalfTable = (title: string, halfSlots: CheckInSlot[], isUpper: boolean) => (
       <div className="flex-1 min-w-0">
-        <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-          <h4 className="text-xs font-bold text-gray-600 tracking-wider">{title}</h4>
-          <span className="text-[10px] text-gray-400">{halfSlots.filter(s => s.entry).length}名</span>
+        <div
+          className="px-4 py-2.5 border-b-2 flex items-center justify-between"
+          style={{
+            background: isUpper
+              ? 'linear-gradient(135deg, #f0fdf4, #ecfdf5)'
+              : 'linear-gradient(135deg, #eff6ff, #eef2ff)',
+            borderBottomColor: isUpper ? '#86efac' : '#93c5fd',
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black text-white shadow-sm"
+              style={{ background: isUpper ? '#16a34a' : '#2563eb' }}
+            >
+              {isUpper ? '上' : '下'}
+            </span>
+            <h4 className="text-sm font-bold" style={{ color: isUpper ? '#15803d' : '#1d4ed8' }}>
+              {title}
+            </h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500 font-medium">
+              {halfSlots.filter(s => s.entry && s.entry.status !== 'withdrawn').length}名
+            </span>
+          </div>
         </div>
-        <div className="overflow-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
             <thead>
-              <tr className="border-b-2 border-gray-200">
-                <th className="py-1.5 px-2 text-[10px] font-semibold text-gray-500 w-10 text-center">No</th>
-                <th className="py-1.5 px-1 text-[10px] font-semibold text-gray-500 w-8"></th>
-                <th className="py-1.5 px-2 text-[10px] font-semibold text-gray-500">氏名</th>
-                <th className="py-1.5 px-2 text-[10px] font-semibold text-gray-500 hidden sm:table-cell">所属</th>
-                <th className="py-1.5 px-2 text-[10px] font-semibold text-gray-500 w-16 text-center">状態</th>
-                <th className="py-1.5 px-1 text-[10px] font-semibold text-gray-500 w-12 text-center">操作</th>
+              <tr className="bg-gray-50/80">
+                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 w-10 text-center border-b-2 border-gray-200">No</th>
+                <th className="py-2 px-1 text-[10px] font-semibold text-gray-500 w-8 text-center border-b-2 border-gray-200">S</th>
+                <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border-b-2 border-gray-200">氏名</th>
+                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 hidden sm:table-cell border-b-2 border-gray-200">所属</th>
+                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 w-16 text-center border-b-2 border-gray-200">状態</th>
+                <th className="py-2 px-1 text-[10px] font-semibold text-gray-500 w-10 text-center border-b-2 border-gray-200">操作</th>
+                <th className="py-2 w-8 border-b-2 border-gray-200"></th>
               </tr>
             </thead>
             <tbody>
-              {halfSlots.map(renderSlotRow)}
+              {halfSlots.map((slot, idx) => renderSlotRow(slot, idx))}
             </tbody>
           </table>
         </div>
@@ -371,19 +418,30 @@ export default function EntryRegistration() {
 
     return (
       <div>
-        {/* Draw size info */}
+        {/* Draw size info bar */}
         {draw && (
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-3 text-xs text-gray-500">
-            <span>ドローサイズ: <strong className="text-gray-700">{draw.drawSize}</strong></span>
-            <span>エントリー: <strong className="text-gray-700">{slots.filter(s => s.entry && !s.isBye).length}</strong></span>
-            <span>BYE: <strong className="text-gray-700">{slots.filter(s => s.isBye || (s.entry?.status === 'withdrawn')).length}</strong></span>
+          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
+            <span className="flex items-center gap-1.5 text-gray-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+              ドロー <strong className="text-gray-800">{draw.drawSize}</strong>
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              エントリー <strong className="text-gray-800">{slots.filter(s => s.entry && !s.isBye).length}</strong>
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              BYE <strong className="text-gray-800">{slots.filter(s => s.isBye || (s.entry?.status === 'withdrawn')).length}</strong>
+            </span>
           </div>
         )}
 
         {/* Two-column table layout (top half / bottom half) */}
-        <div className="flex flex-col lg:flex-row lg:divide-x divide-gray-200">
-          {renderHalfTable('上の山', topHalf)}
-          {renderHalfTable('下の山', bottomHalf)}
+        <div className="flex flex-col lg:flex-row">
+          {renderHalfTable('上の山', topHalf, true)}
+          <div className="hidden lg:block w-px bg-gray-200" />
+          <div className="lg:hidden h-px bg-gray-200" />
+          {renderHalfTable('下の山', bottomHalf, false)}
         </div>
       </div>
     );
@@ -576,7 +634,7 @@ export default function EntryRegistration() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto space-y-4 min-h-0 px-1">
         {showAllEvents ? (
           events.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">

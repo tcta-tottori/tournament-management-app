@@ -1,6 +1,7 @@
-import { Database as DatabaseIcon, CalendarDays, Info, Zap } from 'lucide-react';
+import { Database as DatabaseIcon, CalendarDays, Info, Zap, MapPin } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import FuriganaManager from './FuriganaManager';
+import AffiliationFuriganaManager from './AffiliationFuriganaManager';
 import DataImport from './DrawMeetingImport';
 import DataSync from './DataSync';
 import ScheduleImport from './ScheduleImport';
@@ -91,6 +92,17 @@ export default function DataManagement() {
         </div>
         <div className="p-5">
            <FuriganaManager />
+        </div>
+      </section>
+
+      {/* 所属ふりがな管理パネル */}
+      <section className="mt-6 bg-white rounded-xl card-tottori border border-border-main overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-primary-500" />
+          <h2 className="font-semibold text-primary-600">所属ふりがな管理</h2>
+        </div>
+        <div className="p-5">
+          <AffiliationFuriganaManager />
         </div>
       </section>
     </div>

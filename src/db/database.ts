@@ -132,6 +132,17 @@ export interface Court {
 }
 
 // ---------------------------
+// 9. 所属ふりがな辞書 (AffiliationFurigana)
+// 所属名（団体・クラブ名）のふりがな読みを保持
+// ---------------------------
+export interface AffiliationFurigana {
+  id?: number;
+  name: string;        // 所属名（漢字） e.g. "鳥取グリーンTC"
+  furigana: string;    // ふりがな e.g. "とっとりグリーンティーシー"
+  updatedAt: number;
+}
+
+// ---------------------------
 // データベースクラス定義
 // ---------------------------
 const db = new Dexie('TennisTournamentDB') as Dexie & {
@@ -143,6 +154,7 @@ const db = new Dexie('TennisTournamentDB') as Dexie & {
   draws: EntityTable<Draw, 'id'>;
   matches: EntityTable<Match, 'id'>;
   courts: EntityTable<Court, 'id'>;
+  affiliationFurigana: EntityTable<AffiliationFurigana, 'id'>;
 };
 
 // スキーマのバージョン定義
@@ -161,6 +173,10 @@ db.version(2).stores({
 db.version(3).stores({
   matches: '++id, eventId, matchId, round, status, courtId',
   courts: '++id, tournamentId, courtId'
+});
+
+db.version(4).stores({
+  affiliationFurigana: '++id, &name'
 });
 
 export { db };

@@ -117,6 +117,19 @@ export default function BroadcastPanel() {
     [currentTournamentId]
   ) || [];
 
+  // 所属ふりがなマップを取得
+  const affiliationFuriganaMap = useLiveQuery(
+    async () => {
+      const entries = await db.affiliationFurigana.toArray();
+      const map: Record<string, string> = {};
+      for (const entry of entries) {
+        map[entry.name] = entry.furigana;
+      }
+      return map;
+    },
+    []
+  ) || {};
+
   // データベースから試合データを読み込む
   const handleLoadFromDB = useCallback(async () => {
     if (!currentTournamentId) {
@@ -296,7 +309,7 @@ export default function BroadcastPanel() {
   const handleCall = useCallback((match: MatchCall) => {
     if (!match.courtNumber) return;
 
-    const text = buildCallText(match, match.courtNumber, match.startTime);
+    const text = buildCallText(match, match.courtNumber, match.startTime, affiliationFuriganaMap);
     setSpeakingMatchId(match.id);
     setMatches(prev => prev.map(m => m.id === match.id ? { ...m, status: 'speaking' as const } : m));
 
@@ -314,7 +327,7 @@ export default function BroadcastPanel() {
         matchId: match.id,
       }, ...prev]);
     });
-  }, [settings, speak]);
+  }, [settings, speak, affiliationFuriganaMap]);
 
   // 再コール
   const handleRecall = useCallback((match: MatchCall) => {
