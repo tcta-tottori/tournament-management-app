@@ -1,8 +1,9 @@
-import { Database as DatabaseIcon } from 'lucide-react';
+import { Database as DatabaseIcon, CalendarDays } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import FuriganaManager from './FuriganaManager';
 import DataImport from './DrawMeetingImport';
 import DataSync from './DataSync';
+import ScheduleImport from './ScheduleImport';
 
 export default function DataManagement() {
   return (
@@ -46,6 +47,17 @@ export default function DataManagement() {
           </div>
         </section>
       </div>
+
+      {/* 時間割インポートパネル */}
+      <section className="mt-6 bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div className="bg-[#e3f2fd] px-4 py-3 border-b border-[#e0e7ef] flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-[#1565c0]" />
+          <h2 className="font-semibold text-[#0d47a1]">時間割インポート</h2>
+        </div>
+        <div className="p-5">
+          <ScheduleImport />
+        </div>
+      </section>
 
       {/* ふりがなDB管理パネル */}
       <section className="mt-6 bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
