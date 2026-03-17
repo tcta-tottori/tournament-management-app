@@ -62,7 +62,8 @@ export default function MatchManager() {
     setIsGenerating(true);
 
     try {
-      const slots = drawData.slots;
+      // ドロー表のposition順にソートして正しい対戦ペアを生成
+      const slots = [...drawData.slots].sort((a, b) => a.position - b.position);
       const newMatches: Omit<Match, 'id'>[] = [];
       let matchOrder = 1;
 
