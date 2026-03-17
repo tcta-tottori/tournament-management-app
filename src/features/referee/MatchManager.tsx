@@ -230,8 +230,8 @@ export default function MatchManager() {
       updatedAt: Date.now(),
     });
 
-    // 勝者を次のラウンドに進出させる
-    if (winnerEntryId && selectedEventId) {
+    // 次ラウンドへの自動進出（スプレッドシートの対戦順シートと同じ仕組み）
+    if (selectedEventId) {
       const nextRound = m.round + 1;
       const nextPosition = Math.ceil(m.position / 2);
       const nextMatch = await db.matches
@@ -241,13 +241,27 @@ export default function MatchManager() {
 
       if (nextMatch?.id) {
         const isUpper = m.position % 2 === 1;
-        await db.matches.update(nextMatch.id, {
-          ...(isUpper
-            ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-            : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-          ),
-          updatedAt: Date.now(),
-        });
+        if (winnerEntryId) {
+          // 勝者を次ラウンドに配置
+          await db.matches.update(nextMatch.id, {
+            ...(isUpper
+              ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+              : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+            ),
+            updatedAt: Date.now(),
+          });
+        } else {
+          // 勝者をクリアした場合、次ラウンドからも削除
+          await db.matches.update(nextMatch.id, {
+            ...(isUpper
+              ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
+              : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
+            ),
+            // 次ラウンドの結果もリセット（勝者が変わったため）
+            ...(nextMatch.winnerEntryId ? { winnerEntryId: null, score: '', status: 'waiting' } : {}),
+            updatedAt: Date.now(),
+          });
+        }
       }
     }
 
