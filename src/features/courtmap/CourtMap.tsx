@@ -160,13 +160,13 @@ export default function CourtMap() {
     ready: {
       bg: 'bg-blue-50',
       border: 'border-[#2e7d32]',
-      text: 'text-[#2e7d32]',
+      text: 'text-primary-500',
       glow: '',
     },
     empty: {
       bg: 'bg-white',
-      border: 'border-[#e0e7ef]',
-      text: 'text-[#6b7280]',
+      border: 'border-border-main',
+      text: 'text-gray-500',
       glow: '',
     },
     unavailable: {
@@ -187,14 +187,14 @@ export default function CourtMap() {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-4">
       {/* ヘッダー */}
-      <header className="bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-              <MapPin className="w-6 h-6 text-[#2e7d32]" />
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <MapPin className="w-6 h-6 text-primary-500" />
               コートマップ
             </h1>
-            <p className="text-sm text-[#6b7280] mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               会場のコート使用状況をリアルタイムで確認できます
             </p>
           </div>
@@ -206,8 +206,8 @@ export default function CourtMap() {
                 onClick={() => { setSelectedVenue(v.id); setSelectedCourt(null); }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedVenue === v.id
-                    ? 'bg-[#2e7d32] text-white'
-                    : 'bg-[#f1f8e9] text-[#6b7280] hover:bg-[#e8f5e9]'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-primary-50 text-gray-500 hover:bg-primary-50'
                 }`}
               >
                 {v.name}
@@ -223,11 +223,11 @@ export default function CourtMap() {
             試合中 {stats.playing}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-[#2e7d32]" />
+            <span className="w-3 h-3 rounded-full bg-primary-500" />
             準備中 {stats.ready}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-white border border-[#e0e7ef]" />
+            <span className="w-3 h-3 rounded-full bg-white border border-border-main" />
             空き {stats.empty}
           </span>
           <span className="flex items-center gap-1.5">
@@ -239,8 +239,8 @@ export default function CourtMap() {
 
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
         {/* コートマップ */}
-        <div className="flex-1 bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4 md:p-6 overflow-auto">
-          <h2 className="text-sm font-bold text-[#6b7280] uppercase tracking-wider mb-4">
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-border-main p-4 md:p-6 overflow-auto">
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
             {venue.name} - コート配置図
           </h2>
 
@@ -255,7 +255,7 @@ export default function CourtMap() {
 
                     return (
                       <div key={blockIdx} className="w-full">
-                        <div className={`bg-[#e8f5e9] rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
+                        <div className={`bg-primary-50 rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
                           <div className={`grid ${gridCols} gap-2`}>
                             {block.courts.map(courtName => {
                               const cs = courtStatusMap[courtName];
@@ -298,11 +298,11 @@ export default function CourtMap() {
                                   )}
                                   {!cs.currentMatch && cs.nextMatch && (
                                     <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                      <p className="text-[9px] text-[#2e7d32] truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.nextMatch.player1Name}
                                       </p>
                                       <p className="text-[7px] text-blue-400 text-center">vs</p>
-                                      <p className="text-[9px] text-[#2e7d32] truncate whitespace-nowrap text-center leading-tight">
+                                      <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                         {cs.nextMatch.player2Name}
                                       </p>
                                     </div>
@@ -317,7 +317,7 @@ export default function CourtMap() {
                         {blockIdx < venue.blocks.length - 1 && (
                           <div className="flex items-center gap-2 my-2">
                             <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
-                            <span className="text-[10px] text-[#6b7280]">通路</span>
+                            <span className="text-[10px] text-gray-500">通路</span>
                             <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
                           </div>
                         )}
@@ -343,7 +343,7 @@ export default function CourtMap() {
                 <div key={blockIdx} className="w-full">
                   {/* コートブロック - 緑のフィールド風 */}
                   <div className="flex items-stretch gap-3">
-                    <div className={`flex-1 bg-[#e8f5e9] rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
+                    <div className={`flex-1 bg-primary-50 rounded-xl border border-[#a5d6a7] p-3 shadow-sm`}>
                       <div className={`grid ${gridCols} gap-2`}>
                         {block.courts.map(courtName => {
                           const cs = courtStatusMap[courtName];
@@ -386,11 +386,11 @@ export default function CourtMap() {
                               )}
                               {!cs.currentMatch && cs.nextMatch && (
                                 <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                  <p className="text-[9px] text-[#2e7d32] truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.nextMatch.player1Name}
                                   </p>
                                   <p className="text-[7px] text-blue-400 text-center">vs</p>
-                                  <p className="text-[9px] text-[#2e7d32] truncate whitespace-nowrap text-center leading-tight">
+                                  <p className="text-[9px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
                                     {cs.nextMatch.player2Name}
                                   </p>
                                 </div>
@@ -409,9 +409,9 @@ export default function CourtMap() {
                         <span className="text-base">🏠</span>
                         <span className="text-sm font-bold text-amber-800">本部</span>
                       </div>
-                      <div className="flex-1 border-t border-dashed border-[#e0e7ef]" />
-                      <span className="text-[10px] text-[#6b7280]">通路</span>
-                      <div className="flex-1 border-t border-dashed border-[#e0e7ef]" />
+                      <div className="flex-1 border-t border-dashed border-border-main" />
+                      <span className="text-[10px] text-gray-500">通路</span>
+                      <div className="flex-1 border-t border-dashed border-border-main" />
                     </div>
                   )}
 
@@ -419,7 +419,7 @@ export default function CourtMap() {
                   {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
                     <div className="flex items-center gap-2 my-2">
                       <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
-                      <span className="text-[10px] text-[#6b7280]">通路</span>
+                      <span className="text-[10px] text-gray-500">通路</span>
                       <div className="flex-1 border-t border-dashed border-[#d0d5dd]" />
                     </div>
                   )}
@@ -430,7 +430,7 @@ export default function CourtMap() {
 
             {/* 駐車場（ヤマタのみ） */}
             {venue.id === 'yamata' && (
-              <div className="bg-[#f1f8e9] rounded-lg px-6 py-2 text-xs text-[#6b7280] font-medium border border-[#e0e7ef] w-full text-center mt-1">
+              <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main w-full text-center mt-1">
                 駐車場側
               </div>
             )}
@@ -441,24 +441,24 @@ export default function CourtMap() {
         <div className="lg:w-80 shrink-0 overflow-auto space-y-3">
           {selectedCourtDetail ? (
             <>
-              <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4">
-                <h3 className="font-bold text-lg text-[#111827] flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-[#2e7d32]" />
+              <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
+                <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary-500" />
                   {selectedCourt}番コート
                 </h3>
                 <div className="mt-2 flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                     selectedCourtDetail.status === 'playing' ? 'bg-green-100 text-green-800' :
-                    selectedCourtDetail.status === 'ready' ? 'bg-blue-100 text-[#2e7d32]' :
+                    selectedCourtDetail.status === 'ready' ? 'bg-blue-100 text-primary-500' :
                     selectedCourtDetail.status === 'unavailable' ? 'bg-gray-100 text-gray-500' :
-                    'bg-gray-50 text-[#6b7280]'
+                    'bg-gray-50 text-gray-500'
                   }`}>
                     {selectedCourtDetail.status === 'playing' && <Play className="w-3 h-3" />}
                     {selectedCourtDetail.status === 'ready' && <Clock className="w-3 h-3" />}
                     {selectedCourtDetail.status === 'unavailable' && <AlertCircle className="w-3 h-3" />}
                     {statusLabel[selectedCourtDetail.status]}
                   </span>
-                  <span className="text-xs text-[#6b7280]">{selectedCourtDetail.matchCount}試合割当</span>
+                  <span className="text-xs text-gray-500">{selectedCourtDetail.matchCount}試合割当</span>
                 </div>
 
                 {/* 現在の試合 */}
@@ -467,14 +467,14 @@ export default function CourtMap() {
                     <div className="text-xs font-medium text-green-700 mb-1 flex items-center gap-1">
                       <Play className="w-3 h-3" /> 現在の試合
                     </div>
-                    <div className="text-xs text-[#6b7280] mb-1">
+                    <div className="text-xs text-gray-500 mb-1">
                       {getEventName(selectedCourtDetail.currentMatch.eventId)}
                     </div>
                     <p className="text-sm font-medium whitespace-nowrap">{selectedCourtDetail.currentMatch.player1Name}</p>
-                    <p className="text-[10px] text-[#6b7280] text-center">vs</p>
+                    <p className="text-[10px] text-gray-500 text-center">vs</p>
                     <p className="text-sm font-medium whitespace-nowrap">{selectedCourtDetail.currentMatch.player2Name}</p>
                     {selectedCourtDetail.currentMatch.score && (
-                      <p className="text-sm font-mono text-[#2e7d32] mt-1">{selectedCourtDetail.currentMatch.score}</p>
+                      <p className="text-sm font-mono text-primary-500 mt-1">{selectedCourtDetail.currentMatch.score}</p>
                     )}
                   </div>
                 )}
@@ -482,26 +482,26 @@ export default function CourtMap() {
 
               {/* コート試合一覧 */}
               {selectedCourtMatches.length > 0 && (
-                <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4">
-                  <h4 className="text-sm font-bold text-[#111827] mb-2">試合一覧</h4>
+                <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
+                  <h4 className="text-sm font-bold text-gray-900 mb-2">試合一覧</h4>
                   <div className="space-y-2 max-h-96 overflow-auto">
                     {selectedCourtMatches.map(m => (
                       <div
                         key={m.matchId}
                         className={`rounded-lg p-2.5 text-xs border ${
                           m.status === 'playing' ? 'bg-green-50 border-green-200' :
-                          m.status === 'finished' ? 'bg-[#f1f8e9] border-[#e0e7ef]' :
+                          m.status === 'finished' ? 'bg-primary-50 border-border-main' :
                           m.status === 'walkover' ? 'bg-amber-50 border-amber-200' :
-                          'bg-white border-[#e0e7ef]'
+                          'bg-white border-border-main'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-[#6b7280] truncate flex-1">
+                          <span className="text-gray-500 truncate flex-1">
                             {getEventName(m.eventId)}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             m.status === 'playing' ? 'bg-green-100 text-green-700' :
-                            m.status === 'finished' ? 'bg-blue-100 text-[#2e7d32]' :
+                            m.status === 'finished' ? 'bg-blue-100 text-primary-500' :
                             m.status === 'walkover' ? 'bg-amber-100 text-amber-700' :
                             m.status === 'ready' ? 'bg-blue-50 text-blue-600' :
                             'bg-gray-100 text-gray-500'
@@ -514,14 +514,14 @@ export default function CourtMap() {
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="font-medium truncate whitespace-nowrap">{m.player1Name}</span>
-                          <span className="text-[#6b7280] shrink-0">vs</span>
+                          <span className="text-gray-500 shrink-0">vs</span>
                           <span className="font-medium truncate whitespace-nowrap">{m.player2Name}</span>
                         </div>
                         {m.score && (
-                          <p className="font-mono text-[#2e7d32] mt-0.5">{m.score}</p>
+                          <p className="font-mono text-primary-500 mt-0.5">{m.score}</p>
                         )}
                         {m.scheduledTime && (
-                          <p className="text-[#6b7280] mt-0.5">{m.scheduledTime}〜</p>
+                          <p className="text-gray-500 mt-0.5">{m.scheduledTime}〜</p>
                         )}
                       </div>
                     ))}
@@ -530,17 +530,17 @@ export default function CourtMap() {
               )}
             </>
           ) : (
-            <div className="bg-white rounded-[10px] shadow-sm border border-dashed border-[#e0e7ef] p-8 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-dashed border-border-main p-8 text-center">
               <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-[#6b7280]">コートをクリックすると</p>
-              <p className="text-sm text-[#6b7280]">詳細が表示されます</p>
+              <p className="text-sm text-gray-500">コートをクリックすると</p>
+              <p className="text-sm text-gray-500">詳細が表示されます</p>
             </div>
           )}
 
           {/* 全体進捗 */}
-          <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4">
-            <h4 className="text-sm font-bold text-[#111827] mb-2 flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-[#2e7d32]" />
+          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
+            <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-primary-500" />
               試合進捗
             </h4>
             {(() => {
@@ -550,7 +550,7 @@ export default function CourtMap() {
               const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
               return (
                 <div>
-                  <div className="flex justify-between text-xs text-[#6b7280] mb-1">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
                     <span>{finished}/{total} 完了</span>
                     <span>{pct}%</span>
                   </div>
@@ -560,7 +560,7 @@ export default function CourtMap() {
                       style={{ width: `${pct}%`, background: 'linear-gradient(135deg, #2e7d32, #1b5e20)' }}
                     />
                   </div>
-                  <div className="flex gap-3 mt-2 text-xs text-[#6b7280]">
+                  <div className="flex gap-3 mt-2 text-xs text-gray-500">
                     <span className="flex items-center gap-1">
                       <Play className="w-3 h-3 text-green-500" /> {playing}試合中
                     </span>

@@ -214,7 +214,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                         </div>
                       )}
                       {matchResult?.courtName && (
-                        <div className="shrink-0 bg-[#2e7d32] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                        <div className="shrink-0 bg-primary-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.courtName}
                         </div>
                       )}
@@ -237,7 +237,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                         </div>
                       )}
                       {matchResult?.courtName && (
-                        <div className="shrink-0 bg-[#2e7d32] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                        <div className="shrink-0 bg-primary-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.courtName}
                         </div>
                       )}

@@ -228,23 +228,23 @@ export default function DrawBoard() {
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef] shrink-0">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main shrink-0">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-[#2e7d32]" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-primary-500" />
             ドロー表プレビュー・調整
           </h1>
-          <p className="text-sm text-[#6b7280] mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             生成されたドローをブラケット形式で確認し、必要に応じて枠の入れ替えができます。
           </p>
         </div>
 
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <label className="text-sm font-semibold text-[#111827] whitespace-nowrap">対象種目:</label>
+          <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
           <select
             value={selectedEventId}
             onChange={e => setSelectedEventId(e.target.value)}
-            className="w-full sm:w-64 border-[#cbd5e1] rounded-[6px] shadow-sm focus:border-[#2e7d32] focus:ring-[3px] focus:ring-[#2e7d32]/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+            className="w-full sm:w-64 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
           >
             <option value="">-- 種目を選択 --</option>
             {events.map(e => (
@@ -256,22 +256,22 @@ export default function DrawBoard() {
 
       {selectedEventId ? (
         <div className="flex-1 flex flex-col gap-4 min-h-0">
-          <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4 flex flex-col md:flex-row gap-4 items-center justify-between shrink-0">
+          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 flex flex-col md:flex-row gap-4 items-center justify-between shrink-0">
             <div className="flex items-center gap-4">
                {drawData ? (
                  <>
-                   <div className="px-3 py-1.5 bg-[#e8f5e9] text-[#2e7d32] rounded-md text-sm font-medium">
+                   <div className="px-3 py-1.5 bg-primary-50 text-primary-500 rounded-md text-sm font-medium">
                      ドローサイズ: {drawData.drawSize}
                    </div>
                    {hasUnsavedChanges && (
-                     <div className="flex items-center gap-1.5 text-[#d97706] text-sm font-medium bg-amber-50 px-3 py-1.5 rounded-md">
+                     <div className="flex items-center gap-1.5 text-warning text-sm font-medium bg-amber-50 px-3 py-1.5 rounded-md">
                        <AlertCircle className="w-4 h-4" />
                        未保存の変更があります
                      </div>
                    )}
                  </>
                ) : (
-                 <div className="text-sm text-[#6b7280]">
+                 <div className="text-sm text-gray-500">
                    まだ抽選結果が保存されていません。「抽選機能 S-04」でドローを作成してください。
                  </div>
                )}
@@ -281,7 +281,7 @@ export default function DrawBoard() {
               {selectedPosition !== null && (
                 <button
                   onClick={() => setSelectedPosition(null)}
-                  className="flex items-center gap-2 bg-[#f1f8e9] text-[#111827] px-4 py-2.5 rounded-md font-medium hover:bg-gray-200 shadow-sm transition-colors text-sm"
+                  className="flex items-center gap-2 bg-primary-50 text-gray-900 px-4 py-2.5 rounded-md font-medium hover:bg-gray-200 shadow-sm transition-colors text-sm"
                 >
                   選択解除
                 </button>
@@ -289,7 +289,7 @@ export default function DrawBoard() {
               <button
                 onClick={handleExportExcel}
                 disabled={!drawData}
-                className="flex items-center gap-2 bg-[#2e7d32] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#256b28] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Excel出力
@@ -306,12 +306,12 @@ export default function DrawBoard() {
           </div>
 
           {selectedPosition !== null && (
-            <div className="bg-[#e8f5e9] border border-[#2e7d32]/30 rounded-md px-4 py-2 text-sm text-[#1b5e20] font-medium shrink-0">
+            <div className="bg-primary-50 border border-[#2e7d32]/30 rounded-md px-4 py-2 text-sm text-primary-600 font-medium shrink-0">
               スロット #{selectedPosition} を選択中 -- 入れ替え先のスロットをタップしてください
             </div>
           )}
 
-          <div className="flex-1 min-h-0 rounded-[10px] overflow-hidden shadow-sm border border-[#e0e7ef] bg-white">
+          <div className="flex-1 min-h-0 rounded-xl overflow-hidden shadow-sm border border-border-main bg-white">
             {editedSlots.length > 0 && drawData ? (
               <DrawRenderer
                 slots={editedSlots}
@@ -325,7 +325,7 @@ export default function DrawBoard() {
                 eventType={events.find(e => e.eventId === selectedEventId)?.type}
               />
             ) : (
-               <div className="flex flex-col items-center justify-center p-8 h-full bg-[#f1f8e9] text-center text-[#6b7280]">
+               <div className="flex flex-col items-center justify-center p-8 h-full bg-primary-50 text-center text-gray-500">
                  <Trophy className="w-16 h-16 mb-4 opacity-20" />
                  <p className="font-semibold">表示できるドローが存在しません</p>
                </div>
@@ -333,8 +333,8 @@ export default function DrawBoard() {
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-center p-8 text-center bg-white rounded-[10px] border border-[#e0e7ef] shadow-sm h-64">
-           <p className="font-semibold text-[#6b7280]">上部のドロップダウンから対象種目を選択してください</p>
+        <div className="flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
+           <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
         </div>
       )}
     </div>

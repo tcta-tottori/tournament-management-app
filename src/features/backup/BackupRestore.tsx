@@ -137,22 +137,22 @@ export default function BackupRestore() {
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-3xl mx-auto space-y-6">
-      <header className="bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
-        <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-          <Save className="w-6 h-6 text-[#2e7d32]" />
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Save className="w-6 h-6 text-primary-500" />
           バックアップ・復元
         </h1>
-        <p className="text-sm text-[#6b7280] mt-1">
+        <p className="text-sm text-gray-500 mt-1">
           大会データのエクスポート・インポートとデータ管理を行います。
         </p>
       </header>
 
       {/* ステータスメッセージ */}
       {status && (
-        <div className={`p-4 rounded-[10px] border flex items-start gap-3 ${
+        <div className={`p-4 rounded-xl border flex items-start gap-3 ${
           status.type === 'success' ? 'bg-green-50 border-green-200 text-[#16a34a]' :
           status.type === 'error' ? 'bg-red-50 border-red-200 text-[#dc2626]' :
-          'bg-[#e8f5e9] border-[#2e7d32]/30 text-[#2e7d32]'
+          'bg-primary-50 border-[#2e7d32]/30 text-primary-500'
         }`}>
           {status.type === 'success' ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0" /> :
            <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />}
@@ -161,18 +161,18 @@ export default function BackupRestore() {
       )}
 
       {/* エクスポート */}
-      <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
-        <h2 className="font-bold text-[#111827] mb-2 flex items-center gap-2">
-          <Download className="w-5 h-5 text-[#2e7d32]" />
+      <div className="bg-white rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <h2 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <Download className="w-5 h-5 text-primary-500" />
           データエクスポート
         </h2>
-        <p className="text-sm text-[#6b7280] mb-4">
+        <p className="text-sm text-gray-500 mb-4">
           全ての大会データをJSON形式でダウンロードします。大会前や重要な操作前にバックアップを取ることを推奨します。
         </p>
         <button
           onClick={handleExport}
           disabled={isExporting}
-          className="flex items-center gap-2 bg-[#2e7d32] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#256b28] disabled:opacity-50 shadow-sm transition-colors"
+          className="flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 shadow-sm transition-colors"
         >
           <Download className="w-4 h-4" />
           {isExporting ? 'エクスポート中...' : 'JSONファイルをダウンロード'}
@@ -180,15 +180,15 @@ export default function BackupRestore() {
       </div>
 
       {/* インポート */}
-      <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
-        <h2 className="font-bold text-[#111827] mb-2 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-[#2e7d32]" />
+      <div className="bg-white rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <h2 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <Upload className="w-5 h-5 text-primary-500" />
           データインポート
         </h2>
-        <p className="text-sm text-[#6b7280] mb-4">
+        <p className="text-sm text-gray-500 mb-4">
           バックアップファイルからデータを復元します。現在のデータは全て上書きされます。
         </p>
-        <label className={`flex items-center gap-2 bg-[#2e7d32] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#256b28] shadow-sm transition-colors cursor-pointer inline-flex ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label className={`flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 shadow-sm transition-colors cursor-pointer inline-flex ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
           <Upload className="w-4 h-4" />
           {isImporting ? 'インポート中...' : 'JSONファイルを選択'}
           <input
@@ -202,17 +202,17 @@ export default function BackupRestore() {
       </div>
 
       {/* データクリア */}
-      <div className="bg-white rounded-[10px] shadow-sm border border-[#dc2626]/30 p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <div className="bg-white rounded-xl shadow-sm border border-[#dc2626]/30 p-6 hover:shadow-md hover:-translate-y-0.5 transition-all">
         <h2 className="font-bold text-[#dc2626] mb-2 flex items-center gap-2">
           <Trash2 className="w-5 h-5" />
           全データ削除
         </h2>
-        <p className="text-sm text-[#6b7280] mb-4">
+        <p className="text-sm text-gray-500 mb-4">
           データベース内の全てのデータを削除します。この操作は取り消せません。
         </p>
         <button
           onClick={handleClearAll}
-          className="flex items-center gap-2 bg-[#dc2626] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#b91c1c] shadow-sm transition-colors"
+          className="flex items-center gap-2 bg-danger text-white px-5 py-2.5 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors"
         >
           <Trash2 className="w-4 h-4" />
           全データを削除

@@ -274,15 +274,15 @@ export default function DataSync() {
     : null;
 
   return (
-    <section className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden hover:shadow-md transition-all">
-      <div className="bg-[#e8f5e9] px-4 py-3 border-b border-[#e0e7ef] flex items-center justify-between">
+    <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden hover:shadow-md transition-all">
+      <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RefreshCw className="w-5 h-5 text-[#2e7d32]" />
-          <h2 className="font-semibold text-[#1b5e20]">データ同期</h2>
-          <span className="text-xs text-[#6b7280] ml-1">ドロー会議システム連携</span>
+          <RefreshCw className="w-5 h-5 text-primary-500" />
+          <h2 className="font-semibold text-primary-600">データ同期</h2>
+          <span className="text-xs text-gray-500 ml-1">ドロー会議システム連携</span>
         </div>
         {formattedLastSync && (
-          <div className="flex items-center gap-1 text-xs text-[#6b7280]">
+          <div className="flex items-center gap-1 text-xs text-gray-500">
             <Clock className="w-3.5 h-3.5" />
             <span>最終同期: {formattedLastSync}</span>
           </div>
@@ -290,7 +290,7 @@ export default function DataSync() {
       </div>
 
       <div className="p-4">
-        <p className="text-xs text-[#6b7280] mb-4">
+        <p className="text-xs text-gray-500 mb-4">
           ドロー会議システムとランキング・ふりがなデータを共有します。両システムが同じブラウザで動作している場合に利用できます。
         </p>
 
@@ -298,7 +298,7 @@ export default function DataSync() {
           <button
             onClick={syncFromDrawSystem}
             disabled={isSyncing}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-[#2e7d32] rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <span>ドロー会議システムから同期</span>
             {isSyncing && <RefreshCw className="w-4 h-4 animate-spin" />}

@@ -807,12 +807,12 @@ export default function DataImport() {
           onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-[#e0e7ef] rounded-lg p-6 text-center bg-[#f1f8e9] hover:bg-[#e8f5e9] hover:border-[#2e7d32] transition-colors cursor-pointer"
+          className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-[#2e7d32] transition-colors cursor-pointer"
         >
-          <FileJson className="w-10 h-10 text-[#2e7d32] mx-auto mb-2 opacity-60" />
-          <p className="text-sm font-medium text-[#111827]">ドロー会議JSON / ドローExcelファイルを読込</p>
-          <p className="text-xs text-[#6b7280] mt-1">完全バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx) に対応</p>
-          <p className="text-xs text-[#6b7280] mt-0.5">クリックまたはドラッグ＆ドロップ</p>
+          <FileJson className="w-10 h-10 text-primary-500 mx-auto mb-2 opacity-60" />
+          <p className="text-sm font-medium text-gray-900">ドロー会議JSON / ドローExcelファイルを読込</p>
+          <p className="text-xs text-gray-500 mt-1">完全バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx) に対応</p>
+          <p className="text-xs text-gray-500 mt-0.5">クリックまたはドラッグ＆ドロップ</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -830,16 +830,16 @@ export default function DataImport() {
       {/* JSON プレビュー (既存) */}
       {parsedData && summary && (
         <div className="space-y-3">
-          <div className="bg-[#e8f5e9] rounded-lg p-3 border border-[#a5d6a7]">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#1b5e20]">
+          <div className="bg-primary-50 rounded-lg p-3 border border-[#a5d6a7]">
+            <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
               <CheckCircle2 className="w-4 h-4" />
               データ読込成功
-              <span className="text-xs font-normal text-[#6b7280] ml-2">
+              <span className="text-xs font-normal text-gray-500 ml-2">
                 形式: {parsedData.format === 'complete-backup' ? '完全バックアップ' : 'ドロー共有'}
               </span>
             </div>
             {parsedData.exportedAt && (
-              <p className="text-xs text-[#6b7280] mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 エクスポート日時: {new Date(parsedData.exportedAt).toLocaleString('ja-JP')}
               </p>
             )}
@@ -847,12 +847,12 @@ export default function DataImport() {
 
           {/* 大会選択（完全バックアップで複数大会がある場合） */}
           {parsedData.tournaments.length > 1 && (
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3">
-              <label className="text-xs font-bold text-[#111827] mb-2 block">インポートする大会を選択:</label>
+            <div className="bg-white rounded-lg border border-border-main p-3">
+              <label className="text-xs font-bold text-gray-900 mb-2 block">インポートする大会を選択:</label>
               <div className="space-y-1 max-h-36 overflow-auto">
                 {parsedData.tournaments.map(t => (
                   <label key={t.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer text-sm ${
-                    selectedTournament === t.id ? 'bg-[#e8f5e9]' : 'hover:bg-[#f1f8e9]'
+                    selectedTournament === t.id ? 'bg-primary-50' : 'hover:bg-primary-50'
                   }`}>
                     <input
                       type="radio"
@@ -862,7 +862,7 @@ export default function DataImport() {
                       className="accent-[#2e7d32]"
                     />
                     <span className="font-medium">{t.name}</span>
-                    <span className="text-xs text-[#6b7280]">{t.date} {t.venue}</span>
+                    <span className="text-xs text-gray-500">{t.date} {t.venue}</span>
                   </label>
                 ))}
               </div>
@@ -871,40 +871,40 @@ export default function DataImport() {
 
           {/* サマリー */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Users className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{summary.playerCount}</p>
-              <p className="text-[10px] text-[#6b7280]">選手</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Users className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{summary.playerCount}</p>
+              <p className="text-[10px] text-gray-500">選手</p>
             </div>
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Trophy className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{summary.eventCodes.length}</p>
-              <p className="text-[10px] text-[#6b7280]">種目</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Trophy className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{summary.eventCodes.length}</p>
+              <p className="text-[10px] text-gray-500">種目</p>
             </div>
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Dices className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{Object.keys(summary.drawCounts).length}</p>
-              <p className="text-[10px] text-[#6b7280]">ドロー</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Dices className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{Object.keys(summary.drawCounts).length}</p>
+              <p className="text-[10px] text-gray-500">ドロー</p>
             </div>
           </div>
 
           {/* 種目詳細 */}
           <button
             onClick={() => setShowDetail(!showDetail)}
-            className="flex items-center gap-1 text-xs font-medium text-[#6b7280] hover:text-[#111827]"
+            className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900"
           >
             {showDetail ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             種目別詳細
           </button>
           {showDetail && (
-            <div className="bg-white rounded-lg border border-[#e0e7ef] overflow-hidden">
+            <div className="bg-white rounded-lg border border-border-main overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-[#f1f8e9]">
+                <thead className="bg-primary-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-[#6b7280]">種目</th>
-                    <th className="px-3 py-2 text-right font-medium text-[#6b7280]">エントリー</th>
-                    <th className="px-3 py-2 text-right font-medium text-[#6b7280]">ドローサイズ</th>
-                    <th className="px-3 py-2 text-center font-medium text-[#6b7280]">確定</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500">種目</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500">エントリー</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500">ドローサイズ</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-500">確定</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -914,15 +914,15 @@ export default function DataImport() {
                     const entries = summary.entryCounts[code] || 0;
                     const confirmed = parsedData.confirmedEvents[code];
                     return (
-                      <tr key={code} className="border-t border-[#e0e7ef]">
+                      <tr key={code} className="border-t border-border-main">
                         <td className="px-3 py-1.5">
-                          <span className="font-medium text-[#111827]">{eventDef?.name || code}</span>
-                          <span className="text-[#6b7280] ml-1">({eventDef?.type === 'Doubles' ? 'D' : 'S'})</span>
+                          <span className="font-medium text-gray-900">{eventDef?.name || code}</span>
+                          <span className="text-gray-500 ml-1">({eventDef?.type === 'Doubles' ? 'D' : 'S'})</span>
                         </td>
-                        <td className="px-3 py-1.5 text-right text-[#6b7280]">
+                        <td className="px-3 py-1.5 text-right text-gray-500">
                           {entries > 0 ? `${entries}件` : (draw ? `${draw.entryCount}件` : '-')}
                         </td>
-                        <td className="px-3 py-1.5 text-right text-[#6b7280]">
+                        <td className="px-3 py-1.5 text-right text-gray-500">
                           {draw ? draw.drawSize : '-'}
                         </td>
                         <td className="px-3 py-1.5 text-center">
@@ -931,9 +931,9 @@ export default function DataImport() {
                               <CheckCircle2 className="w-3.5 h-3.5 inline" />
                             </span>
                           ) : draw ? (
-                            <span className="text-[#d97706] text-[10px]">未確定</span>
+                            <span className="text-warning text-[10px]">未確定</span>
                           ) : (
-                            <span className="text-[#6b7280]">-</span>
+                            <span className="text-gray-500">-</span>
                           )}
                         </td>
                       </tr>
@@ -948,14 +948,14 @@ export default function DataImport() {
           <div className="flex gap-2">
             <button
               onClick={reset}
-              className="px-4 py-2 text-sm font-medium text-[#6b7280] bg-white border border-[#e0e7ef] rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-border-main rounded-lg hover:bg-gray-50 transition-colors"
             >
               キャンセル
             </button>
             <button
               onClick={handleImport}
               disabled={isImporting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#2e7d32] rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Upload className="w-4 h-4" />
               {isImporting ? 'インポート中...' : 'インポート実行'}
@@ -967,70 +967,70 @@ export default function DataImport() {
       {/* Excel プレビュー (新規) */}
       {parsedExcel && (
         <div className="space-y-3">
-          <div className="bg-[#e8f5e9] rounded-lg p-3 border border-[#a5d6a7]">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#1b5e20]">
+          <div className="bg-primary-50 rounded-lg p-3 border border-[#a5d6a7]">
+            <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
               <FileSpreadsheet className="w-4 h-4" />
               Excel読込成功
-              <span className="text-xs font-normal text-[#6b7280] ml-2">
+              <span className="text-xs font-normal text-gray-500 ml-2">
                 形式: ドローExcel
               </span>
             </div>
-            <p className="text-xs text-[#6b7280] mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               ファイル: {parsedExcel.fileName}
             </p>
           </div>
 
           {/* サマリー */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Users className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{excelPlayerCount}</p>
-              <p className="text-[10px] text-[#6b7280]">選手</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Users className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{excelPlayerCount}</p>
+              <p className="text-[10px] text-gray-500">選手</p>
             </div>
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Trophy className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{parsedExcel.events.length}</p>
-              <p className="text-[10px] text-[#6b7280]">種目</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Trophy className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{parsedExcel.events.length}</p>
+              <p className="text-[10px] text-gray-500">種目</p>
             </div>
-            <div className="bg-white rounded-lg border border-[#e0e7ef] p-3 text-center">
-              <Dices className="w-5 h-5 text-[#2e7d32] mx-auto mb-1" />
-              <p className="text-lg font-bold text-[#111827]">{excelDrawCount}</p>
-              <p className="text-[10px] text-[#6b7280]">ドロー</p>
+            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
+              <Dices className="w-5 h-5 text-primary-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{excelDrawCount}</p>
+              <p className="text-[10px] text-gray-500">ドロー</p>
             </div>
           </div>
 
           {/* 種目詳細 */}
           <button
             onClick={() => setShowDetail(!showDetail)}
-            className="flex items-center gap-1 text-xs font-medium text-[#6b7280] hover:text-[#111827]"
+            className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900"
           >
             {showDetail ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             種目別詳細
           </button>
           {showDetail && (
-            <div className="bg-white rounded-lg border border-[#e0e7ef] overflow-hidden">
+            <div className="bg-white rounded-lg border border-border-main overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-[#f1f8e9]">
+                <thead className="bg-primary-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-[#6b7280]">種目</th>
-                    <th className="px-3 py-2 text-right font-medium text-[#6b7280]">選手数</th>
-                    <th className="px-3 py-2 text-right font-medium text-[#6b7280]">ドローサイズ</th>
-                    <th className="px-3 py-2 text-center font-medium text-[#6b7280]">形式</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500">種目</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500">選手数</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500">ドローサイズ</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-500">形式</th>
                   </tr>
                 </thead>
                 <tbody>
                   {parsedExcel.events.map((ev, idx) => {
                     const realCount = ev.players.filter(p => !p.isBye).length;
                     return (
-                      <tr key={idx} className="border-t border-[#e0e7ef]">
+                      <tr key={idx} className="border-t border-border-main">
                         <td className="px-3 py-1.5">
-                          <span className="font-medium text-[#111827]">{ev.eventName}</span>
-                          <span className="text-[#6b7280] ml-1">({ev.type === 'Doubles' ? 'D' : 'S'})</span>
+                          <span className="font-medium text-gray-900">{ev.eventName}</span>
+                          <span className="text-gray-500 ml-1">({ev.type === 'Doubles' ? 'D' : 'S'})</span>
                         </td>
-                        <td className="px-3 py-1.5 text-right text-[#6b7280]">
+                        <td className="px-3 py-1.5 text-right text-gray-500">
                           {realCount}名
                         </td>
-                        <td className="px-3 py-1.5 text-right text-[#6b7280]">
+                        <td className="px-3 py-1.5 text-right text-gray-500">
                           {ev.isRoundRobin ? '-' : ev.drawSize}
                         </td>
                         <td className="px-3 py-1.5 text-center">
@@ -1052,14 +1052,14 @@ export default function DataImport() {
           <div className="flex gap-2">
             <button
               onClick={reset}
-              className="px-4 py-2 text-sm font-medium text-[#6b7280] bg-white border border-[#e0e7ef] rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-border-main rounded-lg hover:bg-gray-50 transition-colors"
             >
               キャンセル
             </button>
             <button
               onClick={handleExcelImport}
               disabled={isImporting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#2e7d32] rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Upload className="w-4 h-4" />
               {isImporting ? 'インポート中...' : 'インポート実行'}

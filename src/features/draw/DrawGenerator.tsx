@@ -148,10 +148,10 @@ export default function DrawGenerator() {
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-            <Dices className="w-6 h-6 text-[#2e7d32]" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Dices className="w-6 h-6 text-primary-500" />
             抽選・ドロー作成
             {import.meta.env.DEV && (
               <button
@@ -163,20 +163,20 @@ export default function DrawGenerator() {
               </button>
             )}
           </h1>
-          <p className="text-sm text-[#6b7280] mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             対象種目を選択し、シード配置・同所属分離を考慮したドローを自動生成します。
           </p>
         </div>
 
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <label className="text-sm font-semibold text-[#111827] whitespace-nowrap">対象種目:</label>
+          <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
           <select
             value={selectedEventId}
             onChange={e => {
               setSelectedEventId(e.target.value);
               setGeneratedDraw(null);
             }}
-            className="w-full sm:w-64 border-[#cbd5e1] rounded-[6px] shadow-sm focus:border-[#2e7d32] focus:ring-[3px] focus:ring-[#2e7d32]/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+            className="w-full sm:w-64 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
           >
             <option value="">-- 種目を選択 --</option>
             {events.map(e => (
@@ -189,13 +189,13 @@ export default function DrawGenerator() {
       {selectedEventId && currentEvent ? (
         <div className="flex-1 flex flex-col gap-4">
           {/* コントロールパネル */}
-          <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-5 flex flex-col md:flex-row gap-6 items-center justify-between">
+          <div className="bg-white rounded-xl shadow-sm border border-border-main p-5 flex flex-col md:flex-row gap-6 items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="bg-[#e8f5e9] p-3 rounded-md flex items-center gap-3">
-                <Users className="w-6 h-6 text-[#2e7d32]" />
+              <div className="bg-primary-50 p-3 rounded-md flex items-center gap-3">
+                <Users className="w-6 h-6 text-primary-500" />
                 <div>
-                  <p className="text-xs text-[#6b7280] font-medium tracking-wider uppercase">有効エントリー数</p>
-                  <p className="text-xl font-bold text-[#1b5e20]">{activeEntries.length} <span className="text-sm font-normal text-[#2e7d32]">組</span></p>
+                  <p className="text-xs text-gray-500 font-medium tracking-wider uppercase">有効エントリー数</p>
+                  <p className="text-xl font-bold text-primary-600">{activeEntries.length} <span className="text-sm font-normal text-primary-500">組</span></p>
                 </div>
               </div>
 
@@ -205,7 +205,7 @@ export default function DrawGenerator() {
                   保存済みドローあり
                 </div>
               ) : (
-                <div className="bg-[#f1f8e9] text-[#6b7280] px-3 py-1.5 rounded-full text-sm font-medium border border-[#e0e7ef]">
+                <div className="bg-primary-50 text-gray-500 px-3 py-1.5 rounded-full text-sm font-medium border border-border-main">
                   未抽選
                 </div>
               )}
@@ -215,7 +215,7 @@ export default function DrawGenerator() {
               <button
                 onClick={handleGenerateDraw}
                 disabled={activeEntries.length === 0}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#2e7d32] text-white px-5 py-2.5 rounded-md font-medium hover:bg-[#256b28] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 {savedDraw || generatedDraw ? '再抽選を実行' : '抽選を実行する'}
@@ -236,21 +236,21 @@ export default function DrawGenerator() {
 
           {/* プレビュー表示エリア */}
           {generatedDraw ? (
-            <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] flex-1 overflow-hidden flex flex-col">
-              <div className="p-4 border-b-2 border-[#e0e7ef] bg-[#f1f8e9] flex items-center justify-between">
-                <h3 className="font-bold text-[#111827] flex items-center gap-2">
-                  ドロー生成プレビュー <span className="text-sm font-normal text-[#6b7280]">(サイズ: {generatedDraw.drawSize})</span>
+            <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">
+              <div className="p-4 border-b-2 border-border-main bg-primary-50 flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  ドロー生成プレビュー <span className="text-sm font-normal text-gray-500">(サイズ: {generatedDraw.drawSize})</span>
                 </h3>
               </div>
               <div className="overflow-auto p-0 flex-1 bg-[#f6f9fc]/50">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#f1f8e9] text-sm font-semibold text-[#111827] sticky top-0">
+                  <thead className="bg-primary-50 text-sm font-semibold text-gray-900 sticky top-0">
                     <tr>
-                      <th className="py-3 px-4 w-16 text-center border-b-2 border-[#e0e7ef]">No.</th>
-                      <th className="py-3 px-4 border-b-2 border-[#e0e7ef]">シード</th>
-                      <th className="py-3 px-4 border-b-2 border-[#e0e7ef]">選手名 / ペア名</th>
-                      <th className="py-3 px-4 border-b-2 border-[#e0e7ef]">所属</th>
-                      <th className="py-3 px-4 border-b-2 border-[#e0e7ef] text-right">ポイント</th>
+                      <th className="py-3 px-4 w-16 text-center border-b-2 border-border-main">No.</th>
+                      <th className="py-3 px-4 border-b-2 border-border-main">シード</th>
+                      <th className="py-3 px-4 border-b-2 border-border-main">選手名 / ペア名</th>
+                      <th className="py-3 px-4 border-b-2 border-border-main">所属</th>
+                      <th className="py-3 px-4 border-b-2 border-border-main text-right">ポイント</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -261,15 +261,15 @@ export default function DrawGenerator() {
                         <tr
                           key={index}
                           className={`
-                            ${d.isBye ? 'bg-[#f1f8e9]/70 text-[#6b7280] italic' : index % 2 === 0 ? 'bg-white' : 'bg-[#f6f9fc]'}
-                            ${isMatchBottom ? 'border-b-2 border-[#e0e7ef]' : 'border-b border-[#e0e7ef]'}
-                            hover:bg-[#e8f5e9] transition-colors
+                            ${d.isBye ? 'bg-primary-50/70 text-gray-500 italic' : index % 2 === 0 ? 'bg-white' : 'bg-[#f6f9fc]'}
+                            ${isMatchBottom ? 'border-b-2 border-border-main' : 'border-b border-border-main'}
+                            hover:bg-primary-50 transition-colors
                           `}
                         >
-                          <td className="py-2.5 px-4 text-center font-mono text-[#6b7280]">{d.position}</td>
+                          <td className="py-2.5 px-4 text-center font-mono text-gray-500">{d.position}</td>
                           <td className="py-2.5 px-4">
                             {d.seed > 0 ? (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#e8f5e9] text-[#2e7d32] font-bold text-xs">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-50 text-primary-500 font-bold text-xs">
                                 {d.seed}
                               </span>
                             ) : null}
@@ -277,8 +277,8 @@ export default function DrawGenerator() {
                           <td className="py-2.5 px-4 font-medium font-sans">
                             {d.isBye ? 'BYE' : d.name}
                           </td>
-                          <td className="py-2.5 px-4 text-[#6b7280] text-xs">{d.affiliation}</td>
-                          <td className="py-2.5 px-4 text-right font-mono text-[#6b7280]">{d.isBye ? '-' : (d.points > 0 ? d.points : 0)}</td>
+                          <td className="py-2.5 px-4 text-gray-500 text-xs">{d.affiliation}</td>
+                          <td className="py-2.5 px-4 text-right font-mono text-gray-500">{d.isBye ? '-' : (d.points > 0 ? d.points : 0)}</td>
                         </tr>
                       );
                     })}
@@ -287,20 +287,20 @@ export default function DrawGenerator() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-[10px] border border-[#e0e7ef] shadow-sm border-dashed">
-              <div className="w-16 h-16 bg-[#f1f8e9] rounded-full flex items-center justify-center mb-4 text-[#6b7280]">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm border-dashed">
+              <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mb-4 text-gray-500">
                 <Dices className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-bold text-[#111827] mb-2">ドローを作成しましょう</h3>
-              <p className="text-[#6b7280] max-w-md">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">ドローを作成しましょう</h3>
+              <p className="text-gray-500 max-w-md">
                 「抽選を実行する」ボタンを押すと、JTAルールに則ったシード配置・BYE均等分散と、同所属分離を自動計算したドロー表が生成されます。
               </p>
             </div>
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-center p-8 text-center bg-white rounded-[10px] border border-[#e0e7ef] shadow-sm h-64">
-           <p className="font-semibold text-[#6b7280]">上部のドロップダウンから対象種目を選択してください</p>
+        <div className="flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
+           <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
         </div>
       )}
     </div>

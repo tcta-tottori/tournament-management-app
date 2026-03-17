@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2 } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X } from 'lucide-react';
 import type { Match } from '../../db/database';
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -56,8 +56,6 @@ export default function MatchManager() {
     [matches]
   );
 
-  const round1Matches = useMemo(() => sortedMatches.filter(m => m.round === 1), [sortedMatches]);
-  const laterMatches = useMemo(() => sortedMatches.filter(m => m.round > 1), [sortedMatches]);
 
   const handleGenerateMatches = async () => {
     if (!drawData || !selectedEventId) return;
@@ -197,6 +195,65 @@ export default function MatchManager() {
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
+  // --- 結果入力 ---
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const [editScore, setEditScore] = useState('');
+  const [editWinner, setEditWinner] = useState<1 | 2 | null>(null);
+
+  const startEdit = useCallback((m: Match) => {
+    setEditingMatchId(m.matchId);
+    setEditScore(m.score || '');
+    setEditWinner(
+      m.winnerEntryId === m.player1EntryId && m.player1EntryId ? 1
+      : m.winnerEntryId === m.player2EntryId && m.player2EntryId ? 2
+      : null
+    );
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingMatchId(null);
+    setEditScore('');
+    setEditWinner(null);
+  }, []);
+
+  const saveResult = useCallback(async (m: Match) => {
+    if (!m.id) return;
+    const winnerEntryId = editWinner === 1 ? m.player1EntryId : editWinner === 2 ? m.player2EntryId : null;
+    const winnerName = editWinner === 1 ? m.player1Name : editWinner === 2 ? m.player2Name : '';
+    const winnerAff = editWinner === 1 ? m.player1Affiliation : editWinner === 2 ? m.player2Affiliation : '';
+
+    // スコアと勝者を更新
+    await db.matches.update(m.id, {
+      score: editScore,
+      winnerEntryId,
+      status: winnerEntryId ? 'finished' : m.status === 'finished' ? 'waiting' : m.status,
+      updatedAt: Date.now(),
+    });
+
+    // 勝者を次のラウンドに進出させる
+    if (winnerEntryId && selectedEventId) {
+      const nextRound = m.round + 1;
+      const nextPosition = Math.ceil(m.position / 2);
+      const nextMatch = await db.matches
+        .where('eventId').equals(selectedEventId)
+        .filter(nm => nm.round === nextRound && nm.position === nextPosition)
+        .first();
+
+      if (nextMatch?.id) {
+        const isUpper = m.position % 2 === 1;
+        await db.matches.update(nextMatch.id, {
+          ...(isUpper
+            ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+            : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+          ),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
+    cancelEdit();
+  }, [editScore, editWinner, selectedEventId, cancelEdit]);
+
   const handlePrint = () => {
     const printableMatches = sortedMatches.filter(m => m.status !== 'walkover');
     if (printableMatches.length === 0) {
@@ -309,7 +366,7 @@ export default function MatchManager() {
   }
   .court-value {
     text-align: center;
-    font-size: 16px;
+    font-size: 36px;
     font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
     border: 1px solid #000;
     border-bottom: 2px solid #000;
@@ -339,7 +396,7 @@ export default function MatchManager() {
   }
   .time-value {
     text-align: center;
-    font-size: 16px;
+    font-size: 22px;
     font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace;
     border: 1px solid #000;
     border-bottom: 2px solid #000;
@@ -615,31 +672,31 @@ ${printableMatches.map(m => {
   };
 
   const statusLabels: Record<string, { text: string; color: string }> = {
-    waiting: { text: '待機', color: 'bg-gray-100 text-[#6b7280]' },
-    ready: { text: '準備完了', color: 'bg-[#e8f5e9] text-[#2e7d32]' },
-    playing: { text: '試合中', color: 'bg-green-100 text-[#16a34a]' },
-    finished: { text: '終了', color: 'bg-[#e8f5e9] text-[#1b5e20]' },
-    walkover: { text: '不戦勝', color: 'bg-amber-100 text-[#d97706]' },
+    waiting: { text: '待機', color: 'bg-gray-100 text-gray-500' },
+    ready: { text: '準備完了', color: 'bg-primary-50 text-primary-500' },
+    playing: { text: '試合中', color: 'bg-green-100 text-primary-500' },
+    finished: { text: '終了', color: 'bg-primary-50 text-primary-600' },
+    walkover: { text: '不戦勝', color: 'bg-amber-100 text-warning' },
   };
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-[#2e7d32]" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <ClipboardList className="w-6 h-6 text-primary-500" />
             対戦順・審判用紙
           </h1>
-          <p className="text-sm text-[#6b7280] mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
           </p>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <label className="text-sm font-semibold text-[#111827] whitespace-nowrap">対象種目:</label>
+          <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
           <select
             value={selectedEventId}
             onChange={e => setSelectedEventId(e.target.value)}
-            className="w-full sm:w-64 border-[#cbd5e1] rounded-[6px] shadow-sm focus:border-[#2e7d32] focus:ring-[3px] focus:ring-[#2e7d32]/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+            className="w-full sm:w-64 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
           >
             <option value="">-- 種目を選択 --</option>
             {events.map(e => (
@@ -652,14 +709,14 @@ ${printableMatches.map(m => {
       {selectedEventId ? (
         <div className="flex-1 flex flex-col gap-4">
           {/* コントロール */}
-          <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-[#e8f5e9] text-[#2e7d32] px-3 py-1.5 rounded-full text-sm font-medium border border-[#2e7d32]/20">
+              <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
                 <ListOrdered className="w-4 h-4 inline mr-1" />
                 {matches.length} 試合
               </div>
               {!drawData && (
-                <span className="text-sm text-[#d97706]">
+                <span className="text-sm text-warning">
                   先にS-04でドローを作成・保存してください
                 </span>
               )}
@@ -668,7 +725,7 @@ ${printableMatches.map(m => {
               <button
                 onClick={handleGenerateMatches}
                 disabled={!drawData || isGenerating}
-                className="flex items-center gap-2 bg-[#2e7d32] text-white px-4 py-2 rounded-md font-medium hover:bg-[#256b28] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
                 {matches.length > 0 ? '再生成' : '試合生成'}
@@ -676,7 +733,7 @@ ${printableMatches.map(m => {
               <button
                 onClick={handlePrint}
                 disabled={matches.length === 0}
-                className="flex items-center gap-2 bg-[#2e7d32] text-white px-4 py-2 rounded-md font-medium hover:bg-[#256b28] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
               >
                 <Printer className="w-4 h-4" />
                 審判用紙印刷
@@ -684,7 +741,7 @@ ${printableMatches.map(m => {
               {matches.length > 0 && (
                 <button
                   onClick={handleDeleteAll}
-                  className="flex items-center gap-2 bg-[#dc2626] text-white px-4 py-2 rounded-md font-medium hover:bg-[#b91c1c] shadow-sm transition-colors text-sm"
+                  className="flex items-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
                 >
                   <Trash2 className="w-4 h-4" />
                   全削除
@@ -695,90 +752,172 @@ ${printableMatches.map(m => {
 
           {/* 試合一覧 */}
           {matches.length > 0 ? (
-            <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] flex-1 overflow-hidden flex flex-col">
+            <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">
               <div className="overflow-auto flex-1">
-                {round1Matches.length > 0 && (
-                  <>
-                    <div className="px-4 py-3 bg-[#f1f8e9] border-b-2 border-[#e0e7ef] font-bold text-[#111827] text-sm sticky top-0">
-                      1回戦
-                    </div>
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-[#f1f8e9] text-xs font-semibold text-[#111827] sticky top-10">
-                        <tr>
-                          <th className="py-2 px-3 w-12 text-center border-b-2 border-[#e0e7ef]">#</th>
-                          <th className="py-2 px-3 border-b-2 border-[#e0e7ef]">選手1</th>
-                          <th className="py-2 px-3 w-10 text-center border-b-2 border-[#e0e7ef]">vs</th>
-                          <th className="py-2 px-3 border-b-2 border-[#e0e7ef]">選手2</th>
-                          <th className="py-2 px-3 w-20 text-center border-b-2 border-[#e0e7ef]">状態</th>
-                          <th className="py-2 px-3 w-20 text-center border-b-2 border-[#e0e7ef]">スコア</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm">
-                        {round1Matches.map((m, idx) => {
-                          const st = statusLabels[m.status] || statusLabels.waiting;
-                          return (
-                            <tr key={m.matchId} className={`border-b border-[#e0e7ef] hover:bg-[#e8f5e9] transition-colors ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
-                              <td className="py-2.5 px-3 text-center font-mono text-[#6b7280]">{m.matchOrder}</td>
-                              <td className="py-2.5 px-3">
-                                <span className="font-medium whitespace-nowrap">{m.player1Name}</span>
-                                {m.player1Affiliation && <span className="text-xs text-[#6b7280] ml-1">({m.player1Affiliation})</span>}
-                              </td>
-                              <td className="py-2.5 px-3 text-center text-[#6b7280] text-xs">vs</td>
-                              <td className="py-2.5 px-3">
-                                <span className="font-medium whitespace-nowrap">{m.player2Name}</span>
-                                {m.player2Affiliation && <span className="text-xs text-[#6b7280] ml-1">({m.player2Affiliation})</span>}
-                              </td>
-                              <td className="py-2.5 px-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.text}</span>
-                              </td>
-                              <td className="py-2.5 px-3 text-center font-mono text-sm">{m.score || '-'}</td>
+                {(() => {
+                  // ラウンド別にグループ化
+                  const roundGroups = new Map<number, Match[]>();
+                  for (const m of sortedMatches) {
+                    if (!roundGroups.has(m.round)) roundGroups.set(m.round, []);
+                    roundGroups.get(m.round)!.push(m);
+                  }
+                  return Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
+                    const roundLabel = getRoundName(round, totalRounds);
+                    const finishedCount = roundMatches.filter(m => m.status === 'finished' || m.status === 'walkover').length;
+                    return (
+                      <div key={round}>
+                        <div className="px-4 py-2.5 bg-primary-50 border-b-2 border-border-main font-bold text-gray-900 text-sm sticky top-0 flex items-center justify-between">
+                          <span>{roundLabel}</span>
+                          <span className="text-xs font-normal text-gray-500">
+                            {finishedCount}/{roundMatches.length} 完了
+                          </span>
+                        </div>
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-gray-50 text-xs font-semibold text-gray-500">
+                            <tr>
+                              <th className="py-1.5 px-2 w-10 text-center border-b border-border-main">#</th>
+                              <th className="py-1.5 px-2 border-b border-border-main">選手1</th>
+                              <th className="py-1.5 px-2 w-8 text-center border-b border-border-main"></th>
+                              <th className="py-1.5 px-2 border-b border-border-main">選手2</th>
+                              <th className="py-1.5 px-2 w-28 text-center border-b border-border-main">スコア</th>
+                              <th className="py-1.5 px-2 w-16 text-center border-b border-border-main">状態</th>
+                              <th className="py-1.5 px-2 w-14 text-center border-b border-border-main">操作</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </>
-                )}
-                {laterMatches.length > 0 && (
-                  <>
-                    <div className="px-4 py-3 bg-[#f1f8e9] border-b border-t-2 border-[#e0e7ef] font-bold text-[#111827] text-sm">
-                      2回戦以降
-                    </div>
-                    <table className="w-full text-left border-collapse">
-                      <tbody className="text-sm text-[#6b7280]">
-                        {laterMatches.map(m => {
-                          const st = statusLabels[m.status] || statusLabels.waiting;
-                          const roundLabel = getRoundName(m.round, totalRounds);
-                          return (
-                            <tr key={m.matchId} className="border-b border-[#e0e7ef]">
-                              <td className="py-2 px-3 w-12 text-center font-mono">{m.matchOrder}</td>
-                              <td className="py-2 px-3">{roundLabel} #{m.position}</td>
-                              <td className="py-2 px-3 whitespace-nowrap">{m.player1Name || '(未定)'} vs {m.player2Name || '(未定)'}</td>
-                              <td className="py-2 px-3 w-20 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.text}</span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </>
-                )}
+                          </thead>
+                          <tbody className="text-sm">
+                            {roundMatches.map((m, idx) => {
+                              const st = statusLabels[m.status] || statusLabels.waiting;
+                              const isEditing = editingMatchId === m.matchId;
+                              const isWinner1 = m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
+                              const isWinner2 = m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
+                              const hasPlayers = !!m.player1Name && !!m.player2Name;
+                              const isWalkover = m.status === 'walkover';
+
+                              if (isEditing) {
+                                return (
+                                  <tr key={m.matchId} className="border-b border-border-main bg-blue-50">
+                                    <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
+                                    <td className="py-2 px-2">
+                                      <button
+                                        onClick={() => setEditWinner(editWinner === 1 ? null : 1)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${
+                                          editWinner === 1
+                                            ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400 font-bold'
+                                            : 'hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {editWinner === 1 && <Trophy className="w-3.5 h-3.5" />}
+                                        <span className="whitespace-nowrap">{m.player1Name}</span>
+                                      </button>
+                                    </td>
+                                    <td className="py-2 px-1 text-center text-gray-400 text-xs">vs</td>
+                                    <td className="py-2 px-2">
+                                      <button
+                                        onClick={() => setEditWinner(editWinner === 2 ? null : 2)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${
+                                          editWinner === 2
+                                            ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400 font-bold'
+                                            : 'hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {editWinner === 2 && <Trophy className="w-3.5 h-3.5" />}
+                                        <span className="whitespace-nowrap">{m.player2Name}</span>
+                                      </button>
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <input
+                                        type="text"
+                                        value={editScore}
+                                        onChange={e => setEditScore(e.target.value)}
+                                        placeholder="8-6"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') saveResult(m);
+                                          if (e.key === 'Escape') cancelEdit();
+                                        }}
+                                        autoFocus
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2 text-center">
+                                      <span className="text-xs text-blue-600 font-medium">編集中</span>
+                                    </td>
+                                    <td className="py-2 px-2 text-center">
+                                      <div className="flex items-center gap-1 justify-center">
+                                        <button onClick={() => saveResult(m)} className="p-1 text-green-600 hover:bg-green-100 rounded" title="保存">
+                                          <Check className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={cancelEdit} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="キャンセル">
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              }
+
+                              return (
+                                <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${idx % 2 === 1 ? 'bg-[#f9fafb]' : ''}`}>
+                                  <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
+                                  <td className="py-2 px-2">
+                                    <div className="flex items-center gap-1">
+                                      {isWinner1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                      <span className={`whitespace-nowrap ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium'}`}>
+                                        {m.player1Name || '(未定)'}
+                                      </span>
+                                      {m.player1Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player1Affiliation})</span>}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-1 text-center text-gray-300 text-xs">vs</td>
+                                  <td className="py-2 px-2">
+                                    <div className="flex items-center gap-1">
+                                      {isWinner2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                      <span className={`whitespace-nowrap ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium'}`}>
+                                        {m.player2Name || '(未定)'}
+                                      </span>
+                                      {m.player2Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player2Affiliation})</span>}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2 text-center font-mono text-sm">
+                                    {m.score || (isWalkover ? 'W.O' : '-')}
+                                  </td>
+                                  <td className="py-2 px-2 text-center">
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${st.color}`}>{st.text}</span>
+                                  </td>
+                                  <td className="py-2 px-2 text-center">
+                                    {hasPlayers && !isWalkover && (
+                                      <button
+                                        onClick={() => startEdit(m)}
+                                        className="p-1 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
+                                        title="結果入力"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-[10px] border border-dashed border-[#e0e7ef] shadow-sm">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
               <ClipboardList className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-bold text-[#111827] mb-2">試合データがありません</h3>
-              <p className="text-[#6b7280] max-w-md">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">試合データがありません</h3>
+              <p className="text-gray-500 max-w-md">
                 ドローを作成・保存した後、「試合生成」ボタンを押すと1回戦の対戦カードと後続ラウンドの空枠が自動生成されます。
               </p>
             </div>
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-center p-8 text-center bg-white rounded-[10px] border border-[#e0e7ef] shadow-sm h-64">
-          <p className="font-semibold text-[#6b7280]">上部のドロップダウンから対象種目を選択してください</p>
+        <div className="flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
+          <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
         </div>
       )}
     </div>

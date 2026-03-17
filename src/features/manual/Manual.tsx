@@ -125,19 +125,19 @@ export default function Manual() {
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <header className="bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
-        <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-          <HelpCircle className="w-6 h-6 text-[#2e7d32]" />
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <HelpCircle className="w-6 h-6 text-primary-500" />
           操作マニュアル
         </h1>
-        <p className="text-sm text-[#6b7280] mt-1">
+        <p className="text-sm text-gray-500 mt-1">
           各機能の使い方を確認できます。
         </p>
         <div className="mt-3 flex gap-2">
-          <button onClick={openAll} className="text-xs bg-[#f1f8e9] hover:bg-[#e8f5e9] text-[#2e7d32] px-3 py-1 rounded-md font-medium">
+          <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-50 text-primary-500 px-3 py-1 rounded-md font-medium">
             全て開く
           </button>
-          <button onClick={closeAll} className="text-xs bg-[#f1f8e9] hover:bg-[#e8f5e9] text-[#2e7d32] px-3 py-1 rounded-md font-medium">
+          <button onClick={closeAll} className="text-xs bg-primary-50 hover:bg-primary-50 text-primary-500 px-3 py-1 rounded-md font-medium">
             全て閉じる
           </button>
         </div>
@@ -148,19 +148,19 @@ export default function Manual() {
           const isOpen = openSections.has(section.id);
           const Icon = section.icon;
           return (
-            <div key={section.id} className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden">
+            <div key={section.id} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
               <button
                 onClick={() => toggleSection(section.id)}
-                className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#f1f8e9] transition-colors"
+                className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-primary-50 transition-colors"
               >
-                {isOpen ? <ChevronDown className="w-4 h-4 text-[#6b7280] shrink-0" /> : <ChevronRight className="w-4 h-4 text-[#6b7280] shrink-0" />}
-                <Icon className="w-5 h-5 text-[#2e7d32] shrink-0" />
-                <span className="font-bold text-[#111827]">{section.title}</span>
+                {isOpen ? <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />}
+                <Icon className="w-5 h-5 text-primary-500 shrink-0" />
+                <span className="font-bold text-gray-900">{section.title}</span>
               </button>
               {isOpen && (
                 <div className="px-5 pb-5 pl-12 space-y-3">
                   {section.content.map((text, i) => (
-                    <div key={i} className="text-sm text-[#6b7280] leading-relaxed whitespace-pre-line">
+                    <div key={i} className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">
                       {text}
                     </div>
                   ))}
@@ -171,7 +171,7 @@ export default function Manual() {
         })}
       </div>
 
-      <footer className="bg-[#f1f8e9] rounded-[10px] p-4 text-center text-xs text-[#6b7280]">
+      <footer className="bg-primary-50 rounded-xl p-4 text-center text-xs text-gray-500">
         大会運営システム - 鳥取市テニス協会
       </footer>
     </div>

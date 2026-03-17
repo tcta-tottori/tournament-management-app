@@ -246,7 +246,7 @@ export default function ScheduleImport() {
 
   if (!currentTournamentId) {
     return (
-      <div className="text-sm text-[#6b7280]">
+      <div className="text-sm text-gray-500">
         大会が選択されていません。先にデータ読込で大会を作成してください。
       </div>
     );
@@ -254,12 +254,12 @@ export default function ScheduleImport() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-[#6b7280]">
+      <p className="text-xs text-gray-500">
         Excel/CSV ファイルから試合のコート・開始時刻を一括インポートします。
         インポート後に個別調整が可能です。
       </p>
 
-      <div className="text-xs text-[#6b7280] bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-200">
         <p className="font-medium text-gray-700 mb-1">必要な列:</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li><span className="font-medium">試合番号</span> または <span className="font-medium">No.</span> - 試合の通し番号</li>
@@ -287,7 +287,7 @@ export default function ScheduleImport() {
         </button>
         {fileName && (
           <div className="mt-2 flex items-center gap-1.5 text-sm text-[#374151]">
-            <FileSpreadsheet className="w-4 h-4 text-[#2e7d32]" />
+            <FileSpreadsheet className="w-4 h-4 text-primary-500" />
             <span>{fileName}</span>
           </div>
         )}
@@ -339,7 +339,7 @@ export default function ScheduleImport() {
           <button
             onClick={handleImport}
             disabled={isImporting}
-            className="mt-3 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[#2e7d32] rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="mt-3 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>{isImporting ? 'インポート中...' : 'インポート実行'}</span>

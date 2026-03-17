@@ -558,7 +558,7 @@ export default function EntryRegistration() {
                 {slot.seed > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">{slot.seed}</span>}
               </div>
               <div className={`flex-1 min-w-0 ${isWithdrawn ? 'line-through opacity-60' : ''}`}>
-                <div className="font-semibold text-sm text-[#111827] truncate">
+                <div className="font-semibold text-sm text-gray-900 truncate">
                   {slot.playerName}
                   {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
                 </div>
@@ -609,16 +609,16 @@ export default function EntryRegistration() {
     }
 
     return (
-      <div key={eventId} className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden">
+      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
         {/* Event header (collapsible in all-events view) */}
         {showAllEvents && (
-          <div className="bg-[#e8f5e9] px-4 py-3 border-b border-[#e0e7ef] flex items-center justify-between">
+          <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
             <button
               onClick={() => toggleCollapse(eventId)}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
               {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-              <h3 className="font-bold text-[#1b5e20] text-sm">{eventName}</h3>
+              <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
             </button>
             <div className="flex items-center gap-2 text-xs">
               <button
@@ -663,7 +663,7 @@ export default function EntryRegistration() {
 
   if (!currentTournamentId) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-[#6b7280] h-full">
+      <div className="flex flex-col items-center justify-center p-12 text-gray-500 h-full">
         <AlertCircle className="w-12 h-12 mb-4 text-gray-300" />
         <h2 className="text-xl font-bold mb-2">大会が選択されていません</h2>
         <p className="text-sm">データ管理画面で対象の大会を選択するか、新しく作成してください。</p>
@@ -674,20 +674,20 @@ export default function EntryRegistration() {
   return (
     <div className="max-w-full mx-auto space-y-4 pb-6 h-[calc(100vh-120px)] flex flex-col">
       {/* Header */}
-      <header className="bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef] shrink-0">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main shrink-0">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-[#2e7d32]" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-primary-500" />
             エントリー受付
           </h1>
 
           <div className="flex items-center gap-2 flex-wrap">
             {/* View toggle */}
-            <div className="flex rounded-lg border border-[#cbd5e1] overflow-hidden text-sm">
+            <div className="flex rounded-lg border border-border-main overflow-hidden text-sm">
               <button
                 onClick={() => setShowAllEvents(false)}
                 className={`px-3 py-1.5 flex items-center gap-1 font-medium transition-colors ${
-                  !showAllEvents ? 'bg-[#2e7d32] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  !showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -696,7 +696,7 @@ export default function EntryRegistration() {
               <button
                 onClick={() => setShowAllEvents(true)}
                 className={`px-3 py-1.5 flex items-center gap-1 font-medium transition-colors ${
-                  showAllEvents ? 'bg-[#2e7d32] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
@@ -709,7 +709,7 @@ export default function EntryRegistration() {
               <select
                 value={selectedEventId}
                 onChange={e => setSelectedEventId(e.target.value)}
-                className="border-[#cbd5e1] rounded-[6px] shadow-sm focus:border-[#2e7d32] focus:ring-[3px] focus:ring-[#2e7d32]/15 text-sm px-3 py-2 bg-white border outline-none font-medium w-56"
+                className="border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium w-56"
               >
                 <option value="">-- 種目を選択 --</option>
                 {events.map(e => (
@@ -721,10 +721,10 @@ export default function EntryRegistration() {
             {/* Import button */}
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 bg-white border border-[#cbd5e1] text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 bg-white border border-border-main text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
               title="Excel/CSVからエントリーデータを一括で読み込みます"
             >
-              <Upload className="w-4 h-4 text-[#2e7d32]" />
+              <Upload className="w-4 h-4 text-primary-500" />
               <span className="hidden md:inline">インポート</span>
             </button>
           </div>
@@ -734,14 +734,14 @@ export default function EntryRegistration() {
         <div className="mt-3 flex items-center gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-[#6b7280]" />
+              <Search className="h-4 w-4 text-gray-500" />
             </div>
             <input
               type="text"
               placeholder="選手名・所属で検索 (ブラケット内でハイライト表示)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-[#cbd5e1] rounded-[6px] text-sm focus:outline-none focus:ring-[3px] focus:ring-[#2e7d32]/15 focus:border-[#2e7d32]"
+              className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500"
             />
           </div>
         </div>
@@ -803,7 +803,7 @@ export default function EntryRegistration() {
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {showAllEvents ? (
           events.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] text-[#6b7280] min-h-[400px]">
+            <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
               <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
               <p className="font-semibold">種目が登録されていません</p>
             </div>
@@ -813,7 +813,7 @@ export default function EntryRegistration() {
         ) : selectedEventId ? (
           renderEventSection(selectedEventId, events.find(e => e.eventId === selectedEventId)?.name || '', true)
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] text-[#6b7280] min-h-[400px]">
+          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
             <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
             <p className="font-semibold">上部のドロップダウンから対象種目を選択してください</p>
           </div>

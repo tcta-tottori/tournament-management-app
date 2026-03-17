@@ -218,14 +218,14 @@ export default function ScheduleGenerator() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-[#6b7280]">
+      <p className="text-xs text-gray-500">
         ドローデータから全種目の試合スケジュールを自動生成します。コートが未登録の場合は自動作成されます。
       </p>
 
       {hasExistingSchedule && (
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-          <AlertTriangle className="w-4 h-4 text-[#d97706] shrink-0 mt-0.5" />
-          <p className="text-xs text-[#d97706] font-medium">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <p className="text-xs text-warning font-medium">
             既にスケジュールが設定されています。自動生成を実行すると既存のコート割当・時間が上書きされます。
           </p>
         </div>
@@ -233,36 +233,36 @@ export default function ScheduleGenerator() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1">コート名（カンマ区切り）</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">コート名（カンマ区切り）</label>
           <input
             type="text"
             value={courtNamesInput}
             onChange={e => setCourtNamesInput(e.target.value)}
             placeholder="1,2,3,4,5,6"
-            className="w-full border border-[#cbd5e1] rounded-[6px] px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
           />
           <p className="text-[10px] text-[#9ca3af] mt-1">例: 1,2,3,4,5,6 または A-1,A-2,B-1</p>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1">1試合の所要時間（分）</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">1試合の所要時間（分）</label>
           <input
             type="number"
             min={20}
             max={120}
             value={matchDuration}
             onChange={e => setMatchDuration(parseInt(e.target.value) || 40)}
-            className="w-full border border-[#cbd5e1] rounded-[6px] px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1">開始時刻</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">開始時刻</label>
           <input
             type="time"
             value={startTime}
             onChange={e => setStartTime(e.target.value)}
-            className="w-full border border-[#cbd5e1] rounded-[6px] px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
+            className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-[#1565c0] focus:ring-[3px] focus:ring-[#1565c0]/15 outline-none"
           />
         </div>
       </div>

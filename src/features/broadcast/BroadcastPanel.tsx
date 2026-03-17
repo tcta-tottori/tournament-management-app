@@ -333,14 +333,14 @@ export default function BroadcastPanel() {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       {/* ヘッダー */}
-      <header className="bg-white p-4 rounded-[10px] shadow-sm border border-[#e0e7ef]">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-[#111827] flex items-center gap-2">
-              <Volume2 className="w-6 h-6 text-[#2e7d32]" />
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Volume2 className="w-6 h-6 text-primary-500" />
               放送コールシステム
             </h1>
-            <p className="text-sm text-[#6b7280] mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               試合データ読込 → コート指定 → ワンクリックで試合コール放送
             </p>
           </div>
@@ -355,7 +355,7 @@ export default function BroadcastPanel() {
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-white text-[#6b7280] border border-[#e0e7ef] rounded-lg text-sm font-medium hover:bg-[#f1f8e9] transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-white text-gray-500 border border-border-main rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors"
             >
               <Upload className="w-4 h-4" />
               CSVインポート
@@ -372,8 +372,8 @@ export default function BroadcastPanel() {
 
         {/* データ情報 */}
         {matches.length > 0 && (
-          <div className="mt-3 flex items-center gap-3 text-sm text-[#6b7280]">
-            <span className="bg-[#e8f5e9] text-[#2e7d32] px-2 py-0.5 rounded font-medium">
+          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
+            <span className="bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">
               {dataType === 'doubles' ? 'ダブルス' : 'シングルス'}
             </span>
             <span>{matches.length}試合読込</span>
@@ -385,13 +385,13 @@ export default function BroadcastPanel() {
       </header>
 
       {/* 設定パネル */}
-      <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef]">
+      <div className="bg-white rounded-xl shadow-sm border border-border-main">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-[#111827] hover:bg-[#f1f8e9] transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-gray-900 hover:bg-primary-50 transition-colors"
         >
-          {showSettings ? <ChevronDown className="w-4 h-4 text-[#6b7280]" /> : <ChevronRight className="w-4 h-4 text-[#6b7280]" />}
-          <Settings2 className="w-4 h-4 text-[#2e7d32]" />
+          {showSettings ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+          <Settings2 className="w-4 h-4 text-primary-500" />
           音声設定
         </button>
         {showSettings && (
@@ -399,7 +399,7 @@ export default function BroadcastPanel() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 速度 */}
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
                   読み上げ速度: {settings.rate.toFixed(2)}
                 </label>
                 <input
@@ -411,14 +411,14 @@ export default function BroadcastPanel() {
                   onChange={e => setSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
                   className="w-full accent-[#2e7d32]"
                 />
-                <div className="flex justify-between text-[10px] text-[#6b7280]">
+                <div className="flex justify-between text-[10px] text-gray-500">
                   <span>遅い</span><span>標準</span><span>速い</span>
                 </div>
               </div>
 
               {/* 繰り返し回数 */}
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">繰り返し回数</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し回数</label>
                 <div className="flex gap-1">
                   {[1, 2, 3].map(n => (
                     <button
@@ -426,8 +426,8 @@ export default function BroadcastPanel() {
                       onClick={() => setSettings(s => ({ ...s, repeatCount: n }))}
                       className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
                         settings.repeatCount === n
-                          ? 'bg-[#2e7d32] text-white'
-                          : 'bg-[#f1f8e9] text-[#6b7280] hover:bg-[#e8f5e9]'
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-primary-50 text-gray-500 hover:bg-primary-50'
                       }`}
                     >
                       {n}回
@@ -440,7 +440,7 @@ export default function BroadcastPanel() {
               <div className="flex items-end gap-2">
                 <button
                   onClick={() => testVoice(settings.rate)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#f1f8e9] text-[#2e7d32] rounded-lg text-sm font-medium hover:bg-[#e8f5e9] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors"
                 >
                   <Mic className="w-4 h-4" />
                   音声テスト
@@ -464,11 +464,11 @@ export default function BroadcastPanel() {
       <div className="flex-1 min-h-0 flex flex-col">
         {matches.length === 0 ? (
           /* ドロップゾーン */
-          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[10px] border-2 border-dashed border-[#e0e7ef] p-12 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl border-2 border-dashed border-border-main p-12 text-center">
             {/* データベースから読込（メイン） */}
-            <Database className="w-12 h-12 text-[#1565c0] mb-4 opacity-60" />
-            <p className="text-lg font-bold text-[#111827] mb-2">データベースから試合データを読み込む</p>
-            <p className="text-sm text-[#6b7280] mb-4">
+            <Database className="w-12 h-12 text-ocean mb-4 opacity-60" />
+            <p className="text-lg font-bold text-gray-900 mb-2">データベースから試合データを読み込む</p>
+            <p className="text-sm text-gray-500 mb-4">
               エントリー・ドロー作成後、試合が生成されていればすぐに放送できます
             </p>
             <button
@@ -481,20 +481,20 @@ export default function BroadcastPanel() {
             </button>
 
             {dbEvents.length > 0 && (
-              <p className="text-xs text-[#6b7280] mb-6">
+              <p className="text-xs text-gray-500 mb-6">
                 現在の大会: {dbEvents.length}種目が登録されています
               </p>
             )}
 
             {/* CSV読込（代替手段） */}
-            <div className="border-t border-[#e0e7ef] pt-4 w-full max-w-md">
-              <p className="text-xs text-[#6b7280] mb-2">または</p>
+            <div className="border-t border-border-main pt-4 w-full max-w-md">
+              <p className="text-xs text-gray-500 mb-2">または</p>
               <div
                 ref={dropRef}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-dashed border-[#e0e7ef] rounded-lg text-sm text-[#6b7280] hover:border-[#2e7d32] hover:bg-[#f1f8e9] transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-2 px-4 py-2 border border-dashed border-border-main rounded-lg text-sm text-gray-500 hover:border-[#2e7d32] hover:bg-primary-50 transition-colors cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
                 CSVファイルをドラッグ＆ドロップ / クリックで選択
@@ -510,8 +510,8 @@ export default function BroadcastPanel() {
                   onClick={() => setActiveTab('all')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                     activeTab === 'all'
-                      ? 'bg-[#2e7d32] text-white'
-                      : 'bg-white text-[#6b7280] border border-[#e0e7ef] hover:bg-[#f1f8e9]'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-500 border border-border-main hover:bg-primary-50'
                   }`}
                 >
                   全て ({matches.length})
@@ -522,8 +522,8 @@ export default function BroadcastPanel() {
                     onClick={() => setActiveTab(name)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                       activeTab === name
-                        ? 'bg-[#2e7d32] text-white'
-                        : 'bg-white text-[#6b7280] border border-[#e0e7ef] hover:bg-[#f1f8e9]'
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-white text-gray-500 border border-border-main hover:bg-primary-50'
                     }`}
                   >
                     {name} ({matches.filter(m => m.eventName === name).length})
@@ -554,32 +554,32 @@ export default function BroadcastPanel() {
               {/* コール済 */}
               {doneMatches.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-bold text-[#6b7280] uppercase tracking-wider mt-4">コール済み</h3>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-4">コール済み</h3>
                   {doneMatches.map(match => (
                     <div
                       key={match.id}
-                      className="bg-[#FFF8F0] rounded-[10px] border border-[#F9CB9C] p-3 opacity-70"
+                      className="bg-[#FFF8F0] rounded-xl border border-[#F9CB9C] p-3 opacity-70"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span className="font-medium">{match.eventName}</span>
                             <span>{match.round}</span>
                             <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
                               コール済
                             </span>
                           </div>
-                          <p className="text-sm font-medium text-[#111827] mt-0.5 truncate whitespace-nowrap">
+                          <p className="text-sm font-medium text-gray-900 mt-0.5 truncate whitespace-nowrap">
                             {match.numberA}番 {match.nameA}
                             {match.type === 'doubles' && ` / ${match.pairNameA}`}
-                            <span className="text-[#6b7280] mx-1">vs</span>
+                            <span className="text-gray-500 mx-1">vs</span>
                             {match.numberB}番 {match.nameB}
                             {match.type === 'doubles' && ` / ${match.pairNameB}`}
                           </p>
                         </div>
                         <button
                           onClick={() => handleRecall(match)}
-                          className="ml-2 px-3 py-1.5 bg-white border border-[#e0e7ef] rounded-lg text-xs font-medium text-[#6b7280] hover:bg-[#f1f8e9] transition-colors shrink-0"
+                          className="ml-2 px-3 py-1.5 bg-white border border-border-main rounded-lg text-xs font-medium text-gray-500 hover:bg-primary-50 transition-colors shrink-0"
                         >
                           再コール
                         </button>
@@ -595,24 +595,24 @@ export default function BroadcastPanel() {
 
       {/* コール履歴 */}
       {callLog.length > 0 && (
-        <div className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef]">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main">
           <button
             onClick={() => setShowLog(!showLog)}
-            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-[#111827] hover:bg-[#f1f8e9] transition-colors"
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-gray-900 hover:bg-primary-50 transition-colors"
           >
-            {showLog ? <ChevronDown className="w-4 h-4 text-[#6b7280]" /> : <ChevronRight className="w-4 h-4 text-[#6b7280]" />}
-            <History className="w-4 h-4 text-[#2e7d32]" />
+            {showLog ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+            <History className="w-4 h-4 text-primary-500" />
             コール履歴 ({callLog.length}件)
           </button>
           {showLog && (
             <div className="px-4 pb-3 max-h-48 overflow-auto">
               <div className="space-y-1">
                 {callLog.map((log) => (
-                  <div key={`${log.matchId}-${log.timestamp.getTime()}`} className="flex items-start gap-2 text-xs text-[#6b7280] py-1 border-b border-[#f1f8e9] last:border-0">
-                    <span className="font-mono text-[#111827] shrink-0">
+                  <div key={`${log.matchId}-${log.timestamp.getTime()}`} className="flex items-start gap-2 text-xs text-gray-500 py-1 border-b border-[#f1f8e9] last:border-0">
+                    <span className="font-mono text-gray-900 shrink-0">
                       {log.timestamp.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
-                    <span className="bg-[#e8f5e9] text-[#2e7d32] px-1.5 rounded shrink-0">
+                    <span className="bg-primary-50 text-primary-500 px-1.5 rounded shrink-0">
                       {log.courtNumber}番
                     </span>
                     <span className="truncate">{log.eventName} {log.round}</span>
@@ -645,17 +645,17 @@ function MatchCard({
 }) {
   const bgClass = isSpeaking
     ? 'bg-[#FFF3CD] border-[#FFD93D] animate-pulse'
-    : 'bg-white border-[#e0e7ef]';
+    : 'bg-white border-border-main';
 
   // コート番号が未設定で前回の値がある場合、自動設定
   const courtValue = match.courtNumber || '';
 
   return (
-    <div className={`rounded-[10px] shadow-sm border p-4 transition-all ${bgClass}`}>
+    <div className={`rounded-xl shadow-sm border p-4 transition-all ${bgClass}`}>
       {/* 上部：種目・回線 */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-bold text-[#2e7d32]">{match.eventName}</span>
-        <span className="text-xs text-[#6b7280]">{match.round}</span>
+        <span className="text-xs font-bold text-primary-500">{match.eventName}</span>
+        <span className="text-xs text-gray-500">{match.round}</span>
         {isSpeaking && (
           <span className="flex items-center gap-1 text-xs text-orange-600 font-medium ml-auto">
             <Volume2 className="w-3 h-3 animate-pulse" />
@@ -669,38 +669,38 @@ function MatchCard({
         {/* Player A */}
         <div className="min-w-0">
           <div className="flex items-baseline gap-1">
-            <span className="text-xs font-mono text-[#2e7d32] shrink-0">{match.numberA}番</span>
-            <span className="font-bold text-[#111827] text-sm truncate whitespace-nowrap">{match.nameA}</span>
+            <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberA}番</span>
+            <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameA}</span>
           </div>
           {match.type === 'doubles' && match.pairNameA && (
-            <p className="text-xs text-[#6b7280] truncate whitespace-nowrap ml-6">{match.pairNameA}</p>
+            <p className="text-xs text-gray-500 truncate whitespace-nowrap ml-6">{match.pairNameA}</p>
           )}
-          <p className="text-xs text-[#6b7280] truncate ml-6">{match.affA}</p>
+          <p className="text-xs text-gray-500 truncate ml-6">{match.affA}</p>
         </div>
 
-        <span className="text-xs font-bold text-[#6b7280] px-2">VS</span>
+        <span className="text-xs font-bold text-gray-500 px-2">VS</span>
 
         {/* Player B */}
         <div className="min-w-0 text-right">
           <div className="flex items-baseline gap-1 justify-end">
-            <span className="font-bold text-[#111827] text-sm truncate whitespace-nowrap">{match.nameB}</span>
-            <span className="text-xs font-mono text-[#2e7d32] shrink-0">{match.numberB}番</span>
+            <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameB}</span>
+            <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberB}番</span>
           </div>
           {match.type === 'doubles' && match.pairNameB && (
-            <p className="text-xs text-[#6b7280] truncate whitespace-nowrap mr-6">{match.pairNameB}</p>
+            <p className="text-xs text-gray-500 truncate whitespace-nowrap mr-6">{match.pairNameB}</p>
           )}
-          <p className="text-xs text-[#6b7280] truncate mr-6">{match.affB}</p>
+          <p className="text-xs text-gray-500 truncate mr-6">{match.affB}</p>
         </div>
       </div>
 
       {/* 下部：コート・時間・コールボタン */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1">
-          <label className="text-xs text-[#6b7280]">コート:</label>
+          <label className="text-xs text-gray-500">コート:</label>
           <select
             value={courtValue}
             onChange={e => onUpdateMatch(match.id, 'courtNumber', e.target.value)}
-            className="border border-[#e0e7ef] rounded px-2 py-1 text-sm w-20 bg-white"
+            className="border border-border-main rounded px-2 py-1 text-sm w-20 bg-white"
           >
             <option value="">--</option>
             {Array.from({ length: 16 }, (_, i) => i + 1).map(n => (
@@ -710,12 +710,12 @@ function MatchCard({
         </div>
 
         <div className="flex items-center gap-1">
-          <label className="text-xs text-[#6b7280]">時間:</label>
+          <label className="text-xs text-gray-500">時間:</label>
           <input
             type="time"
             value={match.startTime}
             onChange={e => onUpdateMatch(match.id, 'startTime', e.target.value)}
-            className="border border-[#e0e7ef] rounded px-2 py-1 text-sm w-28 bg-white"
+            className="border border-border-main rounded px-2 py-1 text-sm w-28 bg-white"
           />
         </div>
 
