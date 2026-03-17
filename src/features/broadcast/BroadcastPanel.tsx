@@ -1,5 +1,8 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { Volume2, Upload, Square, Play, History, Settings2, ChevronDown, ChevronRight, Mic } from 'lucide-react';
+import { Volume2, Upload, Square, Play, History, Settings2, ChevronDown, ChevronRight, Mic, Database } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/database';
+import { useAppStore } from '../../stores/appStore';
 import type { MatchCall, CallLogEntry, VoiceSettings } from './types';
 import { buildCallText } from './callTextBuilder';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
@@ -79,7 +82,15 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+function getRoundName(round: number, totalRounds: number): string {
+  if (round === totalRounds) return '決勝';
+  if (round === totalRounds - 1) return '準決勝';
+  if (round === totalRounds - 2) return '準々決勝';
+  return `${round}回戦`;
+}
+
 export default function BroadcastPanel() {
+  const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [matches, setMatches] = useState<MatchCall[]>([]);
   const [dataType, setDataType] = useState<'singles' | 'doubles'>('singles');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
@@ -94,10 +105,126 @@ export default function BroadcastPanel() {
   const [showLog, setShowLog] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [lastCourtNumber, setLastCourtNumber] = useState('');
+  const [dbLoading, setDbLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const { isSpeaking, speak, stop, testVoice } = useSpeechSynthesis();
+
+  // データベースから種目一覧を取得
+  const dbEvents = useLiveQuery(
+    () => currentTournamentId ? db.events.where('tournamentId').equals(currentTournamentId).toArray() : [],
+    [currentTournamentId]
+  ) || [];
+
+  // データベースから試合データを読み込む
+  const handleLoadFromDB = useCallback(async () => {
+    if (!currentTournamentId) {
+      alert('大会が選択されていません。ホーム画面で大会を選択してください。');
+      return;
+    }
+    setDbLoading(true);
+    try {
+      const events = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      if (events.length === 0) {
+        alert('この大会には種目が登録されていません。');
+        setDbLoading(false);
+        return;
+      }
+
+      const allMatchCalls: MatchCall[] = [];
+      let idCounter = 1;
+      let hasDoubles = false;
+
+      for (const event of events) {
+        const eventMatches = await db.matches.where('eventId').equals(event.eventId).toArray();
+        const drawData = await db.draws.where('eventId').equals(event.eventId).first();
+        const totalRounds = drawData ? Math.log2(drawData.drawSize) : 1;
+
+        // 両選手が埋まっている待機中/準備完了の試合のみ
+        const validMatches = eventMatches.filter(
+          m => (m.status === 'waiting' || m.status === 'ready') &&
+               m.player1Name && m.player2Name &&
+               m.player1Name !== 'BYE' && m.player2Name !== 'BYE'
+        );
+
+        const isDoubles = event.type === 'Doubles';
+        if (isDoubles) hasDoubles = true;
+
+        for (const m of validMatches) {
+          const roundName = getRoundName(m.round, totalRounds);
+
+          if (isDoubles) {
+            // ダブルスの場合: "山田 太郎 / 佐藤 花子" を分割
+            const [nameA, pairNameA] = m.player1Name.includes(' / ')
+              ? m.player1Name.split(' / ')
+              : [m.player1Name, ''];
+            const [nameB, pairNameB] = m.player2Name.includes(' / ')
+              ? m.player2Name.split(' / ')
+              : [m.player2Name, ''];
+            const [affA, pairAffA] = m.player1Affiliation.includes(' / ')
+              ? m.player1Affiliation.split(' / ')
+              : [m.player1Affiliation, m.player1Affiliation];
+            const [affB, pairAffB] = m.player2Affiliation.includes(' / ')
+              ? m.player2Affiliation.split(' / ')
+              : [m.player2Affiliation, m.player2Affiliation];
+
+            allMatchCalls.push({
+              id: idCounter++,
+              eventName: event.name,
+              round: `${roundName} #${m.position}`,
+              numberA: m.matchOrder,
+              nameA: nameA.trim(),
+              affA: affA.trim(),
+              pairNameA: pairNameA.trim(),
+              pairAffA: pairAffA.trim(),
+              numberB: m.matchOrder,
+              nameB: nameB.trim(),
+              affB: affB.trim(),
+              pairNameB: pairNameB.trim(),
+              pairAffB: pairAffB.trim(),
+              type: 'doubles',
+              status: 'pending',
+              courtNumber: m.courtId || '',
+              startTime: m.scheduledTime || '',
+            });
+          } else {
+            allMatchCalls.push({
+              id: idCounter++,
+              eventName: event.name,
+              round: `${roundName} #${m.position}`,
+              numberA: m.matchOrder,
+              nameA: m.player1Name,
+              affA: m.player1Affiliation,
+              numberB: m.matchOrder,
+              nameB: m.player2Name,
+              affB: m.player2Affiliation,
+              type: 'singles',
+              status: 'pending',
+              courtNumber: m.courtId || '',
+              startTime: m.scheduledTime || '',
+            });
+          }
+        }
+      }
+
+      if (allMatchCalls.length === 0) {
+        alert('放送対象の試合がありません。\n試合が生成されているか、選手名が入力されているか確認してください。');
+        setDbLoading(false);
+        return;
+      }
+
+      setMatches(allMatchCalls);
+      setDataType(hasDoubles ? 'doubles' : 'singles');
+      setActiveTab('all');
+      setCallLog([]);
+    } catch (err) {
+      console.error(err);
+      alert('データベースからの読み込みに失敗しました。');
+    } finally {
+      setDbLoading(false);
+    }
+  }, [currentTournamentId]);
 
   // 種目タブ（順序を安定化）
   const eventNames = useMemo(() => {
@@ -214,13 +341,21 @@ export default function BroadcastPanel() {
               放送コールシステム
             </h1>
             <p className="text-sm text-[#6b7280] mt-1">
-              CSVインポート → コート指定 → ワンクリックで試合コール放送
+              試合データ読込 → コート指定 → ワンクリックで試合コール放送
             </p>
           </div>
           <div className="flex gap-2">
             <button
+              onClick={handleLoadFromDB}
+              disabled={dbLoading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#1565c0] text-white rounded-lg text-sm font-medium hover:bg-[#0d47a1] transition-colors disabled:opacity-50"
+            >
+              <Database className="w-4 h-4" />
+              {dbLoading ? '読込中...' : '試合データから読込'}
+            </button>
+            <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#2e7d32] text-white rounded-lg text-sm font-medium hover:bg-[#1b5e20] transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-white text-[#6b7280] border border-[#e0e7ef] rounded-lg text-sm font-medium hover:bg-[#f1f8e9] transition-colors"
             >
               <Upload className="w-4 h-4" />
               CSVインポート
@@ -329,19 +464,41 @@ export default function BroadcastPanel() {
       <div className="flex-1 min-h-0 flex flex-col">
         {matches.length === 0 ? (
           /* ドロップゾーン */
-          <div
-            ref={dropRef}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            className="flex-1 flex flex-col items-center justify-center bg-white rounded-[10px] border-2 border-dashed border-[#e0e7ef] p-12 text-center hover:border-[#2e7d32] hover:bg-[#f1f8e9] transition-colors cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="w-12 h-12 text-[#6b7280] mb-4 opacity-40" />
-            <p className="text-lg font-bold text-[#111827] mb-2">CSVファイルをドラッグ＆ドロップ</p>
-            <p className="text-sm text-[#6b7280] mb-4">またはクリックしてファイルを選択</p>
-            <div className="text-xs text-[#6b7280] space-y-1">
-              <p>対応形式: シングルス（12列） / ダブルス（16列）</p>
-              <p>Google Sheets「対戦順」シートからCSVダウンロードしたファイル</p>
+          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[10px] border-2 border-dashed border-[#e0e7ef] p-12 text-center">
+            {/* データベースから読込（メイン） */}
+            <Database className="w-12 h-12 text-[#1565c0] mb-4 opacity-60" />
+            <p className="text-lg font-bold text-[#111827] mb-2">データベースから試合データを読み込む</p>
+            <p className="text-sm text-[#6b7280] mb-4">
+              エントリー・ドロー作成後、試合が生成されていればすぐに放送できます
+            </p>
+            <button
+              onClick={handleLoadFromDB}
+              disabled={dbLoading}
+              className="flex items-center gap-2 px-6 py-3 bg-[#1565c0] text-white rounded-lg text-base font-medium hover:bg-[#0d47a1] transition-colors disabled:opacity-50 mb-6"
+            >
+              <Database className="w-5 h-5" />
+              {dbLoading ? '読込中...' : '試合データから読込'}
+            </button>
+
+            {dbEvents.length > 0 && (
+              <p className="text-xs text-[#6b7280] mb-6">
+                現在の大会: {dbEvents.length}種目が登録されています
+              </p>
+            )}
+
+            {/* CSV読込（代替手段） */}
+            <div className="border-t border-[#e0e7ef] pt-4 w-full max-w-md">
+              <p className="text-xs text-[#6b7280] mb-2">または</p>
+              <div
+                ref={dropRef}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-2 border border-dashed border-[#e0e7ef] rounded-lg text-sm text-[#6b7280] hover:border-[#2e7d32] hover:bg-[#f1f8e9] transition-colors cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                CSVファイルをドラッグ＆ドロップ / クリックで選択
+              </div>
             </div>
           </div>
         ) : (
@@ -412,7 +569,7 @@ export default function BroadcastPanel() {
                               コール済
                             </span>
                           </div>
-                          <p className="text-sm font-medium text-[#111827] mt-0.5 truncate">
+                          <p className="text-sm font-medium text-[#111827] mt-0.5 truncate whitespace-nowrap">
                             {match.numberA}番 {match.nameA}
                             {match.type === 'doubles' && ` / ${match.pairNameA}`}
                             <span className="text-[#6b7280] mx-1">vs</span>
@@ -513,10 +670,10 @@ function MatchCard({
         <div className="min-w-0">
           <div className="flex items-baseline gap-1">
             <span className="text-xs font-mono text-[#2e7d32] shrink-0">{match.numberA}番</span>
-            <span className="font-bold text-[#111827] text-sm truncate">{match.nameA}</span>
+            <span className="font-bold text-[#111827] text-sm truncate whitespace-nowrap">{match.nameA}</span>
           </div>
           {match.type === 'doubles' && match.pairNameA && (
-            <p className="text-xs text-[#6b7280] truncate ml-6">{match.pairNameA}</p>
+            <p className="text-xs text-[#6b7280] truncate whitespace-nowrap ml-6">{match.pairNameA}</p>
           )}
           <p className="text-xs text-[#6b7280] truncate ml-6">{match.affA}</p>
         </div>
@@ -526,11 +683,11 @@ function MatchCard({
         {/* Player B */}
         <div className="min-w-0 text-right">
           <div className="flex items-baseline gap-1 justify-end">
-            <span className="font-bold text-[#111827] text-sm truncate">{match.nameB}</span>
+            <span className="font-bold text-[#111827] text-sm truncate whitespace-nowrap">{match.nameB}</span>
             <span className="text-xs font-mono text-[#2e7d32] shrink-0">{match.numberB}番</span>
           </div>
           {match.type === 'doubles' && match.pairNameB && (
-            <p className="text-xs text-[#6b7280] truncate mr-6">{match.pairNameB}</p>
+            <p className="text-xs text-[#6b7280] truncate whitespace-nowrap mr-6">{match.pairNameB}</p>
           )}
           <p className="text-xs text-[#6b7280] truncate mr-6">{match.affB}</p>
         </div>

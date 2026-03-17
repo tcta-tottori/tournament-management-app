@@ -213,7 +213,7 @@ export default function Scoreboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="font-bold text-[#111827]">{m.player1Name}</p>
+                          <p className="font-bold text-[#111827] whitespace-nowrap">{m.player1Name}</p>
                           <p className="text-xs text-[#6b7280]">{m.player1Affiliation}</p>
                         </div>
                         {editingMatchId === m.matchId && (
@@ -229,7 +229,7 @@ export default function Scoreboard() {
                       <div className="text-center text-xs text-[#6b7280]">vs</div>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="font-bold text-[#111827]">{m.player2Name}</p>
+                          <p className="font-bold text-[#111827] whitespace-nowrap">{m.player2Name}</p>
                           <p className="text-xs text-[#6b7280]">{m.player2Affiliation}</p>
                         </div>
                         {editingMatchId === m.matchId && (
@@ -295,9 +295,9 @@ export default function Scoreboard() {
                       <tr key={m.matchId} className={`border-b border-[#e0e7ef] hover:bg-[#e8f5e9] ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
                         <td className="py-2 px-3 font-mono text-[#6b7280]">{m.matchOrder}</td>
                         <td className="py-2 px-3">
-                          <span className="font-medium">{m.player1Name}</span>
+                          <span className="font-medium whitespace-nowrap">{m.player1Name}</span>
                           <span className="text-[#6b7280] mx-2">vs</span>
-                          <span className="font-medium">{m.player2Name}</span>
+                          <span className="font-medium whitespace-nowrap">{m.player2Name}</span>
                         </td>
                         <td className="py-2 px-3">
                           <select
@@ -353,8 +353,8 @@ export default function Scoreboard() {
                       return (
                         <tr key={m.matchId} className={`border-b border-[#e0e7ef] hover:bg-[#e8f5e9] ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
                           <td className="py-2 px-3 font-mono text-[#6b7280]">{m.matchOrder}</td>
-                          <td className="py-2 px-3 font-bold text-[#111827]">{winner}</td>
-                          <td className="py-2 px-3 text-[#6b7280]">{loser || 'BYE'}</td>
+                          <td className="py-2 px-3 font-bold text-[#111827] whitespace-nowrap">{winner}</td>
+                          <td className="py-2 px-3 text-[#6b7280] whitespace-nowrap">{loser || 'BYE'}</td>
                           <td className="py-2 px-3 font-mono">{m.score || (m.status === 'walkover' ? 'W/O' : '-')}</td>
                           <td className="py-2 px-3">
                             <button onClick={() => handleResetMatch(m.matchId)} disabled={isProcessing} className="text-[#6b7280] hover:text-[#111827] disabled:opacity-50" title="リセット">

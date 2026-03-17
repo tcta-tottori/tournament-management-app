@@ -141,7 +141,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                   {slot.seed}
                 </div>
               )}
-              <div className="flex-1 truncate text-sm font-medium text-gray-800" title={slot.name}>
+              <div className="flex-1 truncate whitespace-nowrap text-sm font-medium text-gray-800" title={slot.name}>
                 {slot.name}
               </div>
               {!slot.isBye && slot.affiliation && (
@@ -193,7 +193,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                   <div className="flex flex-col items-center justify-center w-full">
                     {displayName ? (
                       <>
-                        <div className="text-indigo-600 font-bold text-sm truncate w-full text-center" title={displayName}>
+                        <div className="text-indigo-600 font-bold text-sm truncate whitespace-nowrap w-full text-center" title={displayName}>
                           {displayName}
                         </div>
                         <div className="text-[10px] text-indigo-400 tracking-widest">WINNER</div>
@@ -205,7 +205,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                 ) : displayName ? (
                   <div className="flex flex-col justify-center w-full min-w-0">
                     <div className="flex items-center gap-1">
-                      <div className="text-sm font-medium text-gray-800 truncate flex-1" title={displayName}>
+                      <div className="text-sm font-medium text-gray-800 truncate whitespace-nowrap flex-1" title={displayName}>
                         {displayName}
                       </div>
                       {matchResult?.courtName && (

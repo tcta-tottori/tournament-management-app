@@ -240,7 +240,7 @@ export default function EntryList() {
                                   [{entry.seedNo}]
                                 </span>
                               )}
-                              <span className="truncate max-w-[200px]">{activePlayer?.name || '不明な選手'}</span>
+                              <span className="truncate whitespace-nowrap max-w-[200px]">{activePlayer?.name || '不明な選手'}</span>
                               {entry.status === 'withdrawn' && (
                                 <span className="text-[10px] bg-red-100 text-[#dc2626] px-1.5 py-0.5 rounded uppercase font-semibold">WD</span>
                               )}
@@ -255,7 +255,7 @@ export default function EntryList() {
                               <div className="text-gray-300">/</div>
                               <div>
                                 <div className="font-bold text-[#111827] flex items-center gap-2">
-                                  <span className="truncate max-w-[200px]">{partnerPlayer.name}</span>
+                                  <span className="truncate whitespace-nowrap max-w-[200px]">{partnerPlayer.name}</span>
                                 </div>
                                 <div className="text-xs text-[#6b7280] mt-0.5">
                                   {partnerPlayer.affiliation || '-'}

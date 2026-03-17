@@ -138,9 +138,9 @@ export default function LiveDashboard() {
                       <div className="text-xs text-[#16a34a] font-medium mb-1 flex items-center gap-1">
                         <Play className="w-3 h-3" /> 試合中
                       </div>
-                      <p className="text-sm font-medium">{currentMatch.player1Name}</p>
+                      <p className="text-sm font-medium whitespace-nowrap">{currentMatch.player1Name}</p>
                       <p className="text-xs text-[#6b7280] text-center">vs</p>
-                      <p className="text-sm font-medium">{currentMatch.player2Name}</p>
+                      <p className="text-sm font-medium whitespace-nowrap">{currentMatch.player2Name}</p>
                     </div>
                   ) : (
                     <div className="text-sm text-[#6b7280]">
@@ -150,7 +150,7 @@ export default function LiveDashboard() {
                   {nextMatch && !currentMatch && (
                     <div className="mt-2 pt-2 border-t border-[#e0e7ef]">
                       <p className="text-xs text-[#2e7d32] font-medium">次の試合:</p>
-                      <p className="text-xs text-[#6b7280] truncate">{nextMatch.player1Name} vs {nextMatch.player2Name}</p>
+                      <p className="text-xs text-[#6b7280] truncate whitespace-nowrap">{nextMatch.player1Name} vs {nextMatch.player2Name}</p>
                     </div>
                   )}
                 </div>

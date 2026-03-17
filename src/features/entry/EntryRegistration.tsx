@@ -221,7 +221,7 @@ export default function EntryRegistration() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={`font-bold truncate ${isSelectedForPartner ? 'text-white' : 'text-[#111827]'}`}>{player.name}</span>
+                          <span className={`font-bold truncate whitespace-nowrap ${isSelectedForPartner ? 'text-white' : 'text-[#111827]'}`}>{player.name}</span>
                           {isRegistered && <span className="text-[10px] bg-gray-200 text-[#6b7280] px-1.5 py-0.5 rounded uppercase">登録済</span>}
                         </div>
                         <div className={`text-xs truncate ${isSelectedForPartner ? 'text-blue-200' : 'text-[#6b7280]'}`}>
@@ -285,14 +285,14 @@ export default function EntryRegistration() {
                         <div className="flex items-center gap-3">
                           <span className="text-[#6b7280] font-bold text-sm w-6 text-center">#{idx + 1}</span>
                           <div>
-                            <div className="font-bold text-[#111827] text-sm">{p1?.name || '不明'}</div>
+                            <div className="font-bold text-[#111827] text-sm whitespace-nowrap">{p1?.name || '不明'}</div>
                             <div className="text-xs text-[#6b7280]">{p1?.affiliation || '-'}</div>
                           </div>
                           {p2 && (
                             <>
                               <span className="text-gray-300">/</span>
                               <div>
-                                <div className="font-bold text-[#111827] text-sm">{p2.name}</div>
+                                <div className="font-bold text-[#111827] text-sm whitespace-nowrap">{p2.name}</div>
                                 <div className="text-xs text-[#6b7280]">{p2.affiliation || '-'}</div>
                               </div>
                             </>

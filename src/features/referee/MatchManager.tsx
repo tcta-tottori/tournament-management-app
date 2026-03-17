@@ -232,73 +232,259 @@ export default function MatchManager() {
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>審判用紙 - ${eventName}</title>
 <style>
-  @page { size: A4; margin: 10mm; }
-  body { font-family: 'Hiragino Sans', sans-serif; margin: 0; padding: 0; }
-  .sheet { page-break-after: always; border: 2px solid #333; padding: 20px; margin-bottom: 8px; box-sizing: border-box; }
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif; margin: 0; padding: 0; color: #111; }
+  .sheet {
+    page-break-after: always;
+    border: 3px solid #000;
+    padding: 24px 28px;
+    min-height: 260mm;
+    display: flex;
+    flex-direction: column;
+  }
   .sheet:last-child { page-break-after: auto; }
-  .tournament-name { text-align: center; font-size: 20px; font-weight: bold; margin: 0 0 4px; }
-  .tournament-info { text-align: center; font-size: 11px; color: #555; margin: 0 0 8px; }
-  .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 12px; }
-  .header h2 { margin: 0 0 4px; font-size: 16px; }
-  .header h3 { margin: 0; font-size: 13px; color: #555; }
-  .rules { text-align: center; font-size: 12px; color: #333; margin: 8px 0 12px; padding: 6px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; }
-  .players { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; font-size: 18px; }
-  .player { text-align: center; flex: 1; }
-  .player .name { font-weight: bold; font-size: ${playerNameFontSize}; }
-  .player .aff { font-size: 12px; color: #666; margin-top: 4px; }
-  .vs { font-weight: bold; font-size: 14px; color: #999; }
-  .score-area { margin: 16px 0; }
-  .score-area table { width: 100%; border-collapse: collapse; }
-  .score-area th, .score-area td { border: 1px solid #333; padding: 8px 4px; text-align: center; height: 32px; }
-  .score-area th { background: #f5f5f5; font-size: 12px; }
-  .meta { display: flex; justify-content: space-between; margin-top: 12px; font-size: 12px; }
-  .meta-item { border-bottom: 1px solid #333; min-width: 120px; padding: 4px; }
-  .signatures { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 28px; font-size: 12px; }
-  .sig-box { flex: 1; text-align: center; min-width: ${isDoubles ? '40%' : '30%'}; }
-  .sig-line { border-bottom: 1px solid #333; margin: 24px 12px 4px; }
-  .sig-label { color: #555; }
+
+  .tournament-name {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 0 6px;
+    letter-spacing: 2px;
+  }
+  .tournament-info {
+    text-align: center;
+    font-size: 13px;
+    margin: 0 0 16px;
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+  }
+
+  .event-header {
+    text-align: center;
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 10px 0;
+    margin-bottom: 10px;
+  }
+  .event-header .event-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0 0 4px;
+  }
+  .event-header .round-info {
+    font-size: 14px;
+    margin: 0;
+  }
+  .rules {
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    margin: 8px 0 18px;
+    padding: 8px 12px;
+    border: 1px solid #666;
+    background: #f7f7f7;
+  }
+
+  .player-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 20px;
+  }
+  .player-table td {
+    border: 2px solid #000;
+    padding: 12px 16px;
+    vertical-align: middle;
+  }
+  .player-table .player-name {
+    font-size: ${playerNameFontSize};
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  .player-table .player-aff {
+    font-size: 12px;
+    color: #444;
+    text-align: center;
+    width: 120px;
+  }
+  .player-table .vs-cell {
+    text-align: center;
+    font-weight: bold;
+    font-size: 13px;
+    color: #666;
+    border-left: none;
+    border-right: none;
+    padding: 4px 0;
+    background: #f0f0f0;
+  }
+
+  .score-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 24px;
+  }
+  .score-table th, .score-table td {
+    border: 2px solid #000;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .score-table th {
+    background: #e8e8e8;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 8px 4px;
+    height: 36px;
+  }
+  .score-table td {
+    height: 44px;
+    min-width: 56px;
+    font-size: 14px;
+  }
+  .score-table td.player-label {
+    font-weight: bold;
+    font-size: 14px;
+    padding: 8px 12px;
+    text-align: left;
+    background: #fafafa;
+    min-width: 100px;
+  }
+
+  .match-meta {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 20px;
+    font-size: 14px;
+  }
+  .meta-field {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .meta-field .meta-label {
+    font-weight: bold;
+  }
+  .meta-field .meta-blank {
+    display: inline-block;
+    border-bottom: 1px solid #000;
+    min-width: 100px;
+    height: 20px;
+  }
+  .winner-row {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0 0 28px;
+    padding: 10px 0;
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+  }
+  .winner-row .winner-blank {
+    display: inline-block;
+    border-bottom: 2px solid #000;
+    min-width: 260px;
+    height: 24px;
+    margin-left: 8px;
+  }
+
+  .signatures {
+    margin-top: auto;
+    padding-top: 16px;
+  }
+  .sig-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  .sig-item {
+    flex: 1;
+    text-align: center;
+  }
+  .sig-item .sig-label {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+  .sig-item .sig-line {
+    border-bottom: 1px solid #000;
+    height: 28px;
+    margin: 0 8px;
+  }
 </style></head><body>
 ${printableMatches.map(m => {
       const roundName = getRoundName(m.round, totalRounds);
+
       const signaturesHtml = isDoubles
         ? `<div class="signatures">
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ペア1 選手A 署名</div></div>
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ペア1 選手B 署名</div></div>
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ペア2 選手A 署名</div></div>
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">ペア2 選手B 署名</div></div>
-    <div class="sig-box" style="flex-basis:100%; margin-top:8px;"><div class="sig-line" style="max-width:200px; margin-left:auto; margin-right:auto;"></div><div class="sig-label">主審 署名</div></div>
+    <div class="sig-row">
+      <div class="sig-item"><div class="sig-label">選手A サイン</div><div class="sig-line"></div></div>
+      <div class="sig-item"><div class="sig-label">選手B サイン</div><div class="sig-line"></div></div>
+      <div class="sig-item"><div class="sig-label">選手C サイン</div><div class="sig-line"></div></div>
+      <div class="sig-item"><div class="sig-label">選手D サイン</div><div class="sig-line"></div></div>
+    </div>
+    <div class="sig-row" style="justify-content:center;">
+      <div class="sig-item" style="max-width:240px;"><div class="sig-label">審判 サイン</div><div class="sig-line"></div></div>
+    </div>
   </div>`
         : `<div class="signatures">
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">選手1 署名</div></div>
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">選手2 署名</div></div>
-    <div class="sig-box"><div class="sig-line"></div><div class="sig-label">主審 署名</div></div>
+    <div class="sig-row">
+      <div class="sig-item"><div class="sig-label">選手A サイン</div><div class="sig-line"></div></div>
+      <div class="sig-item"><div class="sig-label">選手B サイン</div><div class="sig-line"></div></div>
+      <div class="sig-item"><div class="sig-label">審判 サイン</div><div class="sig-line"></div></div>
+    </div>
   </div>`;
+
       return `
 <div class="sheet">
   <p class="tournament-name">${tournamentName}</p>
-  <p class="tournament-info">${tournamentDate}${tournamentVenue ? ` / ${tournamentVenue}` : ''}</p>
-  <div class="header">
-    <h2>${eventName}</h2>
-    <h3>第${m.matchOrder}試合 (${roundName} #${m.position})</h3>
+  <div class="tournament-info">
+    <span>${tournamentDate}</span>
+    ${tournamentVenue ? `<span>${tournamentVenue}</span>` : ''}
   </div>
-  <div class="rules">${games}ゲーム先取 / ${deuceLabel}${sets > 1 ? ` / ${sets}セットマッチ` : ''}</div>
-  <div class="players">
-    <div class="player"><div class="name">${m.player1Name}</div><div class="aff">${m.player1Affiliation}</div></div>
-    <div class="vs">vs</div>
-    <div class="player"><div class="name">${m.player2Name}</div><div class="aff">${m.player2Affiliation}</div></div>
+
+  <div class="event-header">
+    <p class="event-name">${eventName}</p>
+    <p class="round-info">第${m.matchOrder}試合 / ${roundName} #${m.position}</p>
   </div>
-  <div class="score-area">
-    <table>
-      <tr><th></th>${setHeaders}<th>Tiebreak</th></tr>
-      <tr><td style="font-weight:bold">${getShortName(m.player1Name)}</td>${setEmptyCells}<td></td></tr>
-      <tr><td style="font-weight:bold">${getShortName(m.player2Name)}</td>${setEmptyCells}<td></td></tr>
-    </table>
+
+  <div class="rules">${games}ゲーム先取　${deuceLabel}${sets > 1 ? `　${sets}セットマッチ` : ''}</div>
+
+  <table class="player-table">
+    <tr>
+      <td class="player-name">${m.player1Name}</td>
+      <td class="player-aff">${m.player1Affiliation || ''}</td>
+    </tr>
+    <tr>
+      <td class="vs-cell" colspan="2">vs</td>
+    </tr>
+    <tr>
+      <td class="player-name">${m.player2Name}</td>
+      <td class="player-aff">${m.player2Affiliation || ''}</td>
+    </tr>
+  </table>
+
+  <table class="score-table">
+    <tr>
+      <th></th>${setHeaders}
+    </tr>
+    <tr>
+      <td class="player-label">${getShortName(m.player1Name)}</td>${setEmptyCells}
+    </tr>
+    <tr>
+      <td class="player-label">${getShortName(m.player2Name)}</td>${setEmptyCells}
+    </tr>
+  </table>
+
+  <div class="match-meta">
+    <div class="meta-field"><span class="meta-label">コート</span><span class="meta-blank">${m.courtId || ''}</span></div>
+    <div class="meta-field"><span class="meta-label">開始時刻</span><span class="meta-blank">${m.scheduledTime || ''}</span></div>
+    <div class="meta-field"><span class="meta-label">終了時刻</span><span class="meta-blank"></span></div>
   </div>
-  <div class="meta">
-    <div>コート: <span class="meta-item">${m.courtId || '　　　　　'}</span></div>
-    <div>審判: <span class="meta-item">${m.refereeName || '　　　　　'}</span></div>
-    <div>開始時刻: <span class="meta-item">${m.scheduledTime || '　　:　　'}</span></div>
+
+  <div class="winner-row">
+    勝者:<span class="winner-blank"></span>
   </div>
+
   ${signaturesHtml}
 </div>`;
     }).join('')}
@@ -419,12 +605,12 @@ ${printableMatches.map(m => {
                             <tr key={m.matchId} className={`border-b border-[#e0e7ef] hover:bg-[#e8f5e9] transition-colors ${idx % 2 === 1 ? 'bg-[#f6f9fc]' : ''}`}>
                               <td className="py-2.5 px-3 text-center font-mono text-[#6b7280]">{m.matchOrder}</td>
                               <td className="py-2.5 px-3">
-                                <span className="font-medium">{m.player1Name}</span>
+                                <span className="font-medium whitespace-nowrap">{m.player1Name}</span>
                                 {m.player1Affiliation && <span className="text-xs text-[#6b7280] ml-1">({m.player1Affiliation})</span>}
                               </td>
                               <td className="py-2.5 px-3 text-center text-[#6b7280] text-xs">vs</td>
                               <td className="py-2.5 px-3">
-                                <span className="font-medium">{m.player2Name}</span>
+                                <span className="font-medium whitespace-nowrap">{m.player2Name}</span>
                                 {m.player2Affiliation && <span className="text-xs text-[#6b7280] ml-1">({m.player2Affiliation})</span>}
                               </td>
                               <td className="py-2.5 px-3 text-center">
@@ -452,7 +638,7 @@ ${printableMatches.map(m => {
                             <tr key={m.matchId} className="border-b border-[#e0e7ef]">
                               <td className="py-2 px-3 w-12 text-center font-mono">{m.matchOrder}</td>
                               <td className="py-2 px-3">{roundLabel} #{m.position}</td>
-                              <td className="py-2 px-3">{m.player1Name || '(未定)'} vs {m.player2Name || '(未定)'}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">{m.player1Name || '(未定)'} vs {m.player2Name || '(未定)'}</td>
                               <td className="py-2 px-3 w-20 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.text}</span>
                               </td>

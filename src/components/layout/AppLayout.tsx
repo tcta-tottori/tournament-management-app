@@ -1,13 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, List, Dices, Trophy,
   ClipboardList, MonitorPlay, CalendarDays, BarChart2,
   Save, HelpCircle, MoreHorizontal, Volume2, MapPin
 } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/database';
+import { useAppStore } from '../../stores/appStore';
 import logoUrl from '/logo.png?url';
 
-const MAIN_TABS = [
+const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
   { id: 'S-02', path: '/entry', label: 'エントリー', icon: Users },
   { id: 'S-03', path: '/entry-list', label: 'リスト', icon: List },
@@ -26,10 +29,34 @@ const MORE_ITEMS = [
   { id: 'S-13', path: '/court-map', label: 'コートマップ', icon: MapPin },
 ];
 
+/** 抽選・ドロー表タブを非表示にするパス */
+const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
+
 export default function AppLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const currentTournamentId = useAppStore((s) => s.currentTournamentId);
+
+  // 現在の大会に紐づく種目を取得
+  const events = useLiveQuery(
+    () =>
+      currentTournamentId
+        ? db.events.where('tournamentId').equals(currentTournamentId).toArray()
+        : [],
+    [currentTournamentId]
+  );
+
+  // ミックス or 団体戦の種目があるかどうかでタブを出し分け
+  const mainTabs = useMemo(() => {
+    const hasDrawEvents = (events ?? []).some(
+      (e) =>
+        /ミックス|団体|mixed|team/i.test(e.name) ||
+        /ミックス|団体|mixed|team/i.test(e.type || '')
+    );
+    if (hasDrawEvents) return ALL_MAIN_TABS;
+    return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
+  }, [events]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -93,7 +120,7 @@ export default function AppLayout() {
           {/* メインタブ */}
           <div className="flex-1 overflow-x-auto scrollbar-hide">
             <div className="flex">
-              {MAIN_TABS.map((item) => (
+              {mainTabs.map((item) => (
                 <NavLink
                   key={item.id}
                   to={item.path}

@@ -236,6 +236,11 @@
   animation: dropdown-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* 選手名は改行しない */
+.player-name {
+  white-space: nowrap;
+}
+
 /* スクロールバー非表示 */
 .scrollbar-hide {
   -ms-overflow-style: none;
