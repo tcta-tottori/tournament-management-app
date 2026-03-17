@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, List, Dices, Trophy,
   ClipboardList, MonitorPlay, BarChart2,
-  Save, HelpCircle, MoreHorizontal, Volume2, MapPin
+  Save, HelpCircle, MoreHorizontal, Volume2, MapPin, ExternalLink
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -108,28 +108,46 @@ export default function AppLayout() {
           >
             鳥取市テニス協会
           </p>
-          <h1 className="text-[19px] font-extrabold text-white leading-tight tracking-wide">
+          <h1 className="text-[17px] sm:text-[19px] font-extrabold text-white leading-tight tracking-wide">
             大会運営システム
           </h1>
         </div>
 
-        {/* バージョン情報 */}
-        <div className="relative z-10 flex flex-col items-end ml-auto mr-1 gap-0.5">
-          <span
-            className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-md leading-normal"
+        {/* ドロー会議システムへのリンク + バージョン情報 */}
+        <div className="relative z-10 flex items-center ml-auto gap-2">
+          <a
+            href="https://tcta-tottori.github.io/tottori-tennis-draw/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white/90 hover:text-white transition-colors"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(201,165,90,0.12))',
+              background: 'linear-gradient(135deg, rgba(43,126,198,0.3), rgba(43,126,198,0.15))',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(43,126,198,0.3)',
             }}
+            title="ドロー会議システムを開く"
           >
-            v1.0
-          </span>
-          <span className="text-[10px] text-white/40 text-right">
-            2026.3.17 更新
-          </span>
+            <span className="hidden sm:inline">ドロー会議</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <div className="flex flex-col items-end gap-0.5">
+            <span
+              className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-md leading-normal"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(201,165,90,0.12))',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+              }}
+            >
+              v1.0
+            </span>
+            <span className="text-[10px] text-white/40 text-right hidden sm:block">
+              2026.3.17 更新
+            </span>
+          </div>
         </div>
 
         {/* 日本海の海岸線ウェーブ装飾 */}
