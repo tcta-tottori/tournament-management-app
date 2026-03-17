@@ -100,15 +100,34 @@ interface ImportSummary {
   drawCounts: Record<string, { drawSize: number; entryCount: number }>;
   hasTournamentInfo: boolean;
   hasRankingData: boolean;
+  tournamentDate: string;
+  tournamentVenue: string;
 }
 
 function parseImportFile(json: any): ParsedData | null {
   // draw-share形式
   if (json.type === 'draw-share') {
+    // draw-share形式にも大会情報が含まれる場合がある
+    const shareTournaments: DrawMeetingTournament[] = [];
+    if (json.tournament) {
+      shareTournaments.push(json.tournament);
+    } else if (json.tournamentDate || json.date) {
+      shareTournaments.push({
+        id: 0,
+        name: json.tournamentName || '',
+        events: '',
+        date: json.tournamentDate || json.date || '',
+        dayOfWeek: json.dayOfWeek || '',
+        venue: json.venue || json.tournamentVenue || '',
+        reserveDate: json.reserveDate || '',
+        reserveVenue: json.reserveVenue || '',
+        deadline: '',
+      });
+    }
     return {
       format: 'draw-share',
       tournamentName: json.tournamentName || '',
-      tournaments: [],
+      tournaments: shareTournaments,
       entries: [],
       drawResults: json.drawResults || {},
       confirmedEvents: json.confirmedEvents || {},
@@ -176,6 +195,7 @@ function buildSummary(data: ParsedData): ImportSummary {
     if (!eventCodes.includes(code)) eventCodes.push(code);
   }
 
+  const firstTournament = data.tournaments[0];
   return {
     playerCount: playerNames.size,
     eventCodes,
@@ -183,6 +203,8 @@ function buildSummary(data: ParsedData): ImportSummary {
     drawCounts,
     hasTournamentInfo: data.tournaments.length > 0,
     hasRankingData: Object.keys(data.rankings).length > 0,
+    tournamentDate: firstTournament?.date || '',
+    tournamentVenue: firstTournament?.venue || '',
   };
 }
 
@@ -195,6 +217,9 @@ export default function DataImport() {
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
   const [selectedTournament, setSelectedTournament] = useState<number | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editVenue, setEditVenue] = useState('');
+  const [editReserveDate, setEditReserveDate] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- JSON file handler (existing) ---
@@ -210,8 +235,15 @@ export default function DataImport() {
         }
         setParsedData(data);
         setParsedExcel(null);
-        setSummary(buildSummary(data));
+        const sum = buildSummary(data);
+        setSummary(sum);
         setImportResult(null);
+        // 日程・会場をプリセット
+        setEditDate(sum.tournamentDate);
+        setEditVenue(sum.tournamentVenue);
+        if (data.tournaments.length > 0) {
+          setEditReserveDate(data.tournaments[0].reserveDate || '');
+        }
         // 大会が1つだけならプリセレクト
         if (data.tournaments.length === 1) setSelectedTournament(data.tournaments[0].id);
       } catch (err) {
@@ -288,9 +320,9 @@ export default function DataImport() {
       await db.tournaments.add({
         tournamentId,
         name: tournamentName,
-        date: selTournament?.date || '',
-        venue: selTournament?.venue || '',
-        reserveDate: selTournament?.reserveDate || '',
+        date: editDate || selTournament?.date || '',
+        venue: editVenue || selTournament?.venue || '',
+        reserveDate: editReserveDate || selTournament?.reserveDate || '',
         reserveVenue: selTournament?.reserveVenue || '',
         createdAt: now,
       });
@@ -634,9 +666,9 @@ export default function DataImport() {
       await db.tournaments.add({
         tournamentId,
         name: tournamentName,
-        date: '',
-        venue: '',
-        reserveDate: '',
+        date: editDate,
+        venue: editVenue,
+        reserveDate: editReserveDate,
         reserveVenue: '',
         createdAt: now,
       });
@@ -775,6 +807,9 @@ export default function DataImport() {
     setParsedExcel(null);
     setImportResult(null);
     setSelectedTournament(null);
+    setEditDate('');
+    setEditVenue('');
+    setEditReserveDate('');
   };
 
   // --- Excel preview helpers ---
@@ -858,7 +893,12 @@ export default function DataImport() {
                       type="radio"
                       name="tournament"
                       checked={selectedTournament === t.id}
-                      onChange={() => setSelectedTournament(t.id)}
+                      onChange={() => {
+                        setSelectedTournament(t.id);
+                        setEditDate(t.date || '');
+                        setEditVenue(t.venue || '');
+                        setEditReserveDate(t.reserveDate || '');
+                      }}
                       className="accent-[#2e7d32]"
                     />
                     <span className="font-medium">{t.name}</span>
@@ -868,6 +908,45 @@ export default function DataImport() {
               </div>
             </div>
           )}
+
+          {/* 日程・会場入力 */}
+          <div className="bg-white rounded-lg border border-border-main p-3 space-y-2">
+            <h4 className="text-xs font-bold text-gray-700">大会日程・会場</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
+                <input
+                  type="text"
+                  value={editDate}
+                  onChange={e => setEditDate(e.target.value)}
+                  placeholder="例: 3/15"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">会場</label>
+                <input
+                  type="text"
+                  value={editVenue}
+                  onChange={e => setEditVenue(e.target.value)}
+                  placeholder="例: コカ・コーラウエストパーク"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">予備日</label>
+                <input
+                  type="text"
+                  value={editReserveDate}
+                  onChange={e => setEditReserveDate(e.target.value)}
+                  placeholder="例: 3/22"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* サマリー */}
           <div className="grid grid-cols-3 gap-2">
@@ -978,6 +1057,45 @@ export default function DataImport() {
             <p className="text-xs text-gray-500 mt-1">
               ファイル: {parsedExcel.fileName}
             </p>
+          </div>
+
+          {/* 日程・会場入力 */}
+          <div className="bg-white rounded-lg border border-border-main p-3 space-y-2">
+            <h4 className="text-xs font-bold text-gray-700">大会日程・会場</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
+                <input
+                  type="text"
+                  value={editDate}
+                  onChange={e => setEditDate(e.target.value)}
+                  placeholder="例: 3/15"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">会場</label>
+                <input
+                  type="text"
+                  value={editVenue}
+                  onChange={e => setEditVenue(e.target.value)}
+                  placeholder="例: コカ・コーラウエストパーク"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-0.5">予備日</label>
+                <input
+                  type="text"
+                  value={editReserveDate}
+                  onChange={e => setEditReserveDate(e.target.value)}
+                  placeholder="例: 3/22"
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           {/* サマリー */}
