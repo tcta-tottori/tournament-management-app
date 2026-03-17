@@ -234,11 +234,144 @@ export default function EntryRegistration() {
     });
   };
 
-  // ===== Table-based draw view with bracket lines =====
+  // ===== League / Round-robin table =====
+  const renderLeagueTable = (eventId: string, slots: CheckInSlot[]) => {
+    const searchMatches = getSearchMatchSet(slots);
+    const hasSearch = searchQuery.length > 0;
+    const playerSlots = slots.filter(s => s.entry && !(s.isBye && !s.entry));
+
+    if (playerSlots.length === 0) {
+      return (
+        <div className="py-8 text-center text-gray-400 text-sm">
+          リーグデータがありません
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-4 overflow-x-auto">
+        <table className="border-collapse text-sm" style={{ borderSpacing: 0 }}>
+          <thead>
+            <tr>
+              <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 sticky left-0 z-10">No</th>
+              <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 sticky left-[40px] z-10 min-w-[120px]">選手名</th>
+              <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 w-16 text-center">状態</th>
+              {playerSlots.map((_, colIdx) => (
+                <th key={`col-h-${colIdx}`} className="py-2 px-2 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 text-center w-10">
+                  {colIdx + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {playerSlots.map((slot, rowIdx) => {
+              const isWithdrawn = slot.entry?.status === 'withdrawn';
+              const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+              const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+              const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+
+              let statusBadge: React.ReactNode = null;
+              if (isWithdrawn) {
+                statusBadge = <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">BYE</span>;
+              } else if (isConfirmed) {
+                statusBadge = <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">受付済</span>;
+              } else if (slot.entry) {
+                statusBadge = <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">未確認</span>;
+              }
+
+              return (
+                <tr
+                  key={`league-row-${slot.drawPosition}`}
+                  className={`
+                    ${isDimmed ? 'opacity-25' : ''}
+                    ${isHighlighted ? 'bg-blue-50/50' : ''}
+                    ${isWithdrawn ? 'bg-red-50/40' : isConfirmed ? 'bg-emerald-50/40' : ''}
+                  `}
+                >
+                  <td className="py-2 px-3 text-center text-xs font-mono text-gray-400 border border-gray-200 bg-white sticky left-0 z-10">
+                    {rowIdx + 1}
+                  </td>
+                  <td className="py-2 px-3 border border-gray-200 bg-white sticky left-[40px] z-10 min-w-[120px]">
+                    <div className="flex items-center gap-2">
+                      {slot.seed > 0 && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm flex-shrink-0">{slot.seed}</span>
+                      )}
+                      {slot.entry ? (
+                        <button
+                          onClick={() => handleCheckIn(slot)}
+                          className="text-left group"
+                          title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
+                        >
+                          <span className={`text-sm font-medium ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                            {slot.playerName}
+                            {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
+                          </span>
+                          {slot.affiliation && !isWithdrawn && (
+                            <span className="block text-[10px] text-gray-400 truncate max-w-[140px]">{slot.affiliation}</span>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-300">---</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2 px-2 text-center border border-gray-200">
+                    <div className="flex items-center justify-center gap-1">
+                      {statusBadge}
+                      {slot.entry && (
+                        isWithdrawn ? (
+                          <button
+                            onClick={() => handleRestore(slot)}
+                            className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
+                            title="復元する"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleMarkBye(slot)}
+                            className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="BYEにする"
+                          >
+                            <UserX className="w-3 h-3" />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </td>
+                  {playerSlots.map((_, colIdx) => {
+                    const isDiagonal = rowIdx === colIdx;
+                    return (
+                      <td
+                        key={`cell-${rowIdx}-${colIdx}`}
+                        className={`py-2 px-2 text-center text-xs border border-gray-200 ${isDiagonal ? 'bg-gray-200' : 'bg-white'}`}
+                      >
+                        {isDiagonal ? '' : ''}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // ===== SVG Bracket-based draw view =====
   const renderDrawTable = (eventId: string, slots: CheckInSlot[]) => {
     const draw = drawMap.get(eventId);
     const searchMatches = getSearchMatchSet(slots);
     const hasSearch = searchQuery.length > 0;
+
+    // Check if this is a league/round-robin event
+    const event = events.find(e => e.eventId === eventId);
+    const eventType = event?.type as string | undefined;
+    const isLeague = eventType === 'league' || eventType === 'round-robin' || /リーグ/i.test(event?.name || '');
+    if (isLeague) {
+      return renderLeagueTable(eventId, slots);
+    }
 
     if (slots.length === 0) {
       return (
@@ -248,173 +381,251 @@ export default function EntryRegistration() {
       );
     }
 
-    // Split into upper and lower halves
-    const halfSize = Math.ceil(slots.length / 2);
-    const topHalf = slots.slice(0, halfSize);
-    const bottomHalf = slots.slice(halfSize);
+    // Bracket constants
+    const SLOT_HEIGHT = 40;
+    const SLOT_WIDTH = 240;
+    const Y_SPACING = 50;
+    const X_SPACING = 280;
+    const OFFSET_X = 16;
+    const OFFSET_Y = 40;
 
-    // halfSlots内の相対index(0始まり)でペア判定
-    const renderSlotRow = (slot: CheckInSlot, idxInHalf: number) => {
+    const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
+    const roundsCount = Math.log2(drawSize);
+    const totalRoundsToShow = roundsCount + 1; // includes winner node
+
+    // Round labels
+    // drawSize=4:  1回戦, 決勝, 優勝
+    // drawSize=8:  1回戦, 準決勝, 決勝, 優勝
+    // drawSize=16: 1回戦, 2回戦, 準決勝, 決勝, 優勝
+    // drawSize=32: 1回戦, 2回戦, 準々決勝, 準決勝, 決勝, 優勝
+    const roundLabels: string[] = [];
+    const playRounds = totalRoundsToShow - 1; // 優勝ノードを除いた試合ラウンド数
+    for (let r = 0; r < totalRoundsToShow; r++) {
+      if (r === totalRoundsToShow - 1) {
+        roundLabels.push('優勝');
+      } else {
+        const fromFinal = playRounds - 1 - r; // 決勝=0, 準決勝=1, 準々決勝=2, ...
+        if (fromFinal === 0) roundLabels.push('決勝');
+        else if (fromFinal === 1 && playRounds >= 3) roundLabels.push('準決勝');
+        else if (fromFinal === 2 && playRounds >= 5) roundLabels.push('準々決勝');
+        else roundLabels.push(`${r + 1}回戦`);
+      }
+    }
+
+    // Positioning functions (same as DrawRenderer)
+    const getY = (r: number, i: number): number => {
+      if (r === 0) return OFFSET_Y + i * Y_SPACING;
+      return (getY(r - 1, i * 2) + getY(r - 1, i * 2 + 1)) / 2;
+    };
+    const getX = (r: number): number => OFFSET_X + r * X_SPACING;
+
+    // Container dimensions
+    const containerWidth = OFFSET_X * 2 + (totalRoundsToShow - 1) * X_SPACING + SLOT_WIDTH;
+    const containerHeight = OFFSET_Y + (drawSize - 1) * Y_SPACING + SLOT_HEIGHT + 16;
+
+    // Build SVG bracket lines
+    const svgPaths: React.ReactNode[] = [];
+    for (let r = 0; r < totalRoundsToShow - 1; r++) {
+      const numMatches = drawSize / Math.pow(2, r + 1);
+      for (let m = 0; m < numMatches; m++) {
+        const x = getX(r) + SLOT_WIDTH;
+        const xNext = getX(r + 1);
+        const xMid = (x + xNext) / 2;
+
+        const yTop = getY(r, m * 2) + SLOT_HEIGHT / 2;
+        const yBottom = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
+        const yMid = getY(r + 1, m) + SLOT_HEIGHT / 2;
+
+        // Top path
+        svgPaths.push(
+          <path
+            key={`r${r}-m${m}-top`}
+            d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`}
+            fill="none"
+            stroke="#1b4d3e"
+            strokeWidth="1.5"
+          />
+        );
+        // Bottom path
+        svgPaths.push(
+          <path
+            key={`r${r}-m${m}-bottom`}
+            d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`}
+            fill="none"
+            stroke="#1b4d3e"
+            strokeWidth="1.5"
+          />
+        );
+        // Connection to next round
+        svgPaths.push(
+          <path
+            key={`r${r}-m${m}-conn`}
+            d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
+            fill="none"
+            stroke="#1b4d3e"
+            strokeWidth="1.5"
+          />
+        );
+      }
+    }
+
+    // Build round 0 (first round) slot elements with full player info
+    const slotElements: React.ReactNode[] = [];
+    for (let i = 0; i < drawSize; i++) {
+      const slot = i < slots.length ? slots[i] : null;
+      const x = getX(0);
+      const y = getY(0, i);
+
+      if (!slot) {
+        // Empty slot (no data)
+        slotElements.push(
+          <div
+            key={`slot-empty-${i}`}
+            className="absolute flex items-center px-2 border border-dashed border-gray-200 rounded bg-gray-50/50"
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
+          >
+            <span className="text-xs font-mono text-gray-300 w-6 text-center">{i + 1}</span>
+            <span className="text-sm text-gray-300 ml-2">---</span>
+          </div>
+        );
+        continue;
+      }
+
       const isOriginalBye = slot.isBye && !slot.entry;
       const isWithdrawn = slot.entry?.status === 'withdrawn';
       const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
       const isDimmed = hasSearch && !isOriginalBye && slot.entry && !searchMatches.has(slot.drawPosition);
       const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
-      const isTopOfPair = idxInHalf % 2 === 0;
-      const isBottomOfPair = idxInHalf % 2 === 1;
-      const matchNum = Math.floor(idxInHalf / 2) + 1;
 
-      let rowBg = '';
-      let statusBadge: React.ReactNode = null;
+      // Status dot color
+      let statusDotColor = '#d1d5db'; // gray - unchecked
+      if (isWithdrawn) statusDotColor = '#ef4444'; // red
+      else if (isConfirmed) statusDotColor = '#22c55e'; // green
+      else if (isOriginalBye) statusDotColor = '#ef4444'; // red for BYE
 
-      if (isWithdrawn) {
-        rowBg = 'bg-red-50/60';
-        statusBadge = <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">BYE</span>;
+      // Border/background styles
+      let borderClass = 'border-gray-300';
+      let bgClass = 'bg-white';
+      if (isOriginalBye) {
+        borderClass = 'border-dashed border-gray-300';
+        bgClass = 'bg-gray-50/80';
+      } else if (isWithdrawn) {
+        bgClass = 'bg-red-50/60';
+        borderClass = 'border-red-200';
       } else if (isConfirmed) {
-        rowBg = 'bg-emerald-50/60';
-        statusBadge = <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">受付済</span>;
-      } else if (slot.entry) {
-        statusBadge = <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">未確認</span>;
+        bgClass = 'bg-emerald-50/60';
+        borderClass = 'border-emerald-300';
       }
 
-      return (
-        <tr
+      slotElements.push(
+        <div
           key={`slot-${slot.drawPosition}`}
-          className={`transition-colors hover:bg-primary-50/30
-            ${rowBg}
-            ${isDimmed ? 'opacity-25' : ''}
-            ${isHighlighted ? 'ring-1 ring-inset ring-blue-400 bg-blue-50/50' : ''}
-            ${isBottomOfPair ? 'border-b-2 border-b-gray-200' : 'border-b border-b-gray-100'}
+          className={`absolute flex items-center border rounded shadow-sm transition-all
+            ${borderClass} ${bgClass}
+            ${isDimmed ? 'opacity-20' : ''}
+            ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
           `}
+          style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
         >
-          {/* No */}
-          <td className="py-2 px-2 text-center text-xs font-mono text-gray-400 w-10">{slot.drawPosition}</td>
-          {/* Seed */}
-          <td className="py-2 px-1 text-center w-8">
-            {slot.seed > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm">{slot.seed}</span>
-            )}
-          </td>
-          {/* Name */}
-          <td className="py-2 px-3">
+          {/* Position number */}
+          <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">
+            {slot.drawPosition}
+          </div>
+
+          {/* Seed badge */}
+          {slot.seed > 0 && (
+            <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">
+              {slot.seed}
+            </div>
+          )}
+
+          {/* Player info */}
+          <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
             {isOriginalBye ? (
               <span className="text-sm text-gray-400 italic">BYE</span>
             ) : slot.entry ? (
               <button
                 onClick={() => handleCheckIn(slot)}
-                className="text-left w-full group"
+                className="text-left w-full group block"
                 title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
               >
-                <span className={`text-sm font-medium ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                <div className={`text-xs font-medium leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
                   {slot.playerName}
                   {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
-                </span>
+                </div>
+                {slot.affiliation && !isWithdrawn && (
+                  <div className="text-[9px] text-gray-400 truncate leading-tight mt-0.5">{slot.affiliation}</div>
+                )}
               </button>
             ) : (
               <span className="text-sm text-gray-300">---</span>
             )}
-          </td>
-          {/* Affiliation */}
-          <td className="py-2 px-2 text-xs text-gray-500 max-w-[120px] truncate hidden sm:table-cell">
-            {!isOriginalBye && !isWithdrawn && slot.affiliation}
-          </td>
-          {/* Status */}
-          <td className="py-2 px-2 text-center w-16">
-            {statusBadge}
-          </td>
-          {/* Actions */}
-          <td className="py-2 px-1 text-center w-10">
-            {slot.entry && !isOriginalBye && (
-              isWithdrawn ? (
+          </div>
+
+          {/* Status dot */}
+          <div className="flex-shrink-0 mr-1">
+            <div
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: statusDotColor }}
+            />
+          </div>
+
+          {/* Action button (BYE/Restore) */}
+          {slot.entry && !isOriginalBye && (
+            <div className="flex-shrink-0 mr-1">
+              {isWithdrawn ? (
                 <button
-                  onClick={() => handleRestore(slot)}
-                  className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors"
+                  onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
+                  className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
                   title="復元する"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3 h-3" />
                 </button>
               ) : (
                 <button
-                  onClick={() => handleMarkBye(slot)}
-                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
+                  className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                   title="BYEにする"
                 >
-                  <UserX className="w-3.5 h-3.5" />
+                  <UserX className="w-3 h-3" />
                 </button>
-              )
-            )}
-          </td>
-          {/* Bracket line */}
-          <td
-            className="w-8 p-0 relative"
-            style={{
-              borderRight: '2px solid #1b4d3e',
-              ...(isTopOfPair ? { borderBottom: '2px solid #1b4d3e' } : {}),
-              ...(isBottomOfPair ? { borderTop: '2px solid #1b4d3e' } : {}),
-            }}
-          >
-            {/* Match number label between pairs */}
-            {isTopOfPair && (
-              <span
-                className="absolute text-[9px] font-bold text-primary-600 whitespace-nowrap"
-                style={{ right: -18, top: '100%', transform: 'translateY(-50%)' }}
-              >
-                {matchNum}
-              </span>
-            )}
-          </td>
-        </tr>
+              )}
+            </div>
+          )}
+        </div>
       );
-    };
+    }
 
-    const renderHalfTable = (title: string, halfSlots: CheckInSlot[], isUpper: boolean) => (
-      <div className="flex-1 min-w-0">
-        <div
-          className="px-4 py-2.5 border-b-2 flex items-center justify-between"
-          style={{
-            background: isUpper
-              ? 'linear-gradient(135deg, #f0fdf4, #ecfdf5)'
-              : 'linear-gradient(135deg, #eff6ff, #eef2ff)',
-            borderBottomColor: isUpper ? '#86efac' : '#93c5fd',
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black text-white shadow-sm"
-              style={{ background: isUpper ? '#16a34a' : '#2563eb' }}
-            >
-              {isUpper ? '上' : '下'}
-            </span>
-            <h4 className="text-sm font-bold" style={{ color: isUpper ? '#15803d' : '#1d4ed8' }}>
-              {title}
-            </h4>
+    // Build subsequent round empty slot boxes (rounds 1+)
+    const laterRoundElements: React.ReactNode[] = [];
+    for (let r = 1; r < totalRoundsToShow; r++) {
+      const numNodes = drawSize / Math.pow(2, r);
+      const isWinnerNode = r === totalRoundsToShow - 1;
+
+      for (let m = 0; m < numNodes; m++) {
+        const x = getX(r);
+        const y = getY(r, m);
+
+        laterRoundElements.push(
+          <div
+            key={`later-r${r}-m${m}`}
+            className={`absolute flex items-center justify-center border rounded shadow-sm
+              ${isWinnerNode
+                ? 'border-primary-300 bg-primary-50/50 border-b-2 border-b-primary-500'
+                : 'border-gray-200 bg-white/60'
+              }
+            `}
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
+          >
+            {isWinnerNode ? (
+              <span className="text-xs font-bold text-primary-500 tracking-widest">WINNER</span>
+            ) : (
+              <span className="text-xs text-gray-300"></span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500 font-medium">
-              {halfSlots.filter(s => s.entry && s.entry.status !== 'withdrawn').length}名
-            </span>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-            <thead>
-              <tr className="bg-gray-50/80">
-                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 w-10 text-center border-b-2 border-gray-200">No</th>
-                <th className="py-2 px-1 text-[10px] font-semibold text-gray-500 w-8 text-center border-b-2 border-gray-200">S</th>
-                <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border-b-2 border-gray-200">氏名</th>
-                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 hidden sm:table-cell border-b-2 border-gray-200">所属</th>
-                <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 w-16 text-center border-b-2 border-gray-200">状態</th>
-                <th className="py-2 px-1 text-[10px] font-semibold text-gray-500 w-10 text-center border-b-2 border-gray-200">操作</th>
-                <th className="py-2 w-8 border-b-2 border-gray-200"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {halfSlots.map((slot, idx) => renderSlotRow(slot, idx))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
+        );
+      }
+    }
 
     return (
       <div>
@@ -436,12 +647,39 @@ export default function EntryRegistration() {
           </div>
         )}
 
-        {/* Two-column table layout (top half / bottom half) */}
-        <div className="flex flex-col lg:flex-row">
-          {renderHalfTable('上の山', topHalf, true)}
-          <div className="hidden lg:block w-px bg-gray-200" />
-          <div className="lg:hidden h-px bg-gray-200" />
-          {renderHalfTable('下の山', bottomHalf, false)}
+        {/* Bracket container */}
+        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+          <div className="relative" style={{ width: containerWidth, height: containerHeight, minWidth: containerWidth }}>
+            {/* Round labels at top */}
+            {roundLabels.map((label, r) => (
+              <div
+                key={`round-label-${r}`}
+                className="absolute text-[11px] font-bold text-gray-500 text-center"
+                style={{
+                  left: getX(r),
+                  top: 4,
+                  width: SLOT_WIDTH,
+                }}
+              >
+                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{label}</span>
+              </div>
+            ))}
+
+            {/* SVG bracket lines */}
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={containerWidth}
+              height={containerHeight}
+            >
+              {svgPaths}
+            </svg>
+
+            {/* Round 0 slots (with full player details) */}
+            {slotElements}
+
+            {/* Later round empty boxes */}
+            {laterRoundElements}
+          </div>
         </div>
       </div>
     );
