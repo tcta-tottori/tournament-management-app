@@ -78,7 +78,7 @@ export default function AppLayout() {
     <div className="flex flex-col h-screen bg-bg-main overflow-hidden">
 
       {/* ===== ヘッダー ===== */}
-      <header className="header-main relative flex items-center gap-4 px-5 h-[60px] shrink-0 z-30 overflow-hidden">
+      <header className="header-main relative flex items-center gap-4 px-5 h-[64px] shrink-0 z-30 overflow-visible">
         {/* 背景テニスコートライン装飾 */}
         <div className="header-court-lines" />
 
@@ -89,32 +89,58 @@ export default function AppLayout() {
         <img
           src={logoUrl}
           alt="鳥取市テニス協会"
-          className="relative z-10 w-[44px] h-[44px] rounded-[12px] object-cover shrink-0 shadow-lg"
+          className="relative z-10 w-[46px] h-[46px] rounded-[12px] object-cover shrink-0"
           style={{
-            border: '2px solid rgba(255,255,255,0.2)',
+            border: '2px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.25), 0 0 0 1px rgba(212,225,87,0.08)',
           }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
 
         {/* テキスト */}
         <div className="relative z-10 min-w-0 flex-1">
-          <p className="text-[10px] font-semibold text-white/50 leading-tight tracking-[0.2em] uppercase">
+          <p
+            className="text-[10px] font-semibold leading-tight tracking-[0.25em] uppercase"
+            style={{ color: '#c9a55a' }}
+          >
             鳥取市テニス協会
           </p>
-          <h1 className="text-[18px] font-extrabold text-white leading-tight tracking-wide">
+          <h1 className="text-[19px] font-extrabold text-white leading-tight tracking-wide">
             大会運営システム
           </h1>
         </div>
 
         {/* バージョン情報 */}
         <div className="relative z-10 flex flex-col items-end ml-auto mr-1 gap-0.5">
-          <span className="text-[11px] font-bold text-white px-2 py-0.5 rounded bg-white/[0.08] backdrop-blur-sm leading-normal">
+          <span
+            className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-md leading-normal"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(201,165,90,0.12))',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            }}
+          >
             v1.0
           </span>
-          <span className="text-[10px] text-white/50 text-right">
+          <span className="text-[10px] text-white/40 text-right">
             2026.3.17 更新
           </span>
         </div>
+
+        {/* 日本海の海岸線ウェーブ装飾 */}
+        <svg
+          className="header-wave"
+          viewBox="0 0 1440 16"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M0,8 C120,14 240,2 360,8 C480,14 600,2 720,8 C840,14 960,2 1080,8 C1200,14 1320,2 1440,8 L1440,16 L0,16 Z"
+            fill="#1b4d3e"
+          />
+        </svg>
       </header>
 
       {/* ===== ナビゲーションバー ===== */}
@@ -138,7 +164,7 @@ export default function AppLayout() {
                         style={{
                           width: 16,
                           height: 16,
-                          filter: isActive ? 'drop-shadow(0 0 4px rgba(198,255,0,0.5))' : undefined,
+                          filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
                         }}
                       />
                       <span>{item.label}</span>
@@ -175,7 +201,7 @@ export default function AppLayout() {
                         <item.icon className="shrink-0 w-4 h-4" />
                         <span>{item.label}</span>
                         {isActive && (
-                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#c6ff00] shadow-[0_0_6px_rgba(198,255,0,0.6)]" />
+                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#d4e157] shadow-[0_0_6px_rgba(212,225,87,0.6)]" />
                         )}
                       </>
                     )}
