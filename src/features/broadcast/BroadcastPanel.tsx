@@ -99,6 +99,7 @@ export default function BroadcastPanel() {
     pitch: 1.0,
     volume: 1.0,
     repeatCount: 2,
+    gender: 'female',
   });
   const [speakingMatchId, setSpeakingMatchId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -109,7 +110,7 @@ export default function BroadcastPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const { isSpeaking, speak, stop, testVoice } = useSpeechSynthesis();
+  const { isSpeaking, availableVoices, speak, stop, testVoice } = useSpeechSynthesis();
 
   // データベースから種目一覧を取得
   const dbEvents = useLiveQuery(
@@ -409,6 +410,41 @@ export default function BroadcastPanel() {
         </button>
         {showSettings && (
           <div className="px-4 pb-4 space-y-4">
+            {/* 音声タイプ（男性/女性） */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">音声タイプ</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSettings(s => ({ ...s, gender: 'female' }))}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+                    settings.gender === 'female'
+                      ? 'bg-pink-50 text-pink-700 border-pink-300 shadow-sm'
+                      : 'bg-white text-gray-500 border-border-main hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-lg">👩</span>
+                  <div className="text-left">
+                    <div>女性</div>
+                    <div className="text-[10px] opacity-60 font-normal">{availableVoices.female}</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSettings(s => ({ ...s, gender: 'male' }))}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+                    settings.gender === 'male'
+                      ? 'bg-blue-50 text-blue-700 border-blue-300 shadow-sm'
+                      : 'bg-white text-gray-500 border-border-main hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-lg">👨</span>
+                  <div className="text-left">
+                    <div>男性</div>
+                    <div className="text-[10px] opacity-60 font-normal">{availableVoices.male}</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 速度 */}
               <div>
@@ -422,7 +458,7 @@ export default function BroadcastPanel() {
                   step="0.05"
                   value={settings.rate}
                   onChange={e => setSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
-                  className="w-full accent-[#2e7d32]"
+                  className="w-full accent-primary-500"
                 />
                 <div className="flex justify-between text-[10px] text-gray-500">
                   <span>遅い</span><span>標準</span><span>速い</span>
@@ -440,7 +476,7 @@ export default function BroadcastPanel() {
                       className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
                         settings.repeatCount === n
                           ? 'bg-primary-500 text-white'
-                          : 'bg-primary-50 text-gray-500 hover:bg-primary-50'
+                          : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
                       }`}
                     >
                       {n}回
@@ -452,8 +488,8 @@ export default function BroadcastPanel() {
               {/* 音声テスト */}
               <div className="flex items-end gap-2">
                 <button
-                  onClick={() => testVoice(settings.rate)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-50 transition-colors"
+                  onClick={() => testVoice(settings)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
                 >
                   <Mic className="w-4 h-4" />
                   音声テスト
