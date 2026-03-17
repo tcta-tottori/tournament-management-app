@@ -226,15 +226,17 @@ function buildSummary(data: ParsedData): ImportSummary {
 /** 大会名から不要な文字列を自動除去 */
 function cleanTournamentName(name: string): string {
   return name
+    // 「（確定）」「(リドロー)」「(最終版)」などカッコ付き注釈を先に除去
+    .replace(/[（(]\s*(確定|最終版?|暫定|ドロー|リドロー|re[-\s]?draw|final)\s*[）)]/gi, '')
+    // 「_ドロー結果」「_最終版」などアンダースコア区切りの接尾辞
+    .replace(/[_\-]\s*(ドロー|リドロー|最終版?|確定版?|final|v\d+)\s*/gi, '')
     // 「ドロー」「リドロー」「re-draw」「redraw」などを除去
     .replace(/\s*リドロー\s*/gi, '')
     .replace(/\s*ドロー\s*/gi, '')
     .replace(/\s*re[-\s]?draw\s*/gi, '')
     .replace(/\s*draw\s*/gi, '')
-    // 「_ドロー結果」「_最終版」などアンダースコア区切りの接尾辞
-    .replace(/[_\-]\s*(ドロー|リドロー|最終版?|確定版?|final|v\d+)\s*/gi, '')
-    // 「（確定）」「(最終)」などカッコ付き注釈
-    .replace(/[（(]\s*(確定|最終|暫定|ドロー|リドロー)\s*[）)]/g, '')
+    // 残った空のカッコを除去
+    .replace(/[（(]\s*[）)]/g, '')
     // 先頭・末尾の空白・記号を整理
     .replace(/^[\s_\-]+|[\s_\-]+$/g, '')
     .trim();
@@ -304,9 +306,12 @@ export default function DataImport() {
         setParsedData(null);
         setSummary(null);
         setImportResult(null);
-        // ファイル名から大会名をプリセット（拡張子除去＋自動クリーンアップ）
-        const rawName = file.name.replace(/\.(xlsx?|xls)$/i, '');
+        // 大会名をプリセット（Excel内の大会名 > ファイル名）
+        const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
         setEditTournamentName(cleanTournamentName(rawName));
+        // 日程・会場をプリセット
+        if (result.date) setEditDate(result.date);
+        if (result.venue) setEditVenue(result.venue);
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
       }

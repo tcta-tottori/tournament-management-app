@@ -27,6 +27,9 @@ export interface ParsedDrawFile {
   fileName: string;
   sheetName: string;
   events: ParsedDrawEvent[];
+  tournamentName: string;
+  date: string;
+  venue: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -390,9 +393,50 @@ export function parseDrawExcel(
     });
   }
 
+  // ------------------------------------------------------------------
+  // Step 3: Extract tournament info (name, date, venue) from header rows
+  // ------------------------------------------------------------------
+  let tournamentName = '';
+  let date = '';
+  let venue = '';
+
+  // ヘッダー行（最初のイベントヘッダーより前）を探索
+  const headerEnd = sections.length > 0 ? sections[0].headerRow : Math.min(rows.length, 10);
+  for (let r = 0; r < headerEnd; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const val = cellStr(row, c);
+      if (!val) continue;
+
+      // 大会名（「第○回」「○○大会」「○○選手権」を含む行）
+      if (!tournamentName && /第\d+回|大会|選手権|オープン/.test(val)) {
+        tournamentName = val;
+      }
+
+      // 日程（「月」「日」を含む日付パターン、または「/」区切り）
+      if (!date) {
+        const dateMatch = val.match(
+          /(\d{4}[年\/\-\.]\s*\d{1,2}[月\/\-\.]\s*\d{1,2}日?)|(\d{1,2}[月\/]\s*\d{1,2}日?(?:\s*[（(][日月火水木金土][）)])?)/
+        );
+        if (dateMatch) {
+          date = dateMatch[0];
+        }
+      }
+
+      // 会場（「コート」「パーク」「体育館」「テニス場」等を含む）
+      if (!venue && /コート|パーク|体育館|テニス場|運動公園|市民|スポーツ|アリーナ|センター/.test(val)) {
+        venue = val;
+      }
+    }
+  }
+
   return {
     fileName,
     sheetName: bestSheet,
     events,
+    tournamentName,
+    date,
+    venue,
   };
 }
