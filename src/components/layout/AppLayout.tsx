@@ -19,15 +19,15 @@ const ALL_MAIN_TABS = [
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-08', path: '/schedule', label: '時間割', icon: CalendarDays },
-];
-
-const MORE_ITEMS = [
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-10', path: '/backup', label: 'バックアップ', icon: Save },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/broadcast', label: '放送コール', icon: Volume2 },
   { id: 'S-13', path: '/court-map', label: 'コートマップ', icon: MapPin },
 ];
+
+// モバイルではメイン8個 + その他5個に分割
+const MOBILE_MAIN_COUNT = 8;
 
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
@@ -48,7 +48,7 @@ export default function AppLayout() {
   );
 
   // ミックス or 団体戦の種目があるかどうかでタブを出し分け
-  const mainTabs = useMemo(() => {
+  const allTabs = useMemo(() => {
     const hasDrawEvents = (events ?? []).some(
       (e) =>
         /ミックス|団体|mixed|team/i.test(e.name) ||
@@ -57,6 +57,10 @@ export default function AppLayout() {
     if (hasDrawEvents) return ALL_MAIN_TABS;
     return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
   }, [events]);
+
+  // モバイル用: メインタブとその他に分割
+  const mobileMainTabs = useMemo(() => allTabs.slice(0, MOBILE_MAIN_COUNT), [allTabs]);
+  const mobileMoreTabs = useMemo(() => allTabs.slice(MOBILE_MAIN_COUNT), [allTabs]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -146,10 +150,10 @@ export default function AppLayout() {
       {/* ===== ナビゲーションバー ===== */}
       <nav className="nav-bar sticky top-0 z-20 shrink-0">
         <div className="flex items-center">
-          {/* メインタブ */}
-          <div className="flex-1 overflow-x-auto scrollbar-hide">
+          {/* PC: 全タブ表示 */}
+          <div className="hidden lg:flex flex-1 overflow-x-auto scrollbar-hide">
             <div className="flex">
-              {mainTabs.map((item) => (
+              {allTabs.map((item) => (
                 <NavLink
                   key={item.id}
                   to={item.path}
@@ -175,8 +179,37 @@ export default function AppLayout() {
             </div>
           </div>
 
-          {/* 「その他」ドロップダウン */}
-          <div className="relative shrink-0" ref={moreRef}>
+          {/* モバイル: メインタブ + その他ドロップダウン */}
+          <div className="lg:hidden flex-1 overflow-x-auto scrollbar-hide">
+            <div className="flex">
+              {mobileMainTabs.map((item) => (
+                <NavLink
+                  key={item.id}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `nav-tab ${isActive ? 'nav-tab-active' : ''}`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon
+                        className="shrink-0"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
+                        }}
+                      />
+                      <span>{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+
+          {/* モバイルのみ「その他」ドロップダウン */}
+          <div className="lg:hidden relative shrink-0" ref={moreRef}>
             <button
               onClick={() => setMoreOpen(prev => !prev)}
               className={`nav-tab ${moreOpen ? 'nav-tab-active' : ''}`}
@@ -187,7 +220,7 @@ export default function AppLayout() {
 
             {moreOpen && (
               <div className="dropdown-menu dropdown-animate absolute right-0 top-full mt-1 w-52 rounded-xl py-1.5 z-50">
-                {MORE_ITEMS.map((item) => (
+                {mobileMoreTabs.map((item) => (
                   <NavLink
                     key={item.id}
                     to={item.path}
