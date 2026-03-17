@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 
@@ -208,6 +208,23 @@ function buildSummary(data: ParsedData): ImportSummary {
   };
 }
 
+/** 大会名から不要な文字列を自動除去 */
+function cleanTournamentName(name: string): string {
+  return name
+    // 「ドロー」「リドロー」「re-draw」「redraw」などを除去
+    .replace(/\s*リドロー\s*/gi, '')
+    .replace(/\s*ドロー\s*/gi, '')
+    .replace(/\s*re[-\s]?draw\s*/gi, '')
+    .replace(/\s*draw\s*/gi, '')
+    // 「_ドロー結果」「_最終版」などアンダースコア区切りの接尾辞
+    .replace(/[_\-]\s*(ドロー|リドロー|最終版?|確定版?|final|v\d+)\s*/gi, '')
+    // 「（確定）」「(最終)」などカッコ付き注釈
+    .replace(/[（(]\s*(確定|最終|暫定|ドロー|リドロー)\s*[）)]/g, '')
+    // 先頭・末尾の空白・記号を整理
+    .replace(/^[\s_\-]+|[\s_\-]+$/g, '')
+    .trim();
+}
+
 export default function DataImport() {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
@@ -217,6 +234,7 @@ export default function DataImport() {
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
   const [selectedTournament, setSelectedTournament] = useState<number | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [editTournamentName, setEditTournamentName] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
@@ -238,6 +256,9 @@ export default function DataImport() {
         const sum = buildSummary(data);
         setSummary(sum);
         setImportResult(null);
+        // 大会名をプリセット（自動クリーンアップ）
+        const rawName = data.tournamentName || data.tournaments[0]?.name || '';
+        setEditTournamentName(cleanTournamentName(rawName));
         // 日程・会場をプリセット
         setEditDate(sum.tournamentDate);
         setEditVenue(sum.tournamentVenue);
@@ -268,6 +289,9 @@ export default function DataImport() {
         setParsedData(null);
         setSummary(null);
         setImportResult(null);
+        // ファイル名から大会名をプリセット（拡張子除去＋自動クリーンアップ）
+        const rawName = file.name.replace(/\.(xlsx?|xls)$/i, '');
+        setEditTournamentName(cleanTournamentName(rawName));
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
       }
@@ -303,11 +327,14 @@ export default function DataImport() {
       const now = Date.now();
       const tournamentId = `T-${new Date().getFullYear()}-${String(now).slice(-4)}`;
 
-      // 大会名決定
-      let tournamentName = parsedData.tournamentName || '';
-      if (!tournamentName && selectedTournament !== null) {
-        const t = parsedData.tournaments.find(t => t.id === selectedTournament);
-        if (t) tournamentName = t.name;
+      // 大会名決定（編集フィールド優先）
+      let tournamentName = editTournamentName.trim();
+      if (!tournamentName) {
+        tournamentName = parsedData.tournamentName || '';
+        if (!tournamentName && selectedTournament !== null) {
+          const t = parsedData.tournaments.find(t => t.id === selectedTournament);
+          if (t) tournamentName = t.name;
+        }
       }
       if (!tournamentName) tournamentName = `インポート大会 ${new Date().toLocaleDateString('ja-JP')}`;
 
@@ -660,7 +687,7 @@ export default function DataImport() {
     try {
       const now = Date.now();
       const tournamentId = `T-${new Date().getFullYear()}-${String(now).slice(-4)}`;
-      const tournamentName = parsedExcel.fileName.replace(/\.(xlsx?|xls)$/i, '');
+      const tournamentName = editTournamentName.trim() || parsedExcel.fileName.replace(/\.(xlsx?|xls)$/i, '');
 
       // --- 1. 大会作成 ---
       await db.tournaments.add({
@@ -807,6 +834,7 @@ export default function DataImport() {
     setParsedExcel(null);
     setImportResult(null);
     setSelectedTournament(null);
+    setEditTournamentName('');
     setEditDate('');
     setEditVenue('');
     setEditReserveDate('');
@@ -895,6 +923,7 @@ export default function DataImport() {
                       checked={selectedTournament === t.id}
                       onChange={() => {
                         setSelectedTournament(t.id);
+                        setEditTournamentName(cleanTournamentName(t.name || ''));
                         setEditDate(t.date || '');
                         setEditVenue(t.venue || '');
                         setEditReserveDate(t.reserveDate || '');
@@ -909,9 +938,33 @@ export default function DataImport() {
             </div>
           )}
 
-          {/* 日程・会場入力 */}
+          {/* 大会名・日程・会場入力 */}
           <div className="bg-white rounded-lg border border-border-main p-3 space-y-2">
-            <h4 className="text-xs font-bold text-gray-700">大会日程・会場</h4>
+            <h4 className="text-xs font-bold text-gray-700">大会情報</h4>
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-0.5">大会名</label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={editTournamentName}
+                  onChange={e => setEditTournamentName(e.target.value)}
+                  placeholder="大会名を入力"
+                  className="flex-1 border border-border-main rounded px-2 py-1 text-sm font-medium focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const raw = parsedData.tournamentName || parsedData.tournaments.find(t => t.id === selectedTournament)?.name || '';
+                    setEditTournamentName(cleanTournamentName(raw));
+                  }}
+                  className="shrink-0 px-2 py-1 text-[10px] font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
+                  title="不要な文字を自動除去"
+                >
+                  <Sparkles className="w-3 h-3 inline mr-0.5" />
+                  整理
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
@@ -1059,9 +1112,33 @@ export default function DataImport() {
             </p>
           </div>
 
-          {/* 日程・会場入力 */}
+          {/* 大会名・日程・会場入力 */}
           <div className="bg-white rounded-lg border border-border-main p-3 space-y-2">
-            <h4 className="text-xs font-bold text-gray-700">大会日程・会場</h4>
+            <h4 className="text-xs font-bold text-gray-700">大会情報</h4>
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-0.5">大会名</label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={editTournamentName}
+                  onChange={e => setEditTournamentName(e.target.value)}
+                  placeholder="大会名を入力"
+                  className="flex-1 border border-border-main rounded px-2 py-1 text-sm font-medium focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
+                    setEditTournamentName(cleanTournamentName(raw));
+                  }}
+                  className="shrink-0 px-2 py-1 text-[10px] font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
+                  title="不要な文字を自動除去"
+                >
+                  <Sparkles className="w-3 h-3 inline mr-0.5" />
+                  整理
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
