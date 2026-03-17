@@ -106,11 +106,14 @@ export default function AppLayout() {
           </h1>
         </div>
 
-        {/* 右端のアクセントドット */}
-        <div className="relative z-10 hidden md:flex items-center gap-1.5 mr-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#c6ff00] opacity-80" />
-          <div className="w-1 h-1 rounded-full bg-[#c6ff00] opacity-40" />
-          <div className="w-0.5 h-0.5 rounded-full bg-[#c6ff00] opacity-20" />
+        {/* バージョン情報 */}
+        <div className="relative z-10 flex flex-col items-end ml-auto mr-1 gap-0.5">
+          <span className="text-[11px] font-bold text-white px-2 py-0.5 rounded bg-white/[0.08] backdrop-blur-sm leading-normal">
+            v1.0
+          </span>
+          <span className="text-[10px] text-white/50 text-right">
+            2026.3.17 更新
+          </span>
         </div>
       </header>
 

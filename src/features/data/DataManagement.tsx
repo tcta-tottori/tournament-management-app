@@ -1,9 +1,10 @@
-import { Database as DatabaseIcon, CalendarDays } from 'lucide-react';
+import { Database as DatabaseIcon, CalendarDays, Info } from 'lucide-react';
 import TournamentManager from './TournamentManager';
 import FuriganaManager from './FuriganaManager';
 import DataImport from './DrawMeetingImport';
 import DataSync from './DataSync';
 import ScheduleImport from './ScheduleImport';
+import TournamentInfo from './TournamentInfo';
 
 export default function DataManagement() {
   return (
@@ -56,6 +57,17 @@ export default function DataManagement() {
         </div>
         <div className="p-5">
           <ScheduleImport />
+        </div>
+      </section>
+
+      {/* 大会情報パネル */}
+      <section className="mt-6 bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+        <div className="bg-[#fff8e1] px-4 py-3 border-b border-[#e0e7ef] flex items-center gap-2">
+          <Info className="w-5 h-5 text-[#f57f17]" />
+          <h2 className="font-semibold text-[#e65100]">大会情報（ドロー会議システム）</h2>
+        </div>
+        <div className="p-5">
+          <TournamentInfo />
         </div>
       </section>
 

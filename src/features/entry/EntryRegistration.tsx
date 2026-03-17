@@ -132,13 +132,58 @@ export default function EntryRegistration() {
       return;
     }
 
-    // Mark as confirmed
+    // Toggle: if already confirmed, reset to unconfirmed
     setConfirmedIds(prev => {
       const next = new Set(prev);
-      next.add(slot.entryId!);
+      if (next.has(slot.entryId!)) {
+        next.delete(slot.entryId!);
+      } else {
+        next.add(slot.entryId!);
+      }
       return next;
     });
   }, []);
+
+  // 全員受付済みにする（全種目）
+  const handleCheckInAll = useCallback(() => {
+    const allActiveEntryIds = allEntries
+      .filter(e => e.status === 'active')
+      .map(e => e.entryId);
+    setConfirmedIds(new Set(allActiveEntryIds));
+  }, [allEntries]);
+
+  // 全員受付リセット（全種目）
+  const handleResetAll = useCallback(() => {
+    setConfirmedIds(new Set());
+  }, []);
+
+  // 種目ごとに全員受付済みにする
+  const handleCheckInEvent = useCallback((eventId: string) => {
+    const eventEntryIds = allEntries
+      .filter(e => e.eventId === eventId && e.status === 'active')
+      .map(e => e.entryId);
+    setConfirmedIds(prev => {
+      const next = new Set(prev);
+      for (const id of eventEntryIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [allEntries]);
+
+  // 種目ごとに受付リセット
+  const handleResetEvent = useCallback((eventId: string) => {
+    const eventEntryIds = new Set(
+      allEntries.filter(e => e.eventId === eventId).map(e => e.entryId)
+    );
+    setConfirmedIds(prev => {
+      const next = new Set(prev);
+      for (const id of eventEntryIds) {
+        next.delete(id);
+      }
+      return next;
+    });
+  }, [allEntries]);
 
   const handleMarkBye = useCallback(async (slot: CheckInSlot) => {
     if (!slot.entry || !slot.entry.id || !slot.entryId) return;
@@ -382,15 +427,30 @@ export default function EntryRegistration() {
       <div key={eventId} className="bg-white rounded-[10px] shadow-sm border border-[#e0e7ef] overflow-hidden">
         {/* Event header (collapsible in all-events view) */}
         {showAllEvents && (
-          <button
-            onClick={() => toggleCollapse(eventId)}
-            className="w-full bg-[#e8f5e9] px-4 py-3 border-b border-[#e0e7ef] flex items-center justify-between hover:bg-[#dcedc8] transition-colors"
-          >
-            <div className="flex items-center gap-2">
+          <div className="bg-[#e8f5e9] px-4 py-3 border-b border-[#e0e7ef] flex items-center justify-between">
+            <button
+              onClick={() => toggleCollapse(eventId)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
               {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
               <h3 className="font-bold text-[#1b5e20] text-sm">{eventName}</h3>
-            </div>
+            </button>
             <div className="flex items-center gap-2 text-xs">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors"
+                title="この種目を全員受付済みにする"
+              >
+                <UserCheck className="w-3 h-3" />
+                全員受付
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                title="この種目の受付をリセット"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
               <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
               <span className="text-gray-500">/</span>
               <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
@@ -398,7 +458,7 @@ export default function EntryRegistration() {
                 <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} BYE</span>
               )}
             </div>
-          </button>
+          </div>
         )}
 
         {!isCollapsed && (
@@ -511,27 +571,45 @@ export default function EntryRegistration() {
           </div>
         </div>
 
-        {/* Summary stats */}
+        {/* Summary stats + bulk actions */}
         {(showAllEvents || selectedEventId) && (
-          <div className="mt-3 flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="text-gray-500">合計:</span>
-              <span className="font-bold text-gray-800">{overallStats.total}</span>
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">合計:</span>
+                <span className="font-bold text-gray-800">{overallStats.total}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                <span className="text-gray-500">受付済:</span>
+                <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
+                <span className="text-gray-500">BYE:</span>
+                <span className="font-bold text-red-600">{overallStats.absent}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
+                <span className="text-gray-500">未確認:</span>
+                <span className="font-bold text-gray-600">{overallStats.remaining}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-              <span className="text-gray-500">受付済:</span>
-              <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
-              <span className="text-gray-500">BYE:</span>
-              <span className="font-bold text-red-600">{overallStats.absent}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
-              <span className="text-gray-500">未確認:</span>
-              <span className="font-bold text-gray-600">{overallStats.remaining}</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                全員受付済み
+              </button>
+              <button
+                onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                リセット
+              </button>
             </div>
           </div>
         )}

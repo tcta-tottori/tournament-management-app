@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { db } from '../../db/database';
-import { RefreshCw, ArrowLeft, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 // ドロー会議システムの localStorage キー
 const LS_KEY_RANKING_BACKUP = 'drawSystem_rankingBackup';
@@ -300,7 +300,6 @@ export default function DataSync() {
             disabled={isSyncing}
             className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-[#2e7d32] rounded-lg hover:bg-[#1b5e20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
             <span>ドロー会議システムから同期</span>
             {isSyncing && <RefreshCw className="w-4 h-4 animate-spin" />}
           </button>
