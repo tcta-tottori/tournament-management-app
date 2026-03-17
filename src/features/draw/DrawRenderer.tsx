@@ -208,6 +208,11 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                       <div className="text-sm font-medium text-gray-800 truncate whitespace-nowrap flex-1" title={displayName}>
                         {displayName}
                       </div>
+                      {matchResult?.scheduledTime && (
+                        <div className="shrink-0 bg-[#1565c0] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                          {matchResult.scheduledTime}
+                        </div>
+                      )}
                       {matchResult?.courtName && (
                         <div className="shrink-0 bg-[#2e7d32] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.courtName}
@@ -225,11 +230,18 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                     <div className="text-gray-300 text-sm">
                       {isPlaying ? '試合中...' : ''}
                     </div>
-                    {matchResult?.courtName && (
-                      <div className="shrink-0 bg-[#2e7d32] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
-                        {matchResult.courtName}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {matchResult?.scheduledTime && (
+                        <div className="shrink-0 bg-[#1565c0] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                          {matchResult.scheduledTime}
+                        </div>
+                      )}
+                      {matchResult?.courtName && (
+                        <div className="shrink-0 bg-[#2e7d32] text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
+                          {matchResult.courtName}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

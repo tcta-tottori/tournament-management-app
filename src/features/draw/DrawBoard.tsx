@@ -26,6 +26,7 @@ export type MatchResult = {
   status: 'waiting' | 'ready' | 'playing' | 'finished' | 'walkover';
   courtId: string | null;
   courtName: string;
+  scheduledTime: string | null;
 };
 
 export default function DrawBoard() {
@@ -67,6 +68,7 @@ export default function DrawBoard() {
       status: m.status,
       courtId: m.courtId,
       courtName: court?.name || '',
+      scheduledTime: m.scheduledTime,
     };
   }), [matches, courts]);
 
