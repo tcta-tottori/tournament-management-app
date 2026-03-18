@@ -242,7 +242,7 @@ export default function EntryList() {
                               )}
                               <span className="truncate whitespace-nowrap max-w-[200px]">{activePlayer?.name || '不明な選手'}</span>
                               {entry.status === 'withdrawn' && (
-                                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-semibold">WD</span>
+                                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-semibold">RET</span>
                               )}
                             </div>
                             <div className="text-xs text-gray-500 mt-0.5">
@@ -280,7 +280,7 @@ export default function EntryList() {
                                   : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                               }`}
                             >
-                              {entry.status === 'active' ? 'WD設定' : 'WD取消'}
+                              {entry.status === 'active' ? 'RET設定' : 'RET取消'}
                             </button>
                             <button
                               onClick={() => handleDeleteEntry(entry.id!)}
