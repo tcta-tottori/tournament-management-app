@@ -567,61 +567,50 @@ ${printableMatches.map(m => {
     <!-- Row 19: Score (rows 19-20 merged) -->
     <tr style="height:${rh[18]};">
       <td colspan="6" rowspan="2"
-          class="fg bl2 bt br"
+          class="fg bl2 bt br bb"
           style="text-align:center; font-size:14px; height:calc(${rh[18]} + ${rh[19]});">
         ス　コ　ア
       </td>
-      <!-- Score area left: G19:U20 (cols 7-21) -->
+      <!-- Score area left: G19:U20 (cols 7-21, 15 cols) -->
       <td colspan="15" rowspan="2"
-          class="fg bt bl br"
+          class="fg bt bl br bb"
           style="text-align:center; font-size:24px;">
       </td>
-      <!-- Dash: V19:W20 (cols 22-23) -->
+      <!-- Dash: V19:W20 (cols 22-23, 2 cols) -->
       <td colspan="2" rowspan="2"
-          class="fg bt"
+          class="fg bt bb"
           style="text-align:center; font-size:24px;">
         ―
       </td>
-      <!-- Score area right: X19:AL20 (cols 24-38) -->
+      <!-- Score area right: X19:AL20 (cols 24-38, 15 cols) -->
       <td colspan="15" rowspan="2"
-          class="fg bt bl br2"
+          class="fg bt bl br2 bb"
           style="text-align:center; font-size:24px;">
       </td>
     </tr>
     <tr style="height:${rh[19]};"></tr>
 
-    <!-- Row 21: Tiebreak -->
+    <!-- Row 21: Tiebreak (colspans match score row: 15+2+15) -->
     <tr style="height:${rh[20]};">
       <td colspan="6"
           class="fg bl2 bt br bb2"
           style="text-align:center; font-size:14px; height:${rh[20]};">
         （ＴＢ）
       </td>
-      <!-- TB area left: cols 7-19 (13 cols) -->
-      <td colspan="13"
-          class="fg bl br bb2"
+      <!-- TB area left: cols 7-21 (15 cols) -->
+      <td colspan="15"
+          class="fg bt bl br bb2"
           style="height:${rh[20]};">
       </td>
-      <!-- Paren area: T21:U21 (cols 20-21) -->
+      <!-- TB paren area: cols 22-23 (2 cols) -->
       <td colspan="2"
-          class="fg bb2"
+          class="fg bt bb2"
           style="text-align:center; font-size:12px;">
-        （
+        （　）
       </td>
-      <!-- Space: V21:W21 (cols 22-23) -->
-      <td colspan="2"
-          class="fg bb2"
-          style="text-align:center; font-size:12px;">
-      </td>
-      <!-- Close paren: X21:Y21 (cols 24-25) -->
-      <td colspan="2"
-          class="fg bb2"
-          style="text-align:center; font-size:12px;">
-        ）
-      </td>
-      <!-- TB area right: cols 26-38 (13 cols) -->
-      <td colspan="13"
-          class="fg bl br2 bb2"
+      <!-- TB area right: cols 24-38 (15 cols) -->
+      <td colspan="15"
+          class="fg bt bl br2 bb2"
           style="height:${rh[20]};">
       </td>
     </tr>
