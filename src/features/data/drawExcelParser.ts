@@ -226,7 +226,7 @@ export function parseDrawExcel(
   data: ArrayBuffer,
   fileName: string,
 ): ParsedDrawFile {
-  const wb = XLSX.read(data, { type: 'array' });
+  const wb = XLSX.read(data, { type: 'array', cellDates: true });
 
   // Pick the sheet with the most data (or first)
   let bestSheet = wb.SheetNames[0];
@@ -401,12 +401,23 @@ export function parseDrawExcel(
   let venue = '';
 
   // ヘッダー行（最初のイベントヘッダーより前）を探索
-  const headerEnd = sections.length > 0 ? sections[0].headerRow : Math.min(rows.length, 10);
+  const headerEnd = sections.length > 0 ? sections[0].headerRow : Math.min(rows.length, 15);
   for (let r = 0; r < headerEnd; r++) {
     const row = rows[r];
     if (!row) continue;
     for (let c = 0; c < row.length; c++) {
-      const val = cellStr(row, c);
+      const rawVal = row[c];
+      if (rawVal == null) continue;
+
+      // Date型の場合（Excelの日付セル）
+      if (!date && rawVal instanceof Date && !isNaN(rawVal.getTime())) {
+        const m = rawVal.getMonth() + 1;
+        const d = rawVal.getDate();
+        date = `${m}/${d}`;
+        continue;
+      }
+
+      const val = String(rawVal).trim();
       if (!val) continue;
 
       // 大会名（「第○回」「○○大会」「○○選手権」を含む行）
@@ -414,13 +425,35 @@ export function parseDrawExcel(
         tournamentName = val;
       }
 
-      // 日程（「月」「日」を含む日付パターン、または「/」区切り）
+      // 日程の検出
       if (!date) {
-        const dateMatch = val.match(
-          /(\d{4}[年\/\-\.]\s*\d{1,2}[月\/\-\.]\s*\d{1,2}日?)|(\d{1,2}[月\/]\s*\d{1,2}日?(?:\s*[（(][日月火水木金土][）)])?)/
-        );
-        if (dateMatch) {
-          date = dateMatch[0];
+        // Excelシリアル値がそのまま数値として来た場合（40000〜50000辺り）
+        if (typeof rawVal === 'number' && rawVal > 30000 && rawVal < 60000) {
+          const epoch = new Date((rawVal - 25569) * 86400000);
+          if (!isNaN(epoch.getTime())) {
+            const m = epoch.getMonth() + 1;
+            const d = epoch.getDate();
+            date = `${m}/${d}`;
+            continue;
+          }
+        }
+        // 令和・平成年号パターン（例: 令和6年3月22日）
+        const eraMatch = val.match(/[令平]和\d{1,2}年\s*(\d{1,2})月\s*(\d{1,2})日/);
+        if (eraMatch) {
+          date = `${eraMatch[1]}/${eraMatch[2]}`;
+          continue;
+        }
+        // 西暦パターン（例: 2024年3月22日, 2024/3/22）
+        const fullDateMatch = val.match(/\d{4}[年\/\-\.]\s*(\d{1,2})[月\/\-\.]\s*(\d{1,2})日?/);
+        if (fullDateMatch) {
+          date = `${fullDateMatch[1]}/${fullDateMatch[2]}`;
+          continue;
+        }
+        // 月日パターン（例: 3月22日, 3/22, 3月22日(日)）
+        const mdMatch = val.match(/(\d{1,2})[月\/]\s*(\d{1,2})日?(?:\s*[（(][日月火水木金土][）)])?/);
+        if (mdMatch) {
+          date = `${mdMatch[1]}/${mdMatch[2]}`;
+          continue;
         }
       }
 
