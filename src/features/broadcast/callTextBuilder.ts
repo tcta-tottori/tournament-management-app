@@ -61,7 +61,10 @@ export function buildCallText(
   let courtText = `この試合を、${courtNumber}番コートで`;
   if (startTime) {
     const [h, m] = startTime.split(':');
-    courtText += `、${parseInt(h)}時${parseInt(m)}分より`;
+    const minutes = parseInt(m);
+    courtText += minutes === 0
+      ? `、${parseInt(h)}時より`
+      : `、${parseInt(h)}時${minutes}分より`;
   }
   courtText += '、おこなってください。';
   parts.push(courtText);

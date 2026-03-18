@@ -269,7 +269,8 @@ export default function BroadcastPanel() {
     return matches.filter(m => m.eventName === activeTab);
   }, [matches, activeTab]);
 
-  const pendingMatches = filteredMatches.filter(m => m.status === 'pending');
+  // pending + speaking はアクティブリストに表示（コール中もその場に留まる）
+  const activeMatches = filteredMatches.filter(m => m.status === 'pending' || m.status === 'speaking');
   const doneMatches = filteredMatches.filter(m => m.status === 'done');
 
   // CSVインポート
@@ -568,10 +569,10 @@ export default function BroadcastPanel() {
 
             {/* 試合カードリスト */}
             <div className="flex-1 overflow-auto space-y-3">
-              {/* 未コール */}
-              {pendingMatches.length > 0 && (
+              {/* アクティブ（未コール + コール中） */}
+              {activeMatches.length > 0 && (
                 <div className="space-y-2">
-                  {pendingMatches.map(match => (
+                  {activeMatches.map(match => (
                     <MatchCard
                       key={match.id}
                       match={match}
@@ -585,40 +586,19 @@ export default function BroadcastPanel() {
                 </div>
               )}
 
-              {/* コール済 */}
+              {/* コール済み — 同じカード表示で再コール可能 */}
               {doneMatches.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-4">コール済み</h3>
                   {doneMatches.map(match => (
-                    <div
+                    <DoneMatchCard
                       key={match.id}
-                      className="bg-amber-50 rounded-xl border border-amber-200 p-3 opacity-70"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span className="font-medium">{match.eventName}</span>
-                            <span>{match.round}</span>
-                            <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              コール済
-                            </span>
-                          </div>
-                          <p className="text-sm font-medium text-gray-900 mt-0.5 truncate whitespace-nowrap">
-                            {match.numberA}番 {match.nameA}
-                            {match.type === 'doubles' && ` / ${match.pairNameA}`}
-                            <span className="text-gray-500 mx-1">vs</span>
-                            {match.numberB}番 {match.nameB}
-                            {match.type === 'doubles' && ` / ${match.pairNameB}`}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleRecall(match)}
-                          className="ml-2 px-3 py-1.5 bg-white border border-border-main rounded-lg text-xs font-medium text-gray-500 hover:bg-primary-50 transition-colors shrink-0"
-                        >
-                          再コール
-                        </button>
-                      </div>
-                    </div>
+                      match={match}
+                      onRecall={handleRecall}
+                      onCall={handleCall}
+                      isSpeaking={speakingMatchId === match.id}
+                      onStop={handleStop}
+                    />
                   ))}
                 </div>
               )}
@@ -661,7 +641,40 @@ export default function BroadcastPanel() {
   );
 }
 
-// 試合カードコンポーネント
+/** 選手情報の共通表示 */
+function PlayerInfo({ match }: { match: MatchCall }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+      {/* Player A */}
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1">
+          <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberA}番</span>
+          <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameA}</span>
+        </div>
+        {match.type === 'doubles' && match.pairNameA && (
+          <p className="text-xs text-gray-500 truncate whitespace-nowrap ml-6">{match.pairNameA}</p>
+        )}
+        <p className="text-xs text-gray-500 truncate ml-6">{match.affA}</p>
+      </div>
+
+      <span className="text-xs font-bold text-gray-500 px-2">VS</span>
+
+      {/* Player B */}
+      <div className="min-w-0 text-right">
+        <div className="flex items-baseline gap-1 justify-end">
+          <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameB}</span>
+          <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberB}番</span>
+        </div>
+        {match.type === 'doubles' && match.pairNameB && (
+          <p className="text-xs text-gray-500 truncate whitespace-nowrap mr-6">{match.pairNameB}</p>
+        )}
+        <p className="text-xs text-gray-500 truncate mr-6">{match.affB}</p>
+      </div>
+    </div>
+  );
+}
+
+// アクティブ試合カードコンポーネント（未コール + コール中）
 function MatchCard({
   match,
   isSpeaking,
@@ -678,53 +691,28 @@ function MatchCard({
   onStop: () => void;
 }) {
   const bgClass = isSpeaking
-    ? 'bg-amber-100 border-amber-300 animate-pulse'
+    ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
     : 'bg-white border-border-main';
 
-  // コート番号が未設定で前回の値がある場合、自動設定
   const courtValue = match.courtNumber || '';
 
   return (
     <div className={`rounded-xl shadow-sm border p-4 transition-all ${bgClass}`}>
-      {/* 上部：種目・回線 */}
+      {/* 上部：種目・回戦 + コール中表示 */}
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs font-bold text-primary-500">{match.eventName}</span>
         <span className="text-xs text-gray-500">{match.round}</span>
         {isSpeaking && (
-          <span className="flex items-center gap-1 text-xs text-orange-600 font-medium ml-auto">
-            <Volume2 className="w-3 h-3 animate-pulse" />
+          <span className="flex items-center gap-1 text-xs text-orange-600 font-bold ml-auto">
+            <Volume2 className="w-4 h-4 animate-pulse" />
             コール中...
           </span>
         )}
       </div>
 
       {/* 中央：選手情報 */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center mb-3">
-        {/* Player A */}
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-1">
-            <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberA}番</span>
-            <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameA}</span>
-          </div>
-          {match.type === 'doubles' && match.pairNameA && (
-            <p className="text-xs text-gray-500 truncate whitespace-nowrap ml-6">{match.pairNameA}</p>
-          )}
-          <p className="text-xs text-gray-500 truncate ml-6">{match.affA}</p>
-        </div>
-
-        <span className="text-xs font-bold text-gray-500 px-2">VS</span>
-
-        {/* Player B */}
-        <div className="min-w-0 text-right">
-          <div className="flex items-baseline gap-1 justify-end">
-            <span className="font-bold text-gray-900 text-sm truncate whitespace-nowrap">{match.nameB}</span>
-            <span className="text-xs font-mono text-primary-500 shrink-0">{match.numberB}番</span>
-          </div>
-          {match.type === 'doubles' && match.pairNameB && (
-            <p className="text-xs text-gray-500 truncate whitespace-nowrap mr-6">{match.pairNameB}</p>
-          )}
-          <p className="text-xs text-gray-500 truncate mr-6">{match.affB}</p>
-        </div>
+      <div className="mb-3">
+        <PlayerInfo match={match} />
       </div>
 
       {/* 下部：コート・時間・コールボタン */}
@@ -775,6 +763,91 @@ function MatchCard({
           >
             <Play className="w-4 h-4" />
             コール
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// コール済みカード — 同じ詳細表示 + 再コールボタン
+function DoneMatchCard({
+  match,
+  onRecall,
+  onCall,
+  isSpeaking,
+  onStop,
+}: {
+  match: MatchCall;
+  onRecall: (match: MatchCall) => void;
+  onCall: (match: MatchCall) => void;
+  isSpeaking: boolean;
+  onStop: () => void;
+}) {
+  const bgClass = isSpeaking
+    ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
+    : 'bg-gray-50 border-border-main opacity-80';
+
+  return (
+    <div className={`rounded-xl shadow-sm border p-4 transition-all ${bgClass}`}>
+      {/* 上部：種目・回戦 + コール済バッジ */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-bold text-primary-500">{match.eventName}</span>
+        <span className="text-xs text-gray-500">{match.round}</span>
+        {isSpeaking ? (
+          <span className="flex items-center gap-1 text-xs text-orange-600 font-bold ml-auto">
+            <Volume2 className="w-4 h-4 animate-pulse" />
+            コール中...
+          </span>
+        ) : (
+          <span className="ml-auto bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
+            コール済
+          </span>
+        )}
+      </div>
+
+      {/* 中央：選手情報 */}
+      <div className="mb-3">
+        <PlayerInfo match={match} />
+      </div>
+
+      {/* 下部：コート・時間情報 + 再コールボタン */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {match.courtNumber && (
+          <span className="text-xs bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">
+            {match.courtNumber}番コート
+          </span>
+        )}
+        {match.startTime && (
+          <span className="text-xs text-gray-500">{match.startTime}</span>
+        )}
+        {match.calledAt && (
+          <span className="text-xs text-gray-400">
+            {match.calledAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}にコール
+          </span>
+        )}
+
+        <div className="flex-1" />
+
+        {isSpeaking ? (
+          <button
+            onClick={onStop}
+            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+          >
+            <Square className="w-4 h-4" />
+            停止
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              onRecall(match);
+              // 少し遅延させてからコール（stateが更新されるのを待つ）
+              setTimeout(() => onCall({ ...match, status: 'pending' }), 50);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border-main rounded-lg text-xs font-medium text-gray-600 hover:bg-orange-50 hover:border-orange-300 transition-colors"
+          >
+            <Play className="w-3 h-3" />
+            再コール
           </button>
         )}
       </div>

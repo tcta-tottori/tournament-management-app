@@ -2,20 +2,20 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { VoiceSettings } from './types';
 
 const MAX_REPEATS = 2; // 最大繰り返し回数（初回を除く）
+/** チャンク間のポーズ（ms）— 自然な間を演出 */
+const CHUNK_PAUSE_MS = 600;
 
 /** 利用可能な日本語女性音声を取得 */
 function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
   const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang === 'ja_JP');
 
-  // 既知の女性音声キーワード（かわいらしい声質を優先）
-  const femaleKeywords = ['nanami', 'haruka', 'mizuki', 'o-ren', 'kyoko', 'mei', 'google', 'female'];
+  // 自然で柔らかい声質を優先するキーワード順
+  const preferredKeywords = ['nanami', 'haruka', 'kyoko', 'mei', 'mizuki', 'o-ren', 'google', 'female'];
 
-  for (const v of jaVoices) {
-    const nameLower = v.name.toLowerCase();
-    if (femaleKeywords.some(k => nameLower.includes(k))) {
-      return v;
-    }
+  for (const keyword of preferredKeywords) {
+    const found = jaVoices.find(v => v.name.toLowerCase().includes(keyword));
+    if (found) return found;
   }
 
   // フォールバック: 最初の日本語音声
@@ -62,7 +62,6 @@ export function useSpeechSynthesis() {
     let repeatCount = 0;
 
     function speakChunks() {
-      // 初回はbaseChunks、繰り返し時はrepeatChunksを使用
       const chunks = repeatCount === 0 ? baseChunks : repeatChunks;
       let index = 0;
 
@@ -74,10 +73,10 @@ export function useSpeechSynthesis() {
         if (index >= chunks.length) {
           repeatCount++;
           if (repeatCount < effectiveRepeatCount) {
-            // 繰り返し間ポーズ
+            // 繰り返し間ポーズ（長め）
             setTimeout(() => {
               if (!cancelledRef.current) speakChunks();
-            }, 2000);
+            }, 2500);
           } else {
             setIsSpeaking(false);
             onComplete?.();
@@ -87,13 +86,26 @@ export function useSpeechSynthesis() {
 
         const utterance = new SpeechSynthesisUtterance(chunks[index]);
         utterance.lang = 'ja-JP';
+        // 自然な速度: ゆっくりめに設定
         utterance.rate = settings.rate;
-        // かわいらしい女性の声: ピッチを少し高めに設定
-        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
+        // 柔らかい女性の声: ピッチを少し高めに
+        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.2));
         utterance.volume = settings.volume;
         if (voice) utterance.voice = voice;
-        utterance.onend = () => { index++; speakNext(); };
-        utterance.onerror = () => { index++; speakNext(); };
+
+        utterance.onend = () => {
+          index++;
+          // チャンク間に自然なポーズを入れる（最後のチャンク以外）
+          if (index < chunks.length) {
+            setTimeout(() => speakNext(), CHUNK_PAUSE_MS);
+          } else {
+            speakNext();
+          }
+        };
+        utterance.onerror = () => {
+          index++;
+          speakNext();
+        };
         synth.speak(utterance);
       }
 
@@ -116,7 +128,7 @@ export function useSpeechSynthesis() {
     const utterance = new SpeechSynthesisUtterance('音声テストです。放送コールシステムをご利用いただきありがとうございます。');
     utterance.lang = 'ja-JP';
     utterance.rate = settings.rate;
-    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
+    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.2));
     utterance.volume = settings.volume;
     if (voice) utterance.voice = voice;
     synth.speak(utterance);
