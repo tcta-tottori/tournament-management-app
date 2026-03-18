@@ -30,11 +30,18 @@ export interface ParsedDrawFile {
   tournamentName: string;
   date: string;
   venue: string;
+  reserveDate: string;
+  reserveVenue: string;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** 全角数字→半角数字に変換 */
+function normalizeDigits(s: string): string {
+  return s.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30));
+}
 
 const EVENT_KEYWORDS = [
   'シングルス',
@@ -399,65 +406,106 @@ export function parseDrawExcel(
   let tournamentName = '';
   let date = '';
   let venue = '';
+  let reserveDate = '';
+  let reserveVenue = '';
+
+  /** 日付文字列から M/D 形式を抽出（全角数字対応） */
+  function extractDate(src: string): string {
+    const s = normalizeDigits(src);
+    // 令和・平成年号（例: 令和8年3月22日）
+    const era = s.match(/[令平]和\d{1,2}年\s*(\d{1,2})月\s*(\d{1,2})日/);
+    if (era) return `${era[1]}/${era[2]}`;
+    // 西暦（例: 2026年3月22日, 2026/3/22）
+    const full = s.match(/\d{4}[年\/\-\.]\s*(\d{1,2})[月\/\-\.]\s*(\d{1,2})日?/);
+    if (full) return `${full[1]}/${full[2]}`;
+    // 月日（例: 3月22日, 3/22）
+    const md = s.match(/(\d{1,2})[月\/]\s*(\d{1,2})日?/);
+    if (md) return `${md[1]}/${md[2]}`;
+    return '';
+  }
 
   // ヘッダー行（最初のイベントヘッダーより前）を探索
   const headerEnd = sections.length > 0 ? sections[0].headerRow : Math.min(rows.length, 15);
   for (let r = 0; r < headerEnd; r++) {
     const row = rows[r];
     if (!row) continue;
+
+    // 行内のラベルセル（「期日」「会場」）を検出して値セルを読む
+    let rowLabel = '';
+    let rowValue = '';
+    for (let c = 0; c < row.length; c++) {
+      const rawVal = row[c];
+      if (rawVal == null) continue;
+      const s = String(rawVal).replace(/\s+/g, '').trim();
+      if (/^期日$/.test(s)) rowLabel = 'date';
+      else if (/^会場$/.test(s)) rowLabel = 'venue';
+    }
+    // ラベルの後ろにある最も長いセルを値とする
+    if (rowLabel) {
+      for (let c = 0; c < row.length; c++) {
+        const v = row[c];
+        if (v == null) continue;
+        const s = String(v).trim();
+        if (s.length > rowValue.length && !/^(期\s*日|会\s*場|主\s*催|主\s*管|運\s*営)$/.test(s.replace(/\s+/g, ''))) {
+          rowValue = s;
+        }
+      }
+    }
+
+    if (rowLabel === 'date' && rowValue) {
+      // 日付と予備日が1セルにまとめて入っている場合を分割
+      // 例: "令和８年３月22日（日）予備日：３月28日(土)"
+      const parts = rowValue.split(/予備日[：:]?\s*/);
+      if (!date) date = extractDate(parts[0]);
+      if (!reserveDate && parts[1]) reserveDate = extractDate(parts[1]);
+      continue;
+    }
+
+    if (rowLabel === 'venue' && rowValue) {
+      // 会場と予備日会場が1セルの場合を分割
+      // 例: "ヤマタスポーツパーク・テニスコート\n予備日:千代コート"
+      const venueParts = rowValue.split(/予備日[：:]?\s*/);
+      if (!venue) venue = venueParts[0].replace(/\n/g, ' ').trim();
+      if (!reserveVenue && venueParts[1]) reserveVenue = venueParts[1].replace(/\n/g, ' ').trim();
+      continue;
+    }
+
+    // ラベルなし行のフォールバック検出
     for (let c = 0; c < row.length; c++) {
       const rawVal = row[c];
       if (rawVal == null) continue;
 
-      // Date型の場合（Excelの日付セル）
+      // Date型（Excelの日付セル）
       if (!date && rawVal instanceof Date && !isNaN(rawVal.getTime())) {
-        const m = rawVal.getMonth() + 1;
-        const d = rawVal.getDate();
-        date = `${m}/${d}`;
+        date = `${rawVal.getMonth() + 1}/${rawVal.getDate()}`;
         continue;
+      }
+
+      // Excelシリアル値
+      if (!date && typeof rawVal === 'number' && rawVal > 30000 && rawVal < 60000) {
+        const epoch = new Date((rawVal - 25569) * 86400000);
+        if (!isNaN(epoch.getTime())) {
+          date = `${epoch.getMonth() + 1}/${epoch.getDate()}`;
+          continue;
+        }
       }
 
       const val = String(rawVal).trim();
       if (!val) continue;
 
-      // 大会名（「第○回」「○○大会」「○○選手権」を含む行）
-      if (!tournamentName && /第\d+回|大会|選手権|オープン/.test(val)) {
+      // 大会名
+      const norm = normalizeDigits(val);
+      if (!tournamentName && /第\d+回|大会|選手権|オープン/.test(norm)) {
         tournamentName = val;
       }
 
-      // 日程の検出
+      // 日付（ラベルなし行）
       if (!date) {
-        // Excelシリアル値がそのまま数値として来た場合（40000〜50000辺り）
-        if (typeof rawVal === 'number' && rawVal > 30000 && rawVal < 60000) {
-          const epoch = new Date((rawVal - 25569) * 86400000);
-          if (!isNaN(epoch.getTime())) {
-            const m = epoch.getMonth() + 1;
-            const d = epoch.getDate();
-            date = `${m}/${d}`;
-            continue;
-          }
-        }
-        // 令和・平成年号パターン（例: 令和6年3月22日）
-        const eraMatch = val.match(/[令平]和\d{1,2}年\s*(\d{1,2})月\s*(\d{1,2})日/);
-        if (eraMatch) {
-          date = `${eraMatch[1]}/${eraMatch[2]}`;
-          continue;
-        }
-        // 西暦パターン（例: 2024年3月22日, 2024/3/22）
-        const fullDateMatch = val.match(/\d{4}[年\/\-\.]\s*(\d{1,2})[月\/\-\.]\s*(\d{1,2})日?/);
-        if (fullDateMatch) {
-          date = `${fullDateMatch[1]}/${fullDateMatch[2]}`;
-          continue;
-        }
-        // 月日パターン（例: 3月22日, 3/22, 3月22日(日)）
-        const mdMatch = val.match(/(\d{1,2})[月\/]\s*(\d{1,2})日?(?:\s*[（(][日月火水木金土][）)])?/);
-        if (mdMatch) {
-          date = `${mdMatch[1]}/${mdMatch[2]}`;
-          continue;
-        }
+        const d = extractDate(val);
+        if (d) { date = d; continue; }
       }
 
-      // 会場（「コート」「パーク」「体育館」「テニス場」等を含む）
+      // 会場（ラベルなし行）
       if (!venue && /コート|パーク|体育館|テニス場|運動公園|市民|スポーツ|アリーナ|センター/.test(val)) {
         venue = val;
       }
@@ -471,5 +519,7 @@ export function parseDrawExcel(
     tournamentName,
     date,
     venue,
+    reserveDate,
+    reserveVenue,
   };
 }

@@ -309,9 +309,10 @@ export default function DataImport() {
         // 大会名をプリセット（Excel内の大会名 > ファイル名）
         const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
         setEditTournamentName(cleanTournamentName(rawName));
-        // 日程・会場をプリセット
+        // 日程・会場・予備日をプリセット
         if (result.date) setEditDate(result.date);
         if (result.venue) setEditVenue(result.venue);
+        if (result.reserveDate) setEditReserveDate(result.reserveDate);
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
       }
@@ -716,7 +717,7 @@ export default function DataImport() {
         date: editDate,
         venue: editVenue,
         reserveDate: editReserveDate,
-        reserveVenue: '',
+        reserveVenue: parsedExcel.reserveVenue || '',
         createdAt: now,
       });
 
