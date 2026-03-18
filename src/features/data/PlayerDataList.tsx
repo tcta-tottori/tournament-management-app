@@ -11,6 +11,7 @@ type TabId = 'affiliation' | 'furigana';
 
 export default function PlayerDataList() {
   const players = useLiveQuery(() => db.players.toArray()) || [];
+  const affFuriganaEntries = useLiveQuery(() => db.affiliationFurigana.toArray()) || [];
 
   const [tab, setTab] = useState<TabId>('affiliation');
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,13 +20,22 @@ export default function PlayerDataList() {
 
   // --- 所属一覧 ---
   const [editingAff, setEditingAff] = useState<string | null>(null);
-  const [editAffValue, setEditAffValue] = useState('');
+  const [editAffFurigana, setEditAffFurigana] = useState('');
 
   // --- ふりがな ---
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editFuriganaValue, setEditFuriganaValue] = useState('');
 
-  // === 所属一覧データ ===
+  // === 所属ふりがなマップ ===
+  const affFuriganaMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of affFuriganaEntries) {
+      map.set(entry.name, entry.furigana);
+    }
+    return map;
+  }, [affFuriganaEntries]);
+
+  // === 所属一覧データ（選手データ + ランキングデータから抽出） ===
   const affiliationList = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of players) {
@@ -34,14 +44,21 @@ export default function PlayerDataList() {
       map.set(aff, (map.get(aff) || 0) + 1);
     }
     return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, count]) => ({
+        name,
+        count,
+        furigana: affFuriganaMap.get(name) || '',
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  }, [players]);
+  }, [players, affFuriganaMap]);
 
   const filteredAffiliations = useMemo(() => {
     if (!searchQuery.trim()) return affiliationList;
     const q = searchQuery.trim().toLowerCase();
-    return affiliationList.filter(a => a.name.toLowerCase().includes(q));
+    return affiliationList.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.furigana.toLowerCase().includes(q)
+    );
   }, [affiliationList, searchQuery]);
 
   // === ふりがな一覧データ ===
@@ -62,19 +79,17 @@ export default function PlayerDataList() {
     );
   }, [furiganaList, searchQuery]);
 
-  // === 所属名の一括変更 ===
-  const handleAffRename = async (oldName: string) => {
-    const newName = editAffValue.trim();
-    if (!newName || newName === oldName) {
-      setEditingAff(null);
-      return;
-    }
+  // === 所属ふりがなの保存 ===
+  const handleAffFuriganaSave = async (affName: string) => {
+    const furigana = editAffFurigana.trim();
     try {
-      const targets = players.filter(p => (p.affiliation || '').trim() === oldName);
-      for (const p of targets) {
-        await db.players.update(p.id!, { affiliation: newName });
+      const existing = affFuriganaEntries.find(e => e.name === affName);
+      if (existing) {
+        await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: Date.now() });
+      } else {
+        await db.affiliationFurigana.add({ name: affName, furigana, updatedAt: Date.now() });
       }
-      setStatus({ message: `「${oldName}」→「${newName}」に${targets.length}件更新しました。`, isError: false });
+      setStatus({ message: `「${affName}」のふりがなを更新しました。`, isError: false });
       setEditingAff(null);
     } catch (error: any) {
       setStatus({ message: `更新失敗: ${error.message}`, isError: true });
@@ -111,9 +126,12 @@ export default function PlayerDataList() {
       if (tab === 'affiliation') {
         const data = affiliationList.map(a => ({
           '所属名': a.name,
+          'ふりがな': a.furigana,
           '人数': a.count,
         }));
         const ws = XLSX.utils.json_to_sheet(data);
+        // 列幅設定
+        ws['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 8 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '所属一覧');
         XLSX.writeFile(wb, `affiliations_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -147,19 +165,21 @@ export default function PlayerDataList() {
       const rows = XLSX.utils.sheet_to_json<any>(ws);
 
       if (tab === 'affiliation') {
-        // 所属名の一括変更: 「所属名」「新所属名」列
+        // 所属ふりがなの一括更新: 「所属名」「ふりがな」列
         let count = 0;
         for (const row of rows) {
-          const oldName = String(row['所属名'] || '').trim();
-          const newName = String(row['新所属名'] || '').trim();
-          if (!oldName || !newName || oldName === newName) continue;
-          const targets = await db.players.where('affiliation').equals(oldName).toArray();
-          for (const p of targets) {
-            await db.players.update(p.id!, { affiliation: newName });
+          const name = String(row['所属名'] || '').trim();
+          const furigana = String(row['ふりがな'] || '').trim();
+          if (!name) continue;
+          const existing = affFuriganaEntries.find(e => e.name === name);
+          if (existing) {
+            await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: Date.now() });
+          } else if (furigana) {
+            await db.affiliationFurigana.add({ name, furigana, updatedAt: Date.now() });
           }
-          count += targets.length;
+          count++;
         }
-        setStatus({ message: `${count}件の所属名を更新しました。`, isError: false });
+        setStatus({ message: `${count}件の所属ふりがなを更新しました。`, isError: false });
       } else {
         // ふりがなの一括更新: 「選手名」「ふりがな」列
         let count = 0;
@@ -189,6 +209,9 @@ export default function PlayerDataList() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const affRegisteredCount = affiliationList.filter(a => a.furigana).length;
+  const affUnregisteredCount = affiliationList.length - affRegisteredCount;
 
   return (
     <div className="flex flex-col">
@@ -234,7 +257,7 @@ export default function PlayerDataList() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={tab === 'affiliation' ? '所属名で検索...' : '選手名・ふりがな・所属で検索...'}
+            placeholder={tab === 'affiliation' ? '所属名・ふりがなで検索...' : '選手名・ふりがな・所属で検索...'}
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
           />
         </div>
@@ -267,9 +290,10 @@ export default function PlayerDataList() {
       {tab === 'affiliation' && (
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 border-b px-4 py-2 flex items-center text-xs font-medium text-gray-500">
-            <div className="w-7/12">所属名</div>
+            <div className="w-4/12">所属名</div>
+            <div className="w-4/12">ふりがな</div>
             <div className="w-2/12 text-center">人数</div>
-            <div className="w-3/12 text-center">操作</div>
+            <div className="w-2/12 text-center">操作</div>
           </div>
           <div className="overflow-y-auto bg-white max-h-[400px]">
             {filteredAffiliations.length > 0 ? (
@@ -278,20 +302,22 @@ export default function PlayerDataList() {
                   <div key={aff.name} className="px-4 py-2 flex items-center text-sm hover:bg-gray-50">
                     {editingAff === aff.name ? (
                       <>
-                        <div className="w-7/12 pr-2">
+                        <div className="w-4/12 font-medium text-gray-800 truncate pr-2">{aff.name}</div>
+                        <div className="w-4/12 pr-2">
                           <input
                             type="text"
-                            value={editAffValue}
-                            onChange={e => setEditAffValue(e.target.value)}
+                            value={editAffFurigana}
+                            onChange={e => setEditAffFurigana(e.target.value)}
+                            placeholder="ふりがなを入力..."
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                            onKeyDown={e => { if (e.key === 'Enter') handleAffRename(aff.name); if (e.key === 'Escape') setEditingAff(null); }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAffFuriganaSave(aff.name); if (e.key === 'Escape') setEditingAff(null); }}
                             autoFocus
                           />
                         </div>
                         <div className="w-2/12 text-center text-gray-500">{aff.count}</div>
-                        <div className="w-3/12 flex justify-center gap-1">
+                        <div className="w-2/12 flex justify-center gap-1">
                           <button
-                            onClick={() => handleAffRename(aff.name)}
+                            onClick={() => handleAffFuriganaSave(aff.name)}
                             className="p-1 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
                             title="保存"
                           >
@@ -308,15 +334,22 @@ export default function PlayerDataList() {
                       </>
                     ) : (
                       <>
-                        <div className="w-7/12 font-medium text-gray-800">{aff.name}</div>
+                        <div className="w-4/12 font-medium text-gray-800 truncate">{aff.name}</div>
+                        <div className="w-4/12 truncate">
+                          {aff.furigana ? (
+                            <span className="text-gray-600">{aff.furigana}</span>
+                          ) : (
+                            <span className="text-amber-500 text-xs italic">未登録</span>
+                          )}
+                        </div>
                         <div className="w-2/12 text-center">
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{aff.count}名</span>
                         </div>
-                        <div className="w-3/12 flex justify-center">
+                        <div className="w-2/12 flex justify-center">
                           <button
-                            onClick={() => { setEditingAff(aff.name); setEditAffValue(aff.name); }}
+                            onClick={() => { setEditingAff(aff.name); setEditAffFurigana(aff.furigana); }}
                             className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
-                            title="所属名を変更"
+                            title="ふりがなを編集"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -332,6 +365,14 @@ export default function PlayerDataList() {
               </div>
             )}
           </div>
+          {/* 所属ふりがな統計 */}
+          {affiliationList.length > 0 && (
+            <div className="bg-gray-50 border-t px-4 py-2 flex items-center gap-4 text-xs text-gray-500">
+              <span>全{affiliationList.length}件</span>
+              <span className="text-emerald-600">登録済: {affRegisteredCount}</span>
+              <span className="text-amber-600">未登録: {affUnregisteredCount}</span>
+            </div>
+          )}
         </div>
       )}
 
