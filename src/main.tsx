@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import AppLayout from './components/layout/AppLayout'
 import DataManagement from './features/data/DataManagement'
-import EntryList from './features/entry/EntryList'
+
 import EntryRegistration from './features/entry/EntryRegistration'
 import DrawGenerator from './features/draw/DrawGenerator'
 import DrawBoard from './features/draw/DrawBoard'
@@ -28,7 +28,7 @@ createRoot(document.getElementById('root')!).render(
           <Route index element={<Navigate to="/data" replace />} />
           <Route path="data" element={<DataManagement />} />
           <Route path="entry" element={<EntryRegistration />} />
-          <Route path="entry-list" element={<EntryList />} />
+
           <Route path="draw-lot" element={<DrawGenerator />} />
           <Route path="draw-table" element={<DrawBoard />} />
           <Route path="referee" element={<MatchManager />} />

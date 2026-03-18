@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, SlidersHorizontal } from 'lucide-react';
 import type { Match } from '../../db/database';
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -910,6 +910,37 @@ ${printableMatches.map(m => {
     }
   };
 
+  // モバイルでスクロール時にサイドバーを自動非表示 + FAB自動消去
+  const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
+  const [showFab, setShowFab] = useState(false);
+  const matchContentRef = useRef<HTMLDivElement>(null);
+  const fabTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const el = matchContentRef.current;
+    if (!el) return;
+    let lastScrollY = 0;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      if (y > 30 && y > lastScrollY) {
+        setMobileHeaderVisible(false);
+        setShowFab(true);
+        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+        fabTimerRef.current = setTimeout(() => setShowFab(false), 1000);
+      } else if (y < 30) {
+        setMobileHeaderVisible(true);
+        setShowFab(false);
+        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+      }
+      lastScrollY = y;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+    };
+  }, []);
+
   const statusLabels: Record<string, { text: string; color: string }> = {
     waiting: { text: '待機', color: 'bg-gray-100 text-gray-500' },
     ready: { text: '準備完了', color: 'bg-primary-50 text-primary-500' },
@@ -920,8 +951,8 @@ ${printableMatches.map(m => {
 
   return (
     <div className="h-full flex flex-col lg:flex-row lg:gap-4 p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Sidebar */}
-      <div className="lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-full lg:overflow-y-auto space-y-4 mb-4 lg:mb-0">
+      {/* Sidebar — モバイルではスクロールで自動非表示 */}
+      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-full lg:overflow-y-auto space-y-4 mb-4 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
         <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -999,8 +1030,19 @@ ${printableMatches.map(m => {
         )}
       </div>
 
+      {/* Mobile FAB to show sidebar */}
+      {!mobileHeaderVisible && showFab && (
+        <button
+          onClick={() => { setMobileHeaderVisible(true); setShowFab(false); matchContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className="lg:hidden fixed bottom-20 right-4 z-50 w-11 h-11 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
+          title="メニューを表示"
+        >
+          <SlidersHorizontal className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Main content */}
-      <div className="flex-1 min-w-0 order-2 lg:order-1 overflow-hidden flex flex-col">
+      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-hidden flex flex-col">
         {selectedEventId ? (
           matches.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">

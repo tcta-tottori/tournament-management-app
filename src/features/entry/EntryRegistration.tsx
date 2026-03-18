@@ -656,19 +656,18 @@ export default function EntryRegistration() {
       const isDimmed = hasSearch && !isOriginalBye && slot.entry && !searchMatches.has(slot.drawPosition);
       const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
 
+      // BYEスロットは表示しない（トーナメント表と同じ表示）
+      if (isOriginalBye) continue;
+
       // Status dot color
       let statusDotColor = '#d1d5db'; // gray - unchecked
       if (isWithdrawn) statusDotColor = '#ef4444'; // red
       else if (isConfirmed) statusDotColor = '#22c55e'; // green
-      else if (isOriginalBye) statusDotColor = '#ef4444'; // red for BYE
 
       // Border/background styles
       let borderClass = 'border-gray-300';
       let bgClass = 'bg-white';
-      if (isOriginalBye) {
-        borderClass = 'border-dashed border-gray-300';
-        bgClass = 'bg-gray-50/80';
-      } else if (isWithdrawn) {
+      if (isWithdrawn) {
         bgClass = 'bg-red-50/60';
         borderClass = 'border-red-200';
       } else if (isConfirmed) {
@@ -700,9 +699,7 @@ export default function EntryRegistration() {
 
           {/* Player info */}
           <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
-            {isOriginalBye ? (
-              <span className="text-sm text-gray-400 italic">BYE</span>
-            ) : slot.entry ? (
+            {slot.entry ? (
               <button
                 onClick={() => handleCheckIn(slot)}
                 className="text-left w-full group block"
@@ -730,7 +727,7 @@ export default function EntryRegistration() {
           </div>
 
           {/* Action button (BYE/Restore) */}
-          {slot.entry && !isOriginalBye && (
+          {slot.entry && (
             <div className="flex-shrink-0 mr-1">
               {isWithdrawn ? (
                 <button
@@ -903,9 +900,11 @@ export default function EntryRegistration() {
       : [];
   const overallStats = computeStats(allSlots);
 
-  // モバイルでスクロール時にヘッダーを自動非表示
+  // モバイルでスクロール時にヘッダーを自動非表示 + FAB自動消去
   const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
+  const [showFab, setShowFab] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const fabTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -913,15 +912,25 @@ export default function EntryRegistration() {
     let lastScrollY = 0;
     const onScroll = () => {
       const y = el.scrollTop;
-      if (y > 200 && y > lastScrollY) {
+      // 少しでもスクロールしたら消す
+      if (y > 30 && y > lastScrollY) {
         setMobileHeaderVisible(false);
-      } else if (y < lastScrollY - 30 || y < 100) {
+        setShowFab(true);
+        // スクロール停止後1秒でFABも消す
+        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+        fabTimerRef.current = setTimeout(() => setShowFab(false), 1000);
+      } else if (y < 30) {
         setMobileHeaderVisible(true);
+        setShowFab(false);
+        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
       }
       lastScrollY = y;
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+    };
   }, []);
 
   if (!currentTournamentId) {
@@ -1044,11 +1053,11 @@ export default function EntryRegistration() {
       {/* LEFT: Main content area (draw tables) - on PC comes first visually */}
       <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-y-auto space-y-4 min-h-0">
 
-      {/* Mobile FAB to show header */}
-      {!mobileHeaderVisible && (
+      {/* Mobile FAB to show header — スクロール停止後1秒で消える */}
+      {!mobileHeaderVisible && showFab && (
         <button
-          onClick={() => { setMobileHeaderVisible(true); contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className="lg:hidden fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
+          onClick={() => { setMobileHeaderVisible(true); setShowFab(false); contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className="lg:hidden fixed bottom-20 right-4 z-50 w-11 h-11 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
           title="メニューを表示"
         >
           <SlidersHorizontal className="w-5 h-5" />

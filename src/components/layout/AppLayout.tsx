@@ -13,7 +13,7 @@ import logoUrl from '/logo.png?url';
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
   { id: 'S-02', path: '/entry', label: 'エントリー', icon: Users },
-  { id: 'S-03', path: '/entry-list', label: 'リスト', icon: List },
+
   { id: 'S-04', path: '/draw-lot', label: '抽選', icon: Dices },
   { id: 'S-05', path: '/draw-table', label: 'ドロー表', icon: Trophy },
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
