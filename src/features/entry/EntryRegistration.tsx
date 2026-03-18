@@ -310,7 +310,8 @@ export default function EntryRegistration() {
   };
 
   // ===== League / Round-robin table =====
-  const renderLeagueTable = (_eventId: string, slots: CheckInSlot[]) => {
+  const renderLeagueTable = (eventId: string, slots: CheckInSlot[]) => {
+    const draw = drawMap.get(eventId);
     const searchMatches = getSearchMatchSet(slots);
     const hasSearch = searchQuery.length > 0;
     const playerSlots = slots.filter(s => s.entry && !(s.isBye && !s.entry));
@@ -323,113 +324,184 @@ export default function EntryRegistration() {
       );
     }
 
+    // 短縮名（列ヘッダー用）
+    const shortName = (name: string) => {
+      const parts = name.split(/[\s　]+/);
+      if (parts.length >= 2) return parts[0]; // 姓のみ
+      return name.slice(0, 3);
+    };
+
     return (
-      <div className="p-4 overflow-x-auto">
-        <table className="border-collapse text-sm" style={{ borderSpacing: 0 }}>
-          <thead>
-            <tr>
-              <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 sticky left-0 z-10">No</th>
-              <th className="py-2 px-3 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 sticky left-[40px] z-10 min-w-[120px]">選手名</th>
-              <th className="py-2 px-2 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 w-16 text-center">状態</th>
-              {playerSlots.map((_, colIdx) => (
-                <th key={`col-h-${colIdx}`} className="py-2 px-2 text-[10px] font-semibold text-gray-500 border border-gray-200 bg-gray-50 text-center w-10">
-                  {colIdx + 1}
+      <div>
+        {/* Info bar - トーナメントと同じスタイル */}
+        {draw && (
+          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
+            <span className="flex items-center gap-1.5 text-gray-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+              リーグ <strong className="text-gray-800">{playerSlots.length}人</strong>
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              対戦数 <strong className="text-gray-800">{playerSlots.length * (playerSlots.length - 1) / 2}</strong>
+            </span>
+          </div>
+        )}
+
+        <div className="p-4 overflow-x-auto">
+          <table className="border-collapse text-sm" style={{ borderSpacing: 0 }}>
+            <thead>
+              <tr>
+                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 sticky left-0 z-20 w-8 text-center">
+                  No
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {playerSlots.map((slot, rowIdx) => {
-              const isWithdrawn = slot.entry?.status === 'withdrawn';
-              const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
-              const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
-              const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+                <th className="py-2.5 px-3 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 sticky left-[33px] z-20 min-w-[200px] text-left">
+                  選手名
+                </th>
+                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-[70px] text-center">
+                  受付
+                </th>
+                {playerSlots.map((ps, colIdx) => (
+                  <th
+                    key={`col-h-${colIdx}`}
+                    className="py-1.5 px-1 text-center border border-gray-200 bg-gray-50/80 w-[56px]"
+                  >
+                    <div className="text-[10px] font-bold text-gray-500">{colIdx + 1}</div>
+                    <div className="text-[9px] text-gray-400 truncate leading-tight">{shortName(ps.playerName)}</div>
+                  </th>
+                ))}
+                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                  勝
+                </th>
+                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                  敗
+                </th>
+                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                  順位
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {playerSlots.map((slot, rowIdx) => {
+                const isWithdrawn = slot.entry?.status === 'withdrawn';
+                const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+                const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+                const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
 
-              let statusBadge: React.ReactNode = null;
-              if (isWithdrawn) {
-                statusBadge = <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">BYE</span>;
-              } else if (isConfirmed) {
-                statusBadge = <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">受付済</span>;
-              } else if (slot.entry) {
-                statusBadge = <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">未確認</span>;
-              }
+                // Status dot & border (トーナメントスロットと同じスタイル)
+                let statusDotColor = '#d1d5db';
+                let rowBg = '';
+                let rowBorder = 'border-gray-200';
+                if (isWithdrawn) {
+                  statusDotColor = '#ef4444';
+                  rowBg = 'bg-red-50/40';
+                  rowBorder = 'border-red-200';
+                } else if (isConfirmed) {
+                  statusDotColor = '#22c55e';
+                  rowBg = 'bg-emerald-50/40';
+                  rowBorder = 'border-emerald-200';
+                }
 
-              return (
-                <tr
-                  key={`league-row-${slot.drawPosition}`}
-                  className={`
-                    ${isDimmed ? 'opacity-25' : ''}
-                    ${isHighlighted ? 'bg-blue-50/50' : ''}
-                    ${isWithdrawn ? 'bg-red-50/40' : isConfirmed ? 'bg-emerald-50/40' : ''}
-                  `}
-                >
-                  <td className="py-2 px-3 text-center text-xs font-mono text-gray-400 border border-gray-200 bg-white sticky left-0 z-10">
-                    {rowIdx + 1}
-                  </td>
-                  <td className="py-2 px-3 border border-gray-200 bg-white sticky left-[40px] z-10 min-w-[120px]">
-                    <div className="flex items-center gap-2">
-                      {slot.seed > 0 && (
-                        <span className="inline-flex items-center justify-center w-5 h-5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm flex-shrink-0">{slot.seed}</span>
-                      )}
-                      {slot.entry ? (
-                        <button
-                          onClick={() => handleCheckIn(slot)}
-                          className="text-left group"
-                          title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
-                        >
-                          <span className={`text-sm font-medium ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
-                            {slot.playerName}
-                            {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
-                          </span>
-                          {slot.affiliation && !isWithdrawn && (
-                            <span className="block text-[10px] text-gray-400 truncate max-w-[140px]">{slot.affiliation}</span>
+                return (
+                  <tr
+                    key={`league-row-${slot.drawPosition}`}
+                    className={`transition-all
+                      ${isDimmed ? 'opacity-20' : ''}
+                      ${isHighlighted ? 'ring-2 ring-blue-400 ring-inset' : ''}
+                    `}
+                  >
+                    {/* No */}
+                    <td className={`py-0 px-0 text-center border ${rowBorder} bg-white sticky left-0 z-10`}>
+                      <div className="w-full h-[44px] flex items-center justify-center text-[10px] font-mono text-gray-400 border-r border-gray-100">
+                        {rowIdx + 1}
+                      </div>
+                    </td>
+
+                    {/* 選手名 - トーナメントスロットカードと同じスタイル */}
+                    <td className={`py-0 px-0 border ${rowBorder} sticky left-[33px] z-10 ${rowBg || 'bg-white'}`}>
+                      <div className="flex items-center h-[44px] px-2 gap-1.5">
+                        {slot.seed > 0 && (
+                          <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm">
+                            {slot.seed}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {slot.entry ? (
+                            <button
+                              onClick={() => handleCheckIn(slot)}
+                              className="text-left w-full group block"
+                              title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
+                            >
+                              <div className={`text-xs font-medium leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                                {slot.playerName}
+                                {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
+                              </div>
+                              {slot.affiliation && !isWithdrawn && (
+                                <div className="text-[9px] text-gray-400 truncate leading-tight mt-0.5">{slot.affiliation}</div>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-sm text-gray-300">---</span>
                           )}
-                        </button>
-                      ) : (
-                        <span className="text-sm text-gray-300">---</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 px-2 text-center border border-gray-200">
-                    <div className="flex items-center justify-center gap-1">
-                      {statusBadge}
-                      {slot.entry && (
-                        isWithdrawn ? (
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
+                        </div>
+                        {slot.entry && !isWithdrawn && (
                           <button
-                            onClick={() => handleRestore(slot)}
-                            className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
-                            title="復元する"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleMarkBye(slot)}
-                            className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
+                            className="flex-shrink-0 p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                             title="BYEにする"
                           >
                             <UserX className="w-3 h-3" />
                           </button>
-                        )
-                      )}
-                    </div>
-                  </td>
-                  {playerSlots.map((_, colIdx) => {
-                    const isDiagonal = rowIdx === colIdx;
-                    return (
-                      <td
-                        key={`cell-${rowIdx}-${colIdx}`}
-                        className={`py-2 px-2 text-center text-xs border border-gray-200 ${isDiagonal ? 'bg-gray-200' : 'bg-white'}`}
-                      >
-                        {isDiagonal ? '' : ''}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        )}
+                        {slot.entry && isWithdrawn && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
+                            className="flex-shrink-0 p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
+                            title="復元する"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* 受付状態 */}
+                    <td className={`py-0 px-2 text-center border ${rowBorder} ${rowBg || 'bg-white'}`}>
+                      {isWithdrawn ? (
+                        <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">BYE</span>
+                      ) : isConfirmed ? (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">受付済</span>
+                      ) : slot.entry ? (
+                        <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">未確認</span>
+                      ) : null}
+                    </td>
+
+                    {/* 対戦セル */}
+                    {playerSlots.map((_, colIdx) => {
+                      const isDiagonal = rowIdx === colIdx;
+                      return (
+                        <td
+                          key={`cell-${rowIdx}-${colIdx}`}
+                          className={`h-[44px] text-center text-xs border border-gray-200 ${isDiagonal ? '' : 'bg-white'}`}
+                          style={isDiagonal ? {
+                            background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, #d1d5db 3px, #d1d5db 4px)',
+                          } : undefined}
+                        />
+                      );
+                    })}
+
+                    {/* 勝・敗・順位（空欄） */}
+                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
+                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
+                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
