@@ -431,12 +431,12 @@ export default function EntryRegistration() {
                               className="text-left w-full group block"
                               title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
                             >
-                              <div className={`text-xs font-medium leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                              <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
                                 {slot.playerName}
-                                {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
+                                {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                               </div>
                               {slot.affiliation && !isWithdrawn && (
-                                <div className="text-[9px] text-gray-400 truncate leading-tight mt-0.5">{slot.affiliation}</div>
+                                <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
                               )}
                             </button>
                           ) : (
@@ -705,12 +705,12 @@ export default function EntryRegistration() {
                 className="text-left w-full group block"
                 title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
               >
-                <div className={`text-xs font-medium leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
                   {slot.playerName}
-                  {slot.partnerName && <span className="text-gray-400"> / {slot.partnerName}</span>}
+                  {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                 </div>
                 {slot.affiliation && !isWithdrawn && (
-                  <div className="text-[9px] text-gray-400 truncate leading-tight mt-0.5">{slot.affiliation}</div>
+                  <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
                 )}
               </button>
             ) : (
@@ -945,8 +945,8 @@ export default function EntryRegistration() {
 
   return (
     <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* RIGHT: Sidebar controls - on mobile auto-hide on scroll */}
-      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-3 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
+      {/* LEFT: Sidebar controls - on mobile auto-hide on scroll */}
+      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-1 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-3 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
       <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div className="flex flex-col gap-3">
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -1050,8 +1050,8 @@ export default function EntryRegistration() {
       </header>
       </div>
 
-      {/* LEFT: Main content area (draw tables) - on PC comes first visually */}
-      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-y-auto space-y-4 min-h-0">
+      {/* RIGHT: Main content area (draw tables) - on PC comes second visually */}
+      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-y-auto space-y-4 min-h-0">
 
       {/* Mobile FAB to show header — スクロール停止後1秒で消える */}
       {!mobileHeaderVisible && showFab && (
