@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, SlidersHorizontal } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Match } from '../../db/database';
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -910,11 +910,9 @@ ${printableMatches.map(m => {
     }
   };
 
-  // モバイルでスクロール時にサイドバーを自動非表示 + FAB自動消去
-  const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
-  const [showFab, setShowFab] = useState(false);
+  // スクロール時にコントロールを自動非表示
+  const [controlsOpen, setControlsOpen] = useState(true);
   const matchContentRef = useRef<HTMLDivElement>(null);
-  const fabTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = matchContentRef.current;
@@ -922,23 +920,13 @@ ${printableMatches.map(m => {
     let lastScrollY = 0;
     const onScroll = () => {
       const y = el.scrollTop;
-      if (y > 30 && y > lastScrollY) {
-        setMobileHeaderVisible(false);
-        setShowFab(true);
-        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
-        fabTimerRef.current = setTimeout(() => setShowFab(false), 1000);
-      } else if (y < 30) {
-        setMobileHeaderVisible(true);
-        setShowFab(false);
-        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+      if (y > 20 && y > lastScrollY) {
+        setControlsOpen(false);
       }
       lastScrollY = y;
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
-    };
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
   const statusLabels: Record<string, { text: string; color: string }> = {
@@ -950,99 +938,95 @@ ${printableMatches.map(m => {
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row lg:gap-4 p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Sidebar — モバイルではスクロールで自動非表示 */}
-      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-full lg:overflow-y-auto space-y-4 mb-4 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
-        <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <ClipboardList className="w-6 h-6 text-primary-500" />
-              対戦順・審判用紙
-            </h1>
-            <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-              ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
-            </p>
+    <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto">
+      {/* TOP: プルダウン式コントロールパネル */}
+      <div className="shrink-0 mb-3">
+        <button
+          onClick={() => setControlsOpen(prev => !prev)}
+          className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-primary-500" />
+            <span className="font-bold text-gray-900">対戦順・審判用紙</span>
+            {selectedEventId && (
+              <span className="text-xs text-gray-500 ml-2">{matches.length} 試合</span>
+            )}
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
-            <select
-              value={selectedEventId}
-              onChange={e => setSelectedEventId(e.target.value)}
-              className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-            >
-              <option value="">-- 種目を選択 --</option>
-              {events.map(e => (
-                <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
-              ))}
-            </select>
-            <button
-              onClick={handleGenerateAllMatches}
-              disabled={isGenerating || events.length === 0}
-              className="flex items-center justify-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
-            >
-              <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
-              全種目一括生成
-            </button>
-          </div>
-        </header>
+          {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
 
-        {selectedEventId && (
-          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
-                <ListOrdered className="w-4 h-4 inline mr-1" />
-                {matches.length} 試合
-              </div>
-              {!drawData && (
-                <span className="text-sm text-warning">
-                  先にS-04でドローを作成・保存してください
-                </span>
-              )}
-            </div>
+        <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
             <div className="flex flex-col gap-2">
-              <button
-                onClick={handleGenerateMatches}
-                disabled={!drawData || isGenerating}
-                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+              <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
+              <select
+                value={selectedEventId}
+                onChange={e => setSelectedEventId(e.target.value)}
+                className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
               >
-                <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                {matches.length > 0 ? '再生成' : '試合生成'}
-              </button>
+                <option value="">-- 種目を選択 --</option>
+                {events.map(e => (
+                  <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
+                ))}
+              </select>
               <button
-                onClick={handlePrint}
-                disabled={matches.length === 0}
-                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                onClick={handleGenerateAllMatches}
+                disabled={isGenerating || events.length === 0}
+                className="flex items-center justify-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
               >
-                <Printer className="w-4 h-4" />
-                審判用紙印刷
+                <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
+                全種目一括生成
               </button>
-              {matches.length > 0 && (
-                <button
-                  onClick={handleDeleteAll}
-                  className="flex items-center justify-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  全削除
-                </button>
-              )}
             </div>
+
+            {selectedEventId && (
+              <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
+                    <ListOrdered className="w-4 h-4 inline mr-1" />
+                    {matches.length} 試合
+                  </div>
+                  {!drawData && (
+                    <span className="text-sm text-warning">
+                      先にS-04でドローを作成・保存してください
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleGenerateMatches}
+                    disabled={!drawData || isGenerating}
+                    className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                    {matches.length > 0 ? '再生成' : '試合生成'}
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    disabled={matches.length === 0}
+                    className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                  >
+                    <Printer className="w-4 h-4" />
+                    審判用紙印刷
+                  </button>
+                  {matches.length > 0 && (
+                    <button
+                      onClick={handleDeleteAll}
+                      className="flex items-center justify-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      全削除
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Mobile FAB to show sidebar */}
-      {!mobileHeaderVisible && showFab && (
-        <button
-          onClick={() => { setMobileHeaderVisible(true); setShowFab(false); matchContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className="lg:hidden fixed bottom-20 right-4 z-50 w-11 h-11 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
-          title="メニューを表示"
-        >
-          <SlidersHorizontal className="w-5 h-5" />
-        </button>
-      )}
-
       {/* Main content */}
-      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-hidden flex flex-col">
+      <div ref={matchContentRef} className="flex-1 min-w-0 overflow-hidden flex flex-col">
         {selectedEventId ? (
           matches.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">

@@ -2,8 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserX, Search, Eye, List, Upload, AlertCircle, ChevronDown, ChevronRight, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import EntryImport from './EntryImport';
+import { CheckSquare, UserCheck, UserX, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
 
 type CheckInSlot = {
   drawPosition: number;
@@ -96,8 +95,8 @@ export default function EntryRegistration() {
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(true);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
 
@@ -324,16 +323,9 @@ export default function EntryRegistration() {
       );
     }
 
-    // 短縮名（列ヘッダー用）
-    const shortName = (name: string) => {
-      const parts = name.split(/[\s　]+/);
-      if (parts.length >= 2) return parts[0]; // 姓のみ
-      return name.slice(0, 3);
-    };
-
     return (
       <div>
-        {/* Info bar - トーナメントと同じスタイル */}
+        {/* Info bar */}
         {draw && (
           <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-gray-600">
@@ -347,161 +339,99 @@ export default function EntryRegistration() {
           </div>
         )}
 
-        <div className="p-4 overflow-x-auto">
-          <table className="text-sm rounded-xl overflow-hidden shadow-sm border border-gray-200" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-            <thead>
-              <tr>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 sticky left-0 z-20 w-8 text-center rounded-tl-xl">
-                  No
-                </th>
-                <th className="py-2.5 px-3 text-[10px] font-bold text-white bg-gray-700 sticky left-[33px] z-20 min-w-[200px] text-left">
-                  選手名
-                </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-[70px] text-center">
-                  受付
-                </th>
-                {playerSlots.map((ps, colIdx) => (
-                  <th
-                    key={`col-h-${colIdx}`}
-                    className="py-1.5 px-1 text-center bg-gray-700 w-[56px]"
-                  >
-                    <div className="text-[10px] font-bold text-white">{colIdx + 1}</div>
-                    <div className="text-[9px] text-gray-300 truncate leading-tight">{shortName(ps.playerName)}</div>
-                  </th>
-                ))}
-                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center">
-                  勝
-                </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center">
-                  敗
-                </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center rounded-tr-xl">
-                  順位
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {playerSlots.map((slot, rowIdx) => {
-                const isWithdrawn = slot.entry?.status === 'withdrawn';
-                const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
-                const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
-                const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+        {/* Player cards - トーナメントと同じ角丸カードスタイル */}
+        <div className="p-4 space-y-1.5">
+          {playerSlots.map((slot, idx) => {
+            const isWithdrawn = slot.entry?.status === 'withdrawn';
+            const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+            const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+            const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
 
-                // Status dot & border (トーナメントスロットと同じスタイル)
-                let statusDotColor = '#d1d5db';
-                let rowBg = '';
-                let rowBorder = 'border-gray-200';
-                if (isWithdrawn) {
-                  statusDotColor = '#ef4444';
-                  rowBg = 'bg-red-50/40';
-                  rowBorder = 'border-red-200';
-                } else if (isConfirmed) {
-                  statusDotColor = '#22c55e';
-                  rowBg = 'bg-emerald-50/40';
-                  rowBorder = 'border-emerald-200';
-                }
+            let statusDotColor = '#d1d5db';
+            let borderClass = 'border-gray-300';
+            let bgClass = 'bg-white';
+            if (isWithdrawn) {
+              statusDotColor = '#ef4444';
+              bgClass = 'bg-red-50/60';
+              borderClass = 'border-red-200';
+            } else if (isConfirmed) {
+              statusDotColor = '#22c55e';
+              bgClass = 'bg-emerald-50/60';
+              borderClass = 'border-emerald-300';
+            }
 
-                return (
-                  <tr
-                    key={`league-row-${slot.drawPosition}`}
-                    className={`transition-all
-                      ${isDimmed ? 'opacity-20' : ''}
-                      ${isHighlighted ? 'ring-2 ring-blue-400 ring-inset' : ''}
-                    `}
-                  >
-                    {/* No */}
-                    <td className={`py-0 px-0 text-center border-b ${rowBorder} bg-white sticky left-0 z-10 ${rowIdx === playerSlots.length - 1 ? 'rounded-bl-xl' : ''}`}>
-                      <div className="w-full h-[48px] flex items-center justify-center text-[10px] font-mono text-gray-400 border-r border-gray-100">
-                        {rowIdx + 1}
+            return (
+              <div
+                key={`league-card-${slot.drawPosition}`}
+                className={`flex items-center border rounded-lg shadow-sm transition-all h-[40px]
+                  ${borderClass} ${bgClass}
+                  ${isDimmed ? 'opacity-20' : ''}
+                  ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
+                `}
+              >
+                {/* Position number */}
+                <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">
+                  {idx + 1}
+                </div>
+
+                {/* Seed badge */}
+                {slot.seed > 0 && (
+                  <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">
+                    {slot.seed}
+                  </div>
+                )}
+
+                {/* Player info */}
+                <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
+                  {slot.entry ? (
+                    <button
+                      onClick={() => handleCheckIn(slot)}
+                      className="text-left w-full group block"
+                      title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
+                    >
+                      <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                        {slot.playerName}
+                        {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                       </div>
-                    </td>
+                      {slot.affiliation && !isWithdrawn && (
+                        <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-gray-300">---</span>
+                  )}
+                </div>
 
-                    {/* 選手名 - トーナメントスロットカードと同じスタイル */}
-                    <td className={`py-0 px-0 border-b ${rowBorder} sticky left-[33px] z-10 ${rowBg || 'bg-white'}`}>
-                      <div className="flex items-center h-[48px] px-2 gap-1.5">
-                        {slot.seed > 0 && (
-                          <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm">
-                            {slot.seed}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          {slot.entry ? (
-                            <button
-                              onClick={() => handleCheckIn(slot)}
-                              className="text-left w-full group block"
-                              title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
-                            >
-                              <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
-                                {slot.playerName}
-                                {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
-                              </div>
-                              {slot.affiliation && !isWithdrawn && (
-                                <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
-                              )}
-                            </button>
-                          ) : (
-                            <span className="text-sm text-gray-300">---</span>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
-                        </div>
-                        {slot.entry && !isWithdrawn && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
-                            className="flex-shrink-0 p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                            title="BYEにする"
-                          >
-                            <UserX className="w-3 h-3" />
-                          </button>
-                        )}
-                        {slot.entry && isWithdrawn && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
-                            className="flex-shrink-0 p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
-                            title="復元する"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                {/* Status dot */}
+                <div className="flex-shrink-0 mr-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
+                </div>
 
-                    {/* 受付状態 */}
-                    <td className={`py-0 px-2 text-center border-b ${rowBorder} ${rowBg || 'bg-white'}`}>
-                      {isWithdrawn ? (
-                        <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">BYE</span>
-                      ) : isConfirmed ? (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">受付済</span>
-                      ) : slot.entry ? (
-                        <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">未確認</span>
-                      ) : null}
-                    </td>
-
-                    {/* 対戦セル */}
-                    {playerSlots.map((_, colIdx) => {
-                      const isDiagonal = rowIdx === colIdx;
-                      return (
-                        <td
-                          key={`cell-${rowIdx}-${colIdx}`}
-                          className={`h-[48px] text-center text-xs border-b border-r border-gray-200 ${isDiagonal ? '' : 'bg-white hover:bg-primary-50/30 transition-colors'}`}
-                          style={isDiagonal ? {
-                            background: 'linear-gradient(135deg, #f3f4f6 25%, #e5e7eb 25%, #e5e7eb 50%, #f3f4f6 50%, #f3f4f6 75%, #e5e7eb 75%)',
-                            backgroundSize: '6px 6px',
-                          } : undefined}
-                        />
-                      );
-                    })}
-
-                    {/* 勝・敗・順位（空欄） */}
-                    <td className="h-[48px] text-center text-xs border-b border-r border-gray-200 bg-white" />
-                    <td className="h-[48px] text-center text-xs border-b border-r border-gray-200 bg-white" />
-                    <td className={`h-[48px] text-center text-xs border-b border-gray-200 bg-white ${rowIdx === playerSlots.length - 1 ? 'rounded-br-xl' : ''}`} />
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                {/* Action button */}
+                {slot.entry && (
+                  <div className="flex-shrink-0 mr-1">
+                    {isWithdrawn ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
+                        className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
+                        title="復元する"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
+                        className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="BYEにする"
+                      >
+                        <UserX className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -550,25 +480,16 @@ export default function EntryRegistration() {
     // BYEが末尾に集中している場合、標準位置に再配置
     const displaySlots = redistributeByes(slots, drawSize);
     const roundsCount = Math.log2(drawSize);
-    const totalRoundsToShow = roundsCount + 1; // includes winner node
+    const totalRoundsToShow = roundsCount; // WINNERノードを除く（決勝まで）
 
-    // Round labels
-    // drawSize=4:  1回戦, 決勝, 優勝
-    // drawSize=8:  1回戦, 準決勝, 決勝, 優勝
-    // drawSize=16: 1回戦, 2回戦, 準決勝, 決勝, 優勝
-    // drawSize=32: 1回戦, 2回戦, 準々決勝, 準決勝, 決勝, 優勝
+    // Round labels (優勝ノードなし)
     const roundLabels: string[] = [];
-    const playRounds = totalRoundsToShow - 1; // 優勝ノードを除いた試合ラウンド数
     for (let r = 0; r < totalRoundsToShow; r++) {
-      if (r === totalRoundsToShow - 1) {
-        roundLabels.push('優勝');
-      } else {
-        const fromFinal = playRounds - 1 - r; // 決勝=0, 準決勝=1, 準々決勝=2, ...
-        if (fromFinal === 0) roundLabels.push('決勝');
-        else if (fromFinal === 1 && playRounds >= 3) roundLabels.push('準決勝');
-        else if (fromFinal === 2 && playRounds >= 5) roundLabels.push('準々決勝');
-        else roundLabels.push(`${r + 1}回戦`);
-      }
+      const fromFinal = totalRoundsToShow - 1 - r; // 決勝=0, 準決勝=1, 準々決勝=2, ...
+      if (fromFinal === 0) roundLabels.push('決勝');
+      else if (fromFinal === 1 && totalRoundsToShow >= 3) roundLabels.push('準決勝');
+      else if (fromFinal === 2 && totalRoundsToShow >= 5) roundLabels.push('準々決勝');
+      else roundLabels.push(`${r + 1}回戦`);
     }
 
     // Positioning functions (same as DrawRenderer)
@@ -752,36 +673,7 @@ export default function EntryRegistration() {
       );
     }
 
-    // Build subsequent round empty slot boxes (rounds 1+)
-    const laterRoundElements: React.ReactNode[] = [];
-    for (let r = 1; r < totalRoundsToShow; r++) {
-      const numNodes = drawSize / Math.pow(2, r);
-      const isWinnerNode = r === totalRoundsToShow - 1;
-
-      for (let m = 0; m < numNodes; m++) {
-        const x = getX(r);
-        const y = getY(r, m);
-
-        laterRoundElements.push(
-          <div
-            key={`later-r${r}-m${m}`}
-            className={`absolute flex items-center justify-center border rounded shadow-sm
-              ${isWinnerNode
-                ? 'border-primary-300 bg-primary-50/50 border-b-2 border-b-primary-500'
-                : 'border-gray-200 bg-white/60'
-              }
-            `}
-            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
-          >
-            {isWinnerNode ? (
-              <span className="text-xs font-bold text-primary-500 tracking-widest">WINNER</span>
-            ) : (
-              <span className="text-xs text-gray-300"></span>
-            )}
-          </div>
-        );
-      }
-    }
+    // 2回戦以降はラウンドラベルのみ表示（枠は不要）
 
     return (
       <div>
@@ -833,8 +725,7 @@ export default function EntryRegistration() {
             {/* Round 0 slots (with full player details) */}
             {slotElements}
 
-            {/* Later round empty boxes */}
-            {laterRoundElements}
+            {/* 2回戦以降は枠なし（ラウンドラベルとブラケット線のみ） */}
           </div>
         </div>
       </div>
@@ -900,11 +791,8 @@ export default function EntryRegistration() {
       : [];
   const overallStats = computeStats(allSlots);
 
-  // モバイルでスクロール時にヘッダーを自動非表示 + FAB自動消去
-  const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
-  const [showFab, setShowFab] = useState(false);
+  // スクロール時にコントロールを自動非表示
   const contentRef = useRef<HTMLDivElement>(null);
-  const fabTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -912,25 +800,13 @@ export default function EntryRegistration() {
     let lastScrollY = 0;
     const onScroll = () => {
       const y = el.scrollTop;
-      // 少しでもスクロールしたら消す
-      if (y > 30 && y > lastScrollY) {
-        setMobileHeaderVisible(false);
-        setShowFab(true);
-        // スクロール停止後1秒でFABも消す
-        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
-        fabTimerRef.current = setTimeout(() => setShowFab(false), 1000);
-      } else if (y < 30) {
-        setMobileHeaderVisible(true);
-        setShowFab(false);
-        if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
+      if (y > 20 && y > lastScrollY) {
+        setControlsOpen(false);
       }
       lastScrollY = y;
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      if (fabTimerRef.current) clearTimeout(fabTimerRef.current);
-    };
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
   if (!currentTournamentId) {
@@ -944,125 +820,117 @@ export default function EntryRegistration() {
   }
 
   return (
-    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* LEFT: Sidebar controls - on mobile auto-hide on scroll */}
-      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-1 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-3 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
-      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col p-4">
+      {/* TOP: プルダウン式コントロールパネル */}
+      <div className="shrink-0 mb-3">
+        {/* Toggle button - always visible */}
+        <button
+          onClick={() => setControlsOpen(prev => !prev)}
+          className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-primary-500" />
-            エントリー受付
-          </h1>
-
-          <div className="flex flex-col gap-2">
-            {/* View toggle */}
-            <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
-              <button
-                onClick={() => setShowAllEvents(false)}
-                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-              >
-                <Eye className="w-3.5 h-3.5" />個別表示
-              </button>
-              <button
-                onClick={() => setShowAllEvents(true)}
-                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-              >
-                <List className="w-3.5 h-3.5" />すべて表示
-              </button>
-            </div>
-
-            {!showAllEvents && (
-              <select
-                value={selectedEventId}
-                onChange={e => setSelectedEventId(e.target.value)}
-                className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-              >
-                <option value="">-- 種目を選択 --</option>
-                {events.map(e => (
-                  <option key={e.eventId} value={e.eventId}>{e.name}</option>
-                ))}
-              </select>
+            <span className="font-bold text-gray-900">エントリー受付</span>
+            {(showAllEvents || selectedEventId) && (
+              <span className="text-xs text-gray-500 ml-2">
+                {overallStats.checkedIn}/{overallStats.total} 受付済
+              </span>
             )}
+          </div>
+          {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
 
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center justify-center gap-2 bg-white border border-border-main text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition-colors w-full"
-            >
-              <Upload className="w-4 h-4 text-primary-500" />
-              インポート
-            </button>
+        {/* Collapsible controls */}
+        <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
+            <div className="flex flex-col gap-2">
+              {/* View toggle */}
+              <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
+                <button
+                  onClick={() => setShowAllEvents(false)}
+                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <Eye className="w-3.5 h-3.5" />個別表示
+                </button>
+                <button
+                  onClick={() => setShowAllEvents(true)}
+                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <List className="w-3.5 h-3.5" />すべて表示
+                </button>
+              </div>
+
+              {!showAllEvents && (
+                <select
+                  value={selectedEventId}
+                  onChange={e => setSelectedEventId(e.target.value)}
+                  className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+                >
+                  <option value="">-- 種目を選択 --</option>
+                  {events.map(e => (
+                    <option key={e.eventId} value={e.eventId}>{e.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="選手名・所属で検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500"
+              />
+            </div>
+
+            {/* Stats + bulk actions */}
+            {(showAllEvents || selectedEventId) && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 text-sm flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-500 text-xs">合計:</span>
+                    <span className="font-bold text-gray-800">{overallStats.total}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                    <span className="font-bold text-red-600">{overallStats.absent}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
+                    <span className="font-bold text-gray-600">{overallStats.remaining}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />全員受付済み
+                  </button>
+                  <button
+                    onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />リセット
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Search */}
-        <div className="mt-3">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-500" />
-            </div>
-            <input
-              type="text"
-              placeholder="選手名・所属で検索..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500"
-            />
-          </div>
-        </div>
-
-        {/* Stats + bulk actions */}
-        {(showAllEvents || selectedEventId) && (
-          <div className="mt-3 flex flex-col gap-2">
-            <div className="flex items-center gap-3 text-sm flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-xs">合計:</span>
-                <span className="font-bold text-gray-800">{overallStats.total}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                <span className="font-bold text-red-600">{overallStats.absent}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
-                <span className="font-bold text-gray-600">{overallStats.remaining}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
-              >
-                <UserCheck className="w-3.5 h-3.5" />全員受付済み
-              </button>
-              <button
-                onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />リセット
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
       </div>
 
-      {/* RIGHT: Main content area (draw tables) - on PC comes second visually */}
-      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-y-auto space-y-4 min-h-0">
-
-      {/* Mobile FAB to show header — スクロール停止後1秒で消える */}
-      {!mobileHeaderVisible && showFab && (
-        <button
-          onClick={() => { setMobileHeaderVisible(true); setShowFab(false); contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className="lg:hidden fixed bottom-20 right-4 z-50 w-11 h-11 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
-          title="メニューを表示"
-        >
-          <SlidersHorizontal className="w-5 h-5" />
-        </button>
-      )}
+      {/* Main content area (draw tables) */}
+      <div ref={contentRef} className="flex-1 min-w-0 overflow-y-auto space-y-4 min-h-0">
         {showAllEvents ? (
           events.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
@@ -1081,10 +949,6 @@ export default function EntryRegistration() {
           </div>
         )}
       </div>
-
-      {showImportModal && (
-        <EntryImport onClose={() => setShowImportModal(false)} />
-      )}
     </div>
   );
 }
