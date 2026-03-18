@@ -12,6 +12,82 @@ function getRoundName(round: number, totalRounds: number): string {
   return `${round}回戦`;
 }
 
+type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
+
+/**
+ * BYEが末尾に集中している場合、標準的なトーナメント位置に再配置する。
+ * シード選手の対戦相手位置にBYEを優先配置。
+ */
+function redistributeByeSlots(slots: DrawSlot[], drawSize: number): DrawSlot[] {
+  const sorted = [...slots].sort((a, b) => a.position - b.position);
+  const byeSlots = sorted.filter(s => s.isBye);
+  const entrySlots = sorted.filter(s => !s.isBye);
+  const numByes = drawSize - entrySlots.length;
+
+  if (numByes <= 0) return sorted;
+
+  // BYEが既に分散しているかチェック（前半にBYEがあれば分散済み）
+  const halfPos = drawSize / 2;
+  const hasByeInFirstHalf = byeSlots.some(s => s.position <= halfPos);
+  if (hasByeInFirstHalf && sorted.length >= drawSize) return sorted;
+
+  // 不足分のBYEスロットを補完（slots.lengthがdrawSize未満の場合）
+  if (hasByeInFirstHalf) {
+    const existingPos = new Set(sorted.map(s => s.position));
+    const result = [...sorted];
+    for (let p = 1; p <= drawSize; p++) {
+      if (!existingPos.has(p)) {
+        result.push({ position: p, entryId: null, seed: 0, isBye: true });
+      }
+    }
+    return result.sort((a, b) => a.position - b.position);
+  }
+
+  // BYEを標準位置に再配置
+  // シード選手の対戦相手位置にBYEを優先配置
+  const seedPositions: number[] = [1, drawSize];
+  let count = 2;
+  let sectionSize = drawSize;
+  while (count < drawSize) {
+    sectionSize /= 2;
+    if (sectionSize < 2) break;
+    const newPositions: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const pos = seedPositions[i];
+      const secIdx = Math.floor((pos - 1) / sectionSize);
+      const secStart = secIdx * sectionSize + 1;
+      const secEnd = secStart + sectionSize - 1;
+      newPositions.push(secStart + secEnd - pos);
+    }
+    seedPositions.push(...newPositions);
+    count *= 2;
+  }
+
+  const byePositions: number[] = [];
+  for (let i = 0; i < numByes && i < seedPositions.length; i++) {
+    const p = seedPositions[i];
+    byePositions.push(p % 2 === 1 ? p + 1 : p - 1);
+  }
+  const byePosSet = new Set(byePositions);
+
+  // エントリースロットをBYE以外の位置に配置
+  const nonByePositions: number[] = [];
+  for (let p = 1; p <= drawSize; p++) {
+    if (!byePosSet.has(p)) nonByePositions.push(p);
+  }
+
+  const sortedEntries = entrySlots.sort((a, b) => a.position - b.position);
+  const result: DrawSlot[] = [];
+  for (let i = 0; i < nonByePositions.length && i < sortedEntries.length; i++) {
+    result.push({ ...sortedEntries[i], position: nonByePositions[i] });
+  }
+  for (const bp of byePositions) {
+    result.push({ position: bp, entryId: null, seed: 0, isBye: true });
+  }
+
+  return result.sort((a, b) => a.position - b.position);
+}
+
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
@@ -62,8 +138,8 @@ export default function MatchManager() {
     setIsGenerating(true);
 
     try {
-      // ドロー表のposition順にソートして正しい対戦ペアを生成
-      const slots = [...drawData.slots].sort((a, b) => a.position - b.position);
+      // BYEが末尾に集中している場合は標準位置に再配置してからペアリング
+      const slots = redistributeByeSlots(drawData.slots, drawData.drawSize);
       const newMatches: Omit<Match, 'id'>[] = [];
       let matchOrder = 1;
 
@@ -204,7 +280,7 @@ export default function MatchManager() {
         if (!eventDraw) continue;
 
         const eventEntries = await db.entries.where('eventId').equals(event.eventId).toArray();
-        const slots = [...eventDraw.slots].sort((a, b) => a.position - b.position);
+        const slots = redistributeByeSlots(eventDraw.slots, eventDraw.drawSize);
         const newMatches: Omit<Match, 'id'>[] = [];
         let matchOrder = 1;
 
