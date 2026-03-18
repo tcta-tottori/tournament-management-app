@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap } from 'lucide-react';
 import type { Match } from '../../db/database';
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -183,6 +183,153 @@ export default function MatchManager() {
     } catch (err) {
       console.error(err);
       alert('試合生成に失敗しました');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateAllMatches = async () => {
+    if (!currentTournamentId) return;
+    if (!confirm('全種目の試合を一括生成します。既存の試合データは上書きされます。よろしいですか？')) return;
+    setIsGenerating(true);
+
+    try {
+      const allEvents = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      const allPlayers = await db.players.toArray();
+      let totalGenerated = 0;
+      let generatedEvents = 0;
+
+      for (const event of allEvents) {
+        const eventDraw = await db.draws.where('eventId').equals(event.eventId).first();
+        if (!eventDraw) continue;
+
+        const eventEntries = await db.entries.where('eventId').equals(event.eventId).toArray();
+        const slots = [...eventDraw.slots].sort((a, b) => a.position - b.position);
+        const newMatches: Omit<Match, 'id'>[] = [];
+        let matchOrder = 1;
+
+        for (let i = 0; i < slots.length; i += 2) {
+          const s1 = slots[i];
+          const s2 = slots[i + 1];
+          if (!s1 || !s2) continue;
+          if (s1.isBye && s2.isBye) continue;
+          const isWalkover = s1.isBye || s2.isBye;
+
+          const resolvePlayer = (slot: typeof s1) => {
+            if (slot.isBye) return { name: 'BYE', affiliation: '', entryId: null };
+            const entry = eventEntries.find(e => e.entryId === slot.entryId);
+            if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
+            const p1 = allPlayers.find(p => p.playerId === entry.playerId);
+            const isDoubles = !!entry.partnerId;
+            const p2 = isDoubles ? allPlayers.find(p => p.playerId === entry.partnerId) : null;
+            const name = isDoubles && p1 && p2 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
+            let affiliation = p1?.affiliation || '';
+            if (isDoubles && p2 && p2.affiliation !== p1?.affiliation) {
+              affiliation = `${p1?.affiliation} / ${p2.affiliation}`;
+            }
+            return { name, affiliation, entryId: slot.entryId };
+          };
+
+          const p1Info = resolvePlayer(s1);
+          const p2Info = resolvePlayer(s2);
+
+          newMatches.push({
+            eventId: event.eventId,
+            matchId: `M-R1-${matchOrder}`,
+            round: 1,
+            matchOrder,
+            position: Math.floor(i / 2) + 1,
+            player1EntryId: p1Info.entryId,
+            player2EntryId: p2Info.entryId,
+            player1Name: p1Info.name,
+            player2Name: p2Info.name,
+            player1Affiliation: p1Info.affiliation,
+            player2Affiliation: p2Info.affiliation,
+            score: '',
+            winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
+            courtId: null,
+            scheduledTime: null,
+            status: isWalkover ? 'walkover' : 'waiting',
+            refereeId: null,
+            refereeName: '',
+            updatedAt: Date.now()
+          });
+          matchOrder++;
+        }
+
+        const drawSize = eventDraw.drawSize;
+        const rounds = Math.log2(drawSize);
+        for (let round = 2; round <= rounds; round++) {
+          const matchesInRound = drawSize / Math.pow(2, round);
+          for (let m = 0; m < matchesInRound; m++) {
+            newMatches.push({
+              eventId: event.eventId,
+              matchId: `M-R${round}-${m + 1}`,
+              round,
+              matchOrder: matchOrder++,
+              position: m + 1,
+              player1EntryId: null,
+              player2EntryId: null,
+              player1Name: '',
+              player2Name: '',
+              player1Affiliation: '',
+              player2Affiliation: '',
+              score: '',
+              winnerEntryId: null,
+              courtId: null,
+              scheduledTime: null,
+              status: 'waiting',
+              refereeId: null,
+              refereeName: '',
+              updatedAt: Date.now()
+            });
+          }
+        }
+
+        // 既存の試合を削除してから新しい試合を追加
+        await db.transaction('rw', db.matches, async () => {
+          const existingMatches = await db.matches.where('eventId').equals(event.eventId).toArray();
+          const existingIds = existingMatches.map(m => m.id).filter((id): id is number => id !== undefined);
+          if (existingIds.length > 0) {
+            await db.matches.bulkDelete(existingIds);
+          }
+          await db.matches.bulkAdd(newMatches);
+        });
+
+        // 不戦勝の自動進出処理
+        const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
+        for (const wm of walkoverMatches) {
+          const nextRound = wm.round + 1;
+          const nextPosition = Math.ceil(wm.position / 2);
+          const nextMatch = await db.matches
+            .where('eventId').equals(event.eventId)
+            .filter(m => m.round === nextRound && m.position === nextPosition)
+            .first();
+
+          if (nextMatch?.id && wm.winnerEntryId) {
+            const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
+            const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
+            const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
+            const isUpper = wm.position % 2 === 1;
+
+            await db.matches.update(nextMatch.id, {
+              ...(isUpper
+                ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+                : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+              ),
+              updatedAt: Date.now()
+            });
+          }
+        }
+
+        totalGenerated += newMatches.length;
+        generatedEvents++;
+      }
+
+      alert(`${generatedEvents} 種目、合計 ${totalGenerated} 試合を生成しました`);
+    } catch (err) {
+      console.error(err);
+      alert('一括試合生成に失敗しました');
     } finally {
       setIsGenerating(false);
     }
@@ -415,17 +562,17 @@ ${printableMatches.map(m => {
       </td>
       <td colspan="13" rowspan="4"
           class="fg bt2 br bb"
-          style="text-align:center; font-size:19px; white-space:nowrap;">
+          style="text-align:center; font-size:24px; white-space:nowrap;">
         ${eventName}
       </td>
       <td colspan="6" rowspan="4"
           class="fg bt2 br bb"
-          style="text-align:center; font-size:16px;">
+          style="text-align:center; font-size:18px;">
         回　戦
       </td>
       <td colspan="13" rowspan="4"
           class="fg bt2 br2 bb"
-          style="text-align:center; font-size:24px;">
+          style="text-align:center; font-size:28px; font-weight:bold;">
         ${rName}
       </td>
     </tr>
@@ -452,7 +599,7 @@ ${printableMatches.map(m => {
       </td>
       <td colspan="9" rowspan="2"
           class="fg bt br bb2"
-          style="text-align:center; font-size:14px; white-space:pre-line; line-height:1.3;">
+          style="text-align:center; font-size:18px; white-space:pre-line; line-height:1.3;">
         ${gameMethod}
       </td>
       <td colspan="5" rowspan="2"
@@ -658,7 +805,7 @@ ${printableMatches.map(m => {
             ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
           </p>
         </div>
-        <div className="w-full sm:w-auto flex items-center gap-2">
+        <div className="w-full sm:w-auto flex items-center gap-2 flex-wrap">
           <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
           <select
             value={selectedEventId}
@@ -670,6 +817,14 @@ ${printableMatches.map(m => {
               <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
             ))}
           </select>
+          <button
+            onClick={handleGenerateAllMatches}
+            disabled={isGenerating || events.length === 0}
+            className="flex items-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
+          >
+            <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
+            全種目一括生成
+          </button>
         </div>
       </header>
 
