@@ -155,6 +155,16 @@ export default function BroadcastPanel() {
         const drawData = await db.draws.where('eventId').equals(event.eventId).first();
         const totalRounds = drawData ? Math.log2(drawData.drawSize) : 1;
 
+        // ドロースロットからentryId→ドロー番号のマップを構築
+        const entryPositionMap = new Map<string, number>();
+        if (drawData?.slots) {
+          for (const slot of drawData.slots) {
+            if (slot.entryId) {
+              entryPositionMap.set(slot.entryId, slot.position);
+            }
+          }
+        }
+
         // 両選手が埋まっている待機中/準備完了の試合のみ
         const validMatches = eventMatches.filter(
           m => (m.status === 'waiting' || m.status === 'ready') &&
@@ -167,6 +177,8 @@ export default function BroadcastPanel() {
 
         for (const m of validMatches) {
           const roundName = getRoundName(m.round, totalRounds);
+          const posA = m.player1EntryId ? (entryPositionMap.get(m.player1EntryId) ?? 0) : 0;
+          const posB = m.player2EntryId ? (entryPositionMap.get(m.player2EntryId) ?? 0) : 0;
 
           if (isDoubles) {
             // ダブルスの場合: "山田 太郎 / 佐藤 花子" を分割
@@ -187,12 +199,12 @@ export default function BroadcastPanel() {
               id: idCounter++,
               eventName: event.name,
               round: `${roundName} #${m.position}`,
-              numberA: m.matchOrder,
+              numberA: posA,
               nameA: nameA.trim(),
               affA: affA.trim(),
               pairNameA: pairNameA.trim(),
               pairAffA: pairAffA.trim(),
-              numberB: m.matchOrder,
+              numberB: posB,
               nameB: nameB.trim(),
               affB: affB.trim(),
               pairNameB: pairNameB.trim(),
@@ -207,10 +219,10 @@ export default function BroadcastPanel() {
               id: idCounter++,
               eventName: event.name,
               round: `${roundName} #${m.position}`,
-              numberA: m.matchOrder,
+              numberA: posA,
               nameA: m.player1Name,
               affA: m.player1Affiliation,
-              numberB: m.matchOrder,
+              numberB: posB,
               nameB: m.player2Name,
               affB: m.player2Affiliation,
               type: 'singles',

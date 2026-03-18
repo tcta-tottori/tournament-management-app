@@ -345,40 +345,92 @@ export default function MatchManager() {
 
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
-  const [editScore, setEditScore] = useState('');
-  const [editWinner, setEditWinner] = useState<1 | 2 | null>(null);
+  const [editScore1, setEditScore1] = useState('');
+  const [editScore2, setEditScore2] = useState('');
+  const [editTiebreak, setEditTiebreak] = useState('');
+
+  // ゲーム数からタイブレークかどうか判定
+  const games = currentEvent?.gameRules?.games ?? 6;
+  const isTiebreakScore = useMemo(() => {
+    const s1 = parseInt(editScore1);
+    const s2 = parseInt(editScore2);
+    if (isNaN(s1) || isNaN(s2)) return false;
+    // タイブレーク: 両者がgames数で並んだ場合（6-6→7-6など）
+    // 勝者はgames+1、敗者はgames
+    return (s1 === games + 1 && s2 === games) || (s2 === games + 1 && s1 === games);
+  }, [editScore1, editScore2, games]);
+
+  // スコアから勝者を自動判定
+  const autoWinner = useMemo((): 1 | 2 | null => {
+    const s1 = parseInt(editScore1);
+    const s2 = parseInt(editScore2);
+    if (isNaN(s1) || isNaN(s2)) return null;
+    if (s1 > s2) return 1;
+    if (s2 > s1) return 2;
+    return null;
+  }, [editScore1, editScore2]);
+
+  // タイブレーク敗者側の判定（1=P1が敗者, 2=P2が敗者）
+  const tiebreakLoserSide = useMemo((): 1 | 2 | null => {
+    if (!isTiebreakScore || !autoWinner) return null;
+    return autoWinner === 1 ? 2 : 1;
+  }, [isTiebreakScore, autoWinner]);
 
   const startEdit = useCallback((m: Match) => {
     setEditingMatchId(m.matchId);
-    setEditScore(m.score || '');
-    setEditWinner(
-      m.winnerEntryId === m.player1EntryId && m.player1EntryId ? 1
-      : m.winnerEntryId === m.player2EntryId && m.player2EntryId ? 2
-      : null
-    );
+    // 既存スコアをパース ("8-6" or "7-6(4)")
+    const scoreMatch = (m.score || '').match(/^(\d+)\s*[-–―]\s*(\d+)(?:\((\d+)\))?$/);
+    if (scoreMatch) {
+      setEditScore1(scoreMatch[1]);
+      setEditScore2(scoreMatch[2]);
+      setEditTiebreak(scoreMatch[3] || '');
+    } else {
+      setEditScore1('');
+      setEditScore2('');
+      setEditTiebreak('');
+    }
   }, []);
 
   const cancelEdit = useCallback(() => {
     setEditingMatchId(null);
-    setEditScore('');
-    setEditWinner(null);
+    setEditScore1('');
+    setEditScore2('');
+    setEditTiebreak('');
   }, []);
 
   const saveResult = useCallback(async (m: Match) => {
     if (!m.id) return;
-    const winnerEntryId = editWinner === 1 ? m.player1EntryId : editWinner === 2 ? m.player2EntryId : null;
-    const winnerName = editWinner === 1 ? m.player1Name : editWinner === 2 ? m.player2Name : '';
-    const winnerAff = editWinner === 1 ? m.player1Affiliation : editWinner === 2 ? m.player2Affiliation : '';
+    const s1 = parseInt(editScore1);
+    const s2 = parseInt(editScore2);
+    if (isNaN(s1) || isNaN(s2)) {
+      alert('スコアを入力してください');
+      return;
+    }
+    if (s1 === s2) {
+      alert('同点のスコアは入力できません');
+      return;
+    }
+
+    const winner: 1 | 2 = s1 > s2 ? 1 : 2;
+    const winnerEntryId = winner === 1 ? m.player1EntryId : m.player2EntryId;
+    const winnerName = winner === 1 ? m.player1Name : m.player2Name;
+    const winnerAff = winner === 1 ? m.player1Affiliation : m.player2Affiliation;
+
+    // スコア文字列を生成
+    let scoreStr = `${s1}-${s2}`;
+    if (isTiebreakScore && editTiebreak) {
+      scoreStr += `(${editTiebreak})`;
+    }
 
     // スコアと勝者を更新
     await db.matches.update(m.id, {
-      score: editScore,
+      score: scoreStr,
       winnerEntryId,
-      status: winnerEntryId ? 'finished' : m.status === 'finished' ? 'waiting' : m.status,
+      status: winnerEntryId ? 'finished' : 'waiting',
       updatedAt: Date.now(),
     });
 
-    // 次ラウンドへの自動進出（スプレッドシートの対戦順シートと同じ仕組み）
+    // 次ラウンドへの自動進出
     if (selectedEventId) {
       const nextRound = m.round + 1;
       const nextPosition = Math.ceil(m.position / 2);
@@ -390,7 +442,6 @@ export default function MatchManager() {
       if (nextMatch?.id) {
         const isUpper = m.position % 2 === 1;
         if (winnerEntryId) {
-          // 勝者を次ラウンドに配置
           await db.matches.update(nextMatch.id, {
             ...(isUpper
               ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
@@ -399,13 +450,11 @@ export default function MatchManager() {
             updatedAt: Date.now(),
           });
         } else {
-          // 勝者をクリアした場合、次ラウンドからも削除
           await db.matches.update(nextMatch.id, {
             ...(isUpper
               ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
               : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
             ),
-            // 次ラウンドの結果もリセット（勝者が変わったため）
             ...(nextMatch.winnerEntryId ? { winnerEntryId: null, score: '', status: 'waiting' } : {}),
             updatedAt: Date.now(),
           });
@@ -414,7 +463,7 @@ export default function MatchManager() {
     }
 
     cancelEdit();
-  }, [editScore, editWinner, selectedEventId, cancelEdit]);
+  }, [editScore1, editScore2, editTiebreak, isTiebreakScore, selectedEventId, cancelEdit]);
 
   const handlePrint = () => {
     const printableMatches = sortedMatches.filter(m => m.status !== 'walkover');
@@ -920,52 +969,116 @@ ${printableMatches.map(m => {
                                   <tr key={m.matchId} className="border-b border-border-main bg-blue-50">
                                     <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
                                     <td className="py-2 px-2">
-                                      <button
-                                        onClick={() => setEditWinner(editWinner === 1 ? null : 1)}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${
-                                          editWinner === 1
-                                            ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400 font-bold'
-                                            : 'hover:bg-gray-100'
-                                        }`}
-                                      >
-                                        {editWinner === 1 && <Trophy className="w-3.5 h-3.5" />}
-                                        <span className="whitespace-nowrap">{m.player1Name}</span>
-                                      </button>
+                                      <div className="flex items-center gap-1">
+                                        {autoWinner === 1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-amber-800' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
+                                          {m.player1Name}
+                                        </span>
+                                      </div>
                                     </td>
                                     <td className="py-2 px-1 text-center text-gray-400 text-xs">vs</td>
                                     <td className="py-2 px-2">
-                                      <button
-                                        onClick={() => setEditWinner(editWinner === 2 ? null : 2)}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${
-                                          editWinner === 2
-                                            ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400 font-bold'
-                                            : 'hover:bg-gray-100'
-                                        }`}
-                                      >
-                                        {editWinner === 2 && <Trophy className="w-3.5 h-3.5" />}
-                                        <span className="whitespace-nowrap">{m.player2Name}</span>
-                                      </button>
+                                      <div className="flex items-center gap-1">
+                                        {autoWinner === 2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-amber-800' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
+                                          {m.player2Name}
+                                        </span>
+                                      </div>
                                     </td>
                                     <td className="py-2 px-2">
-                                      <input
-                                        type="text"
-                                        value={editScore}
-                                        onChange={e => setEditScore(e.target.value)}
-                                        placeholder="8-6"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter') saveResult(m);
-                                          if (e.key === 'Escape') cancelEdit();
-                                        }}
-                                        autoFocus
-                                      />
+                                      <div className="flex flex-col items-center gap-1">
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="99"
+                                            value={editScore1}
+                                            onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }}
+                                            placeholder="0"
+                                            className="w-12 border border-gray-300 rounded px-1 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter') saveResult(m);
+                                              if (e.key === 'Escape') cancelEdit();
+                                            }}
+                                            autoFocus
+                                          />
+                                          <span className="text-gray-500 font-bold">―</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="99"
+                                            value={editScore2}
+                                            onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }}
+                                            placeholder="0"
+                                            className="w-12 border border-gray-300 rounded px-1 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter') saveResult(m);
+                                              if (e.key === 'Escape') cancelEdit();
+                                            }}
+                                          />
+                                        </div>
+                                        {isTiebreakScore && (
+                                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                                            <span>TB</span>
+                                            {tiebreakLoserSide === 1 && (
+                                              <>
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max="99"
+                                                  value={editTiebreak}
+                                                  onChange={e => setEditTiebreak(e.target.value)}
+                                                  placeholder="0"
+                                                  className="w-10 border border-amber-300 rounded px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  onKeyDown={e => {
+                                                    if (e.key === 'Enter') saveResult(m);
+                                                    if (e.key === 'Escape') cancelEdit();
+                                                  }}
+                                                />
+                                                <span className="text-gray-300">―</span>
+                                                <span className="text-gray-400 w-10 text-center">-</span>
+                                              </>
+                                            )}
+                                            {tiebreakLoserSide === 2 && (
+                                              <>
+                                                <span className="text-gray-400 w-10 text-center">-</span>
+                                                <span className="text-gray-300">―</span>
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max="99"
+                                                  value={editTiebreak}
+                                                  onChange={e => setEditTiebreak(e.target.value)}
+                                                  placeholder="0"
+                                                  className="w-10 border border-amber-300 rounded px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  onKeyDown={e => {
+                                                    if (e.key === 'Enter') saveResult(m);
+                                                    if (e.key === 'Escape') cancelEdit();
+                                                  }}
+                                                />
+                                              </>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="py-2 px-2 text-center">
-                                      <span className="text-xs text-blue-600 font-medium">編集中</span>
+                                      {autoWinner ? (
+                                        <span className="text-xs text-amber-600 font-medium">
+                                          {autoWinner === 1 ? 'P1' : 'P2'}勝利
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-blue-600 font-medium">入力中</span>
+                                      )}
                                     </td>
                                     <td className="py-2 px-2 text-center">
                                       <div className="flex items-center gap-1 justify-center">
-                                        <button onClick={() => saveResult(m)} className="p-2 text-green-600 hover:bg-green-100 rounded" title="保存">
+                                        <button
+                                          onClick={() => saveResult(m)}
+                                          disabled={!autoWinner}
+                                          className="p-2 text-green-600 hover:bg-green-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                          title="保存"
+                                        >
                                           <Check className="w-4 h-4" />
                                         </button>
                                         <button onClick={cancelEdit} className="p-2 text-gray-400 hover:bg-gray-100 rounded" title="キャンセル">

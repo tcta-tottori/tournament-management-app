@@ -9,6 +9,7 @@ import EntryRegistration from './features/entry/EntryRegistration'
 import DrawGenerator from './features/draw/DrawGenerator'
 import DrawBoard from './features/draw/DrawBoard'
 import MatchManager from './features/referee/MatchManager'
+import ScheduleSheet from './features/schedule/ScheduleSheet'
 import Scoreboard from './features/score/Scoreboard'
 import CourtSchedule from './features/schedule/CourtSchedule'
 import LiveDashboard from './features/live/LiveDashboard'
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="draw-lot" element={<DrawGenerator />} />
           <Route path="draw-table" element={<DrawBoard />} />
           <Route path="referee" element={<MatchManager />} />
+          <Route path="schedule-sheet" element={<ScheduleSheet />} />
           <Route path="score" element={<Scoreboard />} />
           <Route path="schedule" element={<CourtSchedule />} />
           <Route path="dashboard" element={<LiveDashboard />} />
