@@ -10,10 +10,18 @@ function resolveAffiliation(affiliation: string, furiganaMap: Record<string, str
 }
 
 /**
- * テキストから "#" を除去する
+ * 回戦テキストから " #数字" 部分を除去する（例: "1回戦 #3" → "1回戦"）
  */
-function removeHash(text: string): string {
-  return text.replace(/#/g, '');
+function removePositionNumber(text: string): string {
+  return text.replace(/\s*#\d+/, '').trim();
+}
+
+/**
+ * 種目名の級・部の前にポーズ（読点）を挿入する
+ * 例: "男子シングルスA級" → "男子シングルス、A級"
+ */
+function addGradePause(eventName: string): string {
+  return eventName.replace(/([ルスス体])([A-ZＡ-Ｚa-zａ-ｚ0-9０-９][級部])/, '$1、$2');
 }
 
 export function buildCallText(
@@ -28,8 +36,8 @@ export function buildCallText(
 
   const parts: string[] = [];
 
-  // 種目・回線（#を除去）
-  parts.push(`${match.eventName}、${removeHash(match.round)}。`);
+  // 種目・回戦（#番号を除去、級の前にポーズ）
+  parts.push(`${addGradePause(match.eventName)}、${removePositionNumber(match.round)}。`);
 
   // 選手情報（所属はふりがなマップで変換）
   if (match.type === 'doubles') {

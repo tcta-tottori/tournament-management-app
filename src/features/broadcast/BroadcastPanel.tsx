@@ -99,7 +99,6 @@ export default function BroadcastPanel() {
     pitch: 1.0,
     volume: 1.0,
     repeatCount: 2,
-    gender: 'female',
   });
   const [speakingMatchId, setSpeakingMatchId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -110,7 +109,7 @@ export default function BroadcastPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const { isSpeaking, availableVoices, speak, stop, testVoice } = useSpeechSynthesis();
+  const { isSpeaking, voiceName, speak, stop, testVoice } = useSpeechSynthesis();
 
   // データベースから種目一覧を取得
   const dbEvents = useLiveQuery(
@@ -422,38 +421,12 @@ export default function BroadcastPanel() {
         </button>
         {showSettings && (
           <div className="px-4 pb-4 space-y-4">
-            {/* 音声タイプ（男性/女性） */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-2">音声タイプ</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSettings(s => ({ ...s, gender: 'female' }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border ${
-                    settings.gender === 'female'
-                      ? 'bg-pink-50 text-pink-700 border-pink-300 shadow-sm'
-                      : 'bg-white text-gray-500 border-border-main hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="text-lg">👩</span>
-                  <div className="text-left">
-                    <div>女性</div>
-                    <div className="text-[10px] opacity-60 font-normal">{availableVoices.female}</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setSettings(s => ({ ...s, gender: 'male' }))}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all border ${
-                    settings.gender === 'male'
-                      ? 'bg-blue-50 text-blue-700 border-blue-300 shadow-sm'
-                      : 'bg-white text-gray-500 border-border-main hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="text-lg">👨</span>
-                  <div className="text-left">
-                    <div>男性</div>
-                    <div className="text-[10px] opacity-60 font-normal">{availableVoices.male}</div>
-                  </div>
-                </button>
+            {/* 音声情報 */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 rounded-lg border border-pink-200">
+              <span className="text-lg">👩</span>
+              <div>
+                <div className="text-sm font-medium text-pink-700">女性音声</div>
+                <div className="text-[10px] text-pink-500">{voiceName}</div>
               </div>
             </div>
 

@@ -28,12 +28,9 @@ export interface CallLogEntry {
   matchId: number;
 }
 
-export type VoiceGender = 'male' | 'female';
-
 export interface VoiceSettings {
   rate: number;
   pitch: number;
   volume: number;
   repeatCount: number;
-  gender: VoiceGender;
 }
