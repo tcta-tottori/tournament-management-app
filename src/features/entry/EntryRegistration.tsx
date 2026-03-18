@@ -443,10 +443,14 @@ export default function EntryRegistration() {
     // Check if this is a league/round-robin event
     const event = events.find(e => e.eventId === eventId);
     const eventType = event?.type as string | undefined;
+    // drawSizeが2の累乗でない場合もリーグ戦と判定（3人、5人、6人など）
+    const ds = draw?.drawSize || 0;
+    const isPowerOf2 = ds > 0 && (ds & (ds - 1)) === 0;
     const isLeague =
       eventType === 'league' ||
       eventType === 'round-robin' ||
       draw?.drawType === 'roundRobin' ||
+      (ds > 0 && !isPowerOf2) ||
       /リーグ/i.test(event?.name || '');
     if (isLeague) {
       return renderLeagueTable(eventId, slots);
