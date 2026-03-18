@@ -1,13 +1,8 @@
-import { Database as DatabaseIcon, CalendarDays, Info, Zap, MapPin, ListChecks } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks } from 'lucide-react';
 import TournamentManager from './TournamentManager';
-import FuriganaManager from './FuriganaManager';
-import AffiliationFuriganaManager from './AffiliationFuriganaManager';
 import PlayerDataList from './PlayerDataList';
 import DataImport from './DrawMeetingImport';
 import DataSync from './DataSync';
-import ScheduleImport from './ScheduleImport';
-import ScheduleGenerator from './ScheduleGenerator';
-import TournamentInfo from './TournamentInfo';
 
 export default function DataManagement() {
   return (
@@ -19,7 +14,7 @@ export default function DataManagement() {
             データ管理
           </h1>
           <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-            ドロー会議システムからのデータ読込み、大会マスタの管理、ふりがなDBの管理を行います。
+            ドロー会議システムからのデータ読込み、大会マスタの管理、所属・ふりがなの管理を行います。
           </p>
         </div>
       </header>
@@ -60,61 +55,6 @@ export default function DataManagement() {
         </div>
         <div className="p-5">
           <PlayerDataList />
-        </div>
-      </section>
-
-      {/* スケジュール自動生成パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-sky px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <Zap className="w-5 h-5 text-ocean" />
-          <h2 className="font-semibold text-ocean">スケジュール自動生成</h2>
-        </div>
-        <div className="p-5">
-          <ScheduleGenerator />
-        </div>
-      </section>
-
-      {/* 時間割インポートパネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-sky px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-ocean" />
-          <h2 className="font-semibold text-ocean">時間割インポート（Excel/CSV）</h2>
-        </div>
-        <div className="p-5">
-          <ScheduleImport />
-        </div>
-      </section>
-
-      {/* 大会情報パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-secondary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <Info className="w-5 h-5 text-secondary-600" />
-          <h2 className="font-semibold text-secondary-700">大会情報（ドロー会議システム）</h2>
-        </div>
-        <div className="p-5">
-          <TournamentInfo />
-        </div>
-      </section>
-
-      {/* ふりがなDB管理パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <DatabaseIcon className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">ふりがなデータベース管理</h2>
-        </div>
-        <div className="p-5">
-           <FuriganaManager />
-        </div>
-      </section>
-
-      {/* 所属ふりがな管理パネル */}
-      <section className="mt-6 bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">所属ふりがな管理</h2>
-        </div>
-        <div className="p-5">
-          <AffiliationFuriganaManager />
         </div>
       </section>
     </div>
