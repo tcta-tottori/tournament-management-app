@@ -913,16 +913,17 @@ export default function EntryRegistration() {
   }
 
   return (
-    <div className="max-w-full mx-auto space-y-4 pb-6 h-[calc(100vh-120px)] flex flex-col">
-      {/* Header */}
-      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main shrink-0">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
+      {/* RIGHT: Sidebar controls - on mobile stays on top */}
+      <div className="lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-4 lg:mb-0">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
+        <div className="flex flex-col gap-3">
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-primary-500" />
             エントリー受付
           </h1>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col gap-2">
             {/* View toggle */}
             <div className="flex rounded-lg border border-border-main overflow-hidden text-sm">
               <button
@@ -980,8 +981,8 @@ export default function EntryRegistration() {
 
         {/* Stats + bulk actions */}
         {(showAllEvents || selectedEventId) && (
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center gap-4 text-sm">
+          <div className="mt-3 flex flex-col gap-2">
+            <div className="flex items-center gap-3 text-sm flex-wrap">
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-500">合計:</span>
                 <span className="font-bold text-gray-800">{overallStats.total}</span>
@@ -1028,9 +1029,10 @@ export default function EntryRegistration() {
           </div>
         )}
       </header>
+      </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto space-y-4 min-h-0 px-1">
+      {/* LEFT: Main content area (draw tables) - on PC comes first visually */}
+      <div className="flex-1 min-w-0 order-2 lg:order-1 overflow-y-auto space-y-4 min-h-0">
         {showAllEvents ? (
           events.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -98,6 +98,76 @@ export default function ScheduleSheet() {
     });
     return map;
   }, [events]);
+
+  // DBから既存のスケジュールデータを復元
+  useEffect(() => {
+    if (!currentTournamentId || events.length === 0) return;
+
+    const loadExistingSchedule = async () => {
+      try {
+        const allEvents = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+        const allPlayers = await db.players.toArray();
+        const playersList: SchedulePlayer[] = allPlayers.map(p => ({ playerId: p.playerId, name: p.name }));
+        const allCourts = await db.courts.where('tournamentId').equals(currentTournamentId).toArray();
+        const courtIdToName = new Map(allCourts.map(c => [c.courtId, c.name]));
+
+        let restoredMatches: ScheduleMatch[] = [];
+        const restoredSlots: ScheduleSlot[] = [];
+        let hasSchedule = false;
+
+        for (let idx = 0; idx < allEvents.length; idx++) {
+          const evt = allEvents[idx];
+          const draw = await db.draws.where('eventId').equals(evt.eventId).first();
+          if (!draw || draw.drawType === 'roundRobin') continue;
+
+          const entries = await db.entries.where('eventId').equals(evt.eventId).toArray();
+          const eventInfo: EventInfo = { eventCode: evt.eventId, eventName: evt.name, eventOrder: idx };
+          const drawData: ScheduleDraw = { eventId: evt.eventId, drawSize: draw.drawSize, slots: draw.slots };
+          const entryList: ScheduleEntry[] = entries.map(e => ({ entryId: e.entryId, playerId: e.playerId, partnerId: e.partnerId }));
+          const extracted = extractMatchesFromDraw(drawData, entryList, playersList, eventInfo);
+          restoredMatches = restoredMatches.concat(extracted);
+
+          // DBのmatchデータからスケジュールスロットを復元
+          const dbMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+          for (const m of dbMatches) {
+            if (m.scheduledTime && m.courtId) {
+              hasSchedule = true;
+              const courtName = courtIdToName.get(m.courtId) || '';
+              const schedMatch = extracted.find(sm => sm.matchId === m.matchId);
+              if (schedMatch && courtName) {
+                // timeSlotIndexを逆算
+                const parts = startTime.split(':');
+                const startMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                const timeParts = m.scheduledTime.split(':');
+                const matchMin = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
+                const slotIdx = Math.round((matchMin - startMin) / matchDuration);
+
+                restoredSlots.push({
+                  matchId: m.matchId,
+                  courtIndex: courtNames.indexOf(courtName),
+                  courtName,
+                  timeSlotIndex: slotIdx >= 0 ? slotIdx : 0,
+                  startTime: m.scheduledTime,
+                  eventCode: evt.eventId,
+                  roundLabel: schedMatch.roundLabel,
+                });
+              }
+            }
+          }
+        }
+
+        if (hasSchedule && restoredSlots.length > 0) {
+          setScheduleSlots(restoredSlots);
+          setAllScheduleMatches(restoredMatches);
+        }
+      } catch (err) {
+        console.error('スケジュール復元エラー:', err);
+      }
+    };
+
+    loadExistingSchedule();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTournamentId, events.length]);
 
   const gridData = useMemo(() => {
     if (scheduleSlots.length === 0) return null;

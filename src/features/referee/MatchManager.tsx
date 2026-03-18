@@ -919,44 +919,44 @@ ${printableMatches.map(m => {
   };
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-primary-500" />
-            対戦順・審判用紙
-          </h1>
-          <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-            ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
-          </p>
-        </div>
-        <div className="w-full sm:w-auto flex items-center gap-2 flex-wrap">
-          <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
-          <select
-            value={selectedEventId}
-            onChange={e => setSelectedEventId(e.target.value)}
-            className="w-full sm:w-64 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-          >
-            <option value="">-- 種目を選択 --</option>
-            {events.map(e => (
-              <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
-            ))}
-          </select>
-          <button
-            onClick={handleGenerateAllMatches}
-            disabled={isGenerating || events.length === 0}
-            className="flex items-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
-          >
-            <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
-            全種目一括生成
-          </button>
-        </div>
-      </header>
+    <div className="h-full flex flex-col lg:flex-row lg:gap-4 p-4 md:p-6 max-w-7xl mx-auto">
+      {/* Sidebar */}
+      <div className="lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-full lg:overflow-y-auto space-y-4 mb-4 lg:mb-0">
+        <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <ClipboardList className="w-6 h-6 text-primary-500" />
+              対戦順・審判用紙
+            </h1>
+            <p className="text-sm text-gray-500 mt-1 hidden sm:block">
+              ドローから試合一覧を自動生成し、対戦順の管理と審判用紙の印刷を行います。
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
+            <select
+              value={selectedEventId}
+              onChange={e => setSelectedEventId(e.target.value)}
+              className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+            >
+              <option value="">-- 種目を選択 --</option>
+              {events.map(e => (
+                <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
+              ))}
+            </select>
+            <button
+              onClick={handleGenerateAllMatches}
+              disabled={isGenerating || events.length === 0}
+              className="flex items-center justify-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
+            >
+              <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
+              全種目一括生成
+            </button>
+          </div>
+        </header>
 
-      {selectedEventId ? (
-        <div className="flex-1 flex flex-col gap-4">
-          {/* コントロール */}
-          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+        {selectedEventId && (
+          <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
                 <ListOrdered className="w-4 h-4 inline mr-1" />
@@ -968,11 +968,11 @@ ${printableMatches.map(m => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
               <button
                 onClick={handleGenerateMatches}
                 disabled={!drawData || isGenerating}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
                 {matches.length > 0 ? '再生成' : '試合生成'}
@@ -980,7 +980,7 @@ ${printableMatches.map(m => {
               <button
                 onClick={handlePrint}
                 disabled={matches.length === 0}
-                className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+                className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
               >
                 <Printer className="w-4 h-4" />
                 審判用紙印刷
@@ -988,7 +988,7 @@ ${printableMatches.map(m => {
               {matches.length > 0 && (
                 <button
                   onClick={handleDeleteAll}
-                  className="flex items-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
+                  className="flex items-center justify-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
                 >
                   <Trash2 className="w-4 h-4" />
                   全削除
@@ -996,9 +996,13 @@ ${printableMatches.map(m => {
               )}
             </div>
           </div>
+        )}
+      </div>
 
-          {/* 試合一覧 */}
-          {matches.length > 0 ? (
+      {/* Main content */}
+      <div className="flex-1 min-w-0 order-2 lg:order-1 overflow-hidden flex flex-col">
+        {selectedEventId ? (
+          matches.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">
               <div className="overflow-auto flex-1">
                 {(() => {
@@ -1224,13 +1228,13 @@ ${printableMatches.map(m => {
                 ドローを作成・保存した後、「試合生成」ボタンを押すと1回戦の対戦カードと後続ラウンドの空枠が自動生成されます。
               </p>
             </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
-          <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
-        </div>
-      )}
+          )
+        ) : (
+          <div className="flex-1 flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
+            <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
