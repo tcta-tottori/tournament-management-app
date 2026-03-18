@@ -81,9 +81,10 @@ export interface Draw {
   id?: number;
   eventId: string;      // 外部キー
   drawSize: number;
+  drawType?: 'tournament' | 'roundRobin';
   slots: {
     position: number;   // 1-indexed
-    entryId: string | null; 
+    entryId: string | null;
     seed: number;
     isBye: boolean;
   }[];

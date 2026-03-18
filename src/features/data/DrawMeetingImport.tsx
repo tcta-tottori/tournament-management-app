@@ -775,8 +775,8 @@ export default function DataImport() {
           totalEntryCount++;
         }
 
-        // --- 5. ドロー作成（ラウンドロビンはスキップ） ---
-        if (!ev.isRoundRobin && ev.drawSize > 0) {
+        // --- 5. ドロー作成 ---
+        if (ev.drawSize > 0) {
           // entryIdマッピングを取得
           const eventEntries = await db.entries.where('eventId').equals(eventId).toArray();
 
@@ -814,6 +814,7 @@ export default function DataImport() {
           await db.draws.add({
             eventId,
             drawSize: ev.drawSize,
+            drawType: ev.isRoundRobin ? 'roundRobin' : 'tournament',
             slots,
             updatedAt: now,
           });
@@ -875,7 +876,7 @@ export default function DataImport() {
     : 0;
 
   const excelDrawCount = parsedExcel
-    ? parsedExcel.events.filter(ev => !ev.isRoundRobin && ev.drawSize > 0).length
+    ? parsedExcel.events.filter(ev => ev.drawSize > 0).length
     : 0;
 
   const hasPreview = parsedData && summary;

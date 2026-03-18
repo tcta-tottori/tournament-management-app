@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import DrawRenderer from './DrawRenderer';
+import RoundRobinRenderer from './RoundRobinRenderer';
 import { exportDrawToExcel } from './DrawExporter';
-import { Trophy, Save, AlertCircle, Download } from 'lucide-react';
+import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch } from 'lucide-react';
 
 export type DrawSlotData = {
   position: number;
@@ -35,6 +36,7 @@ export default function DrawBoard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'tournament' | 'roundRobin'>('tournament');
 
   const events = useLiveQuery(() => db.events.toArray()) || [];
   const entries = useLiveQuery(
@@ -118,9 +120,25 @@ export default function DrawBoard() {
        mapped.sort((a,b) => a.position - b.position);
        setEditedSlots(mapped);
        setHasUnsavedChanges(false);
+
+       // ドロータイプの自動検出
+       if (drawData.drawType === 'roundRobin') {
+         setViewMode('roundRobin');
+       } else if (drawData.drawType === 'tournament') {
+         setViewMode('tournament');
+       } else {
+         // drawType未設定の場合: 実選手が2〜5人かつdrawSize≦8ならリーグの可能性
+         const realPlayers = mapped.filter(s => !s.isBye);
+         if (realPlayers.length >= 2 && realPlayers.length <= 5 && drawData.drawSize <= 8) {
+           setViewMode('roundRobin');
+         } else {
+           setViewMode('tournament');
+         }
+       }
     } else {
        setEditedSlots([]);
        setHasUnsavedChanges(false);
+       setViewMode('tournament');
     }
   }, [drawData, entries, players, selectedEventId]);
 
@@ -278,7 +296,32 @@ export default function DrawBoard() {
             </div>
 
             <div className="flex items-center gap-3">
-              {selectedPosition !== null && (
+              {/* 表示切替ボタン */}
+              <div className="flex rounded-md border border-border-main overflow-hidden">
+                <button
+                  onClick={() => setViewMode('tournament')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                    viewMode === 'tournament'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <GitBranch className="w-3.5 h-3.5" />
+                  トーナメント
+                </button>
+                <button
+                  onClick={() => setViewMode('roundRobin')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                    viewMode === 'roundRobin'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  リーグ
+                </button>
+              </div>
+              {selectedPosition !== null && viewMode === 'tournament' && (
                 <button
                   onClick={() => setSelectedPosition(null)}
                   className="flex items-center gap-2 bg-primary-50 text-gray-900 px-4 py-2.5 rounded-md font-medium hover:bg-gray-200 shadow-sm transition-colors text-sm"
@@ -313,17 +356,24 @@ export default function DrawBoard() {
 
           <div className="flex-1 min-h-0 rounded-xl overflow-hidden shadow-sm border border-border-main bg-white">
             {editedSlots.length > 0 && drawData ? (
-              <DrawRenderer
-                slots={editedSlots}
-                drawSize={drawData.drawSize}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onTap={handleTap}
-                selectedPosition={selectedPosition}
-                matchResults={matchResults}
-                eventType={events.find(e => e.eventId === selectedEventId)?.type}
-              />
+              viewMode === 'roundRobin' ? (
+                <RoundRobinRenderer
+                  slots={editedSlots}
+                  matchResults={matchResults}
+                />
+              ) : (
+                <DrawRenderer
+                  slots={editedSlots}
+                  drawSize={drawData.drawSize}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onTap={handleTap}
+                  selectedPosition={selectedPosition}
+                  matchResults={matchResults}
+                  eventType={events.find(e => e.eventId === selectedEventId)?.type}
+                />
+              )
             ) : (
                <div className="flex flex-col items-center justify-center p-8 h-full bg-primary-50 text-center text-gray-500">
                  <Trophy className="w-16 h-16 mb-4 opacity-20" />
