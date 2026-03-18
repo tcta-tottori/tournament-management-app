@@ -16,6 +16,81 @@ type CheckInSlot = {
   affiliation: string;
 };
 
+// === BYE再配置ユーティリティ ===
+// 標準的なトーナメントのシード配置位置を生成
+function generateSeedPositions(drawSize: number): number[] {
+  const positions = [1, drawSize];
+  let count = 2;
+  let sectionSize = drawSize;
+  while (count < drawSize) {
+    sectionSize /= 2;
+    if (sectionSize < 2) break;
+    const newPositions: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const pos = positions[i];
+      const secIdx = Math.floor((pos - 1) / sectionSize);
+      const secStart = secIdx * sectionSize + 1;
+      const secEnd = secStart + sectionSize - 1;
+      newPositions.push(secStart + secEnd - pos);
+    }
+    positions.push(...newPositions);
+    count *= 2;
+  }
+  return positions;
+}
+
+// BYEが配置されるべきポジションを生成（シードの対戦相手位置）
+function generateByePositions(drawSize: number, numByes: number): number[] {
+  const seedPositions = generateSeedPositions(drawSize);
+  const byePositions: number[] = [];
+  for (let i = 0; i < numByes && i < seedPositions.length; i++) {
+    const p = seedPositions[i];
+    byePositions.push(p % 2 === 1 ? p + 1 : p - 1);
+  }
+  return byePositions;
+}
+
+// BYEが末尾に集中している場合、標準配置に再分配
+function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
+  const entrySlots = slots.filter(s => !(s.isBye && !s.entry));
+  const numByes = drawSize - entrySlots.length;
+  if (numByes <= 0) return slots;
+
+  // BYEが既に分散しているかチェック（前半にBYEがあれば分散済み）
+  const halfPos = drawSize / 2;
+  const hasByeInFirstHalf = slots.some(s => s.isBye && !s.entry && s.drawPosition <= halfPos);
+  if (hasByeInFirstHalf) {
+    // 既に正しく配置されている → 不足分だけ補完
+    if (slots.length >= drawSize) return slots;
+    const existingPos = new Set(slots.map(s => s.drawPosition));
+    const result = [...slots];
+    for (let p = 1; p <= drawSize; p++) {
+      if (!existingPos.has(p)) {
+        result.push({ drawPosition: p, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
+      }
+    }
+    return result.sort((a, b) => a.drawPosition - b.drawPosition);
+  }
+
+  // BYEを標準位置に再配置
+  const byePositions = generateByePositions(drawSize, numByes);
+  const byePosSet = new Set(byePositions);
+  const nonByePositions: number[] = [];
+  for (let p = 1; p <= drawSize; p++) {
+    if (!byePosSet.has(p)) nonByePositions.push(p);
+  }
+
+  const sorted = entrySlots.sort((a, b) => a.drawPosition - b.drawPosition);
+  const result: CheckInSlot[] = [];
+  for (let i = 0; i < nonByePositions.length && i < sorted.length; i++) {
+    result.push({ ...sorted[i], drawPosition: nonByePositions[i] });
+  }
+  for (const bp of byePositions) {
+    result.push({ drawPosition: bp, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
+  }
+  return result.sort((a, b) => a.drawPosition - b.drawPosition);
+}
+
 export default function EntryRegistration() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
 
@@ -390,6 +465,9 @@ export default function EntryRegistration() {
     const OFFSET_Y = 40;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
+
+    // BYEが末尾に集中している場合、標準位置に再配置
+    const displaySlots = redistributeByes(slots, drawSize);
     const roundsCount = Math.log2(drawSize);
     const totalRoundsToShow = roundsCount + 1; // includes winner node
 
@@ -472,7 +550,7 @@ export default function EntryRegistration() {
     // Build round 0 (first round) slot elements with full player info
     const slotElements: React.ReactNode[] = [];
     for (let i = 0; i < drawSize; i++) {
-      const slot = i < slots.length ? slots[i] : null;
+      const slot = i < displaySlots.length ? displaySlots[i] : null;
       const x = getX(0);
       const y = getY(0, i);
 
