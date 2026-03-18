@@ -44,92 +44,81 @@
 }
 
 /* ===========================================================
-   ヘッダー — 鳥取の森と砂丘のグラデーション
+   ヘッダー — クリーンで品格のあるデザイン
    =========================================================== */
 .header-main {
-  position: relative;
-  background: linear-gradient(
-    135deg,
-    #0f3326 0%,
-    #1b4d3e 35%,
-    #2d6a4f 65%,
-    #3a6b52 85%,
-    #4a7a5e 100%
-  );
-  box-shadow:
-    0 1px 0 0 rgba(212, 225, 87, 0.1),
-    0 4px 24px rgba(15, 51, 38, 0.35),
-    0 1px 3px rgba(139, 94, 47, 0.1);
+  background: linear-gradient(135deg, #0f3326 0%, #1b4d3e 50%, #245840 100%);
+  border-bottom: 1px solid rgba(212, 225, 87, 0.15);
 }
 
-/* ヘッダー下部はSVGウェーブ（AppLayout.tsx側）で装飾 */
-
-/* コートライン装飾（洗練されたパターン） */
-.header-court-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.04;
-  background-image:
-    /* ネット（中央の縦線） */
-    linear-gradient(90deg, transparent 49.8%, rgba(255, 255, 255, 0.8) 49.8%, rgba(255, 255, 255, 0.8) 50.2%, transparent 50.2%),
-    /* サービスライン */
-    linear-gradient(0deg, transparent 28%, rgba(255, 255, 255, 0.6) 28%, rgba(255, 255, 255, 0.6) 30%, transparent 30%),
-    linear-gradient(0deg, transparent 70%, rgba(255, 255, 255, 0.6) 70%, rgba(255, 255, 255, 0.6) 72%, transparent 72%),
-    /* サイドライン */
-    linear-gradient(90deg, transparent 20%, rgba(255, 255, 255, 0.5) 20%, rgba(255, 255, 255, 0.5) 20.2%, transparent 20.2%),
-    linear-gradient(90deg, transparent 79.8%, rgba(255, 255, 255, 0.5) 79.8%, rgba(255, 255, 255, 0.5) 80%, transparent 80%);
+.header-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* テニスボール装飾（温かみのあるグロー） */
-.header-tennis-ball {
-  position: absolute;
-  right: 40px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 36%, #e8e87c, #d4e157 45%, #a8b840 100%);
-  opacity: 0.15;
-  z-index: 1;
-  box-shadow: 0 0 12px 4px rgba(212, 225, 87, 0.15);
+.header-org-name {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+  color: rgba(212, 225, 87, 0.7);
 }
 
-@media (max-width: 639px) {
-  .header-tennis-ball {
-    display: none;
+.header-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+}
+
+@media (min-width: 640px) {
+  .header-title {
+    font-size: 18px;
   }
 }
 
-.header-tennis-ball::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 225, 87, 0.2), rgba(196, 149, 106, 0.05) 60%, transparent 80%);
-  animation: tennis-ball-glow 5s ease-in-out infinite;
+.header-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: color 0.2s, background 0.2s;
 }
 
-/* 波（日本海の海岸線）SVG装飾 */
-.header-wave {
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 16px;
-  z-index: 5;
-  pointer-events: none;
+.header-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.header-version {
+  font-size: 11px;
+  font-weight: 800;
+  color: #d4e157;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(212, 225, 87, 0.12);
+  border: 1px solid rgba(212, 225, 87, 0.25);
+  letter-spacing: 0.05em;
 }
 
 /* ===========================================================
    ナビゲーションバー
    =========================================================== */
 .nav-bar {
-  background: linear-gradient(180deg, #1b4d3e 0%, #2d6a4f 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 2px 16px rgba(15, 51, 38, 0.25);
+  background: #1b4d3e;
+  box-shadow: 0 2px 12px rgba(15, 51, 38, 0.3);
 }
 
 .nav-tab {
@@ -240,20 +229,6 @@
 
 .page-enter {
   animation: page-float-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* ===========================================================
-   テニスボールグロー（温かく柔らかい発光）
-   =========================================================== */
-@keyframes tennis-ball-glow {
-  0%, 100% {
-    box-shadow: 0 0 8px 3px rgba(212, 225, 87, 0.1);
-    opacity: 1;
-  }
-  50% {
-    box-shadow: 0 0 16px 8px rgba(212, 225, 87, 0.2);
-    opacity: 0.95;
-  }
 }
 
 /* ===========================================================

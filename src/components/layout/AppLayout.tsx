@@ -81,87 +81,35 @@ export default function AppLayout() {
     <div className="flex flex-col h-screen bg-bg-main overflow-hidden">
 
       {/* ===== ヘッダー ===== */}
-      <header className="header-main relative flex items-center gap-4 px-5 h-[64px] shrink-0 z-30 overflow-visible">
-        {/* 背景テニスコートライン装飾 */}
-        <div className="header-court-lines" />
-
-        {/* テニスボール装飾（右上） */}
-        <div className="header-tennis-ball" />
-
+      <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
         {/* ロゴ */}
         <img
           src={logoUrl}
           alt="鳥取市テニス協会"
-          className="relative z-10 w-[46px] h-[46px] rounded-[12px] object-cover shrink-0"
-          style={{
-            border: '2px solid rgba(255,255,255,0.15)',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.25), 0 0 0 1px rgba(212,225,87,0.08)',
-          }}
+          className="header-logo"
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
 
-        {/* テキスト */}
-        <div className="relative z-10 min-w-0 flex-1">
-          <p
-            className="text-[10px] font-semibold leading-tight tracking-[0.25em] uppercase"
-            style={{ color: '#c9a55a' }}
-          >
-            鳥取市テニス協会
-          </p>
-          <h1 className="text-[17px] sm:text-[19px] font-extrabold text-white leading-tight tracking-wide">
-            大会運営システム
-          </h1>
+        {/* タイトル */}
+        <div className="min-w-0 flex-1">
+          <p className="header-org-name">鳥取市テニス協会</p>
+          <h1 className="header-title">大会運営システム</h1>
         </div>
 
-        {/* ドロー会議システムへのリンク + バージョン情報 */}
-        <div className="relative z-10 flex items-center ml-auto gap-2">
+        {/* 右側: リンク & バージョン */}
+        <div className="flex items-center gap-2 shrink-0">
           <a
             href="https://tcta-tottori.github.io/tottori-tennis-draw/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white/90 hover:text-white transition-colors"
-            style={{
-              background: 'linear-gradient(135deg, rgba(43,126,198,0.3), rgba(43,126,198,0.15))',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(43,126,198,0.3)',
-            }}
+            className="header-link"
             title="ドロー会議システムを開く"
           >
             <span className="hidden sm:inline">ドロー会議</span>
             <ExternalLink className="w-3 h-3" />
           </a>
-          <div className="flex flex-col items-end gap-0.5">
-            <span
-              className="text-[11px] font-bold text-white px-2.5 py-0.5 rounded-md leading-normal"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(201,165,90,0.12))',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-              }}
-            >
-              v1.0
-            </span>
-            <span className="text-[10px] text-white/40 text-right hidden sm:block">
-              2026.3.17 更新
-            </span>
-          </div>
+          <span className="header-version">v1.0</span>
         </div>
-
-        {/* 日本海の海岸線ウェーブ装飾 */}
-        <svg
-          className="header-wave"
-          viewBox="0 0 1440 16"
-          preserveAspectRatio="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M0,8 C120,14 240,2 360,8 C480,14 600,2 720,8 C840,14 960,2 1080,8 C1200,14 1320,2 1440,8 L1440,16 L0,16 Z"
-            fill="#1b4d3e"
-          />
-        </svg>
       </header>
 
       {/* ===== ナビゲーションバー ===== */}
