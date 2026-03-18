@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserX, Search, Eye, List, Upload, AlertCircle, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { CheckSquare, UserCheck, UserX, Search, Eye, List, Upload, AlertCircle, ChevronDown, ChevronRight, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import EntryImport from './EntryImport';
 
 type CheckInSlot = {
@@ -348,34 +348,34 @@ export default function EntryRegistration() {
         )}
 
         <div className="p-4 overflow-x-auto">
-          <table className="border-collapse text-sm" style={{ borderSpacing: 0 }}>
+          <table className="text-sm rounded-xl overflow-hidden shadow-sm border border-gray-200" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
             <thead>
               <tr>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 sticky left-0 z-20 w-8 text-center">
+                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 sticky left-0 z-20 w-8 text-center rounded-tl-xl">
                   No
                 </th>
-                <th className="py-2.5 px-3 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 sticky left-[33px] z-20 min-w-[200px] text-left">
+                <th className="py-2.5 px-3 text-[10px] font-bold text-white bg-gray-700 sticky left-[33px] z-20 min-w-[200px] text-left">
                   選手名
                 </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-[70px] text-center">
+                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-[70px] text-center">
                   受付
                 </th>
                 {playerSlots.map((ps, colIdx) => (
                   <th
                     key={`col-h-${colIdx}`}
-                    className="py-1.5 px-1 text-center border border-gray-200 bg-gray-50/80 w-[56px]"
+                    className="py-1.5 px-1 text-center bg-gray-700 w-[56px]"
                   >
-                    <div className="text-[10px] font-bold text-gray-500">{colIdx + 1}</div>
-                    <div className="text-[9px] text-gray-400 truncate leading-tight">{shortName(ps.playerName)}</div>
+                    <div className="text-[10px] font-bold text-white">{colIdx + 1}</div>
+                    <div className="text-[9px] text-gray-300 truncate leading-tight">{shortName(ps.playerName)}</div>
                   </th>
                 ))}
-                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center">
                   勝
                 </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center">
                   敗
                 </th>
-                <th className="py-2.5 px-2 text-[10px] font-bold text-gray-500 border border-gray-200 bg-gray-50/80 w-10 text-center">
+                <th className="py-2.5 px-2 text-[10px] font-bold text-white bg-gray-700 w-10 text-center rounded-tr-xl">
                   順位
                 </th>
               </tr>
@@ -410,15 +410,15 @@ export default function EntryRegistration() {
                     `}
                   >
                     {/* No */}
-                    <td className={`py-0 px-0 text-center border ${rowBorder} bg-white sticky left-0 z-10`}>
-                      <div className="w-full h-[44px] flex items-center justify-center text-[10px] font-mono text-gray-400 border-r border-gray-100">
+                    <td className={`py-0 px-0 text-center border-b ${rowBorder} bg-white sticky left-0 z-10 ${rowIdx === playerSlots.length - 1 ? 'rounded-bl-xl' : ''}`}>
+                      <div className="w-full h-[48px] flex items-center justify-center text-[10px] font-mono text-gray-400 border-r border-gray-100">
                         {rowIdx + 1}
                       </div>
                     </td>
 
                     {/* 選手名 - トーナメントスロットカードと同じスタイル */}
-                    <td className={`py-0 px-0 border ${rowBorder} sticky left-[33px] z-10 ${rowBg || 'bg-white'}`}>
-                      <div className="flex items-center h-[44px] px-2 gap-1.5">
+                    <td className={`py-0 px-0 border-b ${rowBorder} sticky left-[33px] z-10 ${rowBg || 'bg-white'}`}>
+                      <div className="flex items-center h-[48px] px-2 gap-1.5">
                         {slot.seed > 0 && (
                           <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full shadow-sm">
                             {slot.seed}
@@ -468,7 +468,7 @@ export default function EntryRegistration() {
                     </td>
 
                     {/* 受付状態 */}
-                    <td className={`py-0 px-2 text-center border ${rowBorder} ${rowBg || 'bg-white'}`}>
+                    <td className={`py-0 px-2 text-center border-b ${rowBorder} ${rowBg || 'bg-white'}`}>
                       {isWithdrawn ? (
                         <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">BYE</span>
                       ) : isConfirmed ? (
@@ -484,18 +484,19 @@ export default function EntryRegistration() {
                       return (
                         <td
                           key={`cell-${rowIdx}-${colIdx}`}
-                          className={`h-[44px] text-center text-xs border border-gray-200 ${isDiagonal ? '' : 'bg-white'}`}
+                          className={`h-[48px] text-center text-xs border-b border-r border-gray-200 ${isDiagonal ? '' : 'bg-white hover:bg-primary-50/30 transition-colors'}`}
                           style={isDiagonal ? {
-                            background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, #d1d5db 3px, #d1d5db 4px)',
+                            background: 'linear-gradient(135deg, #f3f4f6 25%, #e5e7eb 25%, #e5e7eb 50%, #f3f4f6 50%, #f3f4f6 75%, #e5e7eb 75%)',
+                            backgroundSize: '6px 6px',
                           } : undefined}
                         />
                       );
                     })}
 
                     {/* 勝・敗・順位（空欄） */}
-                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
-                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
-                    <td className="h-[44px] text-center text-xs border border-gray-200 bg-white" />
+                    <td className="h-[48px] text-center text-xs border-b border-r border-gray-200 bg-white" />
+                    <td className="h-[48px] text-center text-xs border-b border-r border-gray-200 bg-white" />
+                    <td className={`h-[48px] text-center text-xs border-b border-gray-200 bg-white ${rowIdx === playerSlots.length - 1 ? 'rounded-br-xl' : ''}`} />
                   </tr>
                 );
               })}
@@ -902,6 +903,27 @@ export default function EntryRegistration() {
       : [];
   const overallStats = computeStats(allSlots);
 
+  // モバイルでスクロール時にヘッダーを自動非表示
+  const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    let lastScrollY = 0;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      if (y > 200 && y > lastScrollY) {
+        setMobileHeaderVisible(false);
+      } else if (y < lastScrollY - 30 || y < 100) {
+        setMobileHeaderVisible(true);
+      }
+      lastScrollY = y;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
   if (!currentTournamentId) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-gray-500 h-full">
@@ -914,8 +936,8 @@ export default function EntryRegistration() {
 
   return (
     <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* RIGHT: Sidebar controls - on mobile stays on top */}
-      <div className="lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-4 lg:mb-0">
+      {/* RIGHT: Sidebar controls - on mobile auto-hide on scroll */}
+      <div className={`lg:w-[320px] shrink-0 order-1 lg:order-2 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto space-y-3 mb-3 lg:mb-0 transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!overflow-visible ${mobileHeaderVisible ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden mb-0 lg:max-h-none'}`}>
       <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div className="flex flex-col gap-3">
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -925,16 +947,16 @@ export default function EntryRegistration() {
 
           <div className="flex flex-col gap-2">
             {/* View toggle */}
-            <div className="flex rounded-lg border border-border-main overflow-hidden text-sm">
+            <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
               <button
                 onClick={() => setShowAllEvents(false)}
-                className={`px-3 py-1.5 flex items-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
               >
                 <Eye className="w-3.5 h-3.5" />個別表示
               </button>
               <button
                 onClick={() => setShowAllEvents(true)}
-                className={`px-3 py-1.5 flex items-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
               >
                 <List className="w-3.5 h-3.5" />すべて表示
               </button>
@@ -944,7 +966,7 @@ export default function EntryRegistration() {
               <select
                 value={selectedEventId}
                 onChange={e => setSelectedEventId(e.target.value)}
-                className="border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium w-56"
+                className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
               >
                 <option value="">-- 種目を選択 --</option>
                 {events.map(e => (
@@ -955,17 +977,17 @@ export default function EntryRegistration() {
 
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 bg-white border border-border-main text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+              className="flex items-center justify-center gap-2 bg-white border border-border-main text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition-colors w-full"
             >
               <Upload className="w-4 h-4 text-primary-500" />
-              <span className="hidden md:inline">インポート</span>
+              インポート
             </button>
           </div>
         </div>
 
         {/* Search */}
-        <div className="mt-3 flex items-center gap-3">
-          <div className="relative flex-1">
+        <div className="mt-3">
+          <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-gray-500" />
             </div>
@@ -983,23 +1005,20 @@ export default function EntryRegistration() {
         {(showAllEvents || selectedEventId) && (
           <div className="mt-3 flex flex-col gap-2">
             <div className="flex items-center gap-3 text-sm flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">合計:</span>
+              <div className="flex items-center gap-1">
+                <span className="text-gray-500 text-xs">合計:</span>
                 <span className="font-bold text-gray-800">{overallStats.total}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                <span className="text-gray-500">受付済:</span>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
                 <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
-                <span className="text-gray-500">BYE:</span>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
                 <span className="font-bold text-red-600">{overallStats.absent}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
-                <span className="text-gray-500">未確認:</span>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
                 <span className="font-bold text-gray-600">{overallStats.remaining}</span>
               </div>
             </div>
@@ -1019,20 +1038,22 @@ export default function EntryRegistration() {
             </div>
           </div>
         )}
-
-        {/* Legend */}
-        {(showAllEvents || selectedEventId) && (
-          <div className="mt-2 flex items-center gap-4 text-[11px] text-gray-500 border-t border-gray-100 pt-2">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />名前クリックで受付</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />再クリックで取消</span>
-            <span className="flex items-center gap-1"><UserX className="w-3 h-3 text-red-400" />操作列でBYE</span>
-          </div>
-        )}
       </header>
       </div>
 
       {/* LEFT: Main content area (draw tables) - on PC comes first visually */}
-      <div className="flex-1 min-w-0 order-2 lg:order-1 overflow-y-auto space-y-4 min-h-0">
+      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-1 overflow-y-auto space-y-4 min-h-0">
+
+      {/* Mobile FAB to show header */}
+      {!mobileHeaderVisible && (
+        <button
+          onClick={() => { setMobileHeaderVisible(true); contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className="lg:hidden fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-600 active:scale-95 transition-all"
+          title="メニューを表示"
+        >
+          <SlidersHorizontal className="w-5 h-5" />
+        </button>
+      )}
         {showAllEvents ? (
           events.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
