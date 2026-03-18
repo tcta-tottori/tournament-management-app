@@ -443,7 +443,11 @@ export default function EntryRegistration() {
     // Check if this is a league/round-robin event
     const event = events.find(e => e.eventId === eventId);
     const eventType = event?.type as string | undefined;
-    const isLeague = eventType === 'league' || eventType === 'round-robin' || /リーグ/i.test(event?.name || '');
+    const isLeague =
+      eventType === 'league' ||
+      eventType === 'round-robin' ||
+      draw?.drawType === 'roundRobin' ||
+      /リーグ/i.test(event?.name || '');
     if (isLeague) {
       return renderLeagueTable(eventId, slots);
     }
