@@ -392,11 +392,17 @@ export function autoSchedule(
 ): ScheduleSlot[] {
   const { courtCount, courtNames, matchDuration, startTime } = config;
 
-  // ソート: ラウンド昇順 → ドローサイズ降順 → 種目順
+  // ソート: ラウンド昇順 → ドローサイズ降順 → 種目順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
+  // これにより対戦順（matchOrder）と同じ並びでタイムテーブルに配置される
   const sorted = [...matches].sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
     if (a.drawSize !== b.drawSize) return b.drawSize - a.drawSize;
-    return a.eventOrder - b.eventOrder;
+    if (a.eventOrder !== b.eventOrder) return a.eventOrder - b.eventOrder;
+    // 左山(L) → 右山(R) → 決勝(F) の順
+    const halfOrder = (h: string) => h === 'L' ? 0 : h === 'R' ? 1 : 2;
+    if (a.halfLabel !== b.halfLabel) return halfOrder(a.halfLabel) - halfOrder(b.halfLabel);
+    // 同じ山の中で上から下へ
+    return a.matchNumInRound - b.matchNumInRound;
   });
 
   // 最大ラウンドを算出（後半判定に使用）
