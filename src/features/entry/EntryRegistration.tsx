@@ -472,7 +472,8 @@ export default function EntryRegistration() {
 
             return (
               <div key={`league-card-${slot.drawPosition}`}
-                className={`flex items-center border rounded-lg shadow-sm transition-all h-[40px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
+                className={`flex items-center border rounded-lg shadow-sm transition-all h-[36px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+                style={{ width: 220 }}>
                 <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{idx + 1}</div>
                 {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
                 <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
@@ -578,10 +579,19 @@ export default function EntryRegistration() {
       if (r === 0) return r0Y[i];
       return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
     };
-    const getX = (r: number): number => OFFSET_X + r * (SLOT_WIDTH + X_SPACING);
+
+    // Round 0 は選手カード表示(SLOT_WIDTH)、Round 1以降は線のみ(LINE_ONLY_W)
+    const LINE_ONLY_W = 40;
+    const getX = (r: number): number => {
+      if (r === 0) return OFFSET_X;
+      // Round 0 のカード幅 + gap + (r-1) * 線のみ幅
+      return OFFSET_X + SLOT_WIDTH + X_SPACING + (r - 1) * LINE_ONLY_W;
+    };
+    // 各ラウンドのスロット描画幅（Round 0はカード幅、以降は線のみ幅）
+    const getSlotW = (r: number): number => r === 0 ? SLOT_WIDTH : LINE_ONLY_W;
 
     // Container dimensions (接続線は優勝まで描画)
-    const containerWidth = OFFSET_X * 2 + (roundsCount - 1) * (SLOT_WIDTH + X_SPACING) + SLOT_WIDTH;
+    const containerWidth = getX(roundsCount) + OFFSET_X;
     const containerHeight = nextCompactY + SLOT_HEIGHT;
 
     // === SVG ブラケット線 (優勝まで全ラウンド描画) ===
@@ -589,7 +599,8 @@ export default function EntryRegistration() {
     for (let r = 0; r < roundsCount; r++) {
       const numMatches = drawSize / Math.pow(2, r + 1);
       for (let m = 0; m < numMatches; m++) {
-        const x = getX(r) + SLOT_WIDTH;
+        const sw = getSlotW(r);
+        const x = getX(r) + sw;
         const xNext = getX(r + 1);
         const xMid = (x + xNext) / 2;
 
