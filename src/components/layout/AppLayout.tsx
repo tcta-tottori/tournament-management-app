@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
-  Database, Users, List, Dices, Trophy,
+  Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   Save, HelpCircle, MoreHorizontal, Volume2, MapPin, ExternalLink
 } from 'lucide-react';
