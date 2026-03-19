@@ -181,3 +181,51 @@ db.version(4).stores({
 });
 
 export { db };
+
+// ---------------------------
+// シードデータの初期ロード
+// 初回起動時にふりがな辞書・所属ふりがなをプリセット
+// ---------------------------
+const SEED_KEY = 'tennis-seed-loaded-v1';
+
+export async function loadSeedDataIfNeeded(): Promise<void> {
+  if (localStorage.getItem(SEED_KEY)) return; // 既に初期化済み
+
+  try {
+    const { FURIGANA_SEED, AFFILIATION_SEED } = await import('./seedData');
+
+    // ふりがな辞書
+    const existingFurigana = await db.furiganaDict.count();
+    if (existingFurigana === 0 && FURIGANA_SEED.length > 0) {
+      const entries = FURIGANA_SEED.map(([name, furigana]) => ({
+        name,
+        furigana,
+        type: 'manual' as const,
+        updatedAt: Date.now(),
+      }));
+      await db.furiganaDict.bulkPut(entries);
+    }
+
+    // 所属ふりがな
+    const existingAff = await db.affiliationFurigana.count();
+    if (existingAff === 0 && AFFILIATION_SEED.length > 0) {
+      const entries = AFFILIATION_SEED.map(([name, furigana]) => ({
+        name,
+        furigana,
+        updatedAt: Date.now(),
+      }));
+      // 重複名除去（最初に出現したものを採用）
+      const seen = new Set<string>();
+      const unique = entries.filter(e => {
+        if (seen.has(e.name)) return false;
+        seen.add(e.name);
+        return true;
+      });
+      await db.affiliationFurigana.bulkAdd(unique);
+    }
+
+    localStorage.setItem(SEED_KEY, '1');
+  } catch (err) {
+    console.error('シードデータ読み込みエラー:', err);
+  }
+}

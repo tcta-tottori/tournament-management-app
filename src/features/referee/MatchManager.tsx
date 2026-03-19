@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, FileText } from 'lucide-react';
 import type { Match } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
@@ -747,6 +747,65 @@ ${printableMatches.map(m => {
     }
   }, [allMatchesByEvent, allDraws, events, players, courts, tournament]);
 
+  // 個別試合の印刷
+  const handlePrintMatch = useCallback((m: Match) => {
+    const evt = events.find(e => e.eventId === m.eventId);
+    if (!evt) return;
+    const eventDraw = allDraws.get(m.eventId);
+    const eventTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
+    const rName = getRoundName(m.round, eventTotalRounds);
+    const eventName = evt.name;
+    const tournamentName = tournament?.name || '';
+    const tournamentDate = tournament?.date || '';
+    const gamesVal = evt.gameRules?.games ?? 6;
+    const gameMethod = `${gamesVal}ゲームマッチ\n（${gamesVal}-${gamesVal}タイブレーク）`;
+    const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+    const courtDisplay = courtObj?.name || '';
+
+    const getEntryNo = (entryId: string | null): string => {
+      if (!entryId) return '';
+      if (eventDraw) {
+        const slot = eventDraw.slots.find((s: DrawSlot) => s.entryId === entryId);
+        if (slot) return String(slot.position);
+      }
+      const numMatch = entryId.match(/(\d+)/);
+      return numMatch ? String(parseInt(numMatch[1], 10)) : '';
+    };
+    const entryNo1 = getEntryNo(m.player1EntryId);
+    const entryNo2 = getEntryNo(m.player2EntryId);
+
+    const colA = (3.29 / 315.20 * 100).toFixed(3);
+    const colN = (8.43 / 315.20 * 100).toFixed(3);
+    const colgroup = `<colgroup><col style="width:${colA}%">` + Array.from({length: 37}, () => `<col style="width:${colN}%">`).join('') + `</colgroup>`;
+    const rowHeights = [16.5, 21, 22.5, 18.75, 18.75, 18.75, 18.75, 37.5, 37.5, 7.5, 18.75, 18.75, 16.5, 16.5, 16.5, 16.5, 16.5, 16.5, 39.75, 39.75, 39.75, 25.5];
+    const totalPt = rowHeights.reduce((a, b) => a + b, 0);
+    const rh = rowHeights.map(h => (h / totalPt * 190).toFixed(2) + 'mm');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>審判用紙 - ${eventName} ${rName}</title>
+<style>@page{size:A4 landscape;margin:5mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'MS Gothic','MS ゴシック','Yu Gothic','Hiragino Sans',monospace;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.sheet{width:287mm;height:190mm;overflow:hidden;position:relative;}.ref-table{width:100%;height:100%;table-layout:fixed;border-collapse:collapse;}.ref-table td{padding:0;margin:0;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;}.fg{font-family:'MS Gothic','MS ゴシック','Yu Gothic',monospace;}.fp{font-family:'MS PGothic','MS Pゴシック','Yu Gothic',sans-serif;}.ft{font-family:'Times New Roman',serif;}.bt{border-top:1px solid #000;}.bb{border-bottom:1px solid #000;}.bl{border-left:1px solid #000;}.br{border-right:1px solid #000;}.bt2{border-top:2px solid #000;}.bb2{border-bottom:2px solid #000;}.bl2{border-left:2px solid #000;}.br2{border-right:2px solid #000;}.ba{border:1px solid #000;}</style></head><body>
+<div class="sheet"><table class="ref-table">${colgroup}
+<tr style="height:${rh[0]};"><td colspan="38" rowspan="2" class="fg" style="text-align:center;font-size:32px;font-weight:bold;letter-spacing:0.5em;height:calc(${rh[0]}+${rh[1]});">審　判　用　紙</td></tr><tr style="height:${rh[1]};"></tr>
+<tr style="height:${rh[2]};"><td colspan="7" style="height:${rh[2]};"></td><td colspan="23" class="fg bb2" style="text-align:center;font-size:14px;">(${tournamentName})</td><td colspan="8" class="fg bb2" style="text-align:right;font-size:14px;padding-right:4px;">${tournamentDate}</td></tr>
+<tr style="height:${rh[3]};"><td colspan="6" rowspan="4" class="fg bl2 bt2 br bb" style="text-align:center;font-size:16px;height:calc(${rh[3]}+${rh[4]}+${rh[5]}+${rh[6]});">種　目</td><td colspan="13" rowspan="4" class="fg bt2 br bb" style="text-align:center;font-size:24px;white-space:nowrap;">${eventName}</td><td colspan="6" rowspan="4" class="fg bt2 br bb" style="text-align:center;font-size:18px;">回　戦</td><td colspan="13" rowspan="4" class="fg bt2 br2 bb" style="text-align:center;font-size:28px;font-weight:bold;">${rName}</td></tr><tr style="height:${rh[4]};"></tr><tr style="height:${rh[5]};"></tr><tr style="height:${rh[6]};"></tr>
+<tr style="height:${rh[7]};"><td colspan="6" rowspan="2" class="fg bl2 bt br bb2" style="text-align:center;font-size:16px;height:calc(${rh[7]}+${rh[8]});">コート№</td><td colspan="6" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:36px;font-weight:bold;">${courtDisplay}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">試合方法</td><td colspan="9" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:18px;white-space:pre-line;line-height:1.3;">${gameMethod}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">開始時間</td><td colspan="7" rowspan="2" class="fg bt br2 bb2" style="text-align:center;font-size:22px;font-weight:bold;">${m.scheduledTime || ''}</td></tr><tr style="height:${rh[8]};"></tr>
+<tr style="height:${rh[9]};"><td colspan="38" style="height:${rh[9]};"></td></tr>
+<tr style="height:${rh[10]};"><td colspan="6" rowspan="2" class="fg bl2 bt2 br bb" style="text-align:center;font-size:14px;height:calc(${rh[10]}+${rh[11]});">エントリー№</td><td colspan="4" rowspan="2" class="ft bt2 bb" style="text-align:right;font-size:20px;padding-right:2px;border-left:1px solid #000;">No.</td><td colspan="12" rowspan="2" class="fp bt2 bb br" style="text-align:center;font-size:26px;">${entryNo1}</td><td colspan="4" rowspan="2" class="ft bt2 bb" style="text-align:right;font-size:20px;padding-right:2px;border-left:1px solid #000;">No.</td><td colspan="12" rowspan="2" class="fp bt2 bb br2" style="text-align:center;font-size:26px;">${entryNo2}</td></tr><tr style="height:${rh[11]};"></tr>
+<tr style="height:${rh[12]};"><td colspan="6" rowspan="6" class="fg bl2 bt br bb" style="text-align:center;font-size:14px;height:calc(${rh[12]}+${rh[13]}+${rh[14]}+${rh[15]}+${rh[16]}+${rh[17]});">選 手 氏 名</td><td colspan="16" rowspan="4" class="fp bt br" style="text-align:center;font-size:28px;white-space:nowrap;height:calc(${rh[12]}+${rh[13]}+${rh[14]}+${rh[15]});">${m.player1Name}</td><td colspan="16" rowspan="4" class="fp bt br2" style="text-align:center;font-size:28px;white-space:nowrap;">${m.player2Name}</td></tr><tr style="height:${rh[13]};"></tr><tr style="height:${rh[14]};"></tr><tr style="height:${rh[15]};"></tr>
+<tr style="height:${rh[16]};"><td colspan="2" rowspan="2" class="fp bl bb" style="text-align:right;font-size:20px;vertical-align:top;">（</td><td colspan="12" rowspan="2" class="fp bb" style="text-align:center;font-size:20px;vertical-align:top;white-space:nowrap;">${m.player1Affiliation || ''}</td><td colspan="2" rowspan="2" class="fp br bb" style="text-align:left;font-size:20px;vertical-align:top;">）</td><td colspan="2" rowspan="2" class="fp bl bb" style="text-align:right;font-size:20px;vertical-align:top;">（</td><td colspan="12" rowspan="2" class="fp bb" style="text-align:center;font-size:20px;vertical-align:top;white-space:nowrap;">${m.player2Affiliation || ''}</td><td colspan="2" rowspan="2" class="fp br2 bb" style="text-align:left;font-size:20px;vertical-align:top;">）</td></tr><tr style="height:${rh[17]};"></tr>
+<tr style="height:${rh[18]};"><td colspan="6" rowspan="2" class="fg bl2 bt br bb" style="text-align:center;font-size:14px;height:calc(${rh[18]}+${rh[19]});">ス　コ　ア</td><td colspan="15" rowspan="2" class="fg bt bl br bb" style="text-align:center;font-size:24px;"></td><td colspan="2" rowspan="2" class="fg bt bb" style="text-align:center;font-size:24px;">―</td><td colspan="15" rowspan="2" class="fg bt bl br2 bb" style="text-align:center;font-size:24px;"></td></tr><tr style="height:${rh[19]};"></tr>
+<tr style="height:${rh[20]};"><td colspan="6" class="fg bl2 bt br bb2" style="text-align:center;font-size:14px;height:${rh[20]};">（ＴＢ）</td><td colspan="15" class="fg bt bl br bb2" style="height:${rh[20]};"></td><td colspan="2" class="fg bt bb2" style="text-align:center;font-size:12px;">（　）</td><td colspan="15" class="fg bt bl br2 bb2" style="height:${rh[20]};"></td></tr>
+<tr style="height:${rh[21]};"><td colspan="25" style="height:${rh[21]};"></td><td colspan="13" class="fg bt2" style="text-align:right;font-size:12px;padding-right:4px;">鳥取市テニス協会</td></tr>
+</table></div></body></html>`;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => printWin.print(), 500);
+    }
+  }, [events, allDraws, courts, tournament]);
+
   // スクロール時にコントロールを自動非表示
   const [controlsOpen, setControlsOpen] = useState(true);
   const matchContentRef = useRef<HTMLDivElement>(null);
@@ -930,20 +989,45 @@ ${printableMatches.map(m => {
                   </div>
                 </div>
 
-                {/* 試合リスト */}
-                <div className="overflow-hidden">
+                {/* 試合リスト - 固定列幅テーブル */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col style={{ width: '44px' }} />   {/* # */}
+                      <col />                              {/* Player 1 */}
+                      <col style={{ width: '32px' }} />    {/* vs */}
+                      <col />                              {/* Player 2 */}
+                      <col style={{ width: '80px' }} />    {/* Score */}
+                      <col style={{ width: '64px' }} />    {/* Status */}
+                      <col style={{ width: '130px' }} />   {/* Actions */}
+                    </colgroup>
+                    <tbody className="text-sm">
                   {Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
                     const roundLabel = getRoundName(round, evTotalRounds);
                     const rFinished = roundMatches.filter(m => m.status === 'finished').length;
                     return (
-                      <div key={round}>
-                        <div className="px-4 py-2 bg-gray-50 border-b border-border-main flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-600">{roundLabel}</span>
-                          <span className="text-[10px] text-gray-400">{rFinished}/{roundMatches.length}</span>
-                        </div>
-                        <table className="w-full text-left border-collapse">
-                          <tbody className="text-sm">
-                            {roundMatches.map((m, idx) => {
+                      <React.Fragment key={round}>
+                        {/* ラウンドヘッダー */}
+                        <tr>
+                          <td colSpan={7} className="px-0 py-0">
+                            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-slate-100 to-slate-50 border-b border-t border-slate-200">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-700 text-white text-[10px] font-bold">{round}</span>
+                                <span className="text-xs font-bold text-slate-700 tracking-wide">{roundLabel}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="h-1.5 w-16 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                    style={{ width: roundMatches.length > 0 ? `${(rFinished / roundMatches.length) * 100}%` : '0%' }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-400">{rFinished}/{roundMatches.length}</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        {roundMatches.map((m, idx) => {
                               const st = statusLabels[m.status] || statusLabels.waiting;
                               const isEditing = editingMatchId === m.matchId && isActive;
                               const isWinner1 = m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
@@ -953,9 +1037,9 @@ ${printableMatches.map(m => {
 
                               if (isEditing) {
                                 return (
-                                  <tr key={m.matchId} className="border-b border-border-main bg-blue-50">
-                                    <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
-                                    <td className="py-2 px-2">
+                                  <tr key={m.matchId} className="border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                                    <td className="py-2.5 px-2 text-center font-mono text-blue-400 text-xs font-bold">{m.matchOrder}</td>
+                                    <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
                                         {autoWinner === 1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
                                         <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-amber-800' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
@@ -963,8 +1047,8 @@ ${printableMatches.map(m => {
                                         </span>
                                       </div>
                                     </td>
-                                    <td className="py-2 px-1 text-center text-gray-400 text-xs">vs</td>
-                                    <td className="py-2 px-2">
+                                    <td className="py-2.5 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
+                                    <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
                                         {autoWinner === 2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
                                         <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-amber-800' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
@@ -972,7 +1056,7 @@ ${printableMatches.map(m => {
                                         </span>
                                       </div>
                                     </td>
-                                    <td className="py-2 px-2">
+                                    <td className="py-2.5 px-2">
                                       <div className="flex flex-col items-center gap-1">
                                         <div className="flex items-center gap-1">
                                           <input
@@ -982,14 +1066,14 @@ ${printableMatches.map(m => {
                                             value={editScore1}
                                             onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }}
                                             placeholder="0"
-                                            className="w-12 border border-gray-300 rounded px-1 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                                            className="w-11 border border-blue-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                             onKeyDown={e => {
                                               if (e.key === 'Enter') saveResult(m);
                                               if (e.key === 'Escape') cancelEdit();
                                             }}
                                             autoFocus
                                           />
-                                          <span className="text-gray-500 font-bold">―</span>
+                                          <span className="text-blue-300 font-bold text-xs">-</span>
                                           <input
                                             type="number"
                                             min="0"
@@ -997,7 +1081,7 @@ ${printableMatches.map(m => {
                                             value={editScore2}
                                             onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }}
                                             placeholder="0"
-                                            className="w-12 border border-gray-300 rounded px-1 py-1 text-sm text-center font-mono focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                                            className="w-11 border border-blue-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                             onKeyDown={e => {
                                               if (e.key === 'Enter') saveResult(m);
                                               if (e.key === 'Escape') cancelEdit();
@@ -1006,7 +1090,7 @@ ${printableMatches.map(m => {
                                         </div>
                                         {isTiebreakScore && (
                                           <div className="flex items-center gap-1 text-xs text-gray-500">
-                                            <span>TB</span>
+                                            <span className="text-amber-600 font-bold">TB</span>
                                             {tiebreakLoserSide === 1 && (
                                               <>
                                                 <input
@@ -1016,20 +1100,20 @@ ${printableMatches.map(m => {
                                                   value={editTiebreak}
                                                   onChange={e => setEditTiebreak(e.target.value)}
                                                   placeholder="0"
-                                                  className="w-10 border border-amber-300 rounded px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  className="w-9 border border-amber-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
                                                   onKeyDown={e => {
                                                     if (e.key === 'Enter') saveResult(m);
                                                     if (e.key === 'Escape') cancelEdit();
                                                   }}
                                                 />
-                                                <span className="text-gray-300">―</span>
-                                                <span className="text-gray-400 w-10 text-center">-</span>
+                                                <span className="text-gray-300">-</span>
+                                                <span className="text-gray-300 w-9 text-center">-</span>
                                               </>
                                             )}
                                             {tiebreakLoserSide === 2 && (
                                               <>
-                                                <span className="text-gray-400 w-10 text-center">-</span>
-                                                <span className="text-gray-300">―</span>
+                                                <span className="text-gray-300 w-9 text-center">-</span>
+                                                <span className="text-gray-300">-</span>
                                                 <input
                                                   type="number"
                                                   min="0"
@@ -1037,7 +1121,7 @@ ${printableMatches.map(m => {
                                                   value={editTiebreak}
                                                   onChange={e => setEditTiebreak(e.target.value)}
                                                   placeholder="0"
-                                                  className="w-10 border border-amber-300 rounded px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  className="w-9 border border-amber-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
                                                   onKeyDown={e => {
                                                     if (e.key === 'Enter') saveResult(m);
                                                     if (e.key === 'Escape') cancelEdit();
@@ -1049,27 +1133,27 @@ ${printableMatches.map(m => {
                                         )}
                                       </div>
                                     </td>
-                                    <td className="py-2 px-2 text-center">
+                                    <td className="py-2.5 px-2 text-center">
                                       {autoWinner ? (
-                                        <span className="text-xs text-amber-600 font-medium">
-                                          {autoWinner === 1 ? 'P1' : 'P2'}勝利
+                                        <span className="text-[10px] text-amber-600 font-bold bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                          {autoWinner === 1 ? 'P1' : 'P2'}勝
                                         </span>
                                       ) : (
-                                        <span className="text-xs text-blue-600 font-medium">入力中</span>
+                                        <span className="text-[10px] text-blue-500 font-medium">...</span>
                                       )}
                                     </td>
-                                    <td className="py-2 px-2 text-center">
+                                    <td className="py-2.5 px-2 text-center">
                                       <div className="flex items-center gap-1 justify-center">
                                         <button
                                           onClick={() => saveResult(m)}
                                           disabled={!autoWinner}
-                                          className="p-2 text-green-600 hover:bg-green-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                          className="p-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
                                           title="保存"
                                         >
-                                          <Check className="w-4 h-4" />
+                                          <Check className="w-3.5 h-3.5" />
                                         </button>
-                                        <button onClick={cancelEdit} className="p-2 text-gray-400 hover:bg-gray-100 rounded" title="キャンセル">
-                                          <X className="w-4 h-4" />
+                                        <button onClick={cancelEdit} className="p-1.5 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors" title="キャンセル">
+                                          <X className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
                                     </td>
@@ -1082,80 +1166,126 @@ ${printableMatches.map(m => {
 
                               return (
                                 <React.Fragment key={m.matchId}>
-                                  <tr className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${isThisSpeaking ? 'bg-amber-50' : idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
-                                    <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
-                                    <td className="py-2 px-2">
-                                      <div className="flex items-center gap-1">
+                                  <tr className={`border-b border-slate-100 transition-colors group ${
+                                    isThisSpeaking
+                                      ? 'bg-gradient-to-r from-amber-50 to-orange-50'
+                                      : m.status === 'finished'
+                                        ? 'bg-slate-50/50'
+                                        : m.status === 'playing'
+                                          ? 'bg-gradient-to-r from-emerald-50/50 to-transparent'
+                                          : idx % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'
+                                  } hover:bg-primary-50/40`}>
+                                    <td className="py-2.5 px-2 text-center">
+                                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${
+                                        m.status === 'finished'
+                                          ? 'bg-slate-200 text-slate-500'
+                                          : m.status === 'playing'
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-slate-100 text-slate-500'
+                                      }`}>
+                                        {m.matchOrder}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-2 overflow-hidden">
+                                      <div className="flex items-center gap-1 min-w-0">
                                         {isWinner1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium'}`}>
+                                        <span className={`truncate ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium text-slate-800'}`}>
                                           {m.player1Name || '(未定)'}
                                         </span>
-                                        {m.player1Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player1Affiliation})</span>}
+                                        {m.player1Affiliation && (
+                                          <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">({m.player1Affiliation})</span>
+                                        )}
                                       </div>
                                     </td>
-                                    <td className="py-2 px-1 text-center text-gray-300 text-xs">vs</td>
-                                    <td className="py-2 px-2">
-                                      <div className="flex items-center gap-1">
+                                    <td className="py-2.5 px-0 text-center">
+                                      <span className="text-[10px] text-slate-300 font-bold">vs</span>
+                                    </td>
+                                    <td className="py-2.5 px-2 overflow-hidden">
+                                      <div className="flex items-center gap-1 min-w-0">
                                         {isWinner2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium'}`}>
+                                        <span className={`truncate ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium text-slate-800'}`}>
                                           {m.player2Name || '(未定)'}
                                         </span>
-                                        {m.player2Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player2Affiliation})</span>}
+                                        {m.player2Affiliation && (
+                                          <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">({m.player2Affiliation})</span>
+                                        )}
                                       </div>
                                     </td>
-                                    <td className="py-2 px-2 text-center font-mono text-sm">
-                                      {m.score || (isWalkover ? 'W.O' : '-')}
+                                    <td className="py-2.5 px-2 text-center">
+                                      <span className={`font-mono text-xs ${m.status === 'finished' ? 'text-slate-700 font-semibold' : 'text-slate-400'}`}>
+                                        {m.score || (isWalkover ? 'W.O' : '-')}
+                                      </span>
                                     </td>
-                                    <td className="py-2 px-2 text-center">
-                                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${st.color}`}>{st.text}</span>
+                                    <td className="py-2.5 px-2 text-center">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.color}`}>{st.text}</span>
                                     </td>
-                                    <td className="py-2 px-2 text-center">
+                                    <td className="py-1.5 px-2 text-center">
                                       <div className="flex items-center gap-0.5 justify-center">
-                                        {hasPlayers && !isWalkover && isActive && (
-                                          <>
+                                        {/* 印刷ボタン - 常に表示 */}
+                                        <button
+                                          onClick={() => handlePrintMatch(m)}
+                                          className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                          title="この試合を印刷"
+                                        >
+                                          <FileText className="w-3.5 h-3.5" />
+                                        </button>
+                                        {/* スコア入力/修正 */}
+                                        {hasPlayers && !isWalkover && (
+                                          <button
+                                            onClick={() => {
+                                              if (!isActive) setSelectedEventId(m.eventId);
+                                              startEdit(m);
+                                            }}
+                                            className={`p-1.5 rounded-md transition-colors ${
+                                              m.status === 'finished'
+                                                ? 'text-slate-300 hover:text-orange-500 hover:bg-orange-50 opacity-0 group-hover:opacity-100'
+                                                : 'text-slate-400 hover:text-primary-500 hover:bg-primary-50'
+                                            }`}
+                                            title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
+                                          >
+                                            <Edit3 className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                        {/* 音声コール */}
+                                        {hasPlayers && !isWalkover && (
+                                          isThisSpeaking ? (
                                             <button
-                                              onClick={() => startEdit(m)}
-                                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
-                                              title="結果入力"
+                                              onClick={handleVoiceStop}
+                                              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md transition-colors animate-pulse"
+                                              title="停止"
                                             >
-                                              <Edit3 className="w-3.5 h-3.5" />
+                                              <Square className="w-3.5 h-3.5" />
                                             </button>
-                                            {isThisSpeaking ? (
-                                              <button
-                                                onClick={handleVoiceStop}
-                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors animate-pulse"
-                                                title="停止"
-                                              >
-                                                <Square className="w-3.5 h-3.5" />
-                                              </button>
-                                            ) : (
-                                              <button
-                                                onClick={() => toggleCallTarget(m)}
-                                                className={`p-1.5 rounded transition-colors ${
-                                                  isCallTarget
-                                                    ? 'text-green-600 bg-green-50'
-                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                                                }`}
-                                                title="音声コール"
-                                              >
-                                                <Volume2 className="w-3.5 h-3.5" />
-                                              </button>
-                                            )}
-                                          </>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                if (!isActive) setSelectedEventId(m.eventId);
+                                                toggleCallTarget(m);
+                                              }}
+                                              className={`p-1.5 rounded-md transition-colors ${
+                                                isCallTarget
+                                                  ? 'text-emerald-600 bg-emerald-50'
+                                                  : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'
+                                              }`}
+                                              title="音声コール"
+                                            >
+                                              <Volume2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )
                                         )}
                                       </div>
                                     </td>
                                   </tr>
                                   {isCallTarget && !isThisSpeaking && (
-                                    <tr className="border-b border-green-200 bg-green-50">
-                                      <td colSpan={7} className="py-2.5 px-4">
-                                        <div className="flex items-center gap-3 flex-wrap">
+                                    <tr className="border-b border-emerald-200">
+                                      <td colSpan={7} className="py-0 px-0">
+                                        <div className="flex items-center gap-3 flex-wrap px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50">
                                           <div className="flex items-center gap-1.5">
-                                            <label className="text-xs font-medium text-gray-600">コート:</label>
+                                            <label className="text-xs font-medium text-slate-600">コート:</label>
                                             <select
                                               value={callCourtNumber}
                                               onChange={e => setCallCourtNumber(e.target.value)}
-                                              className="border border-gray-300 rounded px-2 py-1 text-sm w-20 bg-white"
+                                              className="border border-emerald-300 rounded-md px-2 py-1 text-sm w-20 bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                             >
                                               <option value="">--</option>
                                               {Array.from({ length: 16 }, (_, i) => i + 1).map(n => (
@@ -1171,9 +1301,9 @@ ${printableMatches.map(m => {
                                               }
                                             }}
                                             disabled={!callCourtNumber}
-                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm ${
                                               callCourtNumber
-                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-md'
                                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                             }`}
                                           >
@@ -1182,7 +1312,7 @@ ${printableMatches.map(m => {
                                           </button>
                                           <button
                                             onClick={() => setCallTargetMatchId(null)}
-                                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                            className="text-xs text-slate-400 hover:text-slate-600 transition-colors ml-auto"
                                           >
                                             閉じる
                                           </button>
@@ -1193,11 +1323,11 @@ ${printableMatches.map(m => {
                                 </React.Fragment>
                               );
                             })}
-                          </tbody>
-                        </table>
-                      </div>
+                      </React.Fragment>
                     );
                   })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             );

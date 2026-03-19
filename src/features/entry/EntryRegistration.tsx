@@ -315,6 +315,9 @@ export default function EntryRegistration() {
     );
     const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
 
+    // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
+    await db.draws.update(draw.id!, { slots: drawSlots, updatedAt: Date.now() });
+
     const eventEntries = allEntries.filter(e => e.eventId === eventId);
     const newMatches: Omit<Match, 'id'>[] = [];
     let matchOrder = 1;

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CalendarClock, Zap, Printer, Trash2, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { CalendarClock, Zap, Printer, Trash2, Upload, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   extractMatchesFromDraw,
@@ -137,19 +137,38 @@ function matchStatusColor(status: Match['status']): string {
 
 export default function ScheduleSheet() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const scheduleConfig = useAppStore(state => state.scheduleConfig);
+  const setScheduleConfig = useAppStore(state => state.setScheduleConfig);
 
-  // Config
-  const [courtBlocks, setCourtBlocks] = useState<Record<string, boolean>>({
-    A: true, B: true, C: false, D: false,
-  });
-  const [matchDuration, setMatchDuration] = useState(40);
-  const [startTime, setStartTime] = useState('09:00');
+  // Config (persisted in Zustand store)
+  const courtBlocks = scheduleConfig.courtBlocks;
+  const matchDuration = scheduleConfig.matchDuration;
+  const startTime = scheduleConfig.startTime;
+
+  const setCourtBlocks = useCallback((updater: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => {
+    if (typeof updater === 'function') {
+      setScheduleConfig({ courtBlocks: updater(courtBlocks) });
+    } else {
+      setScheduleConfig({ courtBlocks: updater });
+    }
+  }, [courtBlocks, setScheduleConfig]);
+
+  const setMatchDuration = useCallback((val: number) => {
+    setScheduleConfig({ matchDuration: val });
+  }, [setScheduleConfig]);
+
+  const setStartTime = useCallback((val: string) => {
+    setScheduleConfig({ startTime: val });
+  }, [setScheduleConfig]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
-  // Schedule data (local state, not DB)
-  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
-  const [allScheduleMatches, setAllScheduleMatches] = useState<ScheduleMatch[]>([]);
+  // Schedule data (persisted in store across navigation)
+  const scheduleSlots = useAppStore((s) => s.scheduleSlots);
+  const setScheduleSlots = useAppStore((s) => s.setScheduleSlots);
+  const allScheduleMatches = useAppStore((s) => s.allScheduleMatches);
+  const setAllScheduleMatches = useAppStore((s) => s.setAllScheduleMatches);
 
   // Excel import
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,6 +179,27 @@ export default function ScheduleSheet() {
     courtIdx: number;
     slotIdx: number;
   } | null>(null);
+
+  // --------------- Current time tracking ---------------
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000); // 30秒更新
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentTimeStr = useMemo(() => {
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }, [now]);
+
+  // 現在時刻がどのスロットに対応するか
+  const currentSlotIndex = useMemo(() => {
+    if (!startTime) return -1;
+    const [sh, sm] = startTime.split(':').map(Number);
+    const startMin = sh * 60 + sm;
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (nowMin < startMin) return -1;
+    return Math.floor((nowMin - startMin) / matchDuration);
+  }, [now, startTime, matchDuration]);
 
   // --------------- Reactive queries ---------------
 
@@ -200,6 +240,21 @@ export default function ScheduleSheet() {
     return map;
   }, [allDbMatches]);
 
+  // --------------- Progress stats ---------------
+  const progressStats = useMemo(() => {
+    if (scheduleSlots.length === 0) return null;
+    let total = 0, finished = 0, playing = 0, waiting = 0;
+    for (const slot of scheduleSlots) {
+      total++;
+      const dbMatch = dbMatchMap.get(slot.matchId);
+      if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') finished++;
+      else if (dbMatch?.status === 'playing') playing++;
+      else waiting++;
+    }
+    const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
+    return { total, finished, playing, waiting, pct };
+  }, [scheduleSlots, dbMatchMap]);
+
   // --------------- Derived data ---------------
 
   const courtNames = useMemo(() => {
@@ -238,9 +293,18 @@ export default function ScheduleSheet() {
     return map;
   }, [scheduleSlots]);
 
-  // DBから既存のスケジュールデータを復元
+  // DBから既存のスケジュールデータを復元（初回のみ）
+  const scheduleRestoredRef = useRef(false);
+  const prevTournamentIdRef = useRef(currentTournamentId);
+  // 大会が変わったらリセット
+  if (prevTournamentIdRef.current !== currentTournamentId) {
+    prevTournamentIdRef.current = currentTournamentId;
+    scheduleRestoredRef.current = false;
+  }
   useEffect(() => {
     if (!currentTournamentId || events.length === 0) return;
+    // 既にスロットが存在する場合や復元済みの場合はスキップ
+    if (scheduleRestoredRef.current) return;
 
     const loadExistingSchedule = async () => {
       try {
@@ -253,6 +317,55 @@ export default function ScheduleSheet() {
         let restoredMatches: ScheduleMatch[] = [];
         const restoredSlots: ScheduleSlot[] = [];
         let hasSchedule = false;
+
+        // まず全DB matchesからスケジュール済みの時刻を収集して startTime / matchDuration を推定
+        const allScheduledTimes: number[] = [];
+        for (const evt of allEvents) {
+          const dbMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+          for (const m of dbMatches) {
+            if (m.scheduledTime) {
+              const parts = m.scheduledTime.split(':');
+              allScheduledTimes.push(parseInt(parts[0]) * 60 + parseInt(parts[1]));
+            }
+          }
+        }
+
+        if (allScheduledTimes.length === 0) {
+          // スケジュールデータなし → 復元不要
+          scheduleRestoredRef.current = true;
+          return;
+        }
+
+        // startTime を推定（最も早い時刻）
+        allScheduledTimes.sort((a, b) => a - b);
+        const detectedStartMin = allScheduledTimes[0];
+        const detectedStartTime = `${String(Math.floor(detectedStartMin / 60)).padStart(2, '0')}:${String(detectedStartMin % 60).padStart(2, '0')}`;
+
+        // matchDuration を推定（連続した時刻の差分の最頻値）
+        const uniqueTimes = [...new Set(allScheduledTimes)].sort((a, b) => a - b);
+        let detectedDuration = matchDuration; // フォールバック
+        if (uniqueTimes.length >= 2) {
+          const diffs: number[] = [];
+          for (let i = 1; i < uniqueTimes.length; i++) {
+            const diff = uniqueTimes[i] - uniqueTimes[i - 1];
+            if (diff > 0 && diff <= 120) diffs.push(diff);
+          }
+          if (diffs.length > 0) {
+            // 最頻値を使用
+            const freq = new Map<number, number>();
+            for (const d of diffs) freq.set(d, (freq.get(d) || 0) + 1);
+            let maxFreq = 0;
+            for (const [d, count] of freq) {
+              if (count > maxFreq) {
+                maxFreq = count;
+                detectedDuration = d;
+              }
+            }
+          }
+        }
+
+        // 使用コートブロックを推定
+        const usedCourtNames = new Set<string>();
 
         for (let idx = 0; idx < allEvents.length; idx++) {
           const evt = allEvents[idx];
@@ -276,16 +389,18 @@ export default function ScheduleSheet() {
                 sm.eventCode === evt.eventId && sm.round === m.round && sm.matchNumInRound === m.position
               );
               if (courtName) {
-                // timeSlotIndexを逆算
-                const parts = startTime.split(':');
-                const startMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                usedCourtNames.add(courtName);
+                // timeSlotIndexを逆算（推定した startTime / matchDuration を使用）
                 const timeParts = m.scheduledTime.split(':');
                 const matchMin = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
-                const slotIdx = Math.round((matchMin - startMin) / matchDuration);
+                const slotIdx = Math.round((matchMin - detectedStartMin) / detectedDuration);
+
+                // courtIndex は全コート名リストから探す（現在の courtNames 設定に依存しない）
+                const allCourtNamesList = allCourts.map(c => c.name);
 
                 restoredSlots.push({
                   matchId: m.matchId,
-                  courtIndex: courtNames.indexOf(courtName),
+                  courtIndex: allCourtNamesList.indexOf(courtName),
                   courtName,
                   timeSlotIndex: slotIdx >= 0 ? slotIdx : 0,
                   startTime: m.scheduledTime,
@@ -298,11 +413,34 @@ export default function ScheduleSheet() {
         }
 
         if (hasSchedule && restoredSlots.length > 0) {
+          scheduleRestoredRef.current = true;
           setScheduleSlots(restoredSlots);
           setAllScheduleMatches(restoredMatches);
+
+          // 推定した設定を反映（Zustand store に保存）
+          setScheduleConfig({
+            startTime: detectedStartTime,
+            matchDuration: detectedDuration,
+          });
+
+          // 使用コートブロックを推定して反映
+          const courtNums = [...usedCourtNames].map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+          if (courtNums.length > 0) {
+            setScheduleConfig({
+              courtBlocks: {
+                A: courtNums.some(n => n >= 1 && n <= 4),
+                B: courtNums.some(n => n >= 5 && n <= 8),
+                C: courtNums.some(n => n >= 9 && n <= 12),
+                D: courtNums.some(n => n >= 13 && n <= 16),
+              },
+            });
+          }
+        } else {
+          scheduleRestoredRef.current = true;
         }
       } catch (err) {
         console.error('スケジュール復元エラー:', err);
+        scheduleRestoredRef.current = true;
       }
     };
 
@@ -330,11 +468,10 @@ export default function ScheduleSheet() {
     if (allScheduleMatches.length > 0) {
       const mapping = buildMatchMapping(allScheduleMatches, allDbMatches);
       if (mapping.size > 0) {
-        setScheduleSlots(prev => {
-          const relinked = applyMatchMapping(prev, mapping);
-          if (relinked.every((s, i) => s.matchId === prev[i].matchId)) return prev;
-          return relinked;
-        });
+        const relinked = applyMatchMapping(scheduleSlots, mapping);
+        if (!relinked.every((s, i) => s.matchId === scheduleSlots[i].matchId)) {
+          setScheduleSlots(relinked);
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -502,12 +639,10 @@ export default function ScheduleSheet() {
       }
 
       // Swap the two slots
-      setScheduleSlots(prev => {
-        const newSlots = [...prev];
-        const idx1 = newSlots.findIndex(s => s.matchId === selectedCell.matchId);
-        const idx2 = newSlots.findIndex(s => s.matchId === matchId);
-        if (idx1 === -1 || idx2 === -1) return prev;
-
+      const newSlots = [...scheduleSlots];
+      const idx1 = newSlots.findIndex(s => s.matchId === selectedCell.matchId);
+      const idx2 = newSlots.findIndex(s => s.matchId === matchId);
+      if (idx1 !== -1 && idx2 !== -1) {
         const temp = {
           courtIndex: newSlots[idx1].courtIndex,
           courtName: newSlots[idx1].courtName,
@@ -522,8 +657,8 @@ export default function ScheduleSheet() {
           startTime: newSlots[idx2].startTime,
         };
         newSlots[idx2] = { ...newSlots[idx2], ...temp };
-        return newSlots;
-      });
+        setScheduleSlots(newSlots);
+      }
 
       setSelectedCell(null);
     },
@@ -1092,11 +1227,133 @@ export default function ScheduleSheet() {
         )}
       </div>
 
+      {/* Progress Bar */}
+      {progressStats && scheduleSlots.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <Clock className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-bold text-gray-900">{currentTimeStr}</span>
+              <div className="h-4 w-px bg-gray-200" />
+              <span className="text-xs text-gray-500">進行状況</span>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-700">
+                  <CheckCircle2 className="w-3 h-3" />
+                </span>
+                <span className="text-gray-600">完了 <strong className="text-gray-900">{progressStats.finished}</strong></span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="relative inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700">
+                  <PlayCircle className="w-3 h-3" />
+                  {progressStats.playing > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                  )}
+                </span>
+                <span className="text-gray-600">試合中 <strong className="text-gray-900">{progressStats.playing}</strong></span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500">
+                  <Activity className="w-3 h-3" />
+                </span>
+                <span className="text-gray-600">待機 <strong className="text-gray-900">{progressStats.waiting}</strong></span>
+              </span>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 ease-out"
+              style={{ width: `${progressStats.pct}%` }}
+            />
+            {progressStats.playing > 0 && (
+              <div
+                className="absolute inset-y-0 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-1000 ease-out"
+                style={{
+                  left: `${progressStats.pct}%`,
+                  width: `${Math.round((progressStats.playing / progressStats.total) * 100)}%`,
+                }}
+              >
+                <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between mt-1.5">
+            <span className="text-[10px] text-gray-400">{progressStats.finished}/{progressStats.total} 試合完了</span>
+            <span className="text-[10px] font-bold text-emerald-600">{progressStats.pct}%</span>
+          </div>
+        </div>
+      )}
+
       {/* Timetable Grid */}
       {gridData && scheduleSlots.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden flex-1 flex flex-col">
-          <div className="bg-primary-50 px-4 py-2.5 border-b border-border-main flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">タイムテーブル</h2>
+          <style>{`
+            @keyframes shimmer {
+              0% { background-position: -200% 0; }
+              100% { background-position: 200% 0; }
+            }
+            @keyframes glow-pulse {
+              0%, 100% { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.4); }
+              50% { box-shadow: inset 0 0 8px 1px rgba(59,130,246,0.3); }
+            }
+            .cell-playing {
+              animation: glow-pulse 2s ease-in-out infinite;
+              background: linear-gradient(90deg, transparent 25%, rgba(59,130,246,0.08) 50%, transparent 75%);
+              background-size: 200% 100%;
+              animation: glow-pulse 2s ease-in-out infinite, shimmer 3s linear infinite;
+            }
+            .cell-finished {
+              opacity: 0.45;
+              filter: grayscale(0.7);
+            }
+            .time-now-line {
+              position: relative;
+            }
+            .time-now-line::after {
+              content: '';
+              position: absolute;
+              top: 0;
+              bottom: 0;
+              right: -1px;
+              width: 3px;
+              background: linear-gradient(180deg, #ef4444, #f97316);
+              z-index: 5;
+              border-radius: 2px;
+              box-shadow: 0 0 8px rgba(239,68,68,0.5);
+              animation: pulse-line 2s ease-in-out infinite;
+            }
+            @keyframes pulse-line {
+              0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+              50% { opacity: 0.7; box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+            }
+            .time-now-header {
+              position: relative;
+            }
+            .time-now-header::after {
+              content: '▼';
+              position: absolute;
+              bottom: -2px;
+              right: -4px;
+              font-size: 8px;
+              color: #ef4444;
+              z-index: 5;
+            }
+          `}</style>
+          <div className="bg-gradient-to-r from-primary-50 to-blue-50 px-4 py-2.5 border-b border-border-main flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              タイムテーブル
+              {progressStats && progressStats.playing > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                  </span>
+                  LIVE
+                </span>
+              )}
+            </h2>
             <span className="text-xs text-gray-500">
               {selectedCell
                 ? '移動先のセルをタップしてください'
@@ -1110,25 +1367,37 @@ export default function ScheduleSheet() {
                   <th className="sticky left-0 z-10 bg-gray-800 text-white text-xs px-3 py-2 border border-gray-600 whitespace-nowrap">
                     コート
                   </th>
-                  {gridData.timeHeaders.map((time, idx) => (
-                    <th
-                      key={idx}
-                      className="bg-gray-800 text-white text-xs px-2 py-2 border border-gray-600 whitespace-nowrap"
-                    >
-                      {time}
-                    </th>
-                  ))}
+                  {gridData.timeHeaders.map((time, idx) => {
+                    const isNowSlot = idx === currentSlotIndex;
+                    const isPast = currentSlotIndex >= 0 && idx < currentSlotIndex;
+                    return (
+                      <th
+                        key={idx}
+                        className={`text-xs px-2 py-2 border border-gray-600 whitespace-nowrap transition-colors ${
+                          isNowSlot
+                            ? 'bg-red-600 text-white font-bold time-now-header'
+                            : isPast
+                              ? 'bg-gray-600 text-gray-300'
+                              : 'bg-gray-800 text-white'
+                        }`}
+                      >
+                        {time}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {courtNames.map((cn, courtIdx) => (
-                  <tr key={cn}>
-                    <td className="sticky left-0 z-10 bg-gray-100 font-bold text-sm px-3 py-2 border border-gray-300 text-center whitespace-nowrap">
+                  <tr key={cn} className="group">
+                    <td className="sticky left-0 z-10 bg-gray-100 font-bold text-sm px-3 py-2 border border-gray-300 text-center whitespace-nowrap group-hover:bg-gray-200 transition-colors">
                       {cn}
                     </td>
                     {Array.from(
                       { length: gridData.maxSlotIdx + 1 },
                       (_, slotIdx) => {
+                        const isNowSlot = slotIdx === currentSlotIndex;
+                        const isPastSlot = currentSlotIndex >= 0 && slotIdx < currentSlotIndex;
                         const slot = scheduleSlots.find(
                           s => s.courtName === cn && s.timeSlotIndex === slotIdx,
                         );
@@ -1136,12 +1405,16 @@ export default function ScheduleSheet() {
                           return (
                             <td
                               key={slotIdx}
-                              className="border border-gray-200 min-w-[60px] h-10"
+                              className={`border border-gray-200 min-w-[60px] h-10 transition-colors ${
+                                isNowSlot ? 'bg-red-50/50 time-now-line' : isPastSlot ? 'bg-gray-50/80' : ''
+                              }`}
                             />
                           );
                         }
                         // DB match 紐付け情報
                         const dbMatch = dbMatchMap.get(slot.matchId);
+                        const isFinished = dbMatch?.status === 'finished' || dbMatch?.status === 'walkover';
+                        const isPlaying = dbMatch?.status === 'playing';
                         // DB種目の色、またはインポートされたセルから種目名を抽出して色を取得
                         const isImported = slot.eventCode === 'imported' && !dbMatch;
                         const importedEvName = isImported ? extractImportedEventName(slot.roundLabel) : '';
@@ -1169,13 +1442,19 @@ export default function ScheduleSheet() {
                           }
                         }
 
-                        const statusDot = dbMatch ? matchStatusColor(dbMatch.status) : '';
                         const isSelected = selectedCell?.matchId === slot.matchId;
 
                         // ツールチップ
                         const tooltipParts = [evAbbr, slot.roundLabel];
                         if (dbMatch?.player1Name) tooltipParts.push(`${dbMatch.player1Name} vs ${dbMatch.player2Name}`);
                         if (dbMatch?.score) tooltipParts.push(dbMatch.score);
+
+                        // 状態に応じたセルクラス
+                        const cellStatusClass = isFinished
+                          ? 'cell-finished'
+                          : isPlaying
+                            ? 'cell-playing'
+                            : '';
 
                         return (
                           <td
@@ -1184,18 +1463,26 @@ export default function ScheduleSheet() {
                               handleCellClick(slot.matchId, courtIdx, slotIdx)
                             }
                             title={tooltipParts.join(' | ')}
-                            className={`border border-gray-300 min-w-[80px] h-10 cursor-pointer text-center transition-all px-0.5 ${color?.bg || 'bg-gray-50'} ${color?.text || 'text-gray-800'} ${isSelected ? 'ring-2 ring-primary-500 ring-inset shadow-md' : 'hover:brightness-95'}`}
+                            className={`border border-gray-300 min-w-[80px] h-10 cursor-pointer text-center transition-all duration-300 px-0.5 ${color?.bg || 'bg-gray-50'} ${color?.text || 'text-gray-800'} ${isSelected ? 'ring-2 ring-primary-500 ring-inset shadow-md scale-105 z-[2]' : 'hover:brightness-90 hover:scale-[1.02]'} ${cellStatusClass} ${isNowSlot && !isFinished && !isPlaying ? 'time-now-line' : ''}`}
                           >
                             <div className="flex items-center justify-center gap-0.5">
-                              {statusDot && <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot} ${dbMatch?.status === 'playing' ? 'animate-pulse' : ''}`} />}
+                              {isPlaying && (
+                                <span className="relative flex h-2 w-2 flex-shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                                </span>
+                              )}
+                              {isFinished && (
+                                <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0 text-gray-400" />
+                              )}
                               <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
                               <span className="text-[9px] leading-tight opacity-70">{slot.roundLabel}</span>
                             </div>
                             {playerLabel && (
-                              <div className="text-[8px] leading-tight truncate opacity-80">{playerLabel}</div>
+                              <div className={`text-[8px] leading-tight truncate ${isFinished ? 'line-through opacity-60' : 'opacity-80'}`}>{playerLabel}</div>
                             )}
                             {dbMatch?.score && (
-                              <div className="text-[7px] leading-tight text-gray-500 truncate">{dbMatch.score}</div>
+                              <div className={`text-[7px] leading-tight truncate font-mono ${isFinished ? 'text-gray-400 font-bold' : 'text-gray-500'}`}>{dbMatch.score}</div>
                             )}
                           </td>
                         );
@@ -1272,6 +1559,8 @@ export default function ScheduleSheet() {
                           {sorted.map((s, idx) => {
                             // DB match から最新の選手名を取得（スコア反映後も自動更新）
                             const dbMatch = dbMatchMap.get(s.matchId);
+                            const isFinished = dbMatch?.status === 'finished' || dbMatch?.status === 'walkover';
+                            const isPlaying = dbMatch?.status === 'playing';
                             let players = '';
                             if (dbMatch) {
                               const p1 = dbMatch.player1Name || '';
@@ -1290,32 +1579,44 @@ export default function ScheduleSheet() {
                               if (schedMatch) players = schedMatch.players.join(' vs ');
                             }
 
-                            const statusBg = dbMatch?.status === 'playing'
-                              ? 'bg-green-50'
-                              : dbMatch?.status === 'finished'
-                                ? 'bg-gray-50'
-                                : idx % 2 === 1 ? 'bg-gray-50' : '';
-
                             return (
                               <tr
                                 key={s.matchId}
-                                className={statusBg}
+                                className={`transition-all duration-300 ${
+                                  isPlaying
+                                    ? 'bg-blue-50 border-l-2 border-l-blue-500'
+                                    : isFinished
+                                      ? 'bg-gray-50 opacity-50'
+                                      : idx % 2 === 1 ? 'bg-gray-50/50' : ''
+                                }`}
                               >
-                                <td className="py-1 px-2 border-b border-border-main font-mono text-xs">
+                                <td className={`py-1 px-2 border-b border-border-main font-mono text-xs ${isFinished ? 'text-gray-400' : ''}`}>
                                   {s.startTime}
                                 </td>
-                                <td className="py-1 px-2 border-b border-border-main text-center">
+                                <td className={`py-1 px-2 border-b border-border-main text-center ${isFinished ? 'text-gray-400' : ''}`}>
                                   {s.courtName}
                                 </td>
-                                <td className="py-1 px-2 border-b border-border-main">
+                                <td className={`py-1 px-2 border-b border-border-main ${isFinished ? 'text-gray-400' : ''}`}>
                                   {s.roundLabel}
-                                  {dbMatch?.status === 'playing' && <span className="ml-1 text-[9px] text-green-600 font-bold">●</span>}
-                                  {dbMatch?.status === 'finished' && <span className="ml-1 text-[9px] text-gray-400">✓</span>}
+                                  {isPlaying && (
+                                    <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold">
+                                      <span className="relative flex h-1.5 w-1.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
+                                      </span>
+                                      試合中
+                                    </span>
+                                  )}
+                                  {isFinished && (
+                                    <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-gray-400">
+                                      <CheckCircle2 className="w-3 h-3" /> 完了
+                                    </span>
+                                  )}
                                 </td>
-                                <td className="py-1 px-2 border-b border-border-main">
-                                  <span>{players || '(未定)'}</span>
+                                <td className={`py-1 px-2 border-b border-border-main ${isFinished ? 'text-gray-400' : ''}`}>
+                                  <span className={isFinished ? 'line-through' : ''}>{players || '(未定)'}</span>
                                   {dbMatch?.score && (
-                                    <span className="ml-2 text-xs text-gray-500 font-mono">{dbMatch.score}</span>
+                                    <span className={`ml-2 text-xs font-mono ${isFinished ? 'text-gray-400 font-bold' : 'text-gray-500'}`}>{dbMatch.score}</span>
                                   )}
                                 </td>
                               </tr>

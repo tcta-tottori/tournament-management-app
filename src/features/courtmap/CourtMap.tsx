@@ -1,9 +1,39 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import type { Match, Court } from '../../db/database';
 import { MapPin, Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+
+/** テニスコート型のSVGオーバーレイ（縦向き） */
+function CourtLines({ status }: { status: string }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.25)'
+    : status === 'ready' ? 'rgba(59,130,246,0.2)'
+    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
+    : 'rgba(148,163,184,0.15)';
+  return (
+    <svg viewBox="0 0 60 110" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+      {/* 外枠 */}
+      <rect x="4" y="4" width="52" height="102" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
+      {/* ネット（中央横線） */}
+      <line x1="2" y1="55" x2="58" y2="55" stroke={color} strokeWidth="2" />
+      {/* サービスライン上 */}
+      <line x1="10" y1="30" x2="50" y2="30" stroke={color} strokeWidth="0.8" />
+      {/* サービスライン下 */}
+      <line x1="10" y1="80" x2="50" y2="80" stroke={color} strokeWidth="0.8" />
+      {/* シングルスサイドライン左 */}
+      <line x1="10" y1="4" x2="10" y2="106" stroke={color} strokeWidth="0.8" />
+      {/* シングルスサイドライン右 */}
+      <line x1="50" y1="4" x2="50" y2="106" stroke={color} strokeWidth="0.8" />
+      {/* センターサービスライン */}
+      <line x1="30" y1="30" x2="30" y2="80" stroke={color} strokeWidth="0.8" />
+      {/* センターマーク上 */}
+      <line x1="30" y1="4" x2="30" y2="8" stroke={color} strokeWidth="0.8" />
+      {/* センターマーク下 */}
+      <line x1="30" y1="102" x2="30" y2="106" stroke={color} strokeWidth="0.8" />
+    </svg>
+  );
+}
 
 // 会場プリセット定義
 // layout: 'blocks' = ブロック配置（本部位置指定あり）, 'grid' = 単純グリッド
@@ -184,6 +214,68 @@ export default function CourtMap() {
     unavailable: '使用不可',
   };
 
+  /** コートボタン描画 */
+  const renderCourtButton = useCallback((courtName: string) => {
+    const cs = courtStatusMap[courtName];
+    if (!cs) return null;
+    const style = statusStyles[cs.status];
+    const isSelected = selectedCourt === courtName;
+
+    return (
+      <button
+        key={courtName}
+        onClick={() => setSelectedCourt(isSelected ? null : courtName)}
+        className={`
+          relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
+          ${style.bg} ${style.border} ${style.glow}
+          ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
+          ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
+        `}
+        style={{ aspectRatio: '1 / 1.7' }}
+      >
+        {/* テニスコートライン */}
+        <CourtLines status={cs.status} />
+
+        {/* コンテンツ */}
+        <div className="relative z-10 flex flex-col items-center justify-center h-full p-1.5 md:p-2">
+          {cs.status === 'playing' && (
+            <div className="absolute top-1 right-1">
+              <Play className="w-3 h-3 text-green-500 fill-green-500" />
+            </div>
+          )}
+          <div className={`text-xl md:text-2xl font-bold ${style.text} leading-none`}>
+            {courtName}
+          </div>
+          <div className={`text-[9px] md:text-[10px] font-medium ${style.text} mt-0.5`}>
+            {statusLabel[cs.status]}
+          </div>
+          {cs.currentMatch && (
+            <div className="mt-1 pt-1 border-t border-green-200/60 w-full space-y-0">
+              <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate text-center leading-tight">
+                {cs.currentMatch.player1Name}
+              </p>
+              <p className="text-[7px] md:text-[8px] text-green-600 text-center">vs</p>
+              <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate text-center leading-tight">
+                {cs.currentMatch.player2Name}
+              </p>
+            </div>
+          )}
+          {!cs.currentMatch && cs.nextMatch && (
+            <div className="mt-1 pt-1 border-t border-blue-100/60 w-full space-y-0">
+              <p className="text-[9px] md:text-[10px] text-primary-500 truncate text-center leading-tight">
+                {cs.nextMatch.player1Name}
+              </p>
+              <p className="text-[7px] md:text-[8px] text-blue-400 text-center">vs</p>
+              <p className="text-[9px] md:text-[10px] text-primary-500 truncate text-center leading-tight">
+                {cs.nextMatch.player2Name}
+              </p>
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel]);
+
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-4">
       {/* ヘッダー */}
@@ -251,65 +343,13 @@ export default function CourtMap() {
                 <div className="flex-1 flex flex-col gap-3">
                   {venue.blocks.map((block, blockIdx) => {
                     const cols = block.courts.length;
-                    const gridCols = cols <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-6';
+                    const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
 
                     return (
                       <div key={blockIdx} className="w-full">
-                        <div className={`bg-primary-50 rounded-xl border border-primary-200 p-3 shadow-sm`}>
+                        <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
                           <div className={`grid ${gridCols} gap-2`}>
-                            {block.courts.map(courtName => {
-                              const cs = courtStatusMap[courtName];
-                              if (!cs) return null;
-                              const style = statusStyles[cs.status];
-                              const isSelected = selectedCourt === courtName;
-
-                              return (
-                                <button
-                                  key={courtName}
-                                  onClick={() => setSelectedCourt(isSelected ? null : courtName)}
-                                  className={`
-                                    relative rounded-lg border-2 p-2 md:p-3 transition-all cursor-pointer min-h-[80px] md:min-h-[100px]
-                                    ${style.bg} ${style.border} ${style.glow}
-                                    ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
-                                    ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
-                                  `}
-                                >
-                                  {cs.status === 'playing' && (
-                                    <div className="absolute top-1 right-1">
-                                      <Play className="w-3 h-3 text-green-500 fill-green-500" />
-                                    </div>
-                                  )}
-                                  <div className={`text-xl md:text-2xl font-bold ${style.text} text-center leading-none`}>
-                                    {courtName}
-                                  </div>
-                                  <div className={`text-[10px] font-medium ${style.text} text-center mt-1`}>
-                                    {statusLabel[cs.status]}
-                                  </div>
-                                  {cs.currentMatch && (
-                                    <div className="mt-1.5 pt-1 border-t border-green-200 space-y-0">
-                                      <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
-                                        {cs.currentMatch.player1Name}
-                                      </p>
-                                      <p className="text-[8px] text-green-600 text-center">vs</p>
-                                      <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
-                                        {cs.currentMatch.player2Name}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {!cs.currentMatch && cs.nextMatch && (
-                                    <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                      <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
-                                        {cs.nextMatch.player1Name}
-                                      </p>
-                                      <p className="text-[8px] text-blue-400 text-center">vs</p>
-                                      <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
-                                        {cs.nextMatch.player2Name}
-                                      </p>
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
+                            {block.courts.map(renderCourtButton)}
                           </div>
                         </div>
 
@@ -337,68 +377,14 @@ export default function CourtMap() {
             /* 通常レイアウト（ヤマタスポーツパーク等） */
             venue.blocks.map((block, blockIdx) => {
               const cols = block.courts.length;
-              const gridCols = cols <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-6';
+              const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
 
               return (
                 <div key={blockIdx} className="w-full">
                   {/* コートブロック - 緑のフィールド風 */}
-                  <div className="flex items-stretch gap-3">
-                    <div className={`flex-1 bg-primary-50 rounded-xl border border-primary-200 p-3 shadow-sm`}>
-                      <div className={`grid ${gridCols} gap-2`}>
-                        {block.courts.map(courtName => {
-                          const cs = courtStatusMap[courtName];
-                          if (!cs) return null;
-                          const style = statusStyles[cs.status];
-                          const isSelected = selectedCourt === courtName;
-
-                          return (
-                            <button
-                              key={courtName}
-                              onClick={() => setSelectedCourt(isSelected ? null : courtName)}
-                              className={`
-                                relative rounded-lg border-2 p-2 md:p-3 transition-all cursor-pointer min-h-[80px] md:min-h-[100px]
-                                ${style.bg} ${style.border} ${style.glow}
-                                ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
-                                ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
-                              `}
-                            >
-                              {cs.status === 'playing' && (
-                                <div className="absolute top-1 right-1">
-                                  <Play className="w-3 h-3 text-green-500 fill-green-500" />
-                                </div>
-                              )}
-                              <div className={`text-xl md:text-2xl font-bold ${style.text} text-center leading-none`}>
-                                {courtName}
-                              </div>
-                              <div className={`text-[10px] font-medium ${style.text} text-center mt-1`}>
-                                {statusLabel[cs.status]}
-                              </div>
-                              {cs.currentMatch && (
-                                <div className="mt-1.5 pt-1 border-t border-green-200 space-y-0">
-                                  <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
-                                    {cs.currentMatch.player1Name}
-                                  </p>
-                                  <p className="text-[8px] text-green-600 text-center">vs</p>
-                                  <p className="text-[10px] font-medium text-green-800 truncate whitespace-nowrap text-center leading-tight">
-                                    {cs.currentMatch.player2Name}
-                                  </p>
-                                </div>
-                              )}
-                              {!cs.currentMatch && cs.nextMatch && (
-                                <div className="mt-1.5 pt-1 border-t border-blue-100 space-y-0">
-                                  <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
-                                    {cs.nextMatch.player1Name}
-                                  </p>
-                                  <p className="text-[8px] text-blue-400 text-center">vs</p>
-                                  <p className="text-[10px] text-primary-500 truncate whitespace-nowrap text-center leading-tight">
-                                    {cs.nextMatch.player2Name}
-                                  </p>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                    <div className={`grid ${gridCols} gap-2`}>
+                      {block.courts.map(renderCourtButton)}
                     </div>
                   </div>
 

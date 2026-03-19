@@ -18,11 +18,6 @@ export default function DataManagement() {
         </div>
       </header>
 
-      {/* データ同期パネル */}
-      <div>
-        <DataSync />
-      </div>
-
       {/* ドロー会議システム読込パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
@@ -33,6 +28,11 @@ export default function DataManagement() {
           <DataImport />
         </div>
       </section>
+
+      {/* データ同期パネル */}
+      <div>
+        <DataSync />
+      </div>
 
       {/* 所属・ふりがな一覧パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">

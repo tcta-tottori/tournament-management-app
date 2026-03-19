@@ -4,6 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import AppLayout from './components/layout/AppLayout'
 import DataManagement from './features/data/DataManagement'
+import { loadSeedDataIfNeeded } from './db/database'
+
+// 初期データ（ふりがな・所属ふりがな）をプリロード
+loadSeedDataIfNeeded();
 
 import EntryRegistration from './features/entry/EntryRegistration'
 import DrawGenerator from './features/draw/DrawGenerator'
