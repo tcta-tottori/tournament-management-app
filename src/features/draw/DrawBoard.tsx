@@ -4,7 +4,13 @@ import { db } from '../../db/database';
 import DrawRenderer from './DrawRenderer';
 import RoundRobinRenderer from './RoundRobinRenderer';
 import { exportDrawToExcel } from './DrawExporter';
-import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch } from 'lucide-react';
+import {
+  exportTournamentResultAsJpeg,
+  exportTournamentResultAsExcel,
+  exportRoundRobinResultAsJpeg,
+  exportRoundRobinResultAsExcel,
+} from './DrawResultExporter';
+import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch, Image, FileSpreadsheet } from 'lucide-react';
 
 export type DrawSlotData = {
   position: number;
@@ -244,6 +250,48 @@ export default function DrawBoard() {
     }
   };
 
+  const getResultExportOptions = async () => {
+    if (!drawData || !selectedEventId) return null;
+    const eventObj = events.find(e => e.eventId === selectedEventId);
+    if (!eventObj) { alert('種目データが見つかりません'); return null; }
+    const tournamentObj = await db.tournaments.where('tournamentId').equals(eventObj.tournamentId).first();
+    if (!tournamentObj) { alert('大会データが見つかりません'); return null; }
+    const allEntries = await db.entries.where('eventId').equals(selectedEventId).toArray();
+    const allMatches = await db.matches.where('eventId').equals(selectedEventId).toArray();
+    const allPlayers = await db.players.toArray();
+    return { tournament: tournamentObj, event: eventObj, draw: drawData, matches: allMatches, entries: allEntries, players: allPlayers };
+  };
+
+  const handleExportResultJpeg = async () => {
+    try {
+      const opts = await getResultExportOptions();
+      if (!opts) return;
+      if (viewMode === 'roundRobin') {
+        await exportRoundRobinResultAsJpeg(opts);
+      } else {
+        await exportTournamentResultAsJpeg(opts);
+      }
+    } catch (e) {
+      console.error('結果JPEG出力エラー:', e);
+      alert('結果JPEG出力に失敗しました');
+    }
+  };
+
+  const handleExportResultExcel = async () => {
+    try {
+      const opts = await getResultExportOptions();
+      if (!opts) return;
+      if (viewMode === 'roundRobin') {
+        exportRoundRobinResultAsExcel(opts);
+      } else {
+        exportTournamentResultAsExcel(opts);
+      }
+    } catch (e) {
+      console.error('結果Excel出力エラー:', e);
+      alert('結果Excel出力に失敗しました');
+    }
+  };
+
   return (
     <div className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-6">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main shrink-0">
@@ -336,6 +384,22 @@ export default function DrawBoard() {
               >
                 <Download className="w-4 h-4" />
                 Excel出力
+              </button>
+              <button
+                onClick={handleExportResultJpeg}
+                disabled={!drawData}
+                className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-md font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+              >
+                <Image className="w-4 h-4" />
+                結果JPEG
+              </button>
+              <button
+                onClick={handleExportResultExcel}
+                disabled={!drawData}
+                className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-md font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                結果Excel
               </button>
               <button
                 onClick={handleSave}

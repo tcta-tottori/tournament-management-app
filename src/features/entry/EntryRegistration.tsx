@@ -529,13 +529,12 @@ export default function EntryRegistration() {
     const SLOT_WIDTH = 220;
     const Y_SPACING = 44;
     const X_SPACING = 50; // スロット間のギャップ（線のみ）
-    const OFFSET_X = 16;
+    const OFFSET_X = 28;
     const OFFSET_Y = 24;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
     const displaySlots = redistributeByes(slots, drawSize);
     const roundsCount = Math.log2(drawSize);
-    const totalRoundsToShow = roundsCount;
     const halfSize = drawSize / 2;
 
     const isSlotBye = (i: number): boolean => {
@@ -581,13 +580,13 @@ export default function EntryRegistration() {
     };
     const getX = (r: number): number => OFFSET_X + r * (SLOT_WIDTH + X_SPACING);
 
-    // Container dimensions
-    const containerWidth = OFFSET_X * 2 + (totalRoundsToShow - 1) * (SLOT_WIDTH + X_SPACING) + SLOT_WIDTH;
+    // Container dimensions (接続線は優勝まで描画)
+    const containerWidth = OFFSET_X * 2 + (roundsCount - 1) * (SLOT_WIDTH + X_SPACING) + SLOT_WIDTH;
     const containerHeight = nextCompactY + SLOT_HEIGHT;
 
-    // === SVG ブラケット線 ===
+    // === SVG ブラケット線 (優勝まで全ラウンド描画) ===
     const svgPaths: React.ReactNode[] = [];
-    for (let r = 0; r < totalRoundsToShow - 1; r++) {
+    for (let r = 0; r < roundsCount; r++) {
       const numMatches = drawSize / Math.pow(2, r + 1);
       for (let m = 0; m < numMatches; m++) {
         const x = getX(r) + SLOT_WIDTH;
@@ -671,23 +670,6 @@ export default function EntryRegistration() {
       );
     }
 
-    // 2回戦以降: 空のスロット枠（線で繋がる）
-    for (let r = 1; r < totalRoundsToShow; r++) {
-      const matchesInRound = drawSize / Math.pow(2, r);
-      for (let m = 0; m < matchesInRound; m++) {
-        const x = getX(r);
-        const y = getCompactY(r, m);
-        allSlotElements.push(
-          <div key={`r${r}-m${m}-slot`}
-            className="absolute border border-dashed border-gray-300 rounded bg-gray-50/80"
-            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
-            <div className="flex items-center justify-center h-full text-[10px] text-gray-400">
-              {r === totalRoundsToShow - 1 ? '優勝' : ''}
-            </div>
-          </div>
-        );
-      }
-    }
 
     // 左山/右山ラベル
     const halfLabelElements: React.ReactNode[] = [];

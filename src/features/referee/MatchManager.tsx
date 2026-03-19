@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight } from 'lucide-react';
 import type { Match } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
@@ -17,94 +17,32 @@ function getRoundName(round: number, totalRounds: number): string {
 
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
 
-/**
- * BYEが末尾に集中している場合、標準的なトーナメント位置に再配置する。
- * シード選手の対戦相手位置にBYEを優先配置。
- */
-function redistributeByeSlots(slots: DrawSlot[], drawSize: number): DrawSlot[] {
-  const sorted = [...slots].sort((a, b) => a.position - b.position);
-  const byeSlots = sorted.filter(s => s.isBye);
-  const entrySlots = sorted.filter(s => !s.isBye);
-  const numByes = drawSize - entrySlots.length;
-
-  if (numByes <= 0) return sorted;
-
-  // BYEが既に分散しているかチェック（前半にBYEがあれば分散済み）
-  const halfPos = drawSize / 2;
-  const hasByeInFirstHalf = byeSlots.some(s => s.position <= halfPos);
-  if (hasByeInFirstHalf && sorted.length >= drawSize) return sorted;
-
-  // 不足分のBYEスロットを補完（slots.lengthがdrawSize未満の場合）
-  if (hasByeInFirstHalf) {
-    const existingPos = new Set(sorted.map(s => s.position));
-    const result = [...sorted];
-    for (let p = 1; p <= drawSize; p++) {
-      if (!existingPos.has(p)) {
-        result.push({ position: p, entryId: null, seed: 0, isBye: true });
-      }
-    }
-    return result.sort((a, b) => a.position - b.position);
-  }
-
-  // BYEを標準位置に再配置
-  // シード選手の対戦相手位置にBYEを優先配置
-  const seedPositions: number[] = [1, drawSize];
-  let count = 2;
-  let sectionSize = drawSize;
-  while (count < drawSize) {
-    sectionSize /= 2;
-    if (sectionSize < 2) break;
-    const newPositions: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const pos = seedPositions[i];
-      const secIdx = Math.floor((pos - 1) / sectionSize);
-      const secStart = secIdx * sectionSize + 1;
-      const secEnd = secStart + sectionSize - 1;
-      newPositions.push(secStart + secEnd - pos);
-    }
-    seedPositions.push(...newPositions);
-    count *= 2;
-  }
-
-  const byePositions: number[] = [];
-  for (let i = 0; i < numByes && i < seedPositions.length; i++) {
-    const p = seedPositions[i];
-    byePositions.push(p % 2 === 1 ? p + 1 : p - 1);
-  }
-  const byePosSet = new Set(byePositions);
-
-  // エントリースロットをBYE以外の位置に配置
-  const nonByePositions: number[] = [];
-  for (let p = 1; p <= drawSize; p++) {
-    if (!byePosSet.has(p)) nonByePositions.push(p);
-  }
-
-  const sortedEntries = entrySlots.sort((a, b) => a.position - b.position);
-  const result: DrawSlot[] = [];
-  for (let i = 0; i < nonByePositions.length && i < sortedEntries.length; i++) {
-    result.push({ ...sortedEntries[i], position: nonByePositions[i] });
-  }
-  for (const bp of byePositions) {
-    result.push({ position: bp, entryId: null, seed: 0, isBye: true });
-  }
-
-  return result.sort((a, b) => a.position - b.position);
-}
 
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const events = useLiveQuery(
     () => currentTournamentId ? db.events.where('tournamentId').equals(currentTournamentId).toArray() : [],
     [currentTournamentId]
   ) || [];
 
-  const matches = useLiveQuery(
-    () => selectedEventId ? db.matches.where('eventId').equals(selectedEventId).toArray() : [],
-    [selectedEventId]
-  ) || [];
+  // 全種目の試合データを一括取得
+  const allMatchesByEvent = useLiveQuery(
+    async () => {
+      if (!currentTournamentId) return new Map<string, Match[]>();
+      const allEvents = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      const map = new Map<string, Match[]>();
+      for (const evt of allEvents) {
+        const eventMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+        if (eventMatches.length > 0) {
+          map.set(evt.eventId, eventMatches.sort((a, b) => a.round - b.round || a.matchOrder - b.matchOrder));
+        }
+      }
+      return map;
+    },
+    [currentTournamentId]
+  ) || new Map<string, Match[]>();
 
   const entries = useLiveQuery(
     () => selectedEventId ? db.entries.where('eventId').equals(selectedEventId).toArray() : [],
@@ -118,6 +56,20 @@ export default function MatchManager() {
     [selectedEventId]
   );
 
+  const allDraws = useLiveQuery(
+    async () => {
+      if (!currentTournamentId) return new Map<string, any>();
+      const allEvents = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      const map = new Map<string, any>();
+      for (const evt of allEvents) {
+        const draw = await db.draws.where('eventId').equals(evt.eventId).first();
+        if (draw) map.set(evt.eventId, draw);
+      }
+      return map;
+    },
+    [currentTournamentId]
+  ) || new Map<string, any>();
+
   const tournament = useLiveQuery(
     () => currentTournamentId ? db.tournaments.where('tournamentId').equals(currentTournamentId).first() : undefined,
     [currentTournamentId]
@@ -130,10 +82,10 @@ export default function MatchManager() {
     return Math.log2(drawData.drawSize);
   }, [drawData]);
 
-  const sortedMatches = useMemo(() =>
-    [...matches].sort((a, b) => a.round - b.round || a.matchOrder - b.matchOrder),
-    [matches]
-  );
+  // 全種目のうち試合データがある種目数
+  const eventsWithMatches = useMemo(() => {
+    return events.filter(e => (allMatchesByEvent.get(e.eventId)?.length || 0) > 0);
+  }, [events, allMatchesByEvent]);
 
   // --- 音声コール ---
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
@@ -296,289 +248,7 @@ export default function MatchManager() {
     }
   }, [callTargetMatchId]);
 
-  const handleGenerateMatches = async () => {
-    if (!drawData || !selectedEventId) return;
-    setIsGenerating(true);
-
-    try {
-      // BYEが末尾に集中している場合は標準位置に再配置してからペアリング
-      const slots = redistributeByeSlots(drawData.slots, drawData.drawSize);
-      const newMatches: Omit<Match, 'id'>[] = [];
-      let matchOrder = 1;
-
-      for (let i = 0; i < slots.length; i += 2) {
-        const s1 = slots[i];
-        const s2 = slots[i + 1];
-        if (!s1 || !s2) continue;
-
-        if (s1.isBye && s2.isBye) continue;
-        const isWalkover = s1.isBye || s2.isBye;
-
-        const resolvePlayer = (slot: typeof s1) => {
-          if (slot.isBye) return { name: 'BYE', affiliation: '', entryId: null };
-          const entry = entries.find(e => e.entryId === slot.entryId);
-          if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
-          const p1 = players.find(p => p.playerId === entry.playerId);
-          const isDoubles = !!entry.partnerId;
-          const p2 = isDoubles ? players.find(p => p.playerId === entry.partnerId) : null;
-          const name = isDoubles && p1 && p2 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
-          let affiliation = p1?.affiliation || '';
-          if (isDoubles && p2 && p2.affiliation !== p1?.affiliation) {
-            affiliation = `${p1?.affiliation} / ${p2.affiliation}`;
-          }
-          return { name, affiliation, entryId: slot.entryId };
-        };
-
-        const p1Info = resolvePlayer(s1);
-        const p2Info = resolvePlayer(s2);
-
-        newMatches.push({
-          eventId: selectedEventId,
-          matchId: `M-R1-${matchOrder}`,
-          round: 1,
-          matchOrder: matchOrder,
-          position: Math.floor(i / 2) + 1,
-          player1EntryId: p1Info.entryId,
-          player2EntryId: p2Info.entryId,
-          player1Name: p1Info.name,
-          player2Name: p2Info.name,
-          player1Affiliation: p1Info.affiliation,
-          player2Affiliation: p2Info.affiliation,
-          score: '',
-          winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
-          courtId: null,
-          scheduledTime: null,
-          status: isWalkover ? 'walkover' : 'waiting',
-          refereeId: null,
-          refereeName: '',
-          updatedAt: Date.now()
-        });
-        matchOrder++;
-      }
-
-      const drawSize = drawData.drawSize;
-      const totalRounds = Math.log2(drawSize);
-
-      for (let round = 2; round <= totalRounds; round++) {
-        const matchesInRound = drawSize / Math.pow(2, round);
-        for (let m = 0; m < matchesInRound; m++) {
-          newMatches.push({
-            eventId: selectedEventId,
-            matchId: `M-R${round}-${m + 1}`,
-            round,
-            matchOrder: matchOrder++,
-            position: m + 1,
-            player1EntryId: null,
-            player2EntryId: null,
-            player1Name: '',
-            player2Name: '',
-            player1Affiliation: '',
-            player2Affiliation: '',
-            score: '',
-            winnerEntryId: null,
-            courtId: null,
-            scheduledTime: null,
-            status: 'waiting',
-            refereeId: null,
-            refereeName: '',
-            updatedAt: Date.now()
-          });
-        }
-      }
-
-      const existingIds = matches.map(m => m.id).filter((id): id is number => id !== undefined);
-      await db.transaction('rw', db.matches, async () => {
-        if (existingIds.length > 0) {
-          await db.matches.bulkDelete(existingIds);
-        }
-        await db.matches.bulkAdd(newMatches);
-      });
-
-      const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
-      for (const wm of walkoverMatches) {
-        const nextRound = wm.round + 1;
-        const nextPosition = Math.ceil(wm.position / 2);
-        const nextMatch = await db.matches
-          .where('eventId').equals(selectedEventId)
-          .filter(m => m.round === nextRound && m.position === nextPosition)
-          .first();
-
-        if (nextMatch?.id && wm.winnerEntryId) {
-          const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
-          const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
-          const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
-          const isUpper = wm.position % 2 === 1;
-
-          await db.matches.update(nextMatch.id, {
-            ...(isUpper
-              ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-              : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-            ),
-            updatedAt: Date.now()
-          });
-        }
-      }
-      alert(`${newMatches.length} 試合を生成しました`);
-    } catch (err) {
-      console.error(err);
-      alert('試合生成に失敗しました');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleGenerateAllMatches = async () => {
-    if (!currentTournamentId) return;
-    if (!confirm('全種目の試合を一括生成します。既存の試合データは上書きされます。よろしいですか？')) return;
-    setIsGenerating(true);
-
-    try {
-      const allEvents = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
-      const allPlayers = await db.players.toArray();
-      let totalGenerated = 0;
-      let generatedEvents = 0;
-
-      for (const event of allEvents) {
-        const eventDraw = await db.draws.where('eventId').equals(event.eventId).first();
-        if (!eventDraw) continue;
-
-        const eventEntries = await db.entries.where('eventId').equals(event.eventId).toArray();
-        const slots = redistributeByeSlots(eventDraw.slots, eventDraw.drawSize);
-        const newMatches: Omit<Match, 'id'>[] = [];
-        let matchOrder = 1;
-
-        for (let i = 0; i < slots.length; i += 2) {
-          const s1 = slots[i];
-          const s2 = slots[i + 1];
-          if (!s1 || !s2) continue;
-          if (s1.isBye && s2.isBye) continue;
-          const isWalkover = s1.isBye || s2.isBye;
-
-          const resolvePlayer = (slot: typeof s1) => {
-            if (slot.isBye) return { name: 'BYE', affiliation: '', entryId: null };
-            const entry = eventEntries.find(e => e.entryId === slot.entryId);
-            if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
-            const p1 = allPlayers.find(p => p.playerId === entry.playerId);
-            const isDoubles = !!entry.partnerId;
-            const p2 = isDoubles ? allPlayers.find(p => p.playerId === entry.partnerId) : null;
-            const name = isDoubles && p1 && p2 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
-            let affiliation = p1?.affiliation || '';
-            if (isDoubles && p2 && p2.affiliation !== p1?.affiliation) {
-              affiliation = `${p1?.affiliation} / ${p2.affiliation}`;
-            }
-            return { name, affiliation, entryId: slot.entryId };
-          };
-
-          const p1Info = resolvePlayer(s1);
-          const p2Info = resolvePlayer(s2);
-
-          newMatches.push({
-            eventId: event.eventId,
-            matchId: `M-R1-${matchOrder}`,
-            round: 1,
-            matchOrder,
-            position: Math.floor(i / 2) + 1,
-            player1EntryId: p1Info.entryId,
-            player2EntryId: p2Info.entryId,
-            player1Name: p1Info.name,
-            player2Name: p2Info.name,
-            player1Affiliation: p1Info.affiliation,
-            player2Affiliation: p2Info.affiliation,
-            score: '',
-            winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
-            courtId: null,
-            scheduledTime: null,
-            status: isWalkover ? 'walkover' : 'waiting',
-            refereeId: null,
-            refereeName: '',
-            updatedAt: Date.now()
-          });
-          matchOrder++;
-        }
-
-        const drawSize = eventDraw.drawSize;
-        const rounds = Math.log2(drawSize);
-        for (let round = 2; round <= rounds; round++) {
-          const matchesInRound = drawSize / Math.pow(2, round);
-          for (let m = 0; m < matchesInRound; m++) {
-            newMatches.push({
-              eventId: event.eventId,
-              matchId: `M-R${round}-${m + 1}`,
-              round,
-              matchOrder: matchOrder++,
-              position: m + 1,
-              player1EntryId: null,
-              player2EntryId: null,
-              player1Name: '',
-              player2Name: '',
-              player1Affiliation: '',
-              player2Affiliation: '',
-              score: '',
-              winnerEntryId: null,
-              courtId: null,
-              scheduledTime: null,
-              status: 'waiting',
-              refereeId: null,
-              refereeName: '',
-              updatedAt: Date.now()
-            });
-          }
-        }
-
-        // 既存の試合を削除してから新しい試合を追加
-        await db.transaction('rw', db.matches, async () => {
-          const existingMatches = await db.matches.where('eventId').equals(event.eventId).toArray();
-          const existingIds = existingMatches.map(m => m.id).filter((id): id is number => id !== undefined);
-          if (existingIds.length > 0) {
-            await db.matches.bulkDelete(existingIds);
-          }
-          await db.matches.bulkAdd(newMatches);
-        });
-
-        // 不戦勝の自動進出処理
-        const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
-        for (const wm of walkoverMatches) {
-          const nextRound = wm.round + 1;
-          const nextPosition = Math.ceil(wm.position / 2);
-          const nextMatch = await db.matches
-            .where('eventId').equals(event.eventId)
-            .filter(m => m.round === nextRound && m.position === nextPosition)
-            .first();
-
-          if (nextMatch?.id && wm.winnerEntryId) {
-            const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
-            const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
-            const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
-            const isUpper = wm.position % 2 === 1;
-
-            await db.matches.update(nextMatch.id, {
-              ...(isUpper
-                ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-                : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-              ),
-              updatedAt: Date.now()
-            });
-          }
-        }
-
-        totalGenerated += newMatches.length;
-        generatedEvents++;
-      }
-
-      alert(`${generatedEvents} 種目、合計 ${totalGenerated} 試合を生成しました`);
-    } catch (err) {
-      console.error(err);
-      alert('一括試合生成に失敗しました');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!confirm('この種目の試合データをすべて削除しますか？')) return;
-    const ids = matches.map(m => m.id).filter((id): id is number => id !== undefined);
-    if (ids.length > 0) await db.matches.bulkDelete(ids);
-  };
+  // (生成機能は削除済み - ドロー画面から試合生成を行う)
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
@@ -704,20 +374,24 @@ export default function MatchManager() {
     cancelEdit();
   }, [editScore1, editScore2, editTiebreak, isTiebreakScore, selectedEventId, cancelEdit]);
 
-  const handlePrint = () => {
-    const printableMatches = sortedMatches.filter(m => m.status !== 'walkover');
+  const handlePrintEvent = useCallback((eventId: string) => {
+    const eventMatches = allMatchesByEvent.get(eventId) || [];
+    const printableMatches = eventMatches.filter(m => m.status !== 'walkover').sort((a, b) => a.round - b.round || a.matchOrder - b.matchOrder);
     if (printableMatches.length === 0) {
       alert('印刷対象の試合がありません');
       return;
     }
 
-    const eventName = currentEvent?.name || '';
+    const evt = events.find(e => e.eventId === eventId);
+    const eventName = evt?.name || '';
     const tournamentName = tournament?.name || '';
     const tournamentDate = tournament?.date || '';
-    const games = currentEvent?.gameRules?.games ?? 6;
+    const games = evt?.gameRules?.games ?? 6;
     const gameMethod = `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
+    const eventDraw = allDraws.get(eventId);
+    const eventTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
 
-    const roundName = (round: number) => getRoundName(round, totalRounds);
+    const roundName = (round: number) => getRoundName(round, eventTotalRounds);
 
     // Excel column structure: 38 columns (A-AL)
     // Col A = 3.29 width, Cols B-AL = 8.43 width each (37 cols)
@@ -803,8 +477,8 @@ ${printableMatches.map(m => {
       const getEntryNo = (entryId: string | null): string => {
         if (!entryId) return '';
         // Try to find position from draw slots
-        if (drawData) {
-          const slot = drawData.slots.find(s => s.entryId === entryId);
+        if (eventDraw) {
+          const slot = eventDraw.slots.find((s: DrawSlot) => s.entryId === entryId);
           if (slot) return String(slot.position);
         }
         // Fallback: extract number from entryId
@@ -1071,7 +745,7 @@ ${printableMatches.map(m => {
       printWin.focus();
       setTimeout(() => printWin.print(), 500);
     }
-  };
+  }, [allMatchesByEvent, allDraws, events, players, courts, tournament]);
 
   // スクロール時にコントロールを自動非表示
   const [controlsOpen, setControlsOpen] = useState(true);
@@ -1111,82 +785,17 @@ ${printableMatches.map(m => {
           <div className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-primary-500" />
             <span className="font-bold text-gray-900">対戦順・審判用紙</span>
-            {selectedEventId && (
-              <span className="text-xs text-gray-500 ml-2">{matches.filter(m => m.status !== 'walkover').length} 試合</span>
-            )}
+            <span className="text-xs text-gray-500 ml-1">
+              {eventsWithMatches.length} 種目
+            </span>
           </div>
           {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
 
         <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-gray-900 whitespace-nowrap">対象種目:</label>
-              <select
-                value={selectedEventId}
-                onChange={e => setSelectedEventId(e.target.value)}
-                className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-              >
-                <option value="">-- 種目を選択 --</option>
-                {events.map(e => (
-                  <option key={e.eventId} value={e.eventId}>{e.name} ({e.type})</option>
-                ))}
-              </select>
-              <button
-                onClick={handleGenerateAllMatches}
-                disabled={isGenerating || events.length === 0}
-                className="flex items-center justify-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-md font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm whitespace-nowrap"
-              >
-                <Zap className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
-                全種目一括生成
-              </button>
-            </div>
-
-            {selectedEventId && (
-              <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
-                    <ListOrdered className="w-4 h-4 inline mr-1" />
-                    {matches.filter(m => m.status !== 'walkover').length} 試合
-                  </div>
-                  {!drawData && (
-                    <span className="text-sm text-warning">
-                      先にS-04でドローを作成・保存してください
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={handleGenerateMatches}
-                    disabled={!drawData || isGenerating}
-                    className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                    {matches.length > 0 ? '再生成' : '試合生成'}
-                  </button>
-                  <button
-                    onClick={handlePrint}
-                    disabled={matches.length === 0}
-                    className="flex items-center justify-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
-                  >
-                    <Printer className="w-4 h-4" />
-                    審判用紙印刷
-                  </button>
-                  {matches.length > 0 && (
-                    <button
-                      onClick={handleDeleteAll}
-                      className="flex items-center justify-center gap-2 bg-danger text-white px-4 py-2 rounded-md font-medium hover:bg-red-800 shadow-sm transition-colors text-sm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      全削除
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* 音声コール設定 */}
-            <div className="pt-2 border-t border-gray-100">
+            <div>
               <button
                 onClick={() => setShowVoiceSettings(!showVoiceSettings)}
                 className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-primary-500 transition-colors"
@@ -1261,47 +870,82 @@ ${printableMatches.map(m => {
         </div>
       </div>
 
-      {/* Main content */}
-      <div ref={matchContentRef} className="flex-1 min-w-0 overflow-hidden flex flex-col">
-        {selectedEventId ? (
-          matches.length > 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">
-              <div className="overflow-auto flex-1">
-                {(() => {
-                  // BYE（不戦勝）を除外してラウンド別にグループ化
-                  const playableMatches = sortedMatches.filter(m => m.status !== 'walkover');
-                  const roundGroups = new Map<number, Match[]>();
-                  for (const m of playableMatches) {
-                    if (!roundGroups.has(m.round)) roundGroups.set(m.round, []);
-                    roundGroups.get(m.round)!.push(m);
-                  }
-                  return Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
-                    const roundLabel = getRoundName(round, totalRounds);
-                    const finishedCount = roundMatches.filter(m => m.status === 'finished').length;
+      {/* Main content - 全種目表示 */}
+      <div ref={matchContentRef} className="flex-1 min-w-0 overflow-auto space-y-3">
+        {eventsWithMatches.length > 0 ? (
+          eventsWithMatches.map(evt => {
+            const eventMatches = (allMatchesByEvent.get(evt.eventId) || []).filter(m => m.status !== 'walkover');
+            const eventDraw = allDraws.get(evt.eventId);
+            const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
+            const finishedCount = eventMatches.filter(m => m.status === 'finished').length;
+            const isActive = selectedEventId === evt.eventId;
+
+            // ラウンド別にグループ化
+            const roundGroups = new Map<number, Match[]>();
+            for (const m of eventMatches) {
+              if (!roundGroups.has(m.round)) roundGroups.set(m.round, []);
+              roundGroups.get(m.round)!.push(m);
+            }
+
+            return (
+              <div key={evt.eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+                {/* 種目ヘッダー */}
+                <div
+                  className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors ${
+                    isActive ? 'bg-primary-500 text-white' : 'bg-gradient-to-r from-gray-50 to-white hover:from-primary-50'
+                  }`}
+                  onClick={() => setSelectedEventId(isActive ? '' : evt.eventId)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-primary-100 text-primary-600'
+                    }`}>
+                      <ListOrdered className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className={`text-sm font-bold ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                        {evt.name}
+                      </h3>
+                      <p className={`text-[10px] ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                        {eventMatches.length}試合 / {finishedCount}完了
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handlePrintEvent(evt.eventId); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                        isActive
+                          ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
+                          : 'bg-primary-500 text-white hover:bg-primary-600'
+                      }`}
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      印刷
+                    </button>
+                    {isActive
+                      ? <ChevronUp className="w-4 h-4 text-white/60" />
+                      : <ChevronDown className="w-4 h-4 text-gray-300" />
+                    }
+                  </div>
+                </div>
+
+                {/* 試合リスト */}
+                <div className="overflow-hidden">
+                  {Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
+                    const roundLabel = getRoundName(round, evTotalRounds);
+                    const rFinished = roundMatches.filter(m => m.status === 'finished').length;
                     return (
                       <div key={round}>
-                        <div className="px-4 py-2.5 bg-primary-50 border-b-2 border-border-main font-bold text-gray-900 text-sm sticky top-0 flex items-center justify-between">
-                          <span>{roundLabel}</span>
-                          <span className="text-xs font-normal text-gray-500">
-                            {finishedCount}/{roundMatches.length} 完了
-                          </span>
+                        <div className="px-4 py-2 bg-gray-50 border-b border-border-main flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-600">{roundLabel}</span>
+                          <span className="text-[10px] text-gray-400">{rFinished}/{roundMatches.length}</span>
                         </div>
                         <table className="w-full text-left border-collapse">
-                          <thead className="bg-gray-50 text-xs font-semibold text-gray-500">
-                            <tr>
-                              <th className="py-1.5 px-2 w-10 text-center border-b border-border-main">#</th>
-                              <th className="py-1.5 px-2 border-b border-border-main">選手1</th>
-                              <th className="py-1.5 px-2 w-8 text-center border-b border-border-main"></th>
-                              <th className="py-1.5 px-2 border-b border-border-main">選手2</th>
-                              <th className="py-1.5 px-2 w-28 text-center border-b border-border-main">スコア</th>
-                              <th className="py-1.5 px-2 w-16 text-center border-b border-border-main">状態</th>
-                              <th className="py-1.5 px-2 w-24 text-center border-b border-border-main">操作</th>
-                            </tr>
-                          </thead>
                           <tbody className="text-sm">
                             {roundMatches.map((m, idx) => {
                               const st = statusLabels[m.status] || statusLabels.waiting;
-                              const isEditing = editingMatchId === m.matchId;
+                              const isEditing = editingMatchId === m.matchId && isActive;
                               const isWinner1 = m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                               const isWinner2 = m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
                               const hasPlayers = !!m.player1Name && !!m.player2Name;
@@ -1467,7 +1111,7 @@ ${printableMatches.map(m => {
                                     </td>
                                     <td className="py-2 px-2 text-center">
                                       <div className="flex items-center gap-0.5 justify-center">
-                                        {hasPlayers && !isWalkover && (
+                                        {hasPlayers && !isWalkover && isActive && (
                                           <>
                                             <button
                                               onClick={() => startEdit(m)}
@@ -1553,22 +1197,18 @@ ${printableMatches.map(m => {
                         </table>
                       </div>
                     );
-                  });
-                })()}
+                  })}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
-              <ClipboardList className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-bold text-gray-900 mb-2">試合データがありません</h3>
-              <p className="text-gray-500 max-w-md">
-                ドローを作成・保存した後、「試合生成」ボタンを押すと1回戦の対戦カードと後続ラウンドの空枠が自動生成されます。
-              </p>
-            </div>
-          )
+            );
+          })
         ) : (
-          <div className="flex-1 flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
-            <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
+            <ClipboardList className="w-16 h-16 text-gray-300 mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 mb-2">試合データがありません</h3>
+            <p className="text-gray-500 max-w-md">
+              ドロー画面で試合を生成すると、ここに全種目の対戦順が表示されます。
+            </p>
           </div>
         )}
       </div>

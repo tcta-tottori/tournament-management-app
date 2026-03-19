@@ -1,9 +1,64 @@
 import { useState, useCallback, useRef } from 'react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
+import {
+  getSavedToken as gdriveGetSavedToken,
+  getSavedClientId,
+  isTokenValid as gdriveIsTokenValid,
+} from '../backup/googleDriveApi';
+
+/** Google Drive ブランドアイコン */
+function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5l5.4 9.35z" fill="#0066DA"/>
+      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L3.45 44.7c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
+      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.85L73.55 76.8z" fill="#EA4335"/>
+      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
+      <path d="M59.85 53H27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L59.85 53z" fill="#2684FC"/>
+      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.2 28h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
+    </svg>
+  );
+}
+
+/** Google Drive からドロー会議システムの最新バックアップを取得 */
+async function fetchDrawBackupFromGDrive(token: string): Promise<{ data: any; fileName: string }> {
+  const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+  const hdrs = { Authorization: `Bearer ${token}` };
+
+  // 「鳥取テニス協会バックアップ」フォルダを検索
+  const rootQ = `name='鳥取テニス協会バックアップ' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const rootRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: rootQ, fields: 'files(id)', pageSize: '1' })}`, { headers: hdrs });
+  if (!rootRes.ok) throw new Error(`Google Drive API エラー (${rootRes.status})`);
+  const rootData = await rootRes.json();
+  const rootId = rootData.files?.[0]?.id;
+  if (!rootId) throw new Error('Google Drive に「鳥取テニス協会バックアップ」フォルダが見つかりません');
+
+  // 「ドロー会議システム」サブフォルダを検索
+  const subQ = `name='ドロー会議システム' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`;
+  const subRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: subQ, fields: 'files(id)', pageSize: '1' })}`, { headers: hdrs });
+  if (!subRes.ok) throw new Error(`Google Drive API エラー (${subRes.status})`);
+  const subData = await subRes.json();
+  const subId = subData.files?.[0]?.id;
+  if (!subId) throw new Error('Google Drive に「ドロー会議システム」フォルダが見つかりません');
+
+  // フォルダ内のJSONバックアップを最新順で取得
+  const filesQ = `'${subId}' in parents and trashed=false and mimeType='application/json'`;
+  const filesRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: filesQ, fields: 'files(id,name,modifiedTime)', orderBy: 'modifiedTime desc', pageSize: '1' })}`, { headers: hdrs });
+  if (!filesRes.ok) throw new Error(`Google Drive API エラー (${filesRes.status})`);
+  const filesData = await filesRes.json();
+  const latest = filesData.files?.[0];
+  if (!latest) throw new Error('Google Drive にドロー会議のバックアップファイルがありません');
+
+  // ダウンロード
+  const dlRes = await fetch(`${DRIVE_API}/files/${latest.id}?alt=media`, { headers: hdrs });
+  if (!dlRes.ok) throw new Error(`ダウンロード失敗 (${dlRes.status})`);
+  const data = await dlRes.json();
+  return { data, fileName: latest.name };
+}
 
 // ドロー会議システムのイベントコード → 大会運営システムの種目定義
 const EVENT_MAP: Record<string, { name: string; type: 'Singles' | 'Doubles' }> = {
@@ -255,7 +310,47 @@ export default function DataImport() {
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
+  const [isLoadingGDrive, setIsLoadingGDrive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Google Drive 接続状態
+  const gdriveConnected = !!getSavedClientId() && gdriveIsTokenValid();
+
+  // --- Google Drive からドロー会議データを読み込む ---
+  const handleLoadFromGDrive = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) {
+      setImportResult({ success: false, message: 'Google Drive に接続されていません。バックアップ画面で接続してください。' });
+      return;
+    }
+    setIsLoadingGDrive(true);
+    setImportResult(null);
+    try {
+      const { data: json, fileName } = await fetchDrawBackupFromGDrive(token);
+      const data = parseImportFile(json);
+      if (!data) {
+        setImportResult({ success: false, message: 'Google Drive のバックアップはドロー会議システムのデータ形式ではありません。' });
+        return;
+      }
+      setParsedData(data);
+      setParsedExcel(null);
+      const sum = buildSummary(data);
+      setSummary(sum);
+      // 大会名をプリセット
+      const rawName = data.tournamentName || data.tournaments[0]?.name || fileName.replace(/\.json$/i, '');
+      setEditTournamentName(cleanTournamentName(rawName));
+      setEditDate(sum.tournamentDate);
+      setEditVenue(sum.tournamentVenue);
+      if (data.tournaments.length > 0) {
+        setEditReserveDate(data.tournaments[0].reserveDate || '');
+      }
+      if (data.tournaments.length === 1) setSelectedTournament(data.tournaments[0].id);
+    } catch (err) {
+      setImportResult({ success: false, message: `Google Drive 読込失敗: ${(err as Error).message}` });
+    } finally {
+      setIsLoadingGDrive(false);
+    }
+  }, []);
 
   // --- JSON file handler (existing) ---
   const handleJsonFile = useCallback((file: File) => {
@@ -888,27 +983,53 @@ export default function DataImport() {
     <div className="space-y-4">
       {/* ファイルアップロード */}
       {showDropZone && (
-        <div
-          onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
-        >
-          <FileJson className="w-10 h-10 text-primary-500 mx-auto mb-2 opacity-60" />
-          <p className="text-sm font-medium text-gray-900">ドロー会議JSON / ドローExcelファイルを読込</p>
-          <p className="text-xs text-gray-500 mt-1">完全バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx) に対応</p>
-          <p className="text-xs text-gray-500 mt-0.5">クリックまたはドラッグ＆ドロップ</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,.xlsx,.xls"
-            className="hidden"
-            onChange={e => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-              e.target.value = '';
-            }}
-          />
+        <div className="space-y-3">
+          {/* Google Drive から読込 */}
+          <button
+            onClick={handleLoadFromGDrive}
+            disabled={!gdriveConnected || isLoadingGDrive}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            {isLoadingGDrive ? (
+              <RefreshCw className="w-4.5 h-4.5 animate-spin" />
+            ) : (
+              <GoogleDriveIcon className="w-4.5 h-4.5" />
+            )}
+            {isLoadingGDrive ? 'Google Drive から読込中...' : 'Google Drive から最新データを読込'}
+          </button>
+          {!gdriveConnected && (
+            <p className="text-[10px] text-gray-400 text-center -mt-1">※ バックアップ画面でGoogle Driveに接続すると利用できます</p>
+          )}
+
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <div className="flex-1 border-t border-border-main" />
+            <span>または</span>
+            <div className="flex-1 border-t border-border-main" />
+          </div>
+
+          {/* ファイルドロップゾーン */}
+          <div
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
+          >
+            <FileJson className="w-10 h-10 text-primary-500 mx-auto mb-2 opacity-60" />
+            <p className="text-sm font-medium text-gray-900">ドロー会議JSON / ドローExcelファイルを読込</p>
+            <p className="text-xs text-gray-500 mt-1">完全バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx) に対応</p>
+            <p className="text-xs text-gray-500 mt-0.5">クリックまたはドラッグ＆ドロップ</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,.xlsx,.xls"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = '';
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -1286,14 +1407,104 @@ export default function DataImport() {
       )}
 
       {/* 結果メッセージ */}
-      {importResult && (
-        <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${
-          importResult.success
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {importResult.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+      {importResult && !importResult.success && (
+        <div className="p-3 rounded-lg text-sm flex items-start gap-2 bg-red-50 text-red-800 border border-red-200">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{importResult.message}</span>
+        </div>
+      )}
+
+      {/* インポート成功 - おしゃれな大会情報表示 */}
+      {importResult?.success && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 text-white shadow-lg">
+          {/* 背景装飾 */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+          <div className="relative p-5">
+            {/* ヘッダー */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full backdrop-blur-sm">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">インポート完了</p>
+                <p className="text-[10px] text-white/70">データを正常に取り込みました</p>
+              </div>
+            </div>
+
+            {/* 大会名 */}
+            <h3 className="text-lg font-bold mb-3 leading-tight">
+              {editTournamentName || '大会名未設定'}
+            </h3>
+
+            {/* 大会情報 */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-4 text-sm">
+              {editDate && (
+                <div className="flex items-center gap-1.5 text-white/90">
+                  <Calendar className="w-3.5 h-3.5 text-white/60" />
+                  <span>{editDate}</span>
+                </div>
+              )}
+              {editVenue && (
+                <div className="flex items-center gap-1.5 text-white/90">
+                  <MapPin className="w-3.5 h-3.5 text-white/60" />
+                  <span>{editVenue}</span>
+                </div>
+              )}
+              {editReserveDate && (
+                <div className="flex items-center gap-1.5 text-white/90">
+                  <CalendarClock className="w-3.5 h-3.5 text-white/60" />
+                  <span>予備日 {editReserveDate}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 統計カード */}
+            <div className="grid grid-cols-3 gap-2">
+              {(() => {
+                // インポート結果メッセージから数値を抽出
+                const msg = importResult.message;
+                const playerMatch = msg.match(/(\d+)名/);
+                const eventMatch = msg.match(/(\d+)種目/);
+                const drawMatch = msg.match(/(\d+)ドロー/);
+                const entryMatch = msg.match(/(\d+)エントリー/);
+                return (
+                  <>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
+                      <Users className="w-5 h-5 mx-auto mb-1 text-white/80" />
+                      <p className="text-xl font-bold">{playerMatch?.[1] || '0'}</p>
+                      <p className="text-[10px] text-white/60">選手</p>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
+                      <Trophy className="w-5 h-5 mx-auto mb-1 text-white/80" />
+                      <p className="text-xl font-bold">{eventMatch?.[1] || '0'}</p>
+                      <p className="text-[10px] text-white/60">種目</p>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
+                      <Dices className="w-5 h-5 mx-auto mb-1 text-white/80" />
+                      <p className="text-xl font-bold">{drawMatch?.[1] || entryMatch?.[1] || '0'}</p>
+                      <p className="text-[10px] text-white/60">{drawMatch ? 'ドロー' : 'エントリー'}</p>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* フッター */}
+          <div className="bg-black/10 px-5 py-2.5 flex items-center justify-between">
+            <p className="text-[10px] text-white/50">
+              <Download className="w-3 h-3 inline mr-1" />
+              {importResult.message}
+            </p>
+            <button
+              onClick={reset}
+              className="text-[10px] font-medium text-white/70 hover:text-white transition-colors"
+            >
+              新しいインポート →
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/database';
+import { db, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { CalendarClock, Zap, Printer, Trash2, Upload, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -54,6 +54,87 @@ function extractImportedEventName(cellText: string): string {
   return match ? match[1].trim() : normalized;
 }
 
+/** scheduleEngine matchId → DB matchId のマッピングを構築 (eventId+round+position) */
+function buildMatchMapping(
+  scheduleMatches: ScheduleMatch[],
+  dbMatches: Match[],
+): Map<string, string> {
+  const mapping = new Map<string, string>();
+  const dbByKey = new Map<string, Match>();
+  for (const m of dbMatches) {
+    dbByKey.set(`${m.eventId}|${m.round}|${m.position}`, m);
+  }
+  for (const sm of scheduleMatches) {
+    const key = `${sm.eventCode}|${sm.round}|${sm.matchNumInRound}`;
+    const dbMatch = dbByKey.get(key);
+    if (dbMatch) {
+      mapping.set(sm.matchId, dbMatch.matchId);
+    }
+  }
+  return mapping;
+}
+
+/** ScheduleSlots の matchId を DB matchId に変換 */
+function applyMatchMapping(slots: ScheduleSlot[], mapping: Map<string, string>): ScheduleSlot[] {
+  return slots.map(s => ({
+    ...s,
+    matchId: mapping.get(s.matchId) || s.matchId,
+  }));
+}
+
+/** セルテキストから種目名とラウンド番号をパース */
+function parseCellEventRound(cellText: string): { eventName: string; roundLabel: string } | null {
+  const normalized = cellText
+    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\u3000]+/g, ' ')
+    .trim();
+  const match = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
+  if (!match) return null;
+  return { eventName: match[1].trim(), roundLabel: match[2].toUpperCase() };
+}
+
+/** ラウンドラベルからラウンド番号を算出 */
+function parseRoundFromLabel(label: string, totalRounds: number | null): number | null {
+  const upper = label.toUpperCase().trim();
+  const rMatch = upper.match(/^(\d+)R$/);
+  if (rMatch) return parseInt(rMatch[1]);
+  if (totalRounds === null) return null;
+  if (upper === 'F') return totalRounds;
+  if (upper === 'SF') return totalRounds - 1;
+  if (upper === 'QF') return totalRounds - 2;
+  return null;
+}
+
+/** 種目名を DB event に照合（あいまいマッチング） */
+function findMatchingEvent(
+  cellEventName: string,
+  events: { eventId: string; name: string }[],
+): { eventId: string; name: string } | undefined {
+  const norm = cellEventName.replace(/[級組]/g, '').trim();
+  return (
+    events.find(e => e.name === cellEventName) ||
+    events.find(e => e.name.includes(cellEventName)) ||
+    events.find(e => cellEventName.includes(e.name)) ||
+    events.find(e => abbreviateEventName(e.name) === abbreviateEventName(cellEventName)) ||
+    events.find(e => {
+      const n = e.name.replace(/[級組]/g, '').trim();
+      return n.includes(norm) || norm.includes(n);
+    })
+  );
+}
+
+/** DB Match のステータスに応じたバッジカラー */
+function matchStatusColor(status: Match['status']): string {
+  switch (status) {
+    case 'playing': return 'bg-green-500';
+    case 'finished': return 'bg-gray-600';
+    case 'ready': return 'bg-blue-400';
+    case 'walkover': return 'bg-gray-300';
+    default: return '';
+  }
+}
+
 export default function ScheduleSheet() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
 
@@ -97,6 +178,27 @@ export default function ScheduleSheet() {
         : undefined,
     [currentTournamentId],
   );
+
+  // DB matches (リアクティブ: スコア変更・対戦決定時に自動更新)
+  const allDbMatches = useLiveQuery(
+    async () => {
+      if (!currentTournamentId) return [];
+      const allEvts = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      const matches: Match[] = [];
+      for (const evt of allEvts) {
+        const m = await db.matches.where('eventId').equals(evt.eventId).toArray();
+        matches.push(...m);
+      }
+      return matches;
+    },
+    [currentTournamentId, events.length],
+  ) || [];
+
+  const dbMatchMap = useMemo(() => {
+    const map = new Map<string, Match>();
+    for (const m of allDbMatches) map.set(m.matchId, m);
+    return map;
+  }, [allDbMatches]);
 
   // --------------- Derived data ---------------
 
@@ -170,8 +272,10 @@ export default function ScheduleSheet() {
             if (m.scheduledTime && m.courtId) {
               hasSchedule = true;
               const courtName = courtIdToName.get(m.courtId) || '';
-              const schedMatch = extracted.find(sm => sm.matchId === m.matchId);
-              if (schedMatch && courtName) {
+              const schedMatch = extracted.find(sm =>
+                sm.eventCode === evt.eventId && sm.round === m.round && sm.matchNumInRound === m.position
+              );
+              if (courtName) {
                 // timeSlotIndexを逆算
                 const parts = startTime.split(':');
                 const startMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
@@ -186,7 +290,7 @@ export default function ScheduleSheet() {
                   timeSlotIndex: slotIdx >= 0 ? slotIdx : 0,
                   startTime: m.scheduledTime,
                   eventCode: evt.eventId,
-                  roundLabel: schedMatch.roundLabel,
+                  roundLabel: schedMatch?.roundLabel || `${m.round}R`,
                 });
               }
             }
@@ -205,6 +309,36 @@ export default function ScheduleSheet() {
     loadExistingSchedule();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTournamentId, events.length]);
+
+  // --- 自動紐付け: DB matches が変わったら未紐付けスロットを再リンク ---
+  const prevDbMatchIdsRef = useRef('');
+  useEffect(() => {
+    if (scheduleSlots.length === 0 || allDbMatches.length === 0) return;
+
+    // DB matchIds が変わった場合のみ処理
+    const currentKey = allDbMatches.map(m => m.matchId).sort().join(',');
+    if (currentKey === prevDbMatchIdsRef.current) return;
+    prevDbMatchIdsRef.current = currentKey;
+
+    // 未紐付けスロットがあるかチェック
+    const hasStale = scheduleSlots.some(s =>
+      s.eventCode !== 'imported' && !dbMatchMap.has(s.matchId)
+    );
+    if (!hasStale) return;
+
+    // allScheduleMatches 経由で再マッピング
+    if (allScheduleMatches.length > 0) {
+      const mapping = buildMatchMapping(allScheduleMatches, allDbMatches);
+      if (mapping.size > 0) {
+        setScheduleSlots(prev => {
+          const relinked = applyMatchMapping(prev, mapping);
+          if (relinked.every((s, i) => s.matchId === prev[i].matchId)) return prev;
+          return relinked;
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDbMatches]);
 
   const gridData = useMemo(() => {
     if (scheduleSlots.length === 0) return null;
@@ -316,30 +450,36 @@ export default function ScheduleSheet() {
         matchDuration,
         startTime,
       };
-      const slots = autoSchedule(allMatches, config);
+      const rawSlots = autoSchedule(allMatches, config);
 
-      // Update DB matches with courtId and scheduledTime
+      // scheduleEngine matchId → DB matchId マッピングを構築して紐付け
+      const allDbMatchesForLink: Match[] = [];
       for (const evt of allEvents) {
         const dbMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
-        for (const m of dbMatches) {
-          const scheduled = slots.find(s => s.matchId === m.matchId);
-          if (scheduled && m.id) {
-            const courtId = courtNameToId.get(scheduled.courtName) || null;
-            await db.matches.update(m.id, {
-              courtId,
-              scheduledTime: scheduled.startTime,
-              updatedAt: Date.now(),
-            });
-          }
+        allDbMatchesForLink.push(...dbMatches);
+      }
+      const mapping = buildMatchMapping(allMatches, allDbMatchesForLink);
+      const linkedSlots = applyMatchMapping(rawSlots, mapping);
+
+      // DB matches に courtId, scheduledTime を反映
+      for (const slot of linkedSlots) {
+        const dbMatch = allDbMatchesForLink.find(m => m.matchId === slot.matchId);
+        if (dbMatch?.id) {
+          const courtId = courtNameToId.get(slot.courtName) || null;
+          await db.matches.update(dbMatch.id, {
+            courtId,
+            scheduledTime: slot.startTime,
+            updatedAt: Date.now(),
+          });
         }
       }
 
-      setScheduleSlots(slots);
+      setScheduleSlots(linkedSlots);
       setAllScheduleMatches(allMatches);
 
-      const uniqueCourts = new Set(slots.map(s => s.courtName));
+      const uniqueCourts = new Set(linkedSlots.map(s => s.courtName));
       setStatusMessage(
-        `${slots.length}試合を${uniqueCourts.size}コートに配置しました。`,
+        `${linkedSlots.length}試合を${uniqueCourts.size}コートに配置しました。`,
       );
     } catch (err) {
       console.error(err);
@@ -713,6 +853,67 @@ export default function ScheduleSheet() {
         return;
       }
 
+      // --- DB matches との紐付け ---
+      let linkedCount = 0;
+      try {
+        const allEventsForLink = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+        const allMatchesForLink: Match[] = [];
+        const drawsForLink = new Map<string, number>(); // eventId → drawSize
+        for (const evt of allEventsForLink) {
+          const matches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+          allMatchesForLink.push(...matches);
+          const draw = await db.draws.where('eventId').equals(evt.eventId).first();
+          if (draw) drawsForLink.set(evt.eventId, draw.drawSize);
+        }
+
+        if (allMatchesForLink.length > 0 && allEventsForLink.length > 0) {
+          // セルテキストから種目+ラウンドを解析してグルーピング
+          const groups = new Map<string, number[]>(); // "eventName|roundLabel" → slot indices
+          for (let i = 0; i < importedSlots.length; i++) {
+            const parsed = parseCellEventRound(importedSlots[i].roundLabel);
+            if (!parsed) continue;
+            const key = `${parsed.eventName}|${parsed.roundLabel}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(i);
+          }
+
+          for (const [key, slotIndices] of groups) {
+            const [eventName, roundLabel] = key.split('|');
+            const matchedEvent = findMatchingEvent(eventName, allEventsForLink);
+            if (!matchedEvent) continue;
+
+            const totalRounds = drawsForLink.has(matchedEvent.eventId)
+              ? Math.log2(drawsForLink.get(matchedEvent.eventId)!)
+              : null;
+            const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
+            if (roundNum === null) continue;
+
+            // この種目+ラウンドの DB matches を position 順で取得
+            const dbMatchesForRound = allMatchesForLink
+              .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum)
+              .sort((a, b) => a.position - b.position);
+
+            // インポートスロットを時刻→コート順にソートして position に対応
+            const sortedIndices = [...slotIndices].sort((a, b) => {
+              const sa = importedSlots[a], sb = importedSlots[b];
+              return sa.timeSlotIndex - sb.timeSlotIndex || sa.courtName.localeCompare(sb.courtName);
+            });
+
+            for (let j = 0; j < sortedIndices.length && j < dbMatchesForRound.length; j++) {
+              const idx = sortedIndices[j];
+              importedSlots[idx] = {
+                ...importedSlots[idx],
+                matchId: dbMatchesForRound[j].matchId,
+                eventCode: matchedEvent.eventId,
+              };
+              linkedCount++;
+            }
+          }
+        }
+      } catch (linkErr) {
+        console.warn('Excel紐付けエラー:', linkErr);
+      }
+
       // Update state
       setStartTime(importedStartTime);
       setMatchDuration(importedDuration);
@@ -729,7 +930,8 @@ export default function ScheduleSheet() {
         D: importedCourtNums.some(n => n >= 13 && n <= 16),
       });
 
-      setStatusMessage(`Excelから ${importedSlots.length} 件のスケジュールを読み込みました（${importedCourtNames.length}コート × ${timeColumns.length}時間枠）。`);
+      const linkMsg = linkedCount > 0 ? `（${linkedCount}件をDB試合に紐付け済）` : '';
+      setStatusMessage(`Excelから ${importedSlots.length} 件のスケジュールを読み込みました（${importedCourtNames.length}コート × ${timeColumns.length}時間枠）。${linkMsg}`);
     } catch (err) {
       console.error(err);
       setStatusMessage(`Excel読み込みに失敗しました: ${(err as Error).message}`);
@@ -936,20 +1138,42 @@ export default function ScheduleSheet() {
                             />
                           );
                         }
+                        // DB match 紐付け情報
+                        const dbMatch = dbMatchMap.get(slot.matchId);
                         // DB種目の色、またはインポートされたセルから種目名を抽出して色を取得
-                        const isImported = slot.eventCode === 'imported';
+                        const isImported = slot.eventCode === 'imported' && !dbMatch;
                         const importedEvName = isImported ? extractImportedEventName(slot.roundLabel) : '';
                         const color = isImported
                           ? importedEventColorMap.get(importedEvName)
-                          : eventColorMap.get(slot.eventCode);
-                        const match = allScheduleMatches.find(
+                          : eventColorMap.get(dbMatch ? slot.eventCode : slot.eventCode);
+                        const schedMatch = allScheduleMatches.find(
                           m => m.matchId === slot.matchId,
                         );
-                        const evAbbr = match
-                          ? abbreviateEventName(match.eventName)
-                          : '';
-                        const isSelected =
-                          selectedCell?.matchId === slot.matchId;
+                        // 種目名: DB紐付け済ならeventCodeから、scheduleMatchがあればそこから
+                        const evName = dbMatch
+                          ? events.find(e => e.eventId === slot.eventCode)?.name
+                          : schedMatch?.eventName;
+                        const evAbbr = evName ? abbreviateEventName(evName) : '';
+
+                        // 選手名表示 (DB match から取得)
+                        let playerLabel = '';
+                        if (dbMatch) {
+                          const p1 = dbMatch.player1Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
+                          const p2 = dbMatch.player2Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
+                          if (p1 && p2 && p1 !== 'BYE' && p2 !== 'BYE') {
+                            playerLabel = `${p1}v${p2}`;
+                          } else if (p1 && p1 !== 'BYE') {
+                            playerLabel = p1;
+                          }
+                        }
+
+                        const statusDot = dbMatch ? matchStatusColor(dbMatch.status) : '';
+                        const isSelected = selectedCell?.matchId === slot.matchId;
+
+                        // ツールチップ
+                        const tooltipParts = [evAbbr, slot.roundLabel];
+                        if (dbMatch?.player1Name) tooltipParts.push(`${dbMatch.player1Name} vs ${dbMatch.player2Name}`);
+                        if (dbMatch?.score) tooltipParts.push(dbMatch.score);
 
                         return (
                           <td
@@ -957,14 +1181,20 @@ export default function ScheduleSheet() {
                             onClick={() =>
                               handleCellClick(slot.matchId, courtIdx, slotIdx)
                             }
-                            className={`border border-gray-300 min-w-[60px] h-10 cursor-pointer text-center transition-all ${color?.bg || 'bg-gray-50'} ${color?.text || 'text-gray-800'} ${isSelected ? 'ring-2 ring-primary-500 ring-inset shadow-md' : 'hover:brightness-95'}`}
+                            title={tooltipParts.join(' | ')}
+                            className={`border border-gray-300 min-w-[80px] h-10 cursor-pointer text-center transition-all px-0.5 ${color?.bg || 'bg-gray-50'} ${color?.text || 'text-gray-800'} ${isSelected ? 'ring-2 ring-primary-500 ring-inset shadow-md' : 'hover:brightness-95'}`}
                           >
-                            <div className="text-[10px] font-medium leading-tight">
-                              {evAbbr}
+                            <div className="flex items-center justify-center gap-0.5">
+                              {statusDot && <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot} ${dbMatch?.status === 'playing' ? 'animate-pulse' : ''}`} />}
+                              <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
+                              <span className="text-[9px] leading-tight opacity-70">{slot.roundLabel}</span>
                             </div>
-                            <div className="text-[10px] leading-tight">
-                              {slot.roundLabel}
-                            </div>
+                            {playerLabel && (
+                              <div className="text-[8px] leading-tight truncate opacity-80">{playerLabel}</div>
+                            )}
+                            {dbMatch?.score && (
+                              <div className="text-[7px] leading-tight text-gray-500 truncate">{dbMatch.score}</div>
+                            )}
                           </td>
                         );
                       },
@@ -1038,18 +1268,36 @@ export default function ScheduleSheet() {
                         </thead>
                         <tbody>
                           {sorted.map((s, idx) => {
-                            const match = allScheduleMatches.find(
-                              m => m.matchId === s.matchId,
-                            );
-                            const players = match
-                              ? match.players.join(' vs ')
-                              : '';
+                            // DB match から最新の選手名を取得（スコア反映後も自動更新）
+                            const dbMatch = dbMatchMap.get(s.matchId);
+                            let players = '';
+                            if (dbMatch) {
+                              const p1 = dbMatch.player1Name || '';
+                              const p2 = dbMatch.player2Name || '';
+                              if (p1 && p2 && p1 !== 'BYE' && p2 !== 'BYE') {
+                                players = `${p1} vs ${p2}`;
+                              } else if (p1 && p1 !== 'BYE') {
+                                players = p1;
+                              } else if (p2 && p2 !== 'BYE') {
+                                players = p2;
+                              }
+                            }
+                            if (!players) {
+                              // フォールバック: scheduleMatch から
+                              const schedMatch = allScheduleMatches.find(m => m.matchId === s.matchId);
+                              if (schedMatch) players = schedMatch.players.join(' vs ');
+                            }
+
+                            const statusBg = dbMatch?.status === 'playing'
+                              ? 'bg-green-50'
+                              : dbMatch?.status === 'finished'
+                                ? 'bg-gray-50'
+                                : idx % 2 === 1 ? 'bg-gray-50' : '';
+
                             return (
                               <tr
                                 key={s.matchId}
-                                className={
-                                  idx % 2 === 1 ? 'bg-gray-50' : ''
-                                }
+                                className={statusBg}
                               >
                                 <td className="py-1 px-2 border-b border-border-main font-mono text-xs">
                                   {s.startTime}
@@ -1059,9 +1307,14 @@ export default function ScheduleSheet() {
                                 </td>
                                 <td className="py-1 px-2 border-b border-border-main">
                                   {s.roundLabel}
+                                  {dbMatch?.status === 'playing' && <span className="ml-1 text-[9px] text-green-600 font-bold">●</span>}
+                                  {dbMatch?.status === 'finished' && <span className="ml-1 text-[9px] text-gray-400">✓</span>}
                                 </td>
                                 <td className="py-1 px-2 border-b border-border-main">
-                                  {players || '(未定)'}
+                                  <span>{players || '(未定)'}</span>
+                                  {dbMatch?.score && (
+                                    <span className="ml-2 text-xs text-gray-500 font-mono">{dbMatch.score}</span>
+                                  )}
                                 </td>
                               </tr>
                             );
