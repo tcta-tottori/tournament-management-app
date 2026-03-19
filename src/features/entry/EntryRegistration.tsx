@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Entry } from '../../db/database';
+import { db, type Entry, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserX, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
+import { CheckSquare, UserCheck, UserX, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock } from 'lucide-react';
 
 type CheckInSlot = {
   drawPosition: number;
@@ -16,7 +16,6 @@ type CheckInSlot = {
 };
 
 // === BYE再配置ユーティリティ ===
-// 標準的なトーナメントのシード配置位置を生成
 function generateSeedPositions(drawSize: number): number[] {
   const positions = [1, drawSize];
   let count = 2;
@@ -38,7 +37,6 @@ function generateSeedPositions(drawSize: number): number[] {
   return positions;
 }
 
-// BYEが配置されるべきポジションを生成（シードの対戦相手位置）
 function generateByePositions(drawSize: number, numByes: number): number[] {
   const seedPositions = generateSeedPositions(drawSize);
   const byePositions: number[] = [];
@@ -49,17 +47,14 @@ function generateByePositions(drawSize: number, numByes: number): number[] {
   return byePositions;
 }
 
-// BYEが末尾に集中している場合、標準配置に再分配
 function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
   const entrySlots = slots.filter(s => !(s.isBye && !s.entry));
   const numByes = drawSize - entrySlots.length;
   if (numByes <= 0) return slots;
 
-  // BYEが既に分散しているかチェック（前半にBYEがあれば分散済み）
   const halfPos = drawSize / 2;
   const hasByeInFirstHalf = slots.some(s => s.isBye && !s.entry && s.drawPosition <= halfPos);
   if (hasByeInFirstHalf) {
-    // 既に正しく配置されている → 不足分だけ補完
     if (slots.length >= drawSize) return slots;
     const existingPos = new Set(slots.map(s => s.drawPosition));
     const result = [...slots];
@@ -71,7 +66,6 @@ function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[]
     return result.sort((a, b) => a.drawPosition - b.drawPosition);
   }
 
-  // BYEを標準位置に再配置
   const byePositions = generateByePositions(drawSize, numByes);
   const byePosSet = new Set(byePositions);
   const nonByePositions: number[] = [];
@@ -95,10 +89,11 @@ export default function EntryRegistration() {
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(true);
   const [controlsOpen, setControlsOpen] = useState(true);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
+  const [stickyEventName, setStickyEventName] = useState('');
 
   // Queries
   const events = useLiveQuery(
@@ -120,11 +115,27 @@ export default function EntryRegistration() {
     [events]
   ) || [];
 
+  const allMatches = useLiveQuery(
+    () => currentTournamentId
+      ? db.matches.where('eventId').anyOf(events.map(e => e.eventId)).toArray()
+      : [],
+    [events]
+  ) || [];
+
   const players = useLiveQuery(() => db.players.toArray()) || [];
   const playerMap = useMemo(() => new Map(players.map(p => [p.playerId, p])), [players]);
 
   const entryMap = useMemo(() => new Map(allEntries.map(e => [e.entryId, e])), [allEntries]);
   const drawMap = useMemo(() => new Map(allDraws.map(d => [d.eventId, d])), [allDraws]);
+
+  // Check if an event has confirmed matches
+  const confirmedEventsSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of allMatches) {
+      set.add(m.eventId);
+    }
+    return set;
+  }, [allMatches]);
 
   // Build check-in slots for an event
   const buildSlotsForEvent = useCallback((eventId: string): CheckInSlot[] => {
@@ -167,7 +178,6 @@ export default function EntryRegistration() {
         });
     }
 
-    // No draw - fallback to entries list
     return eventEntries.map((entry, idx) => {
       const p1 = playerMap.get(entry.playerId);
       const p2 = entry.partnerId ? playerMap.get(entry.partnerId) : null;
@@ -289,6 +299,123 @@ export default function EntryRegistration() {
     }
   }, [drawMap, playerMap]);
 
+  // === エントリー確定（対戦表生成）===
+  const handleConfirmEvent = useCallback(async (eventId: string) => {
+    const draw = drawMap.get(eventId);
+    if (!draw) return;
+    if (!confirm('エントリーを確定し対戦表を生成しますか？')) return;
+
+    const slots = redistributeByes(
+      draw.slots.map(s => ({
+        ...s, drawPosition: s.position, seed: s.seed,
+        entryId: s.entryId, isBye: s.isBye,
+        entry: null, playerName: '', partnerName: '', affiliation: '',
+      })),
+      draw.drawSize
+    );
+    const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
+
+    const eventEntries = allEntries.filter(e => e.eventId === eventId);
+    const newMatches: Omit<Match, 'id'>[] = [];
+    let matchOrder = 1;
+
+    const resolvePlayer = (slot: typeof drawSlots[0]) => {
+      if (slot.isBye || !slot.entryId) return { name: 'BYE', affiliation: '', entryId: null };
+      const entry = eventEntries.find(e => e.entryId === slot.entryId);
+      if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
+      const p1 = playerMap.get(entry.playerId);
+      const p2 = entry.partnerId ? playerMap.get(entry.partnerId) : null;
+      const name = p2 && p1 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
+      let aff = p1?.affiliation || '';
+      if (p2 && p2.affiliation !== p1?.affiliation) aff = `${p1?.affiliation} / ${p2.affiliation}`;
+      return { name, affiliation: aff, entryId: slot.entryId };
+    };
+
+    // 1回戦
+    for (let i = 0; i < drawSlots.length; i += 2) {
+      const s1 = drawSlots[i];
+      const s2 = drawSlots[i + 1];
+      if (!s1 || !s2) continue;
+      if (s1.isBye && s2.isBye) continue;
+      const isWalkover = s1.isBye || s2.isBye;
+      const p1Info = resolvePlayer(s1);
+      const p2Info = resolvePlayer(s2);
+
+      newMatches.push({
+        eventId, matchId: `M-R1-${matchOrder}`, round: 1, matchOrder,
+        position: Math.floor(i / 2) + 1,
+        player1EntryId: p1Info.entryId, player2EntryId: p2Info.entryId,
+        player1Name: p1Info.name, player2Name: p2Info.name,
+        player1Affiliation: p1Info.affiliation, player2Affiliation: p2Info.affiliation,
+        score: '', winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
+        courtId: null, scheduledTime: null,
+        status: isWalkover ? 'walkover' : 'waiting',
+        refereeId: null, refereeName: '', updatedAt: Date.now()
+      });
+      matchOrder++;
+    }
+
+    // 2回戦以降
+    const totalRounds = Math.log2(draw.drawSize);
+    for (let round = 2; round <= totalRounds; round++) {
+      const matchesInRound = draw.drawSize / Math.pow(2, round);
+      for (let m = 0; m < matchesInRound; m++) {
+        newMatches.push({
+          eventId, matchId: `M-R${round}-${m + 1}`, round, matchOrder: matchOrder++,
+          position: m + 1,
+          player1EntryId: null, player2EntryId: null,
+          player1Name: '', player2Name: '',
+          player1Affiliation: '', player2Affiliation: '',
+          score: '', winnerEntryId: null,
+          courtId: null, scheduledTime: null, status: 'waiting',
+          refereeId: null, refereeName: '', updatedAt: Date.now()
+        });
+      }
+    }
+
+    // 既存の試合を削除して新しく生成
+    const existingMatches = await db.matches.where('eventId').equals(eventId).toArray();
+    const existingIds = existingMatches.map(m => m.id).filter((id): id is number => id !== undefined);
+
+    await db.transaction('rw', db.matches, async () => {
+      if (existingIds.length > 0) await db.matches.bulkDelete(existingIds);
+      await db.matches.bulkAdd(newMatches);
+    });
+
+    // BYE勝ちの選手を次ラウンドに反映
+    const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
+    for (const wm of walkoverMatches) {
+      const nextRound = wm.round + 1;
+      const nextPosition = Math.ceil(wm.position / 2);
+      const nextMatch = await db.matches
+        .where('eventId').equals(eventId)
+        .filter(m => m.round === nextRound && m.position === nextPosition)
+        .first();
+      if (nextMatch?.id && wm.winnerEntryId) {
+        const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
+        const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
+        const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
+        const isUpper = wm.position % 2 === 1;
+        await db.matches.update(nextMatch.id, {
+          ...(isUpper
+            ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+            : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+          ),
+          updatedAt: Date.now()
+        });
+      }
+    }
+  }, [drawMap, allEntries, playerMap]);
+
+  const handleConfirmAll = useCallback(async () => {
+    if (!confirm('全種目のエントリーを確定し対戦表を生成しますか？')) return;
+    for (const evt of events) {
+      const draw = drawMap.get(evt.eventId);
+      if (!draw) continue;
+      await handleConfirmEvent(evt.eventId);
+    }
+  }, [events, drawMap, handleConfirmEvent]);
+
   // Summary stats
   const computeStats = useCallback((slots: CheckInSlot[]) => {
     const playerSlots = slots.filter(s => s.entry && !(!s.entry && s.isBye));
@@ -316,30 +443,19 @@ export default function EntryRegistration() {
     const playerSlots = slots.filter(s => s.entry && !(s.isBye && !s.entry));
 
     if (playerSlots.length === 0) {
-      return (
-        <div className="py-8 text-center text-gray-400 text-sm">
-          リーグデータがありません
-        </div>
-      );
+      return <div className="py-8 text-center text-gray-400 text-sm">リーグデータがありません</div>;
     }
 
     return (
       <div>
-        {/* Info bar */}
         {draw && (
           <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-gray-600">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
               リーグ <strong className="text-gray-800">{playerSlots.length}人</strong>
             </span>
-            <span className="flex items-center gap-1.5 text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              対戦数 <strong className="text-gray-800">{playerSlots.length * (playerSlots.length - 1) / 2}</strong>
-            </span>
           </div>
         )}
-
-        {/* Player cards - トーナメントと同じ角丸カードスタイル */}
         <div className="p-4 space-y-1.5">
           {playerSlots.map((slot, idx) => {
             const isWithdrawn = slot.entry?.status === 'withdrawn';
@@ -350,82 +466,31 @@ export default function EntryRegistration() {
             let statusDotColor = '#d1d5db';
             let borderClass = 'border-gray-300';
             let bgClass = 'bg-white';
-            if (isWithdrawn) {
-              statusDotColor = '#ef4444';
-              bgClass = 'bg-red-50/60';
-              borderClass = 'border-red-200';
-            } else if (isConfirmed) {
-              statusDotColor = '#22c55e';
-              bgClass = 'bg-emerald-50/60';
-              borderClass = 'border-emerald-300';
-            }
+            if (isWithdrawn) { statusDotColor = '#ef4444'; bgClass = 'bg-red-50/60'; borderClass = 'border-red-200'; }
+            else if (isConfirmed) { statusDotColor = '#22c55e'; bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
 
             return (
-              <div
-                key={`league-card-${slot.drawPosition}`}
-                className={`flex items-center border rounded-lg shadow-sm transition-all h-[40px]
-                  ${borderClass} ${bgClass}
-                  ${isDimmed ? 'opacity-20' : ''}
-                  ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
-                `}
-              >
-                {/* Position number */}
-                <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">
-                  {idx + 1}
-                </div>
-
-                {/* Seed badge */}
-                {slot.seed > 0 && (
-                  <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">
-                    {slot.seed}
-                  </div>
-                )}
-
-                {/* Player info */}
+              <div key={`league-card-${slot.drawPosition}`}
+                className={`flex items-center border rounded-lg shadow-sm transition-all h-[40px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
+                <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{idx + 1}</div>
+                {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
                 <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
                   {slot.entry ? (
-                    <button
-                      onClick={() => handleCheckIn(slot)}
-                      className="text-left w-full group block"
-                      title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
-                    >
+                    <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
                       <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
-                        {slot.playerName}
-                        {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
+                        {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                       </div>
-                      {slot.affiliation && !isWithdrawn && (
-                        <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
-                      )}
+                      {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
                     </button>
-                  ) : (
-                    <span className="text-sm text-gray-300">---</span>
-                  )}
+                  ) : <span className="text-sm text-gray-300">---</span>}
                 </div>
-
-                {/* Status dot */}
-                <div className="flex-shrink-0 mr-1">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
-                </div>
-
-                {/* Action button */}
+                <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} /></div>
                 {slot.entry && (
                   <div className="flex-shrink-0 mr-1">
                     {isWithdrawn ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
-                        className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
-                        title="復元する"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
                     ) : (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
-                        className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                        title="BYEにする"
-                      >
-                        <UserX className="w-3 h-3" />
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
                     )}
                   </div>
                 )}
@@ -443,56 +508,35 @@ export default function EntryRegistration() {
     const searchMatches = getSearchMatchSet(slots);
     const hasSearch = searchQuery.length > 0;
 
-    // Check if this is a league/round-robin event
     const event = events.find(e => e.eventId === eventId);
     const eventType = event?.type as string | undefined;
-    // drawSizeが2の累乗でない場合もリーグ戦と判定（3人、5人、6人など）
     const ds = draw?.drawSize || 0;
     const isPowerOf2 = ds > 0 && (ds & (ds - 1)) === 0;
     const isLeague =
-      eventType === 'league' ||
-      eventType === 'round-robin' ||
+      eventType === 'league' || eventType === 'round-robin' ||
       draw?.drawType === 'roundRobin' ||
       (ds > 0 && !isPowerOf2) ||
       /リーグ/i.test(event?.name || '');
-    if (isLeague) {
-      return renderLeagueTable(eventId, slots);
-    }
+    if (isLeague) return renderLeagueTable(eventId, slots);
 
     if (slots.length === 0) {
-      return (
-        <div className="py-8 text-center text-gray-400 text-sm">
-          ドローデータがありません
-        </div>
-      );
+      return <div className="py-8 text-center text-gray-400 text-sm">ドローデータがありません</div>;
     }
 
-    // Bracket constants
-    const SLOT_HEIGHT = 40;
-    const SLOT_WIDTH = 240;
-    const Y_SPACING = 50;
-    const X_SPACING = 280;
+    // Bracket constants - コンパクトに収める
+    const SLOT_HEIGHT = 36;
+    const SLOT_WIDTH = 220;
+    const Y_SPACING = 44;
+    const X_SPACING = 50; // スロット間のギャップ（線のみ）
     const OFFSET_X = 16;
-    const OFFSET_Y = 40;
+    const OFFSET_Y = 24;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
-
-    // BYEが末尾に集中している場合、標準位置に再配置
     const displaySlots = redistributeByes(slots, drawSize);
     const roundsCount = Math.log2(drawSize);
-    const totalRoundsToShow = roundsCount; // WINNERノードを除く（決勝まで）
+    const totalRoundsToShow = roundsCount;
+    const halfSize = drawSize / 2;
 
-    // Round labels (優勝ノードなし)
-    const roundLabels: string[] = [];
-    for (let r = 0; r < totalRoundsToShow; r++) {
-      const fromFinal = totalRoundsToShow - 1 - r;
-      if (fromFinal === 0) roundLabels.push('決勝');
-      else if (fromFinal === 1 && totalRoundsToShow >= 3) roundLabels.push('準決勝');
-      else if (fromFinal === 2 && totalRoundsToShow >= 5) roundLabels.push('準々決勝');
-      else roundLabels.push(`${r + 1}回戦`);
-    }
-
-    // === コンパクトY計算（BYEの空白を詰める） ===
     const isSlotBye = (i: number): boolean => {
       const slot = i < displaySlots.length ? displaySlots[i] : null;
       return !slot || (slot.isBye && !slot.entry);
@@ -507,40 +551,40 @@ export default function EntryRegistration() {
       const topBye = isSlotBye(topIdx);
       const botBye = isSlotBye(botIdx);
 
+      // 左山と右山の境界にスペースを追加
+      if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
+        nextCompactY += Y_SPACING * 0.8;
+      }
+
       if (topBye && botBye) {
-        // 両方BYE → スペースを取らない
         r0Y[topIdx] = nextCompactY;
         r0Y[botIdx] = nextCompactY;
       } else if (topBye) {
-        // 上がBYE → 下の選手のみ、1スロット分
         r0Y[topIdx] = nextCompactY;
         r0Y[botIdx] = nextCompactY;
         nextCompactY += Y_SPACING;
       } else if (botBye) {
-        // 下がBYE → 上の選手のみ、1スロット分
         r0Y[topIdx] = nextCompactY;
         r0Y[botIdx] = nextCompactY;
         nextCompactY += Y_SPACING;
       } else {
-        // 両方実選手 → 2スロット分
         r0Y[topIdx] = nextCompactY;
         r0Y[botIdx] = nextCompactY + Y_SPACING;
         nextCompactY += Y_SPACING * 2;
       }
     }
 
-    // 全ラウンドのY位置を計算（後のラウンドは前ラウンドの中間）
     const getCompactY = (r: number, i: number): number => {
       if (r === 0) return r0Y[i];
       return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
     };
-    const getX = (r: number): number => OFFSET_X + r * X_SPACING;
+    const getX = (r: number): number => OFFSET_X + r * (SLOT_WIDTH + X_SPACING);
 
-    // Container dimensions（コンパクトサイズ）
-    const containerWidth = OFFSET_X * 2 + (totalRoundsToShow - 1) * X_SPACING + SLOT_WIDTH;
+    // Container dimensions
+    const containerWidth = OFFSET_X * 2 + (totalRoundsToShow - 1) * (SLOT_WIDTH + X_SPACING) + SLOT_WIDTH;
     const containerHeight = nextCompactY + SLOT_HEIGHT;
 
-    // === SVG ブラケット線（L字型、斜めなし） ===
+    // === SVG ブラケット線 ===
     const svgPaths: React.ReactNode[] = [];
     for (let r = 0; r < totalRoundsToShow - 1; r++) {
       const numMatches = drawSize / Math.pow(2, r + 1);
@@ -553,45 +597,31 @@ export default function EntryRegistration() {
         const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
         const yMid = getCompactY(r + 1, m) + SLOT_HEIGHT / 2;
 
-        // Round 0: BYEの処理
         if (r === 0) {
           const topBye = isSlotBye(m * 2);
           const botBye = isSlotBye(m * 2 + 1);
-
           if (topBye && botBye) continue;
-
           if (topBye || botBye) {
-            // BYE片方 → 実選手から水平線で次ラウンドへ（同じY）
             const playerY = topBye ? yBottom : yTop;
-            svgPaths.push(
-              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
-            );
+            svgPaths.push(<path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
             continue;
           }
         }
 
-        // 通常のL字型ブラケット線
-        svgPaths.push(
-          <path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
-        );
-        svgPaths.push(
-          <path key={`r${r}-m${m}-bottom`} d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
-        );
-        svgPaths.push(
-          <path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
-        );
+        svgPaths.push(<path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        svgPaths.push(<path key={`r${r}-m${m}-bottom`} d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        svgPaths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
       }
     }
 
-    // === Round 0 スロット描画（BYEを除外、連番表示） ===
-    const slotElements: React.ReactNode[] = [];
+    // === 全ラウンドのスロット描画 ===
+    const allSlotElements: React.ReactNode[] = [];
+
+    // Round 0: 選手スロット
     let visibleIndex = 0;
     for (let i = 0; i < drawSize; i++) {
       const slot = i < displaySlots.length ? displaySlots[i] : null;
-
-      // BYEスロット・空スロットはスキップ
       if (!slot || (slot.isBye && !slot.entry)) continue;
-
       visibleIndex++;
       const x = getX(0);
       const y = r0Y[i];
@@ -607,81 +637,32 @@ export default function EntryRegistration() {
 
       let borderClass = 'border-gray-300';
       let bgClass = 'bg-white';
-      if (isWithdrawn) {
-        bgClass = 'bg-red-50/60';
-        borderClass = 'border-red-200';
-      } else if (isConfirmed) {
-        bgClass = 'bg-emerald-50/60';
-        borderClass = 'border-emerald-300';
-      }
+      if (isWithdrawn) { bgClass = 'bg-red-50/60'; borderClass = 'border-red-200'; }
+      else if (isConfirmed) { bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
 
-      slotElements.push(
-        <div
-          key={`slot-${slot.drawPosition}`}
-          className={`absolute flex items-center border rounded shadow-sm transition-all
-            ${borderClass} ${bgClass}
-            ${isDimmed ? 'opacity-20' : ''}
-            ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
-          `}
-          style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
-        >
-          {/* 連番（BYEを含まない） */}
-          <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">
-            {visibleIndex}
-          </div>
-
-          {/* Seed badge */}
-          {slot.seed > 0 && (
-            <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">
-              {slot.seed}
-            </div>
-          )}
-
-          {/* Player info */}
+      allSlotElements.push(
+        <div key={`slot-${slot.drawPosition}`}
+          className={`absolute flex items-center border rounded shadow-sm transition-all ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+          style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
+          <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{visibleIndex}</div>
+          {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
           <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
             {slot.entry ? (
-              <button
-                onClick={() => handleCheckIn(slot)}
-                className="text-left w-full group block"
-                title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}
-              >
+              <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
                 <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
-                  {slot.playerName}
-                  {slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
+                  {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                 </div>
-                {slot.affiliation && !isWithdrawn && (
-                  <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>
-                )}
+                {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
               </button>
-            ) : (
-              <span className="text-sm text-gray-300">---</span>
-            )}
+            ) : <span className="text-sm text-gray-300">---</span>}
           </div>
-
-          {/* Status dot */}
-          <div className="flex-shrink-0 mr-1">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
-          </div>
-
-          {/* Action button */}
+          <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} /></div>
           {slot.entry && (
             <div className="flex-shrink-0 mr-1">
               {isWithdrawn ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleRestore(slot); }}
-                  className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
-                  title="復元する"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
               ) : (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }}
-                  className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                  title="BYEにする"
-                >
-                  <UserX className="w-3 h-3" />
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
               )}
             </div>
           )}
@@ -689,11 +670,43 @@ export default function EntryRegistration() {
       );
     }
 
-    // 2回戦以降はラウンドラベルのみ表示（枠は不要）
+    // 2回戦以降: 空のスロット枠（線で繋がる）
+    for (let r = 1; r < totalRoundsToShow; r++) {
+      const matchesInRound = drawSize / Math.pow(2, r);
+      for (let m = 0; m < matchesInRound; m++) {
+        const x = getX(r);
+        const y = getCompactY(r, m);
+        allSlotElements.push(
+          <div key={`r${r}-m${m}-slot`}
+            className="absolute border border-dashed border-gray-300 rounded bg-gray-50/80"
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
+            <div className="flex items-center justify-center h-full text-[10px] text-gray-400">
+              {r === totalRoundsToShow - 1 ? '優勝' : ''}
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // 左山/右山ラベル
+    const halfLabelElements: React.ReactNode[] = [];
+    if (drawSize >= 4) {
+      const topHalfY = OFFSET_Y;
+      const bottomHalfStartIdx = halfSize;
+      const bottomHalfY = r0Y[bottomHalfStartIdx] || (nextCompactY / 2 + Y_SPACING);
+
+      halfLabelElements.push(
+        <div key="label-left" className="absolute writing-vertical text-xs font-bold text-primary-600 bg-primary-50 px-1 py-2 rounded-r border-l-2 border-primary-500"
+          style={{ left: 0, top: topHalfY }}>左山</div>
+      );
+      halfLabelElements.push(
+        <div key="label-right" className="absolute writing-vertical text-xs font-bold text-orange-600 bg-orange-50 px-1 py-2 rounded-r border-l-2 border-orange-500"
+          style={{ left: 0, top: bottomHalfY }}>右山</div>
+      );
+    }
 
     return (
       <div>
-        {/* Draw size info bar */}
         {draw && (
           <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-gray-600">
@@ -711,37 +724,13 @@ export default function EntryRegistration() {
           </div>
         )}
 
-        {/* Bracket container */}
         <div className="overflow-auto">
           <div className="relative" style={{ width: containerWidth, height: containerHeight, minWidth: containerWidth }}>
-            {/* Round labels at top */}
-            {roundLabels.map((label, r) => (
-              <div
-                key={`round-label-${r}`}
-                className="absolute text-[11px] font-bold text-gray-500 text-center"
-                style={{
-                  left: getX(r),
-                  top: 4,
-                  width: SLOT_WIDTH,
-                }}
-              >
-                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{label}</span>
-              </div>
-            ))}
-
-            {/* SVG bracket lines */}
-            <svg
-              className="absolute inset-0 pointer-events-none"
-              width={containerWidth}
-              height={containerHeight}
-            >
+            {halfLabelElements}
+            <svg className="absolute inset-0 pointer-events-none" width={containerWidth} height={containerHeight}>
               {svgPaths}
             </svg>
-
-            {/* Round 0 slots (with full player details) */}
-            {slotElements}
-
-            {/* 2回戦以降は枠なし（ラウンドラベルとブラケット線のみ） */}
+            {allSlotElements}
           </div>
         </div>
       </div>
@@ -753,6 +742,7 @@ export default function EntryRegistration() {
     const slots = buildSlotsForEvent(eventId);
     const stats = computeStats(slots);
     const isCollapsed = collapsedEvents.has(eventId);
+    const isConfirmedEvent = confirmedEventsSet.has(eventId);
 
     if (!forceShow && searchQuery) {
       const searchMatches = getSearchMatchSet(slots);
@@ -760,39 +750,34 @@ export default function EntryRegistration() {
     }
 
     return (
-      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-        {/* Event header */}
-        {showAllEvents && (
-          <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
-            <button
-              onClick={() => toggleCollapse(eventId)}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            >
-              {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-              <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
+      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden"
+        data-event-id={eventId} data-event-name={eventName}>
+        {/* Event header - sticky */}
+        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between sticky top-0 z-10">
+          <button onClick={() => toggleCollapse(eventId)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+            <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
+            {isConfirmedEvent && <Lock className="w-3 h-3 text-green-600" />}
+          </button>
+          <div className="flex items-center gap-2 text-xs">
+            <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors">
+              <UserCheck className="w-3 h-3" />全員受付
             </button>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors"
-              >
-                <UserCheck className="w-3 h-3" />全員受付
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-              </button>
-              <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
-              <span className="text-gray-500">/</span>
-              <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
-              {stats.absent > 0 && (
-                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} 欠場</span>
-              )}
-            </div>
+            <button onClick={(e) => { e.stopPropagation(); handleConfirmEvent(eventId); }}
+              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${isConfirmedEvent ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-orange-500 hover:bg-orange-600'}`}>
+              <Lock className="w-3 h-3" />{isConfirmedEvent ? '再確定' : '確定'}
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
+              <RotateCcw className="w-3 h-3" />
+            </button>
+            <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
+            <span className="text-gray-500">/</span>
+            <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
+            {stats.absent > 0 && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} 欠場</span>}
           </div>
-        )}
+        </div>
 
         {!isCollapsed && renderDrawTable(eventId, slots)}
       </div>
@@ -807,7 +792,7 @@ export default function EntryRegistration() {
       : [];
   const overallStats = computeStats(allSlots);
 
-  // スクロール時にコントロールを自動非表示
+  // スクロール時のスティッキー種目名表示
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -816,14 +801,28 @@ export default function EntryRegistration() {
     let lastScrollY = 0;
     const onScroll = () => {
       const y = el.scrollTop;
-      if (y > 20 && y > lastScrollY) {
-        setControlsOpen(false);
-      }
+      if (y > 20 && y > lastScrollY) setControlsOpen(false);
       lastScrollY = y;
+
+      // スクロール中の種目名検出
+      if (showAllEvents) {
+        const sections = el.querySelectorAll('[data-event-name]');
+        let currentName = '';
+        for (const sec of sections) {
+          const rect = (sec as HTMLElement).getBoundingClientRect();
+          const containerRect = el.getBoundingClientRect();
+          if (rect.top <= containerRect.top + 60) {
+            currentName = (sec as HTMLElement).dataset.eventName || '';
+          }
+        }
+        setStickyEventName(y > 10 ? currentName : '');
+      } else {
+        setStickyEventName('');
+      }
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [showAllEvents]);
 
   if (!currentTournamentId) {
     return (
@@ -837,106 +836,69 @@ export default function EntryRegistration() {
 
   return (
     <div className="max-w-full mx-auto h-full flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* LEFT: コントロールパネル（プルダウン式、スクロールで自動非表示） */}
+      {/* LEFT: コントロールパネル */}
       <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0">
-        {/* Toggle button - always visible */}
-        <button
-          onClick={() => setControlsOpen(prev => !prev)}
-          className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors"
-        >
+        <button onClick={() => setControlsOpen(prev => !prev)}
+          className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors">
           <div className="flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-primary-500" />
             <span className="font-bold text-gray-900 text-sm">エントリー受付</span>
-            {(showAllEvents || selectedEventId) && (
-              <span className="text-xs text-gray-500">
-                {overallStats.checkedIn}/{overallStats.total}
-              </span>
-            )}
+            {(showAllEvents || selectedEventId) && <span className="text-xs text-gray-500">{overallStats.checkedIn}/{overallStats.total}</span>}
           </div>
           {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
 
-        {/* Collapsible controls */}
         <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
             <div className="flex flex-col gap-2">
-              {/* View toggle */}
               <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
-                <button
-                  onClick={() => setShowAllEvents(false)}
-                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
+                <button onClick={() => setShowAllEvents(false)}
+                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   <Eye className="w-3.5 h-3.5" />個別表示
                 </button>
-                <button
-                  onClick={() => setShowAllEvents(true)}
-                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
+                <button onClick={() => setShowAllEvents(true)}
+                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   <List className="w-3.5 h-3.5" />すべて表示
                 </button>
               </div>
 
               {!showAllEvents && (
-                <select
-                  value={selectedEventId}
-                  onChange={e => setSelectedEventId(e.target.value)}
-                  className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-                >
+                <select value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}
+                  className="w-full border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium">
                   <option value="">-- 種目を選択 --</option>
-                  {events.map(e => (
-                    <option key={e.eventId} value={e.eventId}>{e.name}</option>
-                  ))}
+                  {events.map(e => <option key={e.eventId} value={e.eventId}>{e.name}</option>)}
                 </select>
               )}
             </div>
 
-            {/* Search */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-gray-500" />
               </div>
-              <input
-                type="text"
-                placeholder="選手名・所属で検索..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500"
-              />
+              <input type="text" placeholder="選手名・所属で検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500" />
             </div>
 
-            {/* Stats + bulk actions */}
             {(showAllEvents || selectedEventId) && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 text-sm flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <span className="text-gray-500 text-xs">合計:</span>
-                    <span className="font-bold text-gray-800">{overallStats.total}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                    <span className="font-bold text-green-700">{overallStats.checkedIn}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                    <span className="font-bold text-red-600">{overallStats.absent}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
-                    <span className="font-bold text-gray-600">{overallStats.remaining}</span>
-                  </div>
+                  <div className="flex items-center gap-1"><span className="text-gray-500 text-xs">合計:</span><span className="font-bold text-gray-800">{overallStats.total}</span></div>
+                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /><span className="font-bold text-green-700">{overallStats.checkedIn}</span></div>
+                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /><span className="font-bold text-red-600">{overallStats.absent}</span></div>
+                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /><span className="font-bold text-gray-600">{overallStats.remaining}</span></div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
-                  >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
                     <UserCheck className="w-3.5 h-3.5" />全員受付済み
                   </button>
-                  <button
-                    onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                  >
+                  <button onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
                     <RotateCcw className="w-3.5 h-3.5" />リセット
+                  </button>
+                  <button onClick={handleConfirmAll}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors">
+                    <Lock className="w-3.5 h-3.5" />全種目確定
                   </button>
                 </div>
               </div>
@@ -945,25 +907,34 @@ export default function EntryRegistration() {
         </div>
       </div>
 
-      {/* RIGHT: Main content area (draw tables) */}
-      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-y-auto space-y-4 min-h-0">
-        {showAllEvents ? (
-          events.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
-              <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
-              <p className="font-semibold">種目が登録されていません</p>
-            </div>
-          ) : (
-            events.map(e => renderEventSection(e.eventId, e.name))
-          )
-        ) : selectedEventId ? (
-          renderEventSection(selectedEventId, events.find(e => e.eventId === selectedEventId)?.name || '', true)
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
-            <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
-            <p className="font-semibold">上部のドロップダウンから対象種目を選択してください</p>
+      {/* RIGHT: Main content area */}
+      <div className="flex-1 min-w-0 order-2 lg:order-2 flex flex-col min-h-0">
+        {/* スティッキー種目名バー */}
+        {stickyEventName && (
+          <div className="bg-primary-600 text-white px-4 py-1.5 rounded-t-lg text-sm font-bold shadow-sm shrink-0">
+            {stickyEventName}
           </div>
         )}
+
+        <div ref={contentRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
+          {showAllEvents ? (
+            events.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
+                <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
+                <p className="font-semibold">種目が登録されていません</p>
+              </div>
+            ) : (
+              events.map(e => renderEventSection(e.eventId, e.name))
+            )
+          ) : selectedEventId ? (
+            renderEventSection(selectedEventId, events.find(e => e.eventId === selectedEventId)?.name || '', true)
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
+              <AlertCircle className="w-16 h-16 mb-4 text-gray-200" />
+              <p className="font-semibold">上部のドロップダウンから対象種目を選択してください</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
