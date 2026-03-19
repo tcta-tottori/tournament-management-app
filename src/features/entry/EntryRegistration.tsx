@@ -556,29 +556,13 @@ export default function EntryRegistration() {
       const x = getX(0);
       const y = getY(0, i);
 
-      if (!slot) {
-        // Empty slot (no data)
-        slotElements.push(
-          <div
-            key={`slot-empty-${i}`}
-            className="absolute flex items-center px-2 border border-dashed border-gray-200 rounded bg-gray-50/50"
-            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
-          >
-            <span className="text-xs font-mono text-gray-300 w-6 text-center">{i + 1}</span>
-            <span className="text-sm text-gray-300 ml-2">---</span>
-          </div>
-        );
-        continue;
-      }
+      // BYEスロット・空スロットは枠を表示しない
+      if (!slot || (slot.isBye && !slot.entry)) continue;
 
-      const isOriginalBye = slot.isBye && !slot.entry;
       const isWithdrawn = slot.entry?.status === 'withdrawn';
       const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
-      const isDimmed = hasSearch && !isOriginalBye && slot.entry && !searchMatches.has(slot.drawPosition);
+      const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
       const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
-
-      // BYEスロットは表示しない（トーナメント表と同じ表示）
-      if (isOriginalBye) continue;
 
       // Status dot color
       let statusDotColor = '#d1d5db'; // gray - unchecked
@@ -820,9 +804,9 @@ export default function EntryRegistration() {
   }
 
   return (
-    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col p-4">
-      {/* TOP: プルダウン式コントロールパネル */}
-      <div className="shrink-0 mb-3">
+    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
+      {/* LEFT: コントロールパネル（プルダウン式、スクロールで自動非表示） */}
+      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0">
         {/* Toggle button - always visible */}
         <button
           onClick={() => setControlsOpen(prev => !prev)}
@@ -830,10 +814,10 @@ export default function EntryRegistration() {
         >
           <div className="flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-primary-500" />
-            <span className="font-bold text-gray-900">エントリー受付</span>
+            <span className="font-bold text-gray-900 text-sm">エントリー受付</span>
             {(showAllEvents || selectedEventId) && (
-              <span className="text-xs text-gray-500 ml-2">
-                {overallStats.checkedIn}/{overallStats.total} 受付済
+              <span className="text-xs text-gray-500">
+                {overallStats.checkedIn}/{overallStats.total}
               </span>
             )}
           </div>
@@ -929,8 +913,8 @@ export default function EntryRegistration() {
         </div>
       </div>
 
-      {/* Main content area (draw tables) */}
-      <div ref={contentRef} className="flex-1 min-w-0 overflow-y-auto space-y-4 min-h-0">
+      {/* RIGHT: Main content area (draw tables) */}
+      <div ref={contentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-y-auto space-y-4 min-h-0">
         {showAllEvents ? (
           events.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
