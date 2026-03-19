@@ -166,6 +166,7 @@ function GitHubSection({ setStatus }: { setStatus: (s: any) => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRestoring, setIsRestoring] = useState<string | null>(null);
+  const [isImportingLatest, setIsImportingLatest] = useState(false);
   const [showTokenInput, setShowTokenInput] = useState(false);
 
   const config: GitHubConfig = { token };
@@ -239,6 +240,31 @@ function GitHubSection({ setStatus }: { setStatus: (s: any) => void }) {
       setStatus({ type: 'error', message: `保存失敗: ${err}` });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // GitHub から最新のバックアップをワンクリックで復元
+  const handleImportLatest = async () => {
+    setIsImportingLatest(true);
+    setStatus(null);
+    try {
+      const files = await listBackups(config);
+      if (files.length === 0) {
+        setStatus({ type: 'error', message: 'GitHub にバックアップファイルがありません' });
+        return;
+      }
+      const latest = files[0];
+      if (!confirm(`最新のバックアップを復元しますか？\n${latest.name}\n\n現在のデータは全て上書きされます。`)) return;
+
+      const data = await downloadBackup(config, latest);
+      await restoreBackupData(data);
+      setStatus({ type: 'success', message: `復元完了: ${latest.name}` });
+      await loadBackups();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `インポート失敗: ${err}` });
+    } finally {
+      setIsImportingLatest(false);
     }
   };
 
@@ -349,22 +375,32 @@ function GitHubSection({ setStatus }: { setStatus: (s: any) => void }) {
         )}
 
         {isConnected && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleSaveToGitHub}
-              disabled={isSaving}
-              className="flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 shadow-sm transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              {isSaving ? '保存中...' : 'GitHub に保存'}
-            </button>
+          <div className="space-y-3">
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={handleSaveToGitHub}
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-black disabled:opacity-50 shadow-sm transition-colors text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                {isSaving ? 'エクスポート中...' : 'GitHub にエクスポート'}
+              </button>
+              <button
+                onClick={handleImportLatest}
+                disabled={isImportingLatest}
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-black disabled:opacity-50 shadow-sm transition-colors text-sm"
+              >
+                <Download className="w-4 h-4" />
+                {isImportingLatest ? 'インポート中...' : 'GitHub からインポート（最新）'}
+              </button>
+            </div>
             <button
               onClick={() => loadBackups()}
               disabled={isLoading}
-              className="flex items-center gap-2 bg-white text-gray-600 border border-border-main px-4 py-2.5 rounded-md font-medium hover:bg-primary-50 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              更新
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              一覧を更新
             </button>
           </div>
         )}
