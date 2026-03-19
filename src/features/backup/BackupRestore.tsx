@@ -4,8 +4,31 @@ import * as XLSX from 'xlsx';
 import {
   Save, Download, Upload, Trash2, AlertTriangle, CheckCircle,
   Github, RefreshCw, Key, FolderOpen, FileDown, FileUp,
-  FileSpreadsheet, Clock, HardDrive, Cloud, X, ExternalLink
+  FileSpreadsheet, Clock, HardDrive, X
 } from 'lucide-react';
+
+/** Google Drive ブランドアイコン (三角形ロゴ) */
+function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5l5.4 9.35z" fill="#0066DA"/>
+      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L3.45 44.7c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
+      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.85L73.55 76.8z" fill="#EA4335"/>
+      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
+      <path d="M59.85 53H27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L59.85 53z" fill="#2684FC"/>
+      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.2 28h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
+    </svg>
+  );
+}
+
+// Google Drive ブランドカラー
+const GDRIVE_COLOR = {
+  bg: 'bg-[#1a73e8]',
+  bgHover: 'hover:bg-[#1557b0]',
+  text: 'text-[#1a73e8]',
+  bgLight: 'bg-[#e8f0fe]',
+  border: 'border-[#1a73e8]/20',
+};
 import {
   listBackups, downloadBackup, uploadBackup, deleteBackup, validateToken,
   getSavedToken, saveToken, clearToken,
@@ -142,7 +165,7 @@ export default function BackupRestore() {
       {/* セクション切り替えタブ */}
       <div className="flex gap-1 bg-white rounded-xl shadow-sm border border-border-main p-1.5">
         {([
-          { key: 'gdrive' as const, label: 'Google ドライブ', icon: Cloud, color: 'text-blue-500' },
+          { key: 'gdrive' as const, label: 'Google ドライブ', icon: GoogleDriveIcon, color: 'text-[#1a73e8]' },
           { key: 'github' as const, label: 'GitHub', icon: Github, color: 'text-gray-900' },
           { key: 'local' as const, label: 'ローカル JSON', icon: HardDrive, color: 'text-primary-500' },
           { key: 'excel' as const, label: 'Excel', icon: FileSpreadsheet, color: 'text-green-600' },
@@ -358,7 +381,7 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
       <div className="bg-white rounded-xl shadow-sm border border-border-main p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-bold text-gray-900 flex items-center gap-2">
-            <Cloud className="w-5 h-5 text-blue-500" />
+            <GoogleDriveIcon className="w-5 h-5" />
             Google ドライブ バックアップ
           </h2>
           {isConnected ? (
@@ -400,7 +423,7 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
                   <button
                     onClick={handleConnect}
                     disabled={!clientIdInput.trim() || isConnecting}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    className={`px-4 py-2 ${GDRIVE_COLOR.bg} text-white rounded-lg text-sm font-medium ${GDRIVE_COLOR.bgHover} disabled:opacity-50 transition-colors whitespace-nowrap`}
                   >
                     {isConnecting ? '接続中...' : 'Google で認証'}
                   </button>
@@ -416,9 +439,9 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
               <button
                 onClick={handleConnect}
                 disabled={isConnecting}
-                className="flex items-center gap-2 bg-blue-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-blue-600 disabled:opacity-50 shadow-sm transition-colors"
+                className={`flex items-center gap-2 ${GDRIVE_COLOR.bg} text-white px-5 py-2.5 rounded-md font-medium ${GDRIVE_COLOR.bgHover} disabled:opacity-50 shadow-sm transition-colors`}
               >
-                <Cloud className="w-4 h-4" />
+                <GoogleDriveIcon className="w-4 h-4" />
                 {isConnecting ? '認証中...' : 'Google ドライブに接続'}
               </button>
             )}
@@ -431,19 +454,30 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors text-sm"
+                className={`flex items-center gap-2 ${GDRIVE_COLOR.bg} text-white px-6 py-3 rounded-lg font-semibold ${GDRIVE_COLOR.bgHover} disabled:opacity-50 shadow-sm transition-colors text-sm`}
               >
-                <Upload className="w-4 h-4" />
+                <GoogleDriveIcon className="w-4 h-4" />
                 {isSaving ? 'エクスポート中...' : 'Google ドライブにエクスポート'}
               </button>
               <button
                 onClick={handleImportLatest}
                 disabled={isImportingLatest}
-                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors text-sm"
+                className={`flex items-center gap-2 ${GDRIVE_COLOR.bg} text-white px-6 py-3 rounded-lg font-semibold ${GDRIVE_COLOR.bgHover} disabled:opacity-50 shadow-sm transition-colors text-sm`}
               >
-                <Download className="w-4 h-4" />
+                <GoogleDriveIcon className="w-4 h-4" />
                 {isImportingLatest ? 'インポート中...' : 'Google ドライブからインポート（最新）'}
               </button>
+              {folderLink && (
+                <a
+                  href={folderLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-2 ${GDRIVE_COLOR.bgLight} ${GDRIVE_COLOR.text} px-5 py-3 rounded-lg font-semibold hover:brightness-95 transition-all text-sm border ${GDRIVE_COLOR.border}`}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  バックアップフォルダを開く
+                </a>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -454,17 +488,6 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                 一覧を更新
               </button>
-              {folderLink && (
-                <a
-                  href={folderLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  ドライブで開く
-                </a>
-              )}
               <button
                 onClick={handleResetClientId}
                 className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors ml-auto"
@@ -481,7 +504,7 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
         <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
             <h3 className="font-bold text-sm text-gray-700 flex items-center gap-2">
-              <FolderOpen className="w-4 h-4 text-blue-500" />
+              <GoogleDriveIcon className="w-4 h-4" />
               保存済みバックアップ
             </h3>
             <span className="text-xs text-gray-400">{backups.length} 件</span>
@@ -494,13 +517,13 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
             </div>
           ) : backups.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
-              <Cloud className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <GoogleDriveIcon className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">バックアップファイルがありません</p>
             </div>
           ) : (
             <div className="divide-y divide-border-main max-h-[400px] overflow-auto">
               {backups.map(file => (
-                <div key={file.id} className="px-4 py-3 flex items-center gap-3 hover:bg-blue-50/50 transition-colors">
+                <div key={file.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[#e8f0fe]/50 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                     <div className="flex items-center gap-3 mt-0.5">
@@ -517,7 +540,7 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
                     <button
                       onClick={() => handleRestore(file)}
                       disabled={isRestoring === file.id}
-                      className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                      className={`px-3 py-1.5 text-xs font-medium ${GDRIVE_COLOR.bgLight} ${GDRIVE_COLOR.text} rounded-md hover:brightness-95 disabled:opacity-50 transition-colors`}
                     >
                       {isRestoring === file.id ? '復元中...' : '復元'}
                     </button>
@@ -809,7 +832,7 @@ function GitHubSection({ setStatus }: { setStatus: (s: any) => void }) {
             </div>
           ) : backups.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
-              <Cloud className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <Github className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">バックアップファイルがありません</p>
             </div>
           ) : (
