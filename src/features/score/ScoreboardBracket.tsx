@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Timer } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../../features/draw/DrawBoard';
 
 interface ScoreboardBracketProps {

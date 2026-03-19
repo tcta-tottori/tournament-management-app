@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/appStore';
 import type { Match, Court } from '../../db/database';
 import {
   BarChart2, Play, CheckCircle, Clock, Trophy, Users, MapPin,
-  AlertCircle, Timer, TrendingUp, ChevronDown, ChevronUp,
+  AlertCircle, Timer,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ export default function LiveDashboard() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showCourtDetail, setShowCourtDetail] = useState(false);
+
 
   // Tick clock every 30s
   useEffect(() => {
