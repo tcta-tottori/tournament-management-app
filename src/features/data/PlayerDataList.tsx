@@ -183,11 +183,12 @@ export default function PlayerDataList() {
         }
         setStatus({ message: `${count}件の所属ふりがなをインポートしました。`, isError: false });
       } else {
-        // ふりがなの一括更新: 「選手名」「ふりがな」列
-        let count = 0;
+        // ふりがなの一括更新: 「選手名」「氏名」「漢字」「ふりがな」列
+        let dictCount = 0;
+        let playerCount = 0;
         const allPlayers = await db.players.toArray();
         for (const row of rows) {
-          const name = String(row['選手名'] || row['漢字'] || row['name'] || '').trim();
+          const name = String(row['選手名'] || row['氏名'] || row['漢字'] || row['name'] || '').trim();
           const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
           if (!name || !furigana) continue;
           const nameKey = name.replace(/\s+/g, '');
@@ -195,7 +196,7 @@ export default function PlayerDataList() {
           const matched = allPlayers.filter(p => p.playerId === nameKey || p.name.replace(/\s+/g, '') === nameKey);
           for (const p of matched) {
             await db.players.update(p.id!, { furigana });
-            count++;
+            playerCount++;
           }
           // ふりがな辞書にも反映
           await db.furiganaDict.put({
@@ -204,8 +205,10 @@ export default function PlayerDataList() {
             type: 'manual',
             updatedAt: Date.now(),
           });
+          dictCount++;
         }
-        setStatus({ message: `${count}件のふりがなをインポートしました。`, isError: false });
+        const playerMsg = playerCount > 0 ? `（選手${playerCount}名に適用）` : '';
+        setStatus({ message: `${dictCount}件のふりがな辞書をインポートしました。${playerMsg}`, isError: false });
       }
     } catch (error: any) {
       setStatus({ message: `インポート失敗: ${error.message}`, isError: true });

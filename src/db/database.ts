@@ -186,7 +186,7 @@ export { db };
 // シードデータの初期ロード
 // 初回起動時にふりがな辞書・所属ふりがなをプリセット
 // ---------------------------
-const SEED_KEY = 'tennis-seed-loaded-v1';
+const SEED_KEY = 'tennis-seed-loaded-v2';
 
 export async function loadSeedDataIfNeeded(): Promise<void> {
   if (localStorage.getItem(SEED_KEY)) return; // 既に初期化済み
@@ -194,9 +194,8 @@ export async function loadSeedDataIfNeeded(): Promise<void> {
   try {
     const { FURIGANA_SEED, AFFILIATION_SEED } = await import('./seedData');
 
-    // ふりがな辞書
-    const existingFurigana = await db.furiganaDict.count();
-    if (existingFurigana === 0 && FURIGANA_SEED.length > 0) {
+    // ふりがな辞書（bulkPut = 既存キーは上書き、新規は追加）
+    if (FURIGANA_SEED.length > 0) {
       const entries = FURIGANA_SEED.map(([name, furigana]) => ({
         name,
         furigana,
@@ -204,11 +203,11 @@ export async function loadSeedDataIfNeeded(): Promise<void> {
         updatedAt: Date.now(),
       }));
       await db.furiganaDict.bulkPut(entries);
+      console.log(`シード: ふりがな辞書 ${entries.length}件を登録`);
     }
 
     // 所属ふりがな
-    const existingAff = await db.affiliationFurigana.count();
-    if (existingAff === 0 && AFFILIATION_SEED.length > 0) {
+    if (AFFILIATION_SEED.length > 0) {
       const entries = AFFILIATION_SEED.map(([name, furigana]) => ({
         name,
         furigana,
@@ -221,7 +220,16 @@ export async function loadSeedDataIfNeeded(): Promise<void> {
         seen.add(e.name);
         return true;
       });
-      await db.affiliationFurigana.bulkAdd(unique);
+      // 既存データがあれば上書き
+      for (const entry of unique) {
+        const existing = await db.affiliationFurigana.where('name').equals(entry.name).first();
+        if (existing) {
+          await db.affiliationFurigana.update(existing.id!, { furigana: entry.furigana, updatedAt: entry.updatedAt });
+        } else {
+          await db.affiliationFurigana.add(entry);
+        }
+      }
+      console.log(`シード: 所属ふりがな ${unique.length}件を登録`);
     }
 
     localStorage.setItem(SEED_KEY, '1');

@@ -147,8 +147,8 @@ export default function FuriganaManager() {
       let updatedCount = 0;
 
       for (const row of jsonData) {
-        // Excelのカラム名が "漢字"(kanji) と "ふりがな"(furigana) であることを期待
-        const kanji = row['漢字'] || row['kanji'];
+        // Excelのカラム名: "氏名" / "漢字" / "選手名" / "kanji" と "ふりがな" / "furigana"
+        const kanji = row['氏名'] || row['漢字'] || row['選手名'] || row['kanji'];
         const furigana = row['ふりがな'] || row['furigana'];
 
         if (kanji && furigana) {
