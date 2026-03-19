@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CalendarClock, Zap, Printer, Trash2 } from 'lucide-react';
+import { CalendarClock, Zap, Printer, Trash2, Upload, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import {
   extractMatchesFromDraw,
   autoSchedule,
@@ -30,8 +31,8 @@ const EVENT_COLORS = [
 function abbreviateEventName(name: string): string {
   return name
     .replace(/一般/g, '')
-    .replace(/男子/g, '男')
-    .replace(/女子/g, '女')
+    .replace(/男子/g, 'M')
+    .replace(/女子/g, 'W')
     .replace(/シングルス/g, 'S')
     .replace(/ダブルス/g, 'D')
     .replace(/ミックス/g, 'MX')
@@ -54,6 +55,9 @@ export default function ScheduleSheet() {
   // Schedule data (local state, not DB)
   const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
   const [allScheduleMatches, setAllScheduleMatches] = useState<ScheduleMatch[]>([]);
+
+  // Excel import
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Swap interaction
   const [selectedCell, setSelectedCell] = useState<{
@@ -480,6 +484,164 @@ export default function ScheduleSheet() {
     }
   }, [gridData, scheduleSlots, allScheduleMatches, courtNames, tournament, events]);
 
+  // --------------- Excel Export ---------------
+
+  const handleExcelExport = useCallback(() => {
+    if (!gridData || scheduleSlots.length === 0) return;
+
+    const matchInfoMap = new Map<string, ScheduleMatch>();
+    allScheduleMatches.forEach(m => matchInfoMap.set(m.matchId, m));
+
+    // Build rows: header + court rows
+    const headerRow = ['コート', ...gridData.timeHeaders];
+    const rows: (string | null)[][] = [headerRow];
+
+    for (const cn of courtNames) {
+      const row: (string | null)[] = [cn];
+      for (let si = 0; si <= gridData.maxSlotIdx; si++) {
+        const slot = scheduleSlots.find(s => s.courtName === cn && s.timeSlotIndex === si);
+        if (slot) {
+          const match = matchInfoMap.get(slot.matchId);
+          const evName = match ? abbreviateEventName(match.eventName) : '';
+          row.push(`${evName} ${slot.roundLabel}`);
+        } else {
+          row.push(null);
+        }
+      }
+      rows.push(row);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '時間割');
+    const fileName = tournament?.name ? `時間割_${tournament.name}.xlsx` : '時間割.xlsx';
+    XLSX.writeFile(wb, fileName);
+  }, [gridData, scheduleSlots, allScheduleMatches, courtNames, tournament]);
+
+  // --------------- Excel Import ---------------
+
+  const handleExcelImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentTournamentId) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: (string | number | null)[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      if (rows.length < 2) {
+        setStatusMessage('Excelのデータが不足しています（ヘッダー行＋データ行が必要です）。');
+        return;
+      }
+
+      // Parse header row to get time slots
+      const headerRow = rows[0].map(v => String(v ?? '').trim());
+      // Find time columns (HH:MM format)
+      const timeColumns: { colIdx: number; time: string }[] = [];
+      for (let c = 1; c < headerRow.length; c++) {
+        const val = headerRow[c];
+        if (/^\d{1,2}:\d{2}$/.test(val)) {
+          timeColumns.push({ colIdx: c, time: val.padStart(5, '0') });
+        }
+      }
+
+      if (timeColumns.length === 0) {
+        setStatusMessage('Excelのヘッダー行に時刻（HH:MM形式）が見つかりません。');
+        return;
+      }
+
+      // Detect startTime and matchDuration from time columns
+      const importedStartTime = timeColumns[0].time;
+      let importedDuration = matchDuration;
+      if (timeColumns.length >= 2) {
+        const t1Parts = timeColumns[0].time.split(':');
+        const t2Parts = timeColumns[1].time.split(':');
+        const min1 = parseInt(t1Parts[0]) * 60 + parseInt(t1Parts[1]);
+        const min2 = parseInt(t2Parts[0]) * 60 + parseInt(t2Parts[1]);
+        if (min2 > min1) importedDuration = min2 - min1;
+      }
+
+      // Ensure courts exist in DB
+      const existingCourts = await db.courts.where('tournamentId').equals(currentTournamentId).toArray();
+      const existingCourtNames = new Set(existingCourts.map(c => c.name));
+
+      // Parse data rows
+      const importedSlots: ScheduleSlot[] = [];
+      const importedCourtNames: string[] = [];
+
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.length === 0) continue;
+        const courtName = String(row[0] ?? '').trim();
+        if (!courtName) continue;
+
+        importedCourtNames.push(courtName);
+
+        // Ensure court exists in DB
+        if (!existingCourtNames.has(courtName)) {
+          await db.courts.add({
+            tournamentId: currentTournamentId,
+            courtId: `C-${Date.now()}-${r}`,
+            name: courtName,
+            surface: '',
+            isAvailable: true,
+            currentMatchId: null,
+            order: existingCourts.length + r,
+          });
+          existingCourtNames.add(courtName);
+        }
+
+        for (const tc of timeColumns) {
+          const cellValue = String(row[tc.colIdx] ?? '').trim();
+          if (!cellValue) continue;
+
+          const slotIdx = timeColumns.indexOf(tc);
+          const matchId = `import-${courtName}-${slotIdx}-${Date.now()}`;
+
+          importedSlots.push({
+            matchId,
+            courtIndex: importedCourtNames.length - 1,
+            courtName,
+            timeSlotIndex: slotIdx,
+            startTime: tc.time,
+            eventCode: 'imported',
+            roundLabel: cellValue,
+          });
+        }
+      }
+
+      if (importedSlots.length === 0) {
+        setStatusMessage('Excelからスケジュールデータを読み取れませんでした。');
+        return;
+      }
+
+      // Update state
+      setStartTime(importedStartTime);
+      setMatchDuration(importedDuration);
+      setScheduleSlots(importedSlots);
+      setAllScheduleMatches([]);
+      setSelectedCell(null);
+
+      // Enable matching court blocks
+      const importedCourtNums = importedCourtNames.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      setCourtBlocks({
+        A: importedCourtNums.some(n => n >= 1 && n <= 4),
+        B: importedCourtNums.some(n => n >= 5 && n <= 8),
+        C: importedCourtNums.some(n => n >= 9 && n <= 12),
+        D: importedCourtNums.some(n => n >= 13 && n <= 16),
+      });
+
+      setStatusMessage(`Excelから ${importedSlots.length} 件のスケジュールを読み込みました。`);
+    } catch (err) {
+      console.error(err);
+      setStatusMessage(`Excel読み込みに失敗しました: ${(err as Error).message}`);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [currentTournamentId, matchDuration]);
+
   // --------------- Render ---------------
 
   return (
@@ -585,6 +747,31 @@ export default function ScheduleSheet() {
           >
             <Printer className="w-4 h-4" />
             印刷
+          </button>
+
+          {/* Excel buttons */}
+          <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelImport}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 shadow-sm transition-colors text-sm"
+          >
+            <Upload className="w-4 h-4" />
+            Excel読込
+          </button>
+          <button
+            onClick={handleExcelExport}
+            disabled={scheduleSlots.length === 0}
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Excel出力
           </button>
         </div>
 
