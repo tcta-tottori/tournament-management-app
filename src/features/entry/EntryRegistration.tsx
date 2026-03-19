@@ -516,6 +516,32 @@ export default function EntryRegistration() {
         const yBottom = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
         const yMid = getY(r + 1, m) + SLOT_HEIGHT / 2;
 
+        // Round 0: BYEスロットへの線を調整
+        if (r === 0) {
+          const topSlot = m * 2 < displaySlots.length ? displaySlots[m * 2] : null;
+          const bottomSlot = m * 2 + 1 < displaySlots.length ? displaySlots[m * 2 + 1] : null;
+          const topIsBye = !topSlot || (topSlot.isBye && !topSlot.entry);
+          const bottomIsBye = !bottomSlot || (bottomSlot.isBye && !bottomSlot.entry);
+
+          if (topIsBye && bottomIsBye) {
+            // 両方BYE → 線を描画しない
+            continue;
+          } else if (topIsBye) {
+            // 上がBYE → 下のスロットから次ラウンドへ直接接続
+            svgPaths.push(
+              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${yBottom} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
+            );
+            continue;
+          } else if (bottomIsBye) {
+            // 下がBYE → 上のスロットから次ラウンドへ直接接続
+            svgPaths.push(
+              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${yTop} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
+            );
+            continue;
+          }
+        }
+
+        // 通常のブラケット線（両方にエントリーがある場合）
         // Top path
         svgPaths.push(
           <path
@@ -680,7 +706,7 @@ export default function EntryRegistration() {
         )}
 
         {/* Bracket container */}
-        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+        <div className="overflow-auto">
           <div className="relative" style={{ width: containerWidth, height: containerHeight, minWidth: containerWidth }}>
             {/* Round labels at top */}
             {roundLabels.map((label, r) => (
@@ -804,7 +830,7 @@ export default function EntryRegistration() {
   }
 
   return (
-    <div className="max-w-full mx-auto h-[calc(100vh-120px)] flex flex-col lg:flex-row lg:gap-4 p-4">
+    <div className="max-w-full mx-auto h-full flex flex-col lg:flex-row lg:gap-4 p-4">
       {/* LEFT: コントロールパネル（プルダウン式、スクロールで自動非表示） */}
       <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0">
         {/* Toggle button - always visible */}

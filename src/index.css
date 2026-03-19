@@ -317,3 +317,9 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* 縦書きテキスト */
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
