@@ -83,34 +83,27 @@ export default function AppLayout() {
 
       {/* ===== ヘッダー ===== */}
       <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
-        {/* ゴールド波型ライン — 上部 */}
-        <svg className="header-gold-wave header-gold-wave-top" viewBox="0 0 1440 8" preserveAspectRatio="none">
-          <path d="M0,4 C120,0 240,8 360,4 C480,0 600,8 720,4 C840,0 960,8 1080,4 C1200,0 1320,8 1440,4" fill="none" stroke="url(#gold-grad-top)" strokeWidth="2"/>
+        {/* ゴールド波型ライン — ヘッダー全体に散りばめ */}
+        <svg className="header-gold-waves" viewBox="0 0 1440 56" preserveAspectRatio="none">
           <defs>
-            <linearGradient id="gold-grad-top" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgba(191,155,48,0)" />
-              <stop offset="15%" stopColor="rgba(218,185,92,0.5)" />
-              <stop offset="50%" stopColor="rgba(255,215,120,0.9)" />
-              <stop offset="85%" stopColor="rgba(218,185,92,0.5)" />
-              <stop offset="100%" stopColor="rgba(191,155,48,0)" />
+            <linearGradient id="gold-wave-g" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgba(218,185,92,0)" />
+              <stop offset="20%" stopColor="rgba(218,185,92,0.18)" />
+              <stop offset="50%" stopColor="rgba(255,215,120,0.25)" />
+              <stop offset="80%" stopColor="rgba(218,185,92,0.18)" />
+              <stop offset="100%" stopColor="rgba(218,185,92,0)" />
             </linearGradient>
           </defs>
-        </svg>
-
-        {/* ゴールド波型ライン — 下部 */}
-        <svg className="header-gold-wave header-gold-wave-bottom" viewBox="0 0 1440 10" preserveAspectRatio="none">
-          <path d="M0,5 C180,1 360,9 540,5 C720,1 900,9 1080,5 C1260,1 1440,9 1440,5" fill="none" stroke="url(#gold-grad-bottom)" strokeWidth="2.5"/>
-          <path d="M0,5 C180,1 360,9 540,5 C720,1 900,9 1080,5 C1260,1 1440,9 1440,5" fill="none" stroke="url(#gold-grad-bottom)" strokeWidth="6" opacity="0.15"/>
-          <defs>
-            <linearGradient id="gold-grad-bottom" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="rgba(191,155,48,0)" />
-              <stop offset="10%" stopColor="rgba(218,185,92,0.6)" />
-              <stop offset="40%" stopColor="rgba(255,215,120,1)" />
-              <stop offset="60%" stopColor="rgba(245,208,100,0.95)" />
-              <stop offset="90%" stopColor="rgba(218,185,92,0.6)" />
-              <stop offset="100%" stopColor="rgba(191,155,48,0)" />
-            </linearGradient>
-          </defs>
+          {/* 波1 — 上部を横切る緩やかな波 */}
+          <path d="M0,8 C200,3 400,14 600,8 C800,2 1000,13 1200,7 C1320,4 1400,10 1440,8" fill="none" stroke="url(#gold-wave-g)" strokeWidth="1" />
+          {/* 波2 — 中央付近の大きな波 */}
+          <path d="M0,26 C160,20 320,34 480,26 C640,18 800,35 960,27 C1120,19 1280,33 1440,26" fill="none" stroke="url(#gold-wave-g)" strokeWidth="1.2" opacity="0.7" />
+          {/* 波3 — やや上寄りの細い波 */}
+          <path d="M0,17 C240,12 480,22 720,16 C960,10 1200,23 1440,17" fill="none" stroke="url(#gold-wave-g)" strokeWidth="0.8" opacity="0.5" />
+          {/* 波4 — 下寄りの波 */}
+          <path d="M0,40 C180,35 360,46 540,39 C720,32 900,47 1080,40 C1260,33 1380,44 1440,40" fill="none" stroke="url(#gold-wave-g)" strokeWidth="1" opacity="0.6" />
+          {/* 波5 — 最下部の細い波 */}
+          <path d="M0,50 C300,46 600,54 900,49 C1100,45 1300,53 1440,50" fill="none" stroke="url(#gold-wave-g)" strokeWidth="0.7" opacity="0.4" />
         </svg>
 
         {/* ロゴ */}
