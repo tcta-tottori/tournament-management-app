@@ -382,7 +382,8 @@ export default function DrawBoard() {
                 disabled={!drawData}
                 className="flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
               >
-                <Download className="w-4 h-4" />
+                <FileSpreadsheet className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
                 Excel出力
               </button>
               <button

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CalendarClock, Zap, Printer, Trash2, Upload, Download } from 'lucide-react';
+import { CalendarClock, Zap, Printer, Trash2, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   extractMatchesFromDraw,
@@ -1061,7 +1061,8 @@ export default function ScheduleSheet() {
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 shadow-sm transition-colors text-sm"
           >
-            <Upload className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4" />
+            <Upload className="w-3.5 h-3.5" />
             Excel読込
           </button>
           <button
@@ -1069,7 +1070,8 @@ export default function ScheduleSheet() {
             disabled={scheduleSlots.length === 0}
             className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
           >
-            <Download className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
             Excel出力
           </button>
         </div>

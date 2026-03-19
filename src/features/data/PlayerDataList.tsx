@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
 import {
   Search, Download, Upload, Pencil, Check, X,
-  CheckCircle2, AlertCircle, Users, Building2,
+  CheckCircle2, AlertCircle, Users, Building2, FileSpreadsheet,
 } from 'lucide-react';
 
 type TabId = 'affiliation' | 'furigana';
@@ -168,29 +168,31 @@ export default function PlayerDataList() {
         // 所属ふりがなの一括更新: 「所属名」「ふりがな」列
         let count = 0;
         for (const row of rows) {
-          const name = String(row['所属名'] || '').trim();
-          const furigana = String(row['ふりがな'] || '').trim();
+          const name = String(row['所属名'] || row['name'] || '').trim();
+          const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
           if (!name) continue;
-          // DB直接クエリ（staleなstateではなく最新データを参照）
           const existing = await db.affiliationFurigana.where('name').equals(name).first();
           if (existing) {
             await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: Date.now() });
-          } else if (furigana) {
-            // put()でupsert（unique制約違反を回避）
-            await db.affiliationFurigana.put({ name, furigana, updatedAt: Date.now() });
+            count++;
+          } else {
+            // 新規追加 (add()でauto-increment idを自動付与)
+            await db.affiliationFurigana.add({ name, furigana, updatedAt: Date.now() });
+            count++;
           }
-          count++;
         }
-        setStatus({ message: `${count}件の所属ふりがなを更新しました。`, isError: false });
+        setStatus({ message: `${count}件の所属ふりがなをインポートしました。`, isError: false });
       } else {
         // ふりがなの一括更新: 「選手名」「ふりがな」列
         let count = 0;
+        const allPlayers = await db.players.toArray();
         for (const row of rows) {
-          const name = String(row['選手名'] || row['漢字'] || '').trim();
+          const name = String(row['選手名'] || row['漢字'] || row['name'] || '').trim();
           const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
           if (!name || !furigana) continue;
           const nameKey = name.replace(/\s+/g, '');
-          const matched = players.filter(p => p.playerId === nameKey || p.name.replace(/\s+/g, '') === nameKey);
+          // DB最新データで照合
+          const matched = allPlayers.filter(p => p.playerId === nameKey || p.name.replace(/\s+/g, '') === nameKey);
           for (const p of matched) {
             await db.players.update(p.id!, { furigana });
             count++;
@@ -203,7 +205,7 @@ export default function PlayerDataList() {
             updatedAt: Date.now(),
           });
         }
-        setStatus({ message: `${count}件のふりがなを更新しました。`, isError: false });
+        setStatus({ message: `${count}件のふりがなをインポートしました。`, isError: false });
       }
     } catch (error: any) {
       setStatus({ message: `インポート失敗: ${error.message}`, isError: true });
@@ -265,18 +267,20 @@ export default function PlayerDataList() {
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
           title="Excelインポート"
         >
-          <Upload className="w-4 h-4" />
+          <FileSpreadsheet className="w-4 h-4" />
+          <Upload className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">インポート</span>
         </button>
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
           title="Excelエクスポート"
         >
-          <Download className="w-4 h-4" />
+          <FileSpreadsheet className="w-4 h-4" />
+          <Download className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">エクスポート</span>
         </button>
         <input

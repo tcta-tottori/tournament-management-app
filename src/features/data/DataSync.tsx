@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
-import { Github, RefreshCw, CheckCircle2, AlertCircle, Clock, FolderOpen } from 'lucide-react';
+import { Github, RefreshCw, CheckCircle2, AlertCircle, Clock, FolderOpen, FileSpreadsheet, Upload } from 'lucide-react';
 import { getSavedToken } from '../backup/githubApi';
 import {
   getSavedToken as gdriveGetSavedToken,
@@ -235,10 +236,11 @@ async function syncFuriganaFromBackupData(
 
 export default function DataSync() {
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncSource, setSyncSource] = useState<'github' | 'gdrive' | null>(null);
+  const [syncSource, setSyncSource] = useState<'github' | 'gdrive' | 'excel' | null>(null);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [gdriveFolderLink, setGdriveFolderLink] = useState('');
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   // Google Drive 接続状態
   const hasGDrive = !!getSavedClientId() && gdriveIsTokenValid();
@@ -336,6 +338,75 @@ export default function DataSync() {
     }
   }, [updateLastSync]);
 
+  // Excel からふりがなを同期
+  const syncFromExcel = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSyncing(true);
+    setSyncSource('excel');
+    setSyncResult(null);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(ws);
+
+      const now = Date.now();
+      let dictCount = 0;
+      let playerCount = 0;
+      const details: string[] = [`ファイル: ${file.name}`];
+
+      for (const row of rows) {
+        const name = String(row['漢字'] || row['選手名'] || row['name'] || '').trim();
+        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+        if (!name || !furigana) continue;
+
+        const key = removeSpaces(name);
+        const furiganaClean = removeSpaces(furigana);
+
+        // ふりがな辞書に登録
+        const existing = await db.furiganaDict.get(key);
+        if (!existing || existing.type !== 'manual') {
+          await db.furiganaDict.put({
+            name: key,
+            furigana: furiganaClean,
+            type: 'manual',
+            updatedAt: now,
+          });
+          dictCount++;
+        }
+
+        // 選手データにも反映
+        const player = await db.players.where('playerId').equals(key).first();
+        if (player && (!player.furigana || player.furigana !== furigana)) {
+          await db.players.where('playerId').equals(key).modify({ furigana });
+          playerCount++;
+        }
+      }
+
+      details.push(`ふりがな辞書: ${dictCount}件 更新`);
+      if (playerCount > 0) details.push(`選手ふりがな: ${playerCount}件 更新`);
+
+      updateLastSync();
+      setSyncResult({
+        success: true,
+        message: `Excelからふりがなデータをインポートしました`,
+        details,
+      });
+    } catch (err) {
+      setSyncResult({
+        success: false,
+        message: `インポートに失敗しました: ${(err as Error).message}`,
+      });
+    } finally {
+      setIsSyncing(false);
+      setSyncSource(null);
+      if (excelInputRef.current) excelInputRef.current.value = '';
+    }
+  }, [updateLastSync]);
+
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {
         year: 'numeric', month: '2-digit', day: '2-digit',
@@ -387,6 +458,25 @@ export default function DataSync() {
             <Github className="w-4 h-4" />
             <span>GitHub から同期</span>
             {isSyncing && syncSource === 'github' && <RefreshCw className="w-4 h-4 animate-spin" />}
+          </button>
+
+          {/* Excel インポートボタン */}
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={syncFromExcel}
+          />
+          <button
+            onClick={() => excelInputRef.current?.click()}
+            disabled={isSyncing}
+            className="flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <Upload className="w-3.5 h-3.5" />
+            <span>Excelから同期</span>
+            {isSyncing && syncSource === 'excel' && <RefreshCw className="w-4 h-4 animate-spin" />}
           </button>
 
           {/* Google Drive フォルダを開く */}
