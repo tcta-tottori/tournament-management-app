@@ -44,7 +44,7 @@
 }
 
 /* ===========================================================
-   ヘッダー — トワイライトエクスプレス風エレガントデザイン
+   ヘッダー — 深緑背景 + ゴールド波型ラインのエレガントデザイン
    =========================================================== */
 .header-main {
   position: relative;
@@ -53,61 +53,29 @@
   overflow: hidden;
 }
 
-/* ゴールド流線型ライン — 上部 */
-.header-main::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(191, 155, 48, 0.3) 10%,
-    rgba(218, 185, 92, 0.8) 30%,
-    rgba(255, 215, 120, 1) 50%,
-    rgba(218, 185, 92, 0.8) 70%,
-    rgba(191, 155, 48, 0.3) 90%,
-    transparent 100%
-  );
-  z-index: 1;
-}
-
-/* ゴールド流線型ライン — 下部（メインライン） */
-.header-main::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2.5px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(191, 155, 48, 0.2) 5%,
-    rgba(218, 185, 92, 0.7) 20%,
-    rgba(255, 215, 120, 1) 40%,
-    rgba(245, 208, 100, 0.9) 60%,
-    rgba(218, 185, 92, 0.7) 80%,
-    rgba(191, 155, 48, 0.2) 95%,
-    transparent 100%
-  );
-  box-shadow:
-    0 0 8px rgba(218, 185, 92, 0.4),
-    0 0 20px rgba(218, 185, 92, 0.15);
-  z-index: 1;
-}
-
-/* ゴールドのアンビエント光彩 */
-@keyframes gold-shimmer {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
-}
-
 .header-main > * {
   position: relative;
   z-index: 2;
+}
+
+/* ゴールド波型SVGライン共通 */
+.header-gold-wave {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.header-gold-wave-top {
+  top: 0;
+  height: 8px;
+}
+
+.header-gold-wave-bottom {
+  bottom: 0;
+  height: 10px;
+  filter: drop-shadow(0 0 6px rgba(218, 185, 92, 0.4));
 }
 
 .header-logo {
