@@ -485,25 +485,62 @@ export default function EntryRegistration() {
     // Round labels (優勝ノードなし)
     const roundLabels: string[] = [];
     for (let r = 0; r < totalRoundsToShow; r++) {
-      const fromFinal = totalRoundsToShow - 1 - r; // 決勝=0, 準決勝=1, 準々決勝=2, ...
+      const fromFinal = totalRoundsToShow - 1 - r;
       if (fromFinal === 0) roundLabels.push('決勝');
       else if (fromFinal === 1 && totalRoundsToShow >= 3) roundLabels.push('準決勝');
       else if (fromFinal === 2 && totalRoundsToShow >= 5) roundLabels.push('準々決勝');
       else roundLabels.push(`${r + 1}回戦`);
     }
 
-    // Positioning functions (same as DrawRenderer)
-    const getY = (r: number, i: number): number => {
-      if (r === 0) return OFFSET_Y + i * Y_SPACING;
-      return (getY(r - 1, i * 2) + getY(r - 1, i * 2 + 1)) / 2;
+    // === コンパクトY計算（BYEの空白を詰める） ===
+    const isSlotBye = (i: number): boolean => {
+      const slot = i < displaySlots.length ? displaySlots[i] : null;
+      return !slot || (slot.isBye && !slot.entry);
+    };
+
+    // Round 0: コンパクトなY位置を計算
+    const r0Y: number[] = new Array(drawSize).fill(0);
+    let nextCompactY = OFFSET_Y;
+    for (let matchIdx = 0; matchIdx < drawSize / 2; matchIdx++) {
+      const topIdx = matchIdx * 2;
+      const botIdx = matchIdx * 2 + 1;
+      const topBye = isSlotBye(topIdx);
+      const botBye = isSlotBye(botIdx);
+
+      if (topBye && botBye) {
+        // 両方BYE → スペースを取らない
+        r0Y[topIdx] = nextCompactY;
+        r0Y[botIdx] = nextCompactY;
+      } else if (topBye) {
+        // 上がBYE → 下の選手のみ、1スロット分
+        r0Y[topIdx] = nextCompactY;
+        r0Y[botIdx] = nextCompactY;
+        nextCompactY += Y_SPACING;
+      } else if (botBye) {
+        // 下がBYE → 上の選手のみ、1スロット分
+        r0Y[topIdx] = nextCompactY;
+        r0Y[botIdx] = nextCompactY;
+        nextCompactY += Y_SPACING;
+      } else {
+        // 両方実選手 → 2スロット分
+        r0Y[topIdx] = nextCompactY;
+        r0Y[botIdx] = nextCompactY + Y_SPACING;
+        nextCompactY += Y_SPACING * 2;
+      }
+    }
+
+    // 全ラウンドのY位置を計算（後のラウンドは前ラウンドの中間）
+    const getCompactY = (r: number, i: number): number => {
+      if (r === 0) return r0Y[i];
+      return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
     };
     const getX = (r: number): number => OFFSET_X + r * X_SPACING;
 
-    // Container dimensions
+    // Container dimensions（コンパクトサイズ）
     const containerWidth = OFFSET_X * 2 + (totalRoundsToShow - 1) * X_SPACING + SLOT_WIDTH;
-    const containerHeight = OFFSET_Y + (drawSize - 1) * Y_SPACING + SLOT_HEIGHT + 16;
+    const containerHeight = nextCompactY + SLOT_HEIGHT;
 
-    // Build SVG bracket lines
+    // === SVG ブラケット線（L字型、斜めなし） ===
     const svgPaths: React.ReactNode[] = [];
     for (let r = 0; r < totalRoundsToShow - 1; r++) {
       const numMatches = drawSize / Math.pow(2, r + 1);
@@ -512,90 +549,62 @@ export default function EntryRegistration() {
         const xNext = getX(r + 1);
         const xMid = (x + xNext) / 2;
 
-        const yTop = getY(r, m * 2) + SLOT_HEIGHT / 2;
-        const yBottom = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
-        const yMid = getY(r + 1, m) + SLOT_HEIGHT / 2;
+        const yTop = getCompactY(r, m * 2) + SLOT_HEIGHT / 2;
+        const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
+        const yMid = getCompactY(r + 1, m) + SLOT_HEIGHT / 2;
 
-        // Round 0: BYEスロットへの線を調整
+        // Round 0: BYEの処理
         if (r === 0) {
-          const topSlot = m * 2 < displaySlots.length ? displaySlots[m * 2] : null;
-          const bottomSlot = m * 2 + 1 < displaySlots.length ? displaySlots[m * 2 + 1] : null;
-          const topIsBye = !topSlot || (topSlot.isBye && !topSlot.entry);
-          const bottomIsBye = !bottomSlot || (bottomSlot.isBye && !bottomSlot.entry);
+          const topBye = isSlotBye(m * 2);
+          const botBye = isSlotBye(m * 2 + 1);
 
-          if (topIsBye && bottomIsBye) {
-            // 両方BYE → 線を描画しない
-            continue;
-          } else if (topIsBye) {
-            // 上がBYE → 下のスロットから次ラウンドへ直接接続
+          if (topBye && botBye) continue;
+
+          if (topBye || botBye) {
+            // BYE片方 → 実選手から水平線で次ラウンドへ（同じY）
+            const playerY = topBye ? yBottom : yTop;
             svgPaths.push(
-              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${yBottom} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
-            );
-            continue;
-          } else if (bottomIsBye) {
-            // 下がBYE → 上のスロットから次ラウンドへ直接接続
-            svgPaths.push(
-              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${yTop} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
+              <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
             );
             continue;
           }
         }
 
-        // 通常のブラケット線（両方にエントリーがある場合）
-        // Top path
+        // 通常のL字型ブラケット線
         svgPaths.push(
-          <path
-            key={`r${r}-m${m}-top`}
-            d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`}
-            fill="none"
-            stroke="#1b4d3e"
-            strokeWidth="1.5"
-          />
+          <path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
         );
-        // Bottom path
         svgPaths.push(
-          <path
-            key={`r${r}-m${m}-bottom`}
-            d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`}
-            fill="none"
-            stroke="#1b4d3e"
-            strokeWidth="1.5"
-          />
+          <path key={`r${r}-m${m}-bottom`} d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
         );
-        // Connection to next round
         svgPaths.push(
-          <path
-            key={`r${r}-m${m}-conn`}
-            d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
-            fill="none"
-            stroke="#1b4d3e"
-            strokeWidth="1.5"
-          />
+          <path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />
         );
       }
     }
 
-    // Build round 0 (first round) slot elements with full player info
+    // === Round 0 スロット描画（BYEを除外、連番表示） ===
     const slotElements: React.ReactNode[] = [];
+    let visibleIndex = 0;
     for (let i = 0; i < drawSize; i++) {
       const slot = i < displaySlots.length ? displaySlots[i] : null;
-      const x = getX(0);
-      const y = getY(0, i);
 
-      // BYEスロット・空スロットは枠を表示しない
+      // BYEスロット・空スロットはスキップ
       if (!slot || (slot.isBye && !slot.entry)) continue;
+
+      visibleIndex++;
+      const x = getX(0);
+      const y = r0Y[i];
 
       const isWithdrawn = slot.entry?.status === 'withdrawn';
       const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
       const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
       const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
 
-      // Status dot color
-      let statusDotColor = '#d1d5db'; // gray - unchecked
-      if (isWithdrawn) statusDotColor = '#ef4444'; // red
-      else if (isConfirmed) statusDotColor = '#22c55e'; // green
+      let statusDotColor = '#d1d5db';
+      if (isWithdrawn) statusDotColor = '#ef4444';
+      else if (isConfirmed) statusDotColor = '#22c55e';
 
-      // Border/background styles
       let borderClass = 'border-gray-300';
       let bgClass = 'bg-white';
       if (isWithdrawn) {
@@ -616,9 +625,9 @@ export default function EntryRegistration() {
           `}
           style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}
         >
-          {/* Position number */}
+          {/* 連番（BYEを含まない） */}
           <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">
-            {slot.drawPosition}
+            {visibleIndex}
           </div>
 
           {/* Seed badge */}
@@ -651,13 +660,10 @@ export default function EntryRegistration() {
 
           {/* Status dot */}
           <div className="flex-shrink-0 mr-1">
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: statusDotColor }}
-            />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} />
           </div>
 
-          {/* Action button (BYE/Restore) */}
+          {/* Action button */}
           {slot.entry && (
             <div className="flex-shrink-0 mr-1">
               {isWithdrawn ? (
