@@ -16,7 +16,7 @@ import LiveDashboard from './features/live/LiveDashboard'
 import BackupRestore from './features/backup/BackupRestore'
 import Manual from './features/manual/Manual'
 import BroadcastPanel from './features/broadcast/BroadcastPanel'
-import CourtMap from './features/courtmap/CourtMap'
+// CourtMap は LiveDashboard に統合済み
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -39,7 +39,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="backup" element={<BackupRestore />} />
           <Route path="manual" element={<Manual />} />
           <Route path="broadcast" element={<BroadcastPanel />} />
-          <Route path="court-map" element={<CourtMap />} />
+          {/* court-map は dashboard に統合済み */}
         </Route>
       </Routes>
     </BrowserRouter>

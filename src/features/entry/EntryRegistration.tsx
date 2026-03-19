@@ -300,10 +300,10 @@ export default function EntryRegistration() {
   }, [drawMap, playerMap]);
 
   // === エントリー確定（対戦表生成）===
-  const handleConfirmEvent = useCallback(async (eventId: string) => {
+  const handleConfirmEvent = useCallback(async (eventId: string, skipConfirm = false) => {
     const draw = drawMap.get(eventId);
     if (!draw) return;
-    if (!confirm('エントリーを確定し対戦表を生成しますか？')) return;
+    if (!skipConfirm && !confirm('エントリーを確定し対戦表を生成しますか？')) return;
 
     const slots = redistributeByes(
       draw.slots.map(s => ({
@@ -408,12 +408,13 @@ export default function EntryRegistration() {
   }, [drawMap, allEntries, playerMap]);
 
   const handleConfirmAll = useCallback(async () => {
-    if (!confirm('全種目のエントリーを確定し対戦表を生成しますか？')) return;
-    for (const evt of events) {
-      const draw = drawMap.get(evt.eventId);
-      if (!draw) continue;
-      await handleConfirmEvent(evt.eventId);
+    const targets = events.filter(evt => drawMap.has(evt.eventId));
+    if (targets.length === 0) return;
+    if (!confirm(`全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`)) return;
+    for (const evt of targets) {
+      await handleConfirmEvent(evt.eventId, true);
     }
+    alert(`全${targets.length}種目の対戦表を確定しました。`);
   }, [events, drawMap, handleConfirmEvent]);
 
   // Summary stats

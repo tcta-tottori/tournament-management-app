@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  Save, HelpCircle, MoreHorizontal, Volume2, MapPin, ExternalLink
+  Save, HelpCircle, MoreHorizontal, Volume2, ExternalLink
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -21,7 +21,6 @@ const ALL_MAIN_TABS = [
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-12', path: '/broadcast', label: '放送コール', icon: Volume2 },
-  { id: 'S-13', path: '/court-map', label: 'コートマップ', icon: MapPin },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-10', path: '/backup', label: 'バックアップ', icon: Save },
 ];

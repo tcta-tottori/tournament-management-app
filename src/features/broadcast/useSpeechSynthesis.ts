@@ -10,8 +10,8 @@ function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
   const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang === 'ja_JP');
 
-  // 自然で柔らかい声質を優先するキーワード順
-  const preferredKeywords = ['nanami', 'haruka', 'kyoko', 'mei', 'mizuki', 'o-ren', 'google', 'female'];
+  // 上品で自然な声質を優先するキーワード順（ニューラル音声を最優先）
+  const preferredKeywords = ['nanami', 'kyoko', 'o-ren', 'haruka', 'sayaka', 'ayumi', 'mei', 'mizuki', 'google', 'female'];
 
   for (const keyword of preferredKeywords) {
     const found = jaVoices.find(v => v.name.toLowerCase().includes(keyword));
@@ -89,7 +89,7 @@ export function useSpeechSynthesis() {
         // 自然な速度: ゆっくりめに設定
         utterance.rate = settings.rate;
         // 柔らかい女性の声: ピッチを少し高めに
-        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.2));
+        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
         utterance.volume = settings.volume;
         if (voice) utterance.voice = voice;
 
@@ -128,7 +128,7 @@ export function useSpeechSynthesis() {
     const utterance = new SpeechSynthesisUtterance('音声テストです。放送コールシステムをご利用いただきありがとうございます。');
     utterance.lang = 'ja-JP';
     utterance.rate = settings.rate;
-    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.2));
+    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
     utterance.volume = settings.volume;
     if (voice) utterance.voice = voice;
     synth.speak(utterance);

@@ -1,52 +1,73 @@
 import { useState, useCallback, useEffect } from 'react';
 import { db } from '../../db/database';
-import { RefreshCw, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Github, RefreshCw, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { getSavedToken } from '../backup/githubApi';
 
-// ドロー会議システムの localStorage キー
-const LS_KEY_RANKING_BACKUP = 'drawSystem_rankingBackup';
-const LS_KEY_FURIGANA = 'drawSystem_furigana';
 const LS_KEY_LAST_SYNC = 'dataSyncLastTimestamp';
 
-// ドロー会議システムの rankingBackup 構造
-interface DrawSystemRankingBackup {
-  rankings: Record<string, { rank: number; name: string; affiliation: string; points: number; eventCode: string; furigana?: string }[]>;
-  allPlayers: { rank: number; name: string; affiliation: string; points: number; eventCode: string; furigana?: string }[];
-  furiganaMap: Record<string, string>;
-  listMembers: { name: string; furigana: string }[];
-  savedAt: string;
-}
-
-// ドロー会議システムの furigana エントリ構造
-interface DrawSystemFuriganaEntry {
-  id: number;
-  name: string;
-  furigana: string;
-  source?: string;
-  affiliation?: string;
-  eventCodes?: string[];
-  rankingPoints?: number;
-  rankingPosition?: number;
-  lastUpdated?: string;
-  furiganaEdited?: boolean;
-}
-
-interface SyncResult {
-  success: boolean;
-  message: string;
-  details?: string[];
-}
+// ドロー会議システムのリポジトリ設定
+const DRAW_REPO_OWNER = 'tcta-tottori';
+const DRAW_REPO_NAME = 'tottori-tennis-draw';
+const BACKUP_DIR = 'backups';
 
 /** スペースを全角半角問わず除去 */
 function removeSpaces(s: string): string {
   return s.replace(/[\s\u3000]+/g, '');
 }
 
+/** GitHub API でドロー会議システムの最新バックアップを取得 */
+async function fetchLatestDrawBackup(token: string): Promise<any> {
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github.v3+json',
+  };
+
+  // バックアップ一覧を取得
+  const listUrl = `https://api.github.com/repos/${DRAW_REPO_OWNER}/${DRAW_REPO_NAME}/contents/${BACKUP_DIR}`;
+  const listRes = await fetch(listUrl, { headers });
+
+  if (listRes.status === 404) {
+    throw new Error('ドロー会議システムのバックアップフォルダが見つかりません');
+  }
+  if (!listRes.ok) {
+    throw new Error(`GitHub API エラー (${listRes.status})`);
+  }
+
+  const files = await listRes.json();
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error('バックアップファイルがありません');
+  }
+
+  // JSON ファイルのみ、新しい順にソート
+  const jsonFiles = files
+    .filter((f: any) => f.type === 'file' && f.name.endsWith('.json'))
+    .sort((a: any, b: any) => b.name.localeCompare(a.name));
+
+  if (jsonFiles.length === 0) {
+    throw new Error('バックアップファイルがありません');
+  }
+
+  // 最新ファイルをダウンロード
+  const latest = jsonFiles[0];
+  const fileRes = await fetch(
+    `https://api.github.com/repos/${DRAW_REPO_OWNER}/${DRAW_REPO_NAME}/contents/${latest.path}`,
+    { headers }
+  );
+
+  if (!fileRes.ok) {
+    throw new Error(`バックアップダウンロード失敗 (${fileRes.status})`);
+  }
+
+  const fileData = await fileRes.json();
+  const content = atob(fileData.content.replace(/\n/g, ''));
+  return { data: JSON.parse(decodeURIComponent(escape(content))), fileName: latest.name };
+}
+
 export default function DataSync() {
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
 
-  // 最終同期時刻を読み込み
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY_LAST_SYNC);
@@ -57,200 +78,119 @@ export default function DataSync() {
   const updateLastSync = useCallback(() => {
     const now = new Date().toISOString();
     setLastSyncTime(now);
-    try {
-      localStorage.setItem(LS_KEY_LAST_SYNC, now);
-    } catch { /* ignore */ }
+    try { localStorage.setItem(LS_KEY_LAST_SYNC, now); } catch { /* ignore */ }
   }, []);
 
-  // =========================================
-  // ドロー会議システムから同期 (FROM)
-  // =========================================
-  const syncFromDrawSystem = useCallback(async () => {
+  // GitHubバックアップからふりがなデータを同期
+  const syncFuriganaFromGitHub = useCallback(async () => {
     setIsSyncing(true);
     setSyncResult(null);
     const details: string[] = [];
 
     try {
-      // --- rankingBackup の読み込み ---
-      const rankingRaw = localStorage.getItem(LS_KEY_RANKING_BACKUP);
-      const furiganaRaw = localStorage.getItem(LS_KEY_FURIGANA);
-
-      if (!rankingRaw && !furiganaRaw) {
+      const token = getSavedToken();
+      if (!token) {
         setSyncResult({
           success: false,
-          message: 'ドロー会議システムのデータが見つかりません。先にドロー会議システムでデータを読み込んでください。',
+          message: 'GitHub トークンが設定されていません。バックアップページでトークンを設定してください。',
         });
         return;
       }
 
-      let playerImportCount = 0;
-      let playerSkipCount = 0;
-      let furiganaImportCount = 0;
-      let furiganaSkipCount = 0;
+      const { data, fileName } = await fetchLatestDrawBackup(token);
+      details.push(`バックアップファイル: ${fileName}`);
 
-      // --- ランキング & 選手データの取り込み ---
-      if (rankingRaw) {
+      let playerFuriganaCount = 0;
+      let furiganaDictCount = 0;
+      const now = Date.now();
+
+      // === ドロー会議システムのバックアップからふりがなデータを抽出 ===
+
+      // 1. drawSystem_furigana キー（選手ふりがなデータ）
+      const furiganaData = data['drawSystem_furigana'];
+      if (furiganaData) {
         try {
-          const backup: DrawSystemRankingBackup = JSON.parse(rankingRaw);
-
-          // allPlayers + rankings から選手情報を構築
-          const playerMap = new Map<string, {
-            name: string;
-            furigana: string;
-            affiliation: string;
-            rankings: Record<string, number>;
-          }>();
-
-          // rankings の各種目からデータを取得
-          if (backup.rankings) {
-            for (const [eventCode, players] of Object.entries(backup.rankings)) {
-              if (!Array.isArray(players)) continue;
-              for (const p of players) {
-                const key = removeSpaces(p.name);
-                if (!key) continue;
-                const existing = playerMap.get(key);
-                if (existing) {
-                  existing.rankings[eventCode] = p.points || 0;
-                  if (!existing.furigana && p.furigana) existing.furigana = p.furigana;
-                  if (!existing.affiliation && p.affiliation) existing.affiliation = p.affiliation;
-                } else {
-                  playerMap.set(key, {
-                    name: p.name,
-                    furigana: p.furigana || '',
-                    affiliation: p.affiliation || '',
-                    rankings: { [eventCode]: p.points || 0 },
-                  });
-                }
-              }
-            }
-          }
-
-          // furiganaMap からふりがなを補完
-          if (backup.furiganaMap) {
-            for (const [name, furigana] of Object.entries(backup.furiganaMap)) {
-              const key = removeSpaces(name);
-              const existing = playerMap.get(key);
-              if (existing && !existing.furigana && furigana) {
-                existing.furigana = furigana;
-              }
-            }
-          }
-
-          // listMembers（ランキング外の登録者）も取得
-          if (backup.listMembers && Array.isArray(backup.listMembers)) {
-            for (const m of backup.listMembers) {
-              if (!m.name) continue;
-              const key = removeSpaces(m.name);
-              if (!playerMap.has(key)) {
-                playerMap.set(key, {
-                  name: m.name,
-                  furigana: m.furigana || '',
-                  affiliation: '',
-                  rankings: {},
-                });
-              } else {
-                const existing = playerMap.get(key)!;
-                if (!existing.furigana && m.furigana) {
-                  existing.furigana = m.furigana;
-                }
-              }
-            }
-          }
-
-          // Dexie players テーブルにマージ
-          const now = Date.now();
-          for (const [playerId, data] of playerMap) {
-            const existingPlayer = await db.players.where('playerId').equals(playerId).first();
-
-            if (existingPlayer) {
-              // 手動編集された選手は上書きしない
-              if (existingPlayer.isManual) {
-                playerSkipCount++;
-                continue;
-              }
-              // 既存データのランキングをマージ
-              const mergedRankings = { ...existingPlayer.rankings, ...data.rankings };
-              await db.players.where('playerId').equals(playerId).modify({
-                affiliation: data.affiliation || existingPlayer.affiliation,
-                furigana: data.furigana || existingPlayer.furigana,
-                rankings: mergedRankings,
-              });
-              playerImportCount++;
-            } else {
-              // 新規追加
-              await db.players.add({
-                playerId,
-                name: data.name,
-                furigana: data.furigana,
-                affiliation: data.affiliation,
-                rankings: data.rankings,
-                isManual: false,
-              });
-              playerImportCount++;
-            }
-
-            // ふりがな辞書にも追加
-            if (data.furigana) {
-              const furiganaKey = removeSpaces(data.name);
-              const existingFurigana = await db.furiganaDict.get(furiganaKey);
-              if (!existingFurigana || existingFurigana.type !== 'manual') {
-                await db.furiganaDict.put({
-                  name: furiganaKey,
-                  furigana: removeSpaces(data.furigana),
-                  type: 'auto',
-                  updatedAt: now,
-                });
-              }
-            }
-          }
-
-          details.push(`選手データ: ${playerImportCount}件 取込${playerSkipCount > 0 ? ` (${playerSkipCount}件 手動編集済みのためスキップ)` : ''}`);
-        } catch (e) {
-          details.push(`ランキングデータの解析エラー: ${(e as Error).message}`);
-        }
-      }
-
-      // --- ふりがなデータの取り込み ---
-      if (furiganaRaw) {
-        try {
-          const furiganaData: DrawSystemFuriganaEntry[] = JSON.parse(furiganaRaw);
-          if (Array.isArray(furiganaData)) {
-            const now = Date.now();
-            for (const entry of furiganaData) {
+          const entries = typeof furiganaData === 'string' ? JSON.parse(furiganaData) : furiganaData;
+          if (Array.isArray(entries)) {
+            for (const entry of entries) {
               if (!entry.name || !entry.furigana) continue;
               const key = removeSpaces(entry.name);
+
+              // ふりがな辞書に追加（手動編集は上書きしない）
               const existing = await db.furiganaDict.get(key);
-
-              // 手動編集されたものは上書きしない
-              if (existing && existing.type === 'manual') {
-                furiganaSkipCount++;
-                continue;
-              }
-
-              const newType = entry.furiganaEdited ? 'manual' : 'auto';
-
-              // 新規または自動データの更新
-              if (!existing || existing.type === 'auto') {
+              if (!existing || existing.type !== 'manual') {
                 await db.furiganaDict.put({
                   name: key,
                   furigana: removeSpaces(entry.furigana),
-                  type: newType as 'auto' | 'manual',
+                  type: entry.furiganaEdited ? 'manual' : 'auto',
                   updatedAt: now,
                 });
-                furiganaImportCount++;
+                furiganaDictCount++;
+              }
+
+              // players テーブルのふりがなも更新
+              const player = await db.players.where('playerId').equals(key).first();
+              if (player && !player.isManual && (!player.furigana || !entry.furiganaEdited)) {
+                await db.players.where('playerId').equals(key).modify({
+                  furigana: entry.furigana,
+                  affiliation: entry.affiliation || player.affiliation,
+                });
+                playerFuriganaCount++;
               }
             }
-            details.push(`ふりがな: ${furiganaImportCount}件 取込${furiganaSkipCount > 0 ? ` (${furiganaSkipCount}件 手動編集済みのためスキップ)` : ''}`);
           }
+          details.push(`ふりがな辞書: ${furiganaDictCount}件 更新`);
+          if (playerFuriganaCount > 0) details.push(`選手ふりがな: ${playerFuriganaCount}件 更新`);
         } catch (e) {
           details.push(`ふりがなデータの解析エラー: ${(e as Error).message}`);
+        }
+      }
+
+      // 2. drawSystem_rankingBackup キーからふりがなマップを抽出
+      const rankingBackup = data['drawSystem_rankingBackup'];
+      if (rankingBackup) {
+        try {
+          const backup = typeof rankingBackup === 'string' ? JSON.parse(rankingBackup) : rankingBackup;
+          const furiganaMap = backup.furiganaMap || {};
+
+          let mapCount = 0;
+          for (const [name, furigana] of Object.entries(furiganaMap)) {
+            if (!name || !furigana) continue;
+            const key = removeSpaces(name);
+            const existing = await db.furiganaDict.get(key);
+            if (!existing) {
+              await db.furiganaDict.put({
+                name: key,
+                furigana: removeSpaces(furigana as string),
+                type: 'auto',
+                updatedAt: now,
+              });
+              mapCount++;
+            }
+          }
+          if (mapCount > 0) details.push(`ランキングふりがな: ${mapCount}件 追加`);
+
+          // 所属ふりがなの抽出（選手の所属情報からunique所属を取得）
+          if (backup.allPlayers && Array.isArray(backup.allPlayers)) {
+            const affSet = new Map<string, string>();
+            for (const p of backup.allPlayers) {
+              if (p.affiliation && p.furigana) {
+                // 所属名を収集（ふりがなは選手ふりがなとは別）
+                if (!affSet.has(p.affiliation)) {
+                  affSet.set(p.affiliation, '');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          details.push(`ランキングデータの解析エラー: ${(e as Error).message}`);
         }
       }
 
       updateLastSync();
       setSyncResult({
         success: true,
-        message: '同期が完了しました',
+        message: 'GitHubからふりがなデータを同期しました',
         details,
       });
     } catch (err) {
@@ -265,11 +205,8 @@ export default function DataSync() {
 
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
       })
     : null;
 
@@ -277,9 +214,9 @@ export default function DataSync() {
     <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden hover:shadow-md transition-all">
       <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RefreshCw className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">データ同期</h2>
-          <span className="text-xs text-gray-500 ml-1">ドロー会議システム連携</span>
+          <Github className="w-5 h-5 text-gray-900" />
+          <h2 className="font-semibold text-primary-600">ふりがなデータ同期</h2>
+          <span className="text-xs text-gray-500 ml-1">GitHub バックアップ連携</span>
         </div>
         {formattedLastSync && (
           <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -291,21 +228,19 @@ export default function DataSync() {
 
       <div className="p-4">
         <p className="text-xs text-gray-500 mb-4">
-          ドロー会議システムとランキング・ふりがなデータを共有します。両システムが同じブラウザで動作している場合に利用できます。
+          ドロー会議システムのGitHubバックアップからふりがなデータベースを取得・同期します。
         </p>
 
-        <div>
-          <button
-            onClick={syncFromDrawSystem}
-            disabled={isSyncing}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <span>ドロー会議システムから同期</span>
-            {isSyncing && <RefreshCw className="w-4 h-4 animate-spin" />}
-          </button>
-        </div>
+        <button
+          onClick={syncFuriganaFromGitHub}
+          disabled={isSyncing}
+          className="flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gray-900 rounded-lg hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <Github className="w-4 h-4" />
+          <span>GitHubからふりがなを同期</span>
+          {isSyncing && <RefreshCw className="w-4 h-4 animate-spin" />}
+        </button>
 
-        {/* 結果メッセージ */}
         {syncResult && (
           <div className={`mt-4 p-3 rounded-lg text-sm ${
             syncResult.success

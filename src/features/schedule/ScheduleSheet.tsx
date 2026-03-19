@@ -40,6 +40,20 @@ function abbreviateEventName(name: string): string {
     .slice(0, 6);
 }
 
+/** インポートされたセルテキスト（例: "男子B 1R"）から種目名部分を抽出 */
+function extractImportedEventName(cellText: string): string {
+  // 末尾のラウンド表記を除去: 1R, 2R, QF, SF, F, １R 等
+  // 全角→半角変換してからパース
+  const normalized = cellText
+    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\u3000]+/g, ' ')
+    .trim();
+  // "男子B 1R" → "男子B", "男子AQF" → "男子A", "女子45" → "女子45"
+  const match = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
+  return match ? match[1].trim() : normalized;
+}
+
 export default function ScheduleSheet() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
 
@@ -102,6 +116,25 @@ export default function ScheduleSheet() {
     });
     return map;
   }, [events]);
+
+  // インポートされたセルから種目名→色のマップ（DB種目がない場合用）
+  const importedEventColorMap = useMemo(() => {
+    const map = new Map<string, (typeof EVENT_COLORS)[0]>();
+    if (scheduleSlots.some(s => s.eventCode === 'imported')) {
+      const seenNames = new Set<string>();
+      let colorIdx = 0;
+      for (const slot of scheduleSlots) {
+        if (slot.eventCode !== 'imported') continue;
+        const evName = extractImportedEventName(slot.roundLabel);
+        if (!seenNames.has(evName)) {
+          seenNames.add(evName);
+          map.set(evName, EVENT_COLORS[colorIdx % EVENT_COLORS.length]);
+          colorIdx++;
+        }
+      }
+    }
+    return map;
+  }, [scheduleSlots]);
 
   // DBから既存のスケジュールデータを復元
   useEffect(() => {
@@ -520,6 +553,48 @@ export default function ScheduleSheet() {
 
   // --------------- Excel Import ---------------
 
+  /** Excelシリアル値(0-1)または文字列からHH:MM形式に変換 */
+  const excelTimeToString = (val: unknown): string | null => {
+    if (val == null) return null;
+    const num = Number(val);
+    // Excelシリアル値 (0.375 = 9:00, 0.416667 = 10:00, etc.)
+    if (!isNaN(num) && num > 0 && num < 1) {
+      const totalMinutes = Math.round(num * 24 * 60);
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    const str = String(val).trim();
+    if (/^\d{1,2}:\d{2}$/.test(str)) return str.padStart(5, '0');
+    return null;
+  };
+
+  /** 「コートNO.」「コート」行を自動検出してスケジュールグリッドの開始行を見つける */
+  const findScheduleGrid = (rows: (string | number | null)[][]): {
+    headerRowIdx: number;
+    dataStartIdx: number;
+    timeColumns: { colIdx: number; time: string }[];
+  } | null => {
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || row.length < 2) continue;
+      const firstCell = String(row[0] ?? '').replace(/[\s\u3000]+/g, '').trim();
+      // 「コートNO.」「コートNo.」「コート」をヘッダー行と判定
+      if (!/^コート(NO\.?|No\.?)?$/i.test(firstCell)) continue;
+
+      // この行から時刻カラムを抽出
+      const timeColumns: { colIdx: number; time: string }[] = [];
+      for (let c = 1; c < row.length; c++) {
+        const time = excelTimeToString(row[c]);
+        if (time) timeColumns.push({ colIdx: c, time });
+      }
+      if (timeColumns.length > 0) {
+        return { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
+      }
+    }
+    return null;
+  };
+
   const handleExcelImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentTournamentId) return;
@@ -535,19 +610,29 @@ export default function ScheduleSheet() {
         return;
       }
 
-      // Parse header row to get time slots
-      const headerRow = rows[0].map(v => String(v ?? '').trim());
-      // Find time columns (HH:MM format)
-      const timeColumns: { colIdx: number; time: string }[] = [];
-      for (let c = 1; c < headerRow.length; c++) {
-        const val = headerRow[c];
-        if (/^\d{1,2}:\d{2}$/.test(val)) {
-          timeColumns.push({ colIdx: c, time: val.padStart(5, '0') });
+      // スケジュールグリッドを自動検出
+      const grid = findScheduleGrid(rows);
+
+      // フォールバック: 従来形式（1行目がヘッダー）
+      let timeColumns: { colIdx: number; time: string }[] = [];
+      let dataStartIdx = 1;
+
+      if (grid) {
+        timeColumns = grid.timeColumns;
+        dataStartIdx = grid.dataStartIdx;
+      } else {
+        // 従来形式: 1行目ヘッダーからHH:MM列を探す
+        const headerRow = rows[0].map(v => String(v ?? '').trim());
+        for (let c = 1; c < headerRow.length; c++) {
+          const val = headerRow[c];
+          if (/^\d{1,2}:\d{2}$/.test(val)) {
+            timeColumns.push({ colIdx: c, time: val.padStart(5, '0') });
+          }
         }
       }
 
       if (timeColumns.length === 0) {
-        setStatusMessage('Excelのヘッダー行に時刻（HH:MM形式）が見つかりません。');
+        setStatusMessage('Excelに時刻データが見つかりません。「コートNO.」行に時刻がある形式、またはヘッダー行にHH:MM形式の時刻列が必要です。');
         return;
       }
 
@@ -566,17 +651,29 @@ export default function ScheduleSheet() {
       const existingCourts = await db.courts.where('tournamentId').equals(currentTournamentId).toArray();
       const existingCourtNames = new Set(existingCourts.map(c => c.name));
 
-      // Parse data rows
+      // Parse data rows (コート番号が数値の行のみ、パターン区切り等を無視)
       const importedSlots: ScheduleSlot[] = [];
       const importedCourtNames: string[] = [];
 
-      for (let r = 1; r < rows.length; r++) {
+      for (let r = dataStartIdx; r < rows.length; r++) {
         const row = rows[r];
         if (!row || row.length === 0) continue;
-        const courtName = String(row[0] ?? '').trim();
-        if (!courtName) continue;
 
-        importedCourtNames.push(courtName);
+        const rawCourtName = String(row[0] ?? '').trim();
+        if (!rawCourtName) continue;
+
+        // コート番号が数値かどうかで判定（「パターン2」等の行をスキップ）
+        const courtNum = parseInt(rawCourtName, 10);
+        if (isNaN(courtNum)) {
+          // 数字以外が来たら次のパターンかメモ行 → 現パターンの終端
+          if (importedSlots.length > 0) break;
+          continue;
+        }
+
+        const courtName = String(courtNum);
+        if (!importedCourtNames.includes(courtName)) {
+          importedCourtNames.push(courtName);
+        }
 
         // Ensure court exists in DB
         if (!existingCourtNames.has(courtName)) {
@@ -587,13 +684,13 @@ export default function ScheduleSheet() {
             surface: '',
             isAvailable: true,
             currentMatchId: null,
-            order: existingCourts.length + r,
+            order: existingCourts.length + importedCourtNames.length,
           });
           existingCourtNames.add(courtName);
         }
 
         for (const tc of timeColumns) {
-          const cellValue = String(row[tc.colIdx] ?? '').trim();
+          const cellValue = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
           if (!cellValue) continue;
 
           const slotIdx = timeColumns.indexOf(tc);
@@ -601,7 +698,7 @@ export default function ScheduleSheet() {
 
           importedSlots.push({
             matchId,
-            courtIndex: importedCourtNames.length - 1,
+            courtIndex: importedCourtNames.indexOf(courtName),
             courtName,
             timeSlotIndex: slotIdx,
             startTime: tc.time,
@@ -632,7 +729,7 @@ export default function ScheduleSheet() {
         D: importedCourtNums.some(n => n >= 13 && n <= 16),
       });
 
-      setStatusMessage(`Excelから ${importedSlots.length} 件のスケジュールを読み込みました。`);
+      setStatusMessage(`Excelから ${importedSlots.length} 件のスケジュールを読み込みました（${importedCourtNames.length}コート × ${timeColumns.length}時間枠）。`);
     } catch (err) {
       console.error(err);
       setStatusMessage(`Excel読み込みに失敗しました: ${(err as Error).message}`);
@@ -839,7 +936,12 @@ export default function ScheduleSheet() {
                             />
                           );
                         }
-                        const color = eventColorMap.get(slot.eventCode);
+                        // DB種目の色、またはインポートされたセルから種目名を抽出して色を取得
+                        const isImported = slot.eventCode === 'imported';
+                        const importedEvName = isImported ? extractImportedEventName(slot.roundLabel) : '';
+                        const color = isImported
+                          ? importedEventColorMap.get(importedEvName)
+                          : eventColorMap.get(slot.eventCode);
                         const match = allScheduleMatches.find(
                           m => m.matchId === slot.matchId,
                         );

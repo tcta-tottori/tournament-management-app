@@ -95,10 +95,10 @@ export default function BroadcastPanel() {
   const [dataType, setDataType] = useState<'singles' | 'doubles'>('singles');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [settings, setSettings] = useState<VoiceSettings>({
-    rate: 0.85,
+    rate: 0.95,
     pitch: 1.0,
     volume: 1.0,
-    repeatCount: 2,
+    repeatCount: 1,
   });
   const [speakingMatchId, setSpeakingMatchId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -149,6 +149,20 @@ export default function BroadcastPanel() {
       let idCounter = 1;
       let hasDoubles = false;
 
+      // entryId → Player レコードのキャッシュ（DB参照を減らす）
+      const playerCache = new Map<string, { furigana: string; affiliation: string }>();
+      async function resolvePlayer(entryId: string | null): Promise<{ name: string; affiliation: string } | null> {
+        if (!entryId) return null;
+        if (playerCache.has(entryId)) return { name: playerCache.get(entryId)!.furigana, affiliation: playerCache.get(entryId)!.affiliation };
+        const entry = await db.entries.where('entryId').equals(entryId).first();
+        if (!entry) return null;
+        const player = await db.players.where('playerId').equals(entry.playerId).first();
+        if (!player) return null;
+        const resolved = { furigana: player.furigana || player.name, affiliation: player.affiliation };
+        playerCache.set(entryId, resolved);
+        return { name: resolved.furigana, affiliation: resolved.affiliation };
+      }
+
       for (const event of events) {
         const eventMatches = await db.matches.where('eventId').equals(event.eventId).toArray();
         const drawData = await db.draws.where('eventId').equals(event.eventId).first();
@@ -180,17 +194,39 @@ export default function BroadcastPanel() {
           const posB = m.player2EntryId ? (entryPositionMap.get(m.player2EntryId) ?? 0) : 0;
 
           if (isDoubles) {
-            // ダブルスの場合: "山田 太郎 / 佐藤 花子" を分割
-            const [nameA, pairNameA] = m.player1Name.includes(' / ')
+            // ダブルスの場合: entryIdからペアの選手情報を解決
+            const playerA = await resolvePlayer(m.player1EntryId);
+            const playerB = await resolvePlayer(m.player2EntryId);
+
+            // ダブルスのパートナー情報も解決
+            let partnerA: { name: string; affiliation: string } | null = null;
+            let partnerB: { name: string; affiliation: string } | null = null;
+            if (m.player1EntryId) {
+              const entry1 = await db.entries.where('entryId').equals(m.player1EntryId).first();
+              if (entry1?.partnerId) {
+                const partner = await db.players.where('playerId').equals(entry1.partnerId).first();
+                if (partner) partnerA = { name: partner.furigana || partner.name, affiliation: partner.affiliation };
+              }
+            }
+            if (m.player2EntryId) {
+              const entry2 = await db.entries.where('entryId').equals(m.player2EntryId).first();
+              if (entry2?.partnerId) {
+                const partner = await db.players.where('playerId').equals(entry2.partnerId).first();
+                if (partner) partnerB = { name: partner.furigana || partner.name, affiliation: partner.affiliation };
+              }
+            }
+
+            // フォールバック: db.playersにデータがない場合はmatchレコードの値を使用
+            const [fallbackNameA, fallbackPairNameA] = m.player1Name.includes(' / ')
               ? m.player1Name.split(' / ')
               : [m.player1Name, ''];
-            const [nameB, pairNameB] = m.player2Name.includes(' / ')
+            const [fallbackNameB, fallbackPairNameB] = m.player2Name.includes(' / ')
               ? m.player2Name.split(' / ')
               : [m.player2Name, ''];
-            const [affA, pairAffA] = m.player1Affiliation.includes(' / ')
+            const [fallbackAffA, fallbackPairAffA] = m.player1Affiliation.includes(' / ')
               ? m.player1Affiliation.split(' / ')
               : [m.player1Affiliation, m.player1Affiliation];
-            const [affB, pairAffB] = m.player2Affiliation.includes(' / ')
+            const [fallbackAffB, fallbackPairAffB] = m.player2Affiliation.includes(' / ')
               ? m.player2Affiliation.split(' / ')
               : [m.player2Affiliation, m.player2Affiliation];
 
@@ -199,31 +235,35 @@ export default function BroadcastPanel() {
               eventName: event.name,
               round: `${roundName} #${m.position}`,
               numberA: posA,
-              nameA: nameA.trim(),
-              affA: affA.trim(),
-              pairNameA: pairNameA.trim(),
-              pairAffA: pairAffA.trim(),
+              nameA: (playerA?.name || fallbackNameA).trim(),
+              affA: (playerA?.affiliation || fallbackAffA).trim(),
+              pairNameA: (partnerA?.name || fallbackPairNameA).trim(),
+              pairAffA: (partnerA?.affiliation || fallbackPairAffA).trim(),
               numberB: posB,
-              nameB: nameB.trim(),
-              affB: affB.trim(),
-              pairNameB: pairNameB.trim(),
-              pairAffB: pairAffB.trim(),
+              nameB: (playerB?.name || fallbackNameB).trim(),
+              affB: (playerB?.affiliation || fallbackAffB).trim(),
+              pairNameB: (partnerB?.name || fallbackPairNameB).trim(),
+              pairAffB: (partnerB?.affiliation || fallbackPairAffB).trim(),
               type: 'doubles',
               status: 'pending',
               courtNumber: m.courtId || '',
               startTime: m.scheduledTime || '',
             });
           } else {
+            // シングルス: db.playersからふりがな・所属を取得
+            const playerA = await resolvePlayer(m.player1EntryId);
+            const playerB = await resolvePlayer(m.player2EntryId);
+
             allMatchCalls.push({
               id: idCounter++,
               eventName: event.name,
               round: `${roundName} #${m.position}`,
               numberA: posA,
-              nameA: m.player1Name,
-              affA: m.player1Affiliation,
+              nameA: playerA?.name || m.player1Name,
+              affA: playerA?.affiliation || m.player1Affiliation,
               numberB: posB,
-              nameB: m.player2Name,
-              affB: m.player2Affiliation,
+              nameB: playerB?.name || m.player2Name,
+              affB: playerB?.affiliation || m.player2Affiliation,
               type: 'singles',
               status: 'pending',
               courtNumber: m.courtId || '',

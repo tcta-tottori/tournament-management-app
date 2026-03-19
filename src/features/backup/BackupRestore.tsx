@@ -4,13 +4,32 @@ import * as XLSX from 'xlsx';
 import {
   Save, Download, Upload, Trash2, AlertTriangle, CheckCircle,
   Github, RefreshCw, Key, FolderOpen, FileDown, FileUp,
-  FileSpreadsheet, Clock, HardDrive, Cloud, X
+  FileSpreadsheet, Clock, HardDrive, Cloud, X, ExternalLink
 } from 'lucide-react';
 import {
   listBackups, downloadBackup, uploadBackup, deleteBackup, validateToken,
   getSavedToken, saveToken, clearToken,
   type GitHubBackupFile, type GitHubConfig
 } from './githubApi';
+import {
+  listBackups as gdriveListBackups,
+  downloadBackup as gdriveDownloadBackup,
+  uploadBackup as gdriveUploadBackup,
+  deleteBackup as gdriveDeleteBackup,
+  loadGisScript,
+  requestAccessToken,
+  revokeToken,
+  getSavedToken as gdriveGetSavedToken,
+  getSavedClientId,
+  saveClientId,
+  clearClientId,
+  isTokenValid as gdriveIsTokenValid,
+  getUserEmail,
+  getSharedFolderLink,
+  clearFolderCache,
+  type GoogleDriveFile,
+  type GoogleDriveConfig,
+} from './googleDriveApi';
 
 // バックアップデータ生成
 async function buildBackupData() {
@@ -90,7 +109,7 @@ function parseBackupDate(fileName: string): string {
 
 export default function BackupRestore() {
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  const [activeSection, setActiveSection] = useState<'github' | 'local' | 'excel' | 'danger'>('github');
+  const [activeSection, setActiveSection] = useState<'gdrive' | 'github' | 'local' | 'excel' | 'danger'>('gdrive');
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-4xl mx-auto space-y-4">
@@ -100,7 +119,7 @@ export default function BackupRestore() {
           バックアップ・復元
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          GitHub リポジトリでのバックアップ管理、ローカルファイルのインポート・エクスポート
+          Google ドライブ・GitHub でのバックアップ管理、ローカルファイルのインポート・エクスポート
         </p>
       </header>
 
@@ -123,7 +142,8 @@ export default function BackupRestore() {
       {/* セクション切り替えタブ */}
       <div className="flex gap-1 bg-white rounded-xl shadow-sm border border-border-main p-1.5">
         {([
-          { key: 'github' as const, label: 'GitHub', icon: Cloud, color: 'text-gray-900' },
+          { key: 'gdrive' as const, label: 'Google ドライブ', icon: Cloud, color: 'text-blue-500' },
+          { key: 'github' as const, label: 'GitHub', icon: Github, color: 'text-gray-900' },
           { key: 'local' as const, label: 'ローカル JSON', icon: HardDrive, color: 'text-primary-500' },
           { key: 'excel' as const, label: 'Excel', icon: FileSpreadsheet, color: 'text-green-600' },
           { key: 'danger' as const, label: 'データ管理', icon: AlertTriangle, color: 'text-red-500' },
@@ -145,11 +165,376 @@ export default function BackupRestore() {
 
       {/* セクション内容 */}
       <div className="flex-1 min-h-0 overflow-auto">
+        {activeSection === 'gdrive' && <GoogleDriveSection setStatus={setStatus} />}
         {activeSection === 'github' && <GitHubSection setStatus={setStatus} />}
         {activeSection === 'local' && <LocalSection setStatus={setStatus} />}
         {activeSection === 'excel' && <ExcelSection setStatus={setStatus} />}
         {activeSection === 'danger' && <DangerSection setStatus={setStatus} />}
       </div>
+    </div>
+  );
+}
+
+// ================================================================
+// Google ドライブ バックアップセクション
+// ================================================================
+function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
+  const [clientId, setClientId] = useState(getSavedClientId());
+  const [clientIdInput, setClientIdInput] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [backups, setBackups] = useState<GoogleDriveFile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState<string | null>(null);
+  const [isImportingLatest, setIsImportingLatest] = useState(false);
+  const [showSetup, setShowSetup] = useState(!clientId);
+  const [folderLink, setFolderLink] = useState('');
+
+  const getConfig = (): GoogleDriveConfig => ({ accessToken: gdriveGetSavedToken() });
+
+  const loadBackups = async (token?: string) => {
+    setIsLoading(true);
+    try {
+      const t = token || gdriveGetSavedToken();
+      const files = await gdriveListBackups({ accessToken: t });
+      setBackups(files);
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `一覧取得失敗: ${err}` });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Google ドライブに接続 (OAuth2 ポップアップ)
+  const handleConnect = async () => {
+    const cid = clientId || clientIdInput.trim();
+    if (!cid) {
+      setStatus({ type: 'error', message: 'Client ID を入力してください' });
+      return;
+    }
+    setIsConnecting(true);
+    try {
+      await loadGisScript();
+      const token = await requestAccessToken(cid);
+      if (cid !== clientId) {
+        saveClientId(cid);
+        setClientId(cid);
+      }
+      const email = await getUserEmail(token);
+      setUserEmail(email);
+      setIsConnected(true);
+      setShowSetup(false);
+      setStatus({ type: 'success', message: `Google ドライブに接続しました (${email})` });
+      await loadBackups(token);
+      try {
+        const link = await getSharedFolderLink(token);
+        setFolderLink(link);
+      } catch { /* ignore */ }
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `接続失敗: ${err}` });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // 初期接続チェック
+  useEffect(() => {
+    if (clientId && gdriveIsTokenValid()) {
+      const token = gdriveGetSavedToken();
+      setIsConnected(true);
+      setShowSetup(false);
+      getUserEmail(token).then(email => setUserEmail(email));
+      loadBackups(token);
+      getSharedFolderLink(token).then(link => setFolderLink(link)).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDisconnect = () => {
+    const token = gdriveGetSavedToken();
+    if (token) revokeToken(token);
+    clearFolderCache();
+    setIsConnected(false);
+    setBackups([]);
+    setUserEmail('');
+    setFolderLink('');
+    setStatus({ type: 'info', message: 'Google ドライブから切断しました' });
+  };
+
+  const handleResetClientId = () => {
+    handleDisconnect();
+    clearClientId();
+    setClientId('');
+    setShowSetup(true);
+  };
+
+  // エクスポート
+  const handleSave = async () => {
+    setIsSaving(true);
+    setStatus(null);
+    try {
+      const data = await buildBackupData();
+      const now = new Date();
+      const fileName = `backup-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.json`;
+      await gdriveUploadBackup(getConfig(), fileName, data);
+      setStatus({ type: 'success', message: `Google ドライブに保存しました: ${fileName}` });
+      await loadBackups();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `保存失敗: ${err}` });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 最新インポート
+  const handleImportLatest = async () => {
+    setIsImportingLatest(true);
+    setStatus(null);
+    try {
+      const files = await gdriveListBackups(getConfig());
+      if (files.length === 0) {
+        setStatus({ type: 'error', message: 'Google ドライブにバックアップファイルがありません' });
+        return;
+      }
+      const latest = files[0];
+      if (!confirm(`最新のバックアップを復元しますか？\n${latest.name}\n\n現在のデータは全て上書きされます。`)) return;
+      const data = await gdriveDownloadBackup(getConfig(), latest);
+      await restoreBackupData(data);
+      setStatus({ type: 'success', message: `復元完了: ${latest.name}` });
+      await loadBackups();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `インポート失敗: ${err}` });
+    } finally {
+      setIsImportingLatest(false);
+    }
+  };
+
+  // 個別復元
+  const handleRestore = async (file: GoogleDriveFile) => {
+    if (!confirm(`このバックアップを復元しますか？\n${file.name}\n\n現在のデータは全て上書きされます。`)) return;
+    setIsRestoring(file.id);
+    setStatus(null);
+    try {
+      const data = await gdriveDownloadBackup(getConfig(), file);
+      await restoreBackupData(data);
+      setStatus({ type: 'success', message: `復元完了: ${file.name} (ver ${data.version})` });
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: `復元失敗: ${err}` });
+    } finally {
+      setIsRestoring(null);
+    }
+  };
+
+  // 削除
+  const handleDelete = async (file: GoogleDriveFile) => {
+    if (!confirm(`このバックアップを削除しますか？\n${file.name}`)) return;
+    try {
+      await gdriveDeleteBackup(getConfig(), file);
+      setStatus({ type: 'success', message: `削除しました: ${file.name}` });
+      await loadBackups();
+    } catch (err) {
+      setStatus({ type: 'error', message: `削除失敗: ${err}` });
+    }
+  };
+
+  const formatModifiedTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 接続設定 */}
+      <div className="bg-white rounded-xl shadow-sm border border-border-main p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Cloud className="w-5 h-5 text-blue-500" />
+            Google ドライブ バックアップ
+          </h2>
+          {isConnected ? (
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium bg-green-50 px-2.5 py-1 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                {userEmail || '接続中'}
+              </span>
+              <button onClick={handleDisconnect} className="text-xs text-gray-500 hover:text-red-500 transition-colors">
+                切断
+              </button>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">未接続</span>
+          )}
+        </div>
+
+        <p className="text-sm text-gray-500 mb-4">
+          Google ドライブの共有フォルダ
+          <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono mx-1">鳥取テニス協会バックアップ/大会運営システム</code>
+          にバックアップを保存・管理します。
+        </p>
+
+        {!isConnected && (
+          <div className="space-y-3">
+            {showSetup ? (
+              <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-border-main">
+                <label className="text-xs font-medium text-gray-600">
+                  Google Cloud Console の OAuth 2.0 Client ID
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={clientIdInput}
+                    onChange={e => setClientIdInput(e.target.value)}
+                    placeholder="xxxx.apps.googleusercontent.com"
+                    className="flex-1 px-3 py-2 border border-border-main rounded-lg text-sm font-mono focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500 outline-none"
+                  />
+                  <button
+                    onClick={handleConnect}
+                    disabled={!clientIdInput.trim() || isConnecting}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {isConnecting ? '接続中...' : 'Google で認証'}
+                  </button>
+                </div>
+                <div className="text-[11px] text-gray-400 space-y-0.5">
+                  <p>1. <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google Cloud Console</a> でプロジェクトを作成</p>
+                  <p>2. Google Drive API を有効化</p>
+                  <p>3. OAuth 同意画面を設定 → 認証情報 → OAuth 2.0 クライアント ID を作成</p>
+                  <p>4. 承認済み JavaScript 生成元にアプリの URL を追加</p>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnect}
+                disabled={isConnecting}
+                className="flex items-center gap-2 bg-blue-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-blue-600 disabled:opacity-50 shadow-sm transition-colors"
+              >
+                <Cloud className="w-4 h-4" />
+                {isConnecting ? '認証中...' : 'Google ドライブに接続'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {isConnected && (
+          <div className="space-y-3">
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                {isSaving ? 'エクスポート中...' : 'Google ドライブにエクスポート'}
+              </button>
+              <button
+                onClick={handleImportLatest}
+                disabled={isImportingLatest}
+                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors text-sm"
+              >
+                <Download className="w-4 h-4" />
+                {isImportingLatest ? 'インポート中...' : 'Google ドライブからインポート（最新）'}
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => loadBackups()}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                一覧を更新
+              </button>
+              {folderLink && (
+                <a
+                  href={folderLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  ドライブで開く
+                </a>
+              )}
+              <button
+                onClick={handleResetClientId}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors ml-auto"
+              >
+                Client ID を変更
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* バックアップ一覧 */}
+      {isConnected && (
+        <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
+            <h3 className="font-bold text-sm text-gray-700 flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-blue-500" />
+              保存済みバックアップ
+            </h3>
+            <span className="text-xs text-gray-400">{backups.length} 件</span>
+          </div>
+
+          {isLoading ? (
+            <div className="p-8 text-center text-gray-400">
+              <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin" />
+              <p className="text-sm">読込中...</p>
+            </div>
+          ) : backups.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <Cloud className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">バックアップファイルがありません</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border-main max-h-[400px] overflow-auto">
+              {backups.map(file => (
+                <div key={file.id} className="px-4 py-3 flex items-center gap-3 hover:bg-blue-50/50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatModifiedTime(file.modifiedTime)}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {formatSize(Number(file.size))}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleRestore(file)}
+                      disabled={isRestoring === file.id}
+                      className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                    >
+                      {isRestoring === file.id ? '復元中...' : '復元'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(file)}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      title="削除"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

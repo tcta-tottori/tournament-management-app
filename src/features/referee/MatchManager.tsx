@@ -1,9 +1,12 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, RefreshCw, Trash2, Trophy, Edit3, Check, X, Zap, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight } from 'lucide-react';
 import type { Match } from '../../db/database';
+import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
+import { buildCallText } from '../broadcast/callTextBuilder';
+import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 
 function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds) return '決勝';
@@ -132,6 +135,166 @@ export default function MatchManager() {
     [matches]
   );
 
+  // --- 音声コール ---
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
+    rate: 0.95,
+    pitch: 1.0,
+    volume: 1.0,
+    repeatCount: 1,
+  });
+  const [callTargetMatchId, setCallTargetMatchId] = useState<string | null>(null);
+  const [callCourtNumber, setCallCourtNumber] = useState('');
+  const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
+
+  const { isSpeaking, voiceName, speak, stop, testVoice } = useSpeechSynthesis();
+
+  // 所属ふりがなマップ
+  const affiliationFuriganaMap = useLiveQuery(
+    async () => {
+      const entries = await db.affiliationFurigana.toArray();
+      const map: Record<string, string> = {};
+      for (const entry of entries) {
+        map[entry.name] = entry.furigana;
+      }
+      return map;
+    },
+    []
+  ) || {};
+
+  // Match → MatchCall 変換
+  const buildMatchCall = useCallback((m: Match, courtNum: string): MatchCall | null => {
+    if (!m.player1Name || !m.player2Name) return null;
+
+    const getPos = (entryId: string | null) => {
+      if (!entryId || !drawData?.slots) return 0;
+      const slot = drawData.slots.find(s => s.entryId === entryId);
+      return slot?.position ?? 0;
+    };
+
+    const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
+      if (!entryId) return { name: fallbackName, aff: fallbackAff };
+      const entry = entries.find(e => e.entryId === entryId);
+      if (!entry) return { name: fallbackName, aff: fallbackAff };
+      const player = players.find(p => p.playerId === entry.playerId);
+      if (!player) return { name: fallbackName, aff: fallbackAff };
+      return { name: player.furigana || player.name, aff: player.affiliation };
+    };
+
+    const isDoubles = currentEvent?.type === 'Doubles';
+    const roundName = getRoundName(m.round, totalRounds);
+
+    if (isDoubles) {
+      const [fallbackNameA, fallbackPairNameA] = m.player1Name.includes(' / ')
+        ? m.player1Name.split(' / ') : [m.player1Name, ''];
+      const [fallbackNameB, fallbackPairNameB] = m.player2Name.includes(' / ')
+        ? m.player2Name.split(' / ') : [m.player2Name, ''];
+      const [fallbackAffA, fallbackPairAffA] = m.player1Affiliation.includes(' / ')
+        ? m.player1Affiliation.split(' / ') : [m.player1Affiliation, m.player1Affiliation];
+      const [fallbackAffB, fallbackPairAffB] = m.player2Affiliation.includes(' / ')
+        ? m.player2Affiliation.split(' / ') : [m.player2Affiliation, m.player2Affiliation];
+
+      const p1 = resolveFurigana(m.player1EntryId, fallbackNameA, fallbackAffA);
+      const p2 = resolveFurigana(m.player2EntryId, fallbackNameB, fallbackAffB);
+
+      let partnerA = { name: fallbackPairNameA.trim(), aff: fallbackPairAffA.trim() };
+      let partnerB = { name: fallbackPairNameB.trim(), aff: fallbackPairAffB.trim() };
+
+      if (m.player1EntryId) {
+        const entry1 = entries.find(e => e.entryId === m.player1EntryId);
+        if (entry1?.partnerId) {
+          const partner = players.find(p => p.playerId === entry1.partnerId);
+          if (partner) partnerA = { name: partner.furigana || partner.name, aff: partner.affiliation };
+        }
+      }
+      if (m.player2EntryId) {
+        const entry2 = entries.find(e => e.entryId === m.player2EntryId);
+        if (entry2?.partnerId) {
+          const partner = players.find(p => p.playerId === entry2.partnerId);
+          if (partner) partnerB = { name: partner.furigana || partner.name, aff: partner.affiliation };
+        }
+      }
+
+      return {
+        id: m.id || 0,
+        eventName: currentEvent?.name || '',
+        round: `${roundName} #${m.position}`,
+        numberA: getPos(m.player1EntryId),
+        nameA: p1.name,
+        affA: p1.aff,
+        pairNameA: partnerA.name,
+        pairAffA: partnerA.aff,
+        numberB: getPos(m.player2EntryId),
+        nameB: p2.name,
+        affB: p2.aff,
+        pairNameB: partnerB.name,
+        pairAffB: partnerB.aff,
+        type: 'doubles',
+        status: 'pending',
+        courtNumber: courtNum,
+        startTime: m.scheduledTime || '',
+      };
+    } else {
+      const p1 = resolveFurigana(m.player1EntryId, m.player1Name, m.player1Affiliation);
+      const p2 = resolveFurigana(m.player2EntryId, m.player2Name, m.player2Affiliation);
+
+      return {
+        id: m.id || 0,
+        eventName: currentEvent?.name || '',
+        round: `${roundName} #${m.position}`,
+        numberA: getPos(m.player1EntryId),
+        nameA: p1.name,
+        affA: p1.aff,
+        numberB: getPos(m.player2EntryId),
+        nameB: p2.name,
+        affB: p2.aff,
+        type: 'singles',
+        status: 'pending',
+        courtNumber: courtNum,
+        startTime: m.scheduledTime || '',
+      };
+    }
+  }, [drawData, entries, players, currentEvent, totalRounds]);
+
+  // コール実行
+  const handleVoiceCall = useCallback((m: Match, courtNum: string) => {
+    if (!courtNum) return;
+    const matchCall = buildMatchCall(m, courtNum);
+    if (!matchCall) return;
+
+    const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap);
+    setSpeakingMatchId(m.matchId);
+
+    speak(text, voiceSettings, () => {
+      setSpeakingMatchId(null);
+      const roundName = getRoundName(m.round, totalRounds);
+      setCallLog(prev => [{
+        timestamp: new Date(),
+        courtNumber: courtNum,
+        eventName: currentEvent?.name || '',
+        round: `${roundName} #${m.position}`,
+        text,
+        matchId: m.id || 0,
+      }, ...prev]);
+    });
+  }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds]);
+
+  // コール停止
+  const handleVoiceStop = useCallback(() => {
+    stop();
+    setSpeakingMatchId(null);
+  }, [stop]);
+
+  // コール対象選択
+  const toggleCallTarget = useCallback((m: Match) => {
+    if (callTargetMatchId === m.matchId) {
+      setCallTargetMatchId(null);
+    } else {
+      setCallTargetMatchId(m.matchId);
+      setCallCourtNumber(m.courtId || '');
+    }
+  }, [callTargetMatchId]);
 
   const handleGenerateMatches = async () => {
     if (!drawData || !selectedEventId) return;
@@ -949,7 +1112,7 @@ ${printableMatches.map(m => {
             <ClipboardList className="w-5 h-5 text-primary-500" />
             <span className="font-bold text-gray-900">対戦順・審判用紙</span>
             {selectedEventId && (
-              <span className="text-xs text-gray-500 ml-2">{matches.length} 試合</span>
+              <span className="text-xs text-gray-500 ml-2">{matches.filter(m => m.status !== 'walkover').length} 試合</span>
             )}
           </div>
           {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -984,7 +1147,7 @@ ${printableMatches.map(m => {
                 <div className="flex items-center gap-3">
                   <div className="bg-primary-50 text-primary-500 px-3 py-1.5 rounded-full text-sm font-medium border border-primary-500/20">
                     <ListOrdered className="w-4 h-4 inline mr-1" />
-                    {matches.length} 試合
+                    {matches.filter(m => m.status !== 'walkover').length} 試合
                   </div>
                   {!drawData && (
                     <span className="text-sm text-warning">
@@ -1021,6 +1184,79 @@ ${printableMatches.map(m => {
                 </div>
               </div>
             )}
+
+            {/* 音声コール設定 */}
+            <div className="pt-2 border-t border-gray-100">
+              <button
+                onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-primary-500 transition-colors"
+              >
+                {showVoiceSettings ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+                <Volume2 className="w-4 h-4 text-primary-500" />
+                音声コール設定
+              </button>
+              {showVoiceSettings && (
+                <div className="mt-2 space-y-3">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 rounded-lg border border-pink-200 text-xs">
+                    <span>👩</span>
+                    <span className="font-medium text-pink-700">女性音声</span>
+                    <span className="text-pink-500">{voiceName}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        速度: {voiceSettings.rate.toFixed(2)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.2"
+                        step="0.05"
+                        value={voiceSettings.rate}
+                        onChange={e => setVoiceSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
+                        className="w-full accent-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し</label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => setVoiceSettings(s => ({ ...s, repeatCount: n }))}
+                            className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                              voiceSettings.repeatCount === n
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
+                            }`}
+                          >
+                            {n}回
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <button
+                        onClick={() => testVoice(voiceSettings)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-500 rounded-lg text-xs font-medium hover:bg-primary-100 transition-colors"
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                        テスト
+                      </button>
+                      {isSpeaking && (
+                        <button
+                          onClick={handleVoiceStop}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                        >
+                          <Square className="w-3.5 h-3.5" />
+                          停止
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1032,15 +1268,16 @@ ${printableMatches.map(m => {
             <div className="bg-white rounded-xl shadow-sm border border-border-main flex-1 overflow-hidden flex flex-col">
               <div className="overflow-auto flex-1">
                 {(() => {
-                  // ラウンド別にグループ化
+                  // BYE（不戦勝）を除外してラウンド別にグループ化
+                  const playableMatches = sortedMatches.filter(m => m.status !== 'walkover');
                   const roundGroups = new Map<number, Match[]>();
-                  for (const m of sortedMatches) {
+                  for (const m of playableMatches) {
                     if (!roundGroups.has(m.round)) roundGroups.set(m.round, []);
                     roundGroups.get(m.round)!.push(m);
                   }
                   return Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
                     const roundLabel = getRoundName(round, totalRounds);
-                    const finishedCount = roundMatches.filter(m => m.status === 'finished' || m.status === 'walkover').length;
+                    const finishedCount = roundMatches.filter(m => m.status === 'finished').length;
                     return (
                       <div key={round}>
                         <div className="px-4 py-2.5 bg-primary-50 border-b-2 border-border-main font-bold text-gray-900 text-sm sticky top-0 flex items-center justify-between">
@@ -1058,7 +1295,7 @@ ${printableMatches.map(m => {
                               <th className="py-1.5 px-2 border-b border-border-main">選手2</th>
                               <th className="py-1.5 px-2 w-28 text-center border-b border-border-main">スコア</th>
                               <th className="py-1.5 px-2 w-16 text-center border-b border-border-main">状態</th>
-                              <th className="py-1.5 px-2 w-14 text-center border-b border-border-main">操作</th>
+                              <th className="py-1.5 px-2 w-24 text-center border-b border-border-main">操作</th>
                             </tr>
                           </thead>
                           <tbody className="text-sm">
@@ -1196,46 +1433,120 @@ ${printableMatches.map(m => {
                                 );
                               }
 
+                              const isCallTarget = callTargetMatchId === m.matchId;
+                              const isThisSpeaking = speakingMatchId === m.matchId;
+
                               return (
-                                <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
-                                  <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
-                                  <td className="py-2 px-2">
-                                    <div className="flex items-center gap-1">
-                                      {isWinner1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                      <span className={`whitespace-nowrap ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium'}`}>
-                                        {m.player1Name || '(未定)'}
-                                      </span>
-                                      {m.player1Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player1Affiliation})</span>}
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-1 text-center text-gray-300 text-xs">vs</td>
-                                  <td className="py-2 px-2">
-                                    <div className="flex items-center gap-1">
-                                      {isWinner2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                      <span className={`whitespace-nowrap ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium'}`}>
-                                        {m.player2Name || '(未定)'}
-                                      </span>
-                                      {m.player2Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player2Affiliation})</span>}
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-2 text-center font-mono text-sm">
-                                    {m.score || (isWalkover ? 'W.O' : '-')}
-                                  </td>
-                                  <td className="py-2 px-2 text-center">
-                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${st.color}`}>{st.text}</span>
-                                  </td>
-                                  <td className="py-2 px-2 text-center">
-                                    {hasPlayers && !isWalkover && (
-                                      <button
-                                        onClick={() => startEdit(m)}
-                                        className="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
-                                        title="結果入力"
-                                      >
-                                        <Edit3 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
+                                <React.Fragment key={m.matchId}>
+                                  <tr className={`border-b border-border-main hover:bg-primary-50/50 transition-colors ${isThisSpeaking ? 'bg-amber-50' : idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
+                                    <td className="py-2 px-2 text-center font-mono text-gray-400 text-xs">{m.matchOrder}</td>
+                                    <td className="py-2 px-2">
+                                      <div className="flex items-center gap-1">
+                                        {isWinner1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium'}`}>
+                                          {m.player1Name || '(未定)'}
+                                        </span>
+                                        {m.player1Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player1Affiliation})</span>}
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-1 text-center text-gray-300 text-xs">vs</td>
+                                    <td className="py-2 px-2">
+                                      <div className="flex items-center gap-1">
+                                        {isWinner2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium'}`}>
+                                          {m.player2Name || '(未定)'}
+                                        </span>
+                                        {m.player2Affiliation && <span className="text-xs text-gray-400 ml-1">({m.player2Affiliation})</span>}
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-2 text-center font-mono text-sm">
+                                      {m.score || (isWalkover ? 'W.O' : '-')}
+                                    </td>
+                                    <td className="py-2 px-2 text-center">
+                                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${st.color}`}>{st.text}</span>
+                                    </td>
+                                    <td className="py-2 px-2 text-center">
+                                      <div className="flex items-center gap-0.5 justify-center">
+                                        {hasPlayers && !isWalkover && (
+                                          <>
+                                            <button
+                                              onClick={() => startEdit(m)}
+                                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded transition-colors"
+                                              title="結果入力"
+                                            >
+                                              <Edit3 className="w-3.5 h-3.5" />
+                                            </button>
+                                            {isThisSpeaking ? (
+                                              <button
+                                                onClick={handleVoiceStop}
+                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors animate-pulse"
+                                                title="停止"
+                                              >
+                                                <Square className="w-3.5 h-3.5" />
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => toggleCallTarget(m)}
+                                                className={`p-1.5 rounded transition-colors ${
+                                                  isCallTarget
+                                                    ? 'text-green-600 bg-green-50'
+                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                                                }`}
+                                                title="音声コール"
+                                              >
+                                                <Volume2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isCallTarget && !isThisSpeaking && (
+                                    <tr className="border-b border-green-200 bg-green-50">
+                                      <td colSpan={7} className="py-2.5 px-4">
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                          <div className="flex items-center gap-1.5">
+                                            <label className="text-xs font-medium text-gray-600">コート:</label>
+                                            <select
+                                              value={callCourtNumber}
+                                              onChange={e => setCallCourtNumber(e.target.value)}
+                                              className="border border-gray-300 rounded px-2 py-1 text-sm w-20 bg-white"
+                                            >
+                                              <option value="">--</option>
+                                              {Array.from({ length: 16 }, (_, i) => i + 1).map(n => (
+                                                <option key={n} value={String(n)}>{n}番</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              if (callCourtNumber) {
+                                                handleVoiceCall(m, callCourtNumber);
+                                                setCallTargetMatchId(null);
+                                              }
+                                            }}
+                                            disabled={!callCourtNumber}
+                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                              callCourtNumber
+                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                          >
+                                            <Play className="w-3.5 h-3.5" />
+                                            コール
+                                          </button>
+                                          <button
+                                            onClick={() => setCallTargetMatchId(null)}
+                                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                          >
+                                            閉じる
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
                               );
                             })}
                           </tbody>
@@ -1261,6 +1572,31 @@ ${printableMatches.map(m => {
           </div>
         )}
       </div>
+
+      {/* コール履歴 */}
+      {callLog.length > 0 && (
+        <div className="shrink-0 mt-3 bg-white rounded-xl shadow-sm border border-border-main">
+          <div className="px-4 py-2 flex items-center gap-2 text-sm font-bold text-gray-900 border-b border-border-main">
+            <Volume2 className="w-4 h-4 text-primary-500" />
+            コール履歴 ({callLog.length}件)
+          </div>
+          <div className="px-4 py-2 max-h-32 overflow-auto">
+            <div className="space-y-1">
+              {callLog.map((log, i) => (
+                <div key={`${log.matchId}-${log.timestamp.getTime()}-${i}`} className="flex items-start gap-2 text-xs text-gray-500 py-1 border-b border-primary-50 last:border-0">
+                  <span className="font-mono text-gray-900 shrink-0">
+                    {log.timestamp.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <span className="bg-primary-50 text-primary-500 px-1.5 rounded shrink-0">
+                    {log.courtNumber}番
+                  </span>
+                  <span className="truncate">{log.eventName} {log.round}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

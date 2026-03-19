@@ -171,11 +171,13 @@ export default function PlayerDataList() {
           const name = String(row['所属名'] || '').trim();
           const furigana = String(row['ふりがな'] || '').trim();
           if (!name) continue;
-          const existing = affFuriganaEntries.find(e => e.name === name);
+          // DB直接クエリ（staleなstateではなく最新データを参照）
+          const existing = await db.affiliationFurigana.where('name').equals(name).first();
           if (existing) {
             await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: Date.now() });
           } else if (furigana) {
-            await db.affiliationFurigana.add({ name, furigana, updatedAt: Date.now() });
+            // put()でupsert（unique制約違反を回避）
+            await db.affiliationFurigana.put({ name, furigana, updatedAt: Date.now() });
           }
           count++;
         }
