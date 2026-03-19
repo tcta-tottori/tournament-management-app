@@ -31,6 +31,15 @@ jobs:
 
       - run: npm run build
 
+      - name: Verify build output
+        run: |
+          echo "=== index.html ==="
+          head -5 dist/index.html
+          echo "=== JS files ==="
+          ls -la dist/assets/*.js
+          echo "=== CSS files ==="
+          ls -la dist/assets/*.css
+
       - name: Create 404.html for SPA routing
         run: cp dist/index.html dist/404.html
 
