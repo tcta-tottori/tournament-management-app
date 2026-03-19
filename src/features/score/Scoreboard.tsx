@@ -5,7 +5,8 @@ import { useAppStore } from '../../stores/appStore';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import ScoreboardBracket from './ScoreboardBracket';
 import ScoreboardLeague from './ScoreboardLeague';
-import MatchActionPanel from './MatchActionPanel';
+import ScoreInputDialog from './ScoreInputDialog';
+import type { ScoreInputMatch } from './ScoreInputDialog';
 import {
   MonitorPlay,
   Check,
@@ -164,8 +165,21 @@ export default function Scoreboard() {
   );
 
   // -- Selected match for action panel --
-  const selectedMatch = useMemo(() => {
+  const selectedMatch: ScoreInputMatch | null = useMemo(() => {
     if (!selectedMatchKey) return null;
+
+    const buildMatch = (m: typeof matches[0]): ScoreInputMatch => {
+      const event = events[selectedEventIdx];
+      return {
+        matchId: m.matchId, dbId: m.id!, round: m.round, position: m.position,
+        matchOrder: m.matchOrder, player1Name: m.player1Name, player2Name: m.player2Name,
+        player1Affiliation: m.player1Affiliation, player2Affiliation: m.player2Affiliation,
+        player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
+        score: m.score, winnerEntryId: m.winnerEntryId, courtId: m.courtId,
+        status: m.status, scheduledTime: m.scheduledTime,
+        eventName: event?.name || '', updatedAt: m.updatedAt,
+      };
+    };
 
     // For bracket: key is "round-position"
     const bracketParts = selectedMatchKey.split('-');
@@ -174,60 +188,17 @@ export default function Scoreboard() {
       const position = parseInt(bracketParts[1]);
       if (!isNaN(round) && !isNaN(position)) {
         const m = matches.find(mt => mt.round === round && mt.position === position);
-        if (m) {
-          const event = events[selectedEventIdx];
-          return {
-            matchId: m.matchId,
-            dbId: m.id!,
-            round: m.round,
-            position: m.position,
-            matchOrder: m.matchOrder,
-            player1Name: m.player1Name,
-            player2Name: m.player2Name,
-            player1Affiliation: m.player1Affiliation,
-            player2Affiliation: m.player2Affiliation,
-            player1EntryId: m.player1EntryId,
-            player2EntryId: m.player2EntryId,
-            score: m.score,
-            winnerEntryId: m.winnerEntryId,
-            courtId: m.courtId,
-            status: m.status,
-            scheduledTime: m.scheduledTime,
-            eventName: event?.name || '',
-          };
-        }
+        if (m) return buildMatch(m);
       }
     }
 
-    // For league: key is "entryId1-entryId2" (entryIds can contain dashes)
-    // Try to find a match by scanning
+    // For league: key is "entryId1-entryId2"
     const leagueMatch = matches.find(m => {
       const k1 = `${m.player1EntryId}-${m.player2EntryId}`;
       const k2 = `${m.player2EntryId}-${m.player1EntryId}`;
       return selectedMatchKey === k1 || selectedMatchKey === k2;
     });
-    if (leagueMatch) {
-      const event = events[selectedEventIdx];
-      return {
-        matchId: leagueMatch.matchId,
-        dbId: leagueMatch.id!,
-        round: leagueMatch.round,
-        position: leagueMatch.position,
-        matchOrder: leagueMatch.matchOrder,
-        player1Name: leagueMatch.player1Name,
-        player2Name: leagueMatch.player2Name,
-        player1Affiliation: leagueMatch.player1Affiliation,
-        player2Affiliation: leagueMatch.player2Affiliation,
-        player1EntryId: leagueMatch.player1EntryId,
-        player2EntryId: leagueMatch.player2EntryId,
-        score: leagueMatch.score,
-        winnerEntryId: leagueMatch.winnerEntryId,
-        courtId: leagueMatch.courtId,
-        status: leagueMatch.status,
-        scheduledTime: leagueMatch.scheduledTime,
-        eventName: event?.name || '',
-      };
-    }
+    if (leagueMatch) return buildMatch(leagueMatch);
 
     return null;
   }, [selectedMatchKey, matches, events, selectedEventIdx]);
@@ -605,9 +576,9 @@ export default function Scoreboard() {
             )}
           </div>
 
-          {/* Action panel (right side) */}
-          <div className="w-80 shrink-0 print:hidden hidden lg:block">
-            <MatchActionPanel
+          {/* Score input dialog (popup) */}
+          {selectedMatch && (
+            <ScoreInputDialog
               match={selectedMatch}
               courts={courts.filter(c => c.isAvailable).map(c => ({
                 courtId: c.courtId,
@@ -615,31 +586,9 @@ export default function Scoreboard() {
                 isAvailable: c.isAvailable,
               }))}
               onClose={() => setSelectedMatchKey(null)}
-              onMatchUpdate={() => {
-                // Live query auto-updates; just clear selection if needed
-              }}
+              onMatchUpdate={() => {}}
               getRoundName={makeRoundName}
             />
-          </div>
-
-          {/* Mobile action panel (bottom sheet) */}
-          {selectedMatch && (
-            <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden print:hidden">
-              <div className="bg-black/20 fixed inset-0" onClick={() => setSelectedMatchKey(null)} />
-              <div className="relative max-h-[70vh] overflow-y-auto">
-                <MatchActionPanel
-                  match={selectedMatch}
-                  courts={courts.filter(c => c.isAvailable).map(c => ({
-                    courtId: c.courtId,
-                    name: c.name,
-                    isAvailable: c.isAvailable,
-                  }))}
-                  onClose={() => setSelectedMatchKey(null)}
-                  onMatchUpdate={() => {}}
-                  getRoundName={makeRoundName}
-                />
-              </div>
-            </div>
           )}
         </div>
       ) : (

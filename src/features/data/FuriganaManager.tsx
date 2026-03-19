@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
-import { Database, Download, Upload, Cpu, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Database, Download, Upload, Cpu, AlertCircle, CheckCircle2, FileSpreadsheet } from 'lucide-react';
 
 export default function FuriganaManager() {
   const furiganaDict = useLiveQuery(() => db.furiganaDict.toArray());
@@ -166,7 +166,16 @@ export default function FuriganaManager() {
           const matchedPlayers = await db.players.where('playerId').equals(kanjiStr).toArray();
           for (const p of matchedPlayers) {
             if (p.furigana !== furiganaStr) {
-               await db.players.put({ ...p, furigana: furiganaStr });
+               await db.players.update(p.id!, { furigana: furiganaStr });
+            }
+          }
+          // playerId以外にname(スペース除去)でもマッチを試みる
+          if (matchedPlayers.length === 0) {
+            const allP = await db.players.filter(p => p.name.replace(/\s+/g, '') === kanjiStr).toArray();
+            for (const p of allP) {
+              if (p.furigana !== furiganaStr) {
+                await db.players.update(p.id!, { furigana: furiganaStr });
+              }
             }
           }
           updatedCount++;
@@ -269,7 +278,10 @@ export default function FuriganaManager() {
           disabled={isProcessing}
           className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-100 rounded-lg transition-colors disabled:opacity-50 relative"
         >
-          <Upload className="w-6 h-6 text-emerald-600" />
+          <div className="flex items-center gap-1">
+            <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+            <Upload className="w-4 h-4 text-emerald-600" />
+          </div>
           <span className="text-sm font-semibold text-emerald-900">Excelインポート</span>
           <span className="text-xs text-emerald-600 text-center">修正したExcelを読み込み優先更新</span>
           <input 
@@ -286,7 +298,10 @@ export default function FuriganaManager() {
           disabled={isProcessing}
           className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-100 rounded-lg transition-colors disabled:opacity-50"
         >
-          <Download className="w-6 h-6 text-orange-600" />
+          <div className="flex items-center gap-1">
+            <FileSpreadsheet className="w-6 h-6 text-orange-600" />
+            <Download className="w-4 h-4 text-orange-600" />
+          </div>
           <span className="text-sm font-semibold text-orange-900">未登録エクスポート</span>
           <span className="text-xs text-orange-600 text-center">ふりがなが無い選手Excelに出力</span>
         </button>
