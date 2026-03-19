@@ -689,8 +689,8 @@ export default function EntryRegistration() {
               エントリー <strong className="text-gray-800">{slots.filter(s => s.entry && !s.isBye).length}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-              BYE <strong className="text-gray-800">{slots.filter(s => s.isBye || (s.entry?.status === 'withdrawn')).length}</strong>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              欠場 <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
             </span>
           </div>
         )}
@@ -772,7 +772,7 @@ export default function EntryRegistration() {
               <span className="text-gray-500">/</span>
               <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
               {stats.absent > 0 && (
-                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} BYE</span>
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} 欠場</span>
               )}
             </div>
           </div>
