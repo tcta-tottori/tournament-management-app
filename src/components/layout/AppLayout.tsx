@@ -237,7 +237,7 @@ export default function AppLayout() {
 
       {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
       <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
-        <div key={location.pathname} className="page-enter h-full">
+        <div key={location.pathname} className="page-enter min-h-full">
           <Outlet />
         </div>
       </main>

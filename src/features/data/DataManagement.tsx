@@ -5,8 +5,8 @@ import DataSync from './DataSync';
 
 export default function DataManagement() {
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto h-full flex flex-col">
-      <header className="mb-6 bg-white p-4 rounded-xl card-tottori">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+      <header className="bg-white p-4 rounded-xl card-tottori">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <DatabaseIcon className="w-6 h-6 text-primary-500" />
@@ -18,13 +18,13 @@ export default function DataManagement() {
         </div>
       </header>
 
-      {/* データ同期パネル（フルwidth） */}
-      <div className="mb-6">
+      {/* データ同期パネル */}
+      <div>
         <DataSync />
       </div>
 
       {/* ドロー会議システム読込パネル */}
-      <section className="mb-6 bg-white rounded-xl card-tottori overflow-hidden">
+      <section className="bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <DatabaseIcon className="w-5 h-5 text-primary-500" />
           <h2 className="font-semibold text-primary-600">データ読込</h2>
