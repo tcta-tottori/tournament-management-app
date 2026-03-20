@@ -110,7 +110,7 @@
   50% { transform: translateY(-4px); }
 }
 
-/* ===== 金の砂粒エフェクト — 3層構成 ===== */
+/* ===== 金の微粒子エフェクト — 空気中に漂う金の粉 ===== */
 .header-gold-dust {
   position: absolute;
   inset: 0;
@@ -121,77 +121,94 @@
   overflow: hidden;
 }
 
-/* 微粒子（type 0）— 控えめにキラッと光る */
+/* 極微粒子（type 0）— ほぼ見えない粉塵、ゆっくり浮遊 */
 .header-gold-dust .dust-t0 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(218,185,92,0.8) 0%, rgba(255,215,120,0.3) 70%, transparent 100%);
-  animation: sparkle-subtle 4s ease-in-out infinite;
+  background: rgba(218,185,92,0.7);
+  animation: float-micro 6s ease-in-out infinite alternate;
 }
 
-/* 中粒子（type 1）— 少し明るくキラキラ */
+/* 微粒子（type 1）— 小さな金の粒、ゆらゆら漂う */
 .header-gold-dust .dust-t1 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,215,120,0.9) 0%, rgba(218,185,92,0.4) 50%, transparent 100%);
-  animation: sparkle-medium 5s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(255,215,120,0.85) 0%, rgba(218,185,92,0.3) 80%, transparent 100%);
+  animation: float-drift 8s ease-in-out infinite alternate;
 }
 
-/* 大粒子（type 2）— 一瞬キラッと輝く星 */
+/* 小粒子（type 2）— たまにキラッと光るアクセント */
 .header-gold-dust .dust-t2 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,240,190,1) 0%, rgba(255,215,120,0.5) 40%, transparent 100%);
-  animation: sparkle-star 6s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(255,235,180,0.9) 0%, rgba(255,215,120,0.4) 50%, transparent 100%);
+  animation: float-sparkle 7s ease-in-out infinite;
 }
 
-/* 控えめスパークル — 普段はほぼ見えず、ふわっと光る */
-@keyframes sparkle-subtle {
-  0%, 100% { opacity: 0.08; transform: scale(0.6); }
-  45% { opacity: 0.12; transform: scale(0.7); }
-  50% { opacity: 0.5; transform: scale(1); }
-  55% { opacity: 0.12; transform: scale(0.7); }
+/* 極微粒子の浮遊 — ゆっくり上下にふわふわ */
+@keyframes float-micro {
+  0%   { transform: translate(0, 0); opacity: 0.12; }
+  25%  { transform: translate(0.5px, -1.5px); opacity: 0.22; }
+  50%  { transform: translate(-0.3px, -0.5px); opacity: 0.15; }
+  75%  { transform: translate(0.8px, 0.5px); opacity: 0.25; }
+  100% { transform: translate(-0.5px, -1px); opacity: 0.12; }
 }
 
-/* 中程度スパークル — やや明るくきらめく */
-@keyframes sparkle-medium {
-  0%, 100% { opacity: 0.1; transform: scale(0.7); }
-  40% { opacity: 0.12; transform: scale(0.75); }
-  48% { opacity: 0.55; transform: scale(1.05); }
-  52% { opacity: 0.55; transform: scale(1.05); }
-  60% { opacity: 0.12; transform: scale(0.75); }
+/* 微粒子の漂い — やや大きくゆらゆら */
+@keyframes float-drift {
+  0%   { transform: translate(0, 0); opacity: 0.1; }
+  20%  { transform: translate(1px, -2px); opacity: 0.25; }
+  40%  { transform: translate(-0.5px, -1px); opacity: 0.15; }
+  60%  { transform: translate(1.5px, 0.5px); opacity: 0.3; }
+  80%  { transform: translate(-1px, -1.5px); opacity: 0.18; }
+  100% { transform: translate(0.5px, -0.5px); opacity: 0.12; }
 }
 
-/* 星型スパークル — 一瞬キラッと強く光る */
-@keyframes sparkle-star {
-  0%, 100% { opacity: 0.05; transform: scale(0.5); box-shadow: none; }
-  47% { opacity: 0.08; transform: scale(0.6); box-shadow: none; }
-  50% { opacity: 0.65; transform: scale(1.2); box-shadow: 0 0 4px rgba(255,215,120,0.4), 0 0 8px rgba(218,185,92,0.15); }
-  53% { opacity: 0.08; transform: scale(0.6); box-shadow: none; }
+/* 小粒子のキラメキ — 漂いながらたまにキラッ */
+@keyframes float-sparkle {
+  0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.08; }
+  15%  { transform: translate(1px, -1.5px) scale(0.85); opacity: 0.12; }
+  30%  { transform: translate(-0.5px, -0.5px) scale(0.9); opacity: 0.15; }
+  48%  { transform: translate(0.8px, -1px) scale(0.9); opacity: 0.15; }
+  50%  { transform: translate(1px, -1.2px) scale(1.3); opacity: 0.55; }
+  52%  { transform: translate(1px, -1px) scale(0.9); opacity: 0.15; }
+  70%  { transform: translate(-1px, 0.5px) scale(0.85); opacity: 0.1; }
+  85%  { transform: translate(0.5px, -1px) scale(0.8); opacity: 0.08; }
 }
 
-/* 各砂粒のアニメーションずらし — バラバラのタイミングで光る */
-.header-gold-dust .dust-t0:nth-child(3n)   { animation-duration: 3.5s; }
-.header-gold-dust .dust-t0:nth-child(5n)   { animation-duration: 5s; }
-.header-gold-dust .dust-t0:nth-child(7n)   { animation-duration: 6s; }
-.header-gold-dust .dust-t0:nth-child(2n)   { animation-delay: 0.8s; }
-.header-gold-dust .dust-t0:nth-child(3n+1) { animation-delay: 1.6s; }
-.header-gold-dust .dust-t0:nth-child(5n+2) { animation-delay: 2.5s; }
-.header-gold-dust .dust-t0:nth-child(7n+3) { animation-delay: 3.2s; }
+/* --- アニメーションのタイミングずらし（自然なランダム感） --- */
 
-.header-gold-dust .dust-t1:nth-child(3n)   { animation-duration: 4.5s; }
-.header-gold-dust .dust-t1:nth-child(5n)   { animation-duration: 6s; }
-.header-gold-dust .dust-t1:nth-child(7n)   { animation-duration: 7s; }
-.header-gold-dust .dust-t1:nth-child(2n)   { animation-delay: 1.2s; }
-.header-gold-dust .dust-t1:nth-child(3n+1) { animation-delay: 2.3s; }
-.header-gold-dust .dust-t1:nth-child(5n+2) { animation-delay: 3.5s; }
+/* 極微粒子: 素数ベースのずらし */
+.header-gold-dust .dust-t0:nth-child(2n)    { animation-duration: 5s; }
+.header-gold-dust .dust-t0:nth-child(3n)    { animation-duration: 7s; }
+.header-gold-dust .dust-t0:nth-child(5n)    { animation-duration: 8s; }
+.header-gold-dust .dust-t0:nth-child(7n)    { animation-duration: 5.5s; }
+.header-gold-dust .dust-t0:nth-child(11n)   { animation-duration: 9s; }
+.header-gold-dust .dust-t0:nth-child(2n+1)  { animation-delay: 0.4s; }
+.header-gold-dust .dust-t0:nth-child(3n+1)  { animation-delay: 1.1s; }
+.header-gold-dust .dust-t0:nth-child(5n+2)  { animation-delay: 2.3s; }
+.header-gold-dust .dust-t0:nth-child(7n+3)  { animation-delay: 3.7s; }
+.header-gold-dust .dust-t0:nth-child(11n+5) { animation-delay: 4.8s; }
+.header-gold-dust .dust-t0:nth-child(odd)   { animation-direction: alternate-reverse; }
 
-.header-gold-dust .dust-t2:nth-child(3n)   { animation-duration: 7s; }
-.header-gold-dust .dust-t2:nth-child(5n)   { animation-duration: 8s; }
-.header-gold-dust .dust-t2:nth-child(2n)   { animation-delay: 2s; }
-.header-gold-dust .dust-t2:nth-child(3n+1) { animation-delay: 4s; }
-.header-gold-dust .dust-t2:nth-child(4n+1) { animation-delay: 0.5s; }
-.header-gold-dust .dust-t2:nth-child(6n+2) { animation-delay: 2s; }
+/* 微粒子 */
+.header-gold-dust .dust-t1:nth-child(2n)    { animation-duration: 7s; }
+.header-gold-dust .dust-t1:nth-child(3n)    { animation-duration: 9s; }
+.header-gold-dust .dust-t1:nth-child(5n)    { animation-duration: 10s; }
+.header-gold-dust .dust-t1:nth-child(7n)    { animation-duration: 6.5s; }
+.header-gold-dust .dust-t1:nth-child(2n+1)  { animation-delay: 0.7s; }
+.header-gold-dust .dust-t1:nth-child(3n+1)  { animation-delay: 2s; }
+.header-gold-dust .dust-t1:nth-child(5n+2)  { animation-delay: 3.3s; }
+.header-gold-dust .dust-t1:nth-child(7n+3)  { animation-delay: 5s; }
+.header-gold-dust .dust-t1:nth-child(odd)   { animation-direction: alternate-reverse; }
+
+/* 小粒子（キラメキ） */
+.header-gold-dust .dust-t2:nth-child(2n)    { animation-duration: 8s; }
+.header-gold-dust .dust-t2:nth-child(3n)    { animation-duration: 9s; }
+.header-gold-dust .dust-t2:nth-child(5n)    { animation-duration: 11s; }
+.header-gold-dust .dust-t2:nth-child(2n+1)  { animation-delay: 1.5s; }
+.header-gold-dust .dust-t2:nth-child(3n+1)  { animation-delay: 3s; }
+.header-gold-dust .dust-t2:nth-child(5n+2)  { animation-delay: 5.5s; }
 
 .header-logo {
   width: 40px;
