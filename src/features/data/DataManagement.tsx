@@ -13,26 +13,24 @@ export default function DataManagement() {
             データ管理
           </h1>
           <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-            ドロー会議システムからのデータ読込み、所属・ふりがなの管理を行います。
+            Google ドライブからのデータ読込、所属・ふりがなの管理を行います。
           </p>
         </div>
       </header>
+
+      {/* Google ドライブ連携（ふりがな・所属の読込/書込） */}
+      <DataSync />
 
       {/* ドロー会議システム読込パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <DatabaseIcon className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">データ読込</h2>
+          <h2 className="font-semibold text-primary-600">ドロー会議データ読込</h2>
         </div>
         <div className="p-4">
           <DataImport />
         </div>
       </section>
-
-      {/* データ同期パネル */}
-      <div>
-        <DataSync />
-      </div>
 
       {/* 所属・ふりがな一覧パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
