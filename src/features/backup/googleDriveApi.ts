@@ -233,12 +233,14 @@ export async function getSharedFolderLink(token: string): Promise<string> {
 const FURIGANA_FOLDER_NAME = 'ふりがな一覧';
 const AFFILIATION_FOLDER_NAME = '所属一覧';
 
-/** ルートフォルダ配下の特定サブフォルダIDを取得（なければ作成） */
+/** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを取得（なければ作成） */
 async function getSubFolderId(token: string, subName: string): Promise<string> {
   let rootId = await findFolder(token, ROOT_FOLDER_NAME);
   if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
-  let subId = await findFolder(token, subName, rootId);
-  if (!subId) subId = await createFolder(token, subName, rootId);
+  let sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
+  if (!sysId) sysId = await createFolder(token, SUB_FOLDER_NAME, rootId);
+  let subId = await findFolder(token, subName, sysId);
+  if (!subId) subId = await createFolder(token, subName, sysId);
   return subId;
 }
 

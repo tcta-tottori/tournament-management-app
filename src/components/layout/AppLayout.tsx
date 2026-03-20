@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
+import { useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
@@ -22,9 +22,6 @@ const ALL_MAIN_TABS = [
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
 ];
-
-// モバイルでも全タブ表示（その他ドロップダウン廃止）
-const MOBILE_MAIN_COUNT = 99;
 
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];

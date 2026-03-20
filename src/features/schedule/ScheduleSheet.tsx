@@ -131,17 +131,6 @@ function findMatchingEvent(
   );
 }
 
-/** DB Match のステータスに応じたバッジカラー */
-function matchStatusColor(status: Match['status']): string {
-  switch (status) {
-    case 'playing': return 'bg-green-500';
-    case 'finished': return 'bg-gray-600';
-    case 'ready': return 'bg-blue-400';
-    case 'walkover': return 'bg-gray-300';
-    default: return '';
-  }
-}
-
 /** Google Drive ブランドアイコン */
 function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
