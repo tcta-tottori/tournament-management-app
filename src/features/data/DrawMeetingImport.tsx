@@ -1784,10 +1784,10 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       <div className="border border-border-main rounded-lg overflow-hidden">
         <button
           onClick={() => setScheduleOpen(!scheduleOpen)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
         >
-          {scheduleOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          <CalendarClock className="w-4 h-4 text-primary-500" />
+          {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+          <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
           時間割読込
           {scheduleItems.length > 0 && (
             <span className="ml-auto text-xs font-normal text-green-600 flex items-center gap-1">

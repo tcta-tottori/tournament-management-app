@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Database as DatabaseIcon, ListChecks, FileJson } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks, FileJson, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -12,6 +12,10 @@ export default function DataManagement() {
   // 共有 Google Drive 接続状態（再レンダリングトリガー用）
   const [, setGdriveVersion] = useState(0);
   const gdriveConnected = !!getSavedClientId() && gdriveIsTokenValid();
+
+  // セクション開閉状態
+  const [dataImportOpen, setDataImportOpen] = useState(true);
+  const [playerListOpen, setPlayerListOpen] = useState(false);
 
   // DataSync の接続/切断時に再評価をトリガー
   const handleConnectionChange = useCallback(() => {
@@ -41,25 +45,41 @@ export default function DataManagement() {
       <DataSync onConnectionChange={handleConnectionChange} />
 
       {/* 大会データ読込パネル */}
-      <section className="bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <FileJson className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">大会データ読込</h2>
-        </div>
-        <div className="p-4">
-          <DataImport gdriveConnected={gdriveConnected} onGDriveConnectionChange={handleConnectionChange} />
-        </div>
+      <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+        <button
+          onClick={() => setDataImportOpen(!dataImportOpen)}
+          className="w-full bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between hover:bg-primary-100/60 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            {dataImportOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+            <FileJson className="w-5 h-5 text-primary-500" />
+            <h2 className="font-semibold text-primary-600">大会データ読込</h2>
+          </div>
+        </button>
+        {dataImportOpen && (
+          <div className="p-4">
+            <DataImport gdriveConnected={gdriveConnected} onGDriveConnectionChange={handleConnectionChange} />
+          </div>
+        )}
       </section>
 
       {/* 所属・ふりがな一覧パネル */}
-      <section className="bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <ListChecks className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">所属・ふりがな一覧</h2>
-        </div>
-        <div className="p-5">
-          <PlayerDataList />
-        </div>
+      <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+        <button
+          onClick={() => setPlayerListOpen(!playerListOpen)}
+          className="w-full bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between hover:bg-primary-100/60 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            {playerListOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+            <ListChecks className="w-5 h-5 text-primary-500" />
+            <h2 className="font-semibold text-primary-600">所属・ふりがな一覧</h2>
+          </div>
+        </button>
+        {playerListOpen && (
+          <div className="p-5">
+            <PlayerDataList />
+          </div>
+        )}
       </section>
     </div>
   );
