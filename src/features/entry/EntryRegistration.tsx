@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserX, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban } from 'lucide-react';
+import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban } from 'lucide-react';
 
 type CheckInSlot = {
   drawPosition: number;
@@ -783,6 +783,221 @@ export default function EntryRegistration() {
       );
     };
 
+    // === PC統一ブラケット（左山→中央←右山） ===
+    const renderUnifiedBracket = () => {
+      const leftSlotsU = displaySlots.slice(0, halfSize);
+      const rightSlotsU = displaySlots.slice(halfSize);
+      const halfRounds = Math.log2(halfSize);
+      const CENTER_GAP = 70;
+
+      // Y位置計算ヘルパー
+      const calcHalfY = (sectionSlots: CheckInSlot[], sectionSize: number) => {
+        const isByeFn = (i: number): boolean => {
+          const s = i < sectionSlots.length ? sectionSlots[i] : null;
+          return !s || (s.isBye && !s.entry);
+        };
+        const r0Y: number[] = new Array(sectionSize).fill(0);
+        let nextY = OFFSET_Y;
+        for (let mi = 0; mi < sectionSize / 2; mi++) {
+          const t = mi * 2, b = mi * 2 + 1;
+          const tBye = isByeFn(t), bBye = isByeFn(b);
+          if (tBye && bBye) { r0Y[t] = nextY; r0Y[b] = nextY; }
+          else if (tBye) { r0Y[t] = nextY; r0Y[b] = nextY; nextY += Y_SPACING; }
+          else if (bBye) { r0Y[t] = nextY; r0Y[b] = nextY; nextY += Y_SPACING; }
+          else { r0Y[t] = nextY; r0Y[b] = nextY + Y_SPACING; nextY += Y_SPACING * 2; }
+        }
+        const getYFn = (r: number, i: number): number => {
+          if (r === 0) return r0Y[i];
+          return (getYFn(r - 1, i * 2) + getYFn(r - 1, i * 2 + 1)) / 2;
+        };
+        return { r0Y, getY: getYFn, height: nextY + SLOT_HEIGHT, isBye: isByeFn };
+      };
+
+      const leftCalc = calcHalfY(leftSlotsU, halfSize);
+      const rightCalc = calcHalfY(rightSlotsU, halfSize);
+
+      const halfWidth = getX(halfRounds) + OFFSET_X;
+      const totalWidth = 2 * halfWidth + CENTER_GAP;
+      const maxHeight = Math.max(leftCalc.height, rightCalc.height);
+      const leftYOff = (maxHeight - leftCalc.height) / 2;
+      const rightYOff = (maxHeight - rightCalc.height) / 2;
+
+      // mirrorX: 右半分のX座標を反転
+      const mx = (x: number) => totalWidth - x;
+
+      const paths: React.ReactNode[] = [];
+
+      // --- 左半分のブラケット線 ---
+      for (let r = 0; r < halfRounds; r++) {
+        const nm = halfSize / Math.pow(2, r + 1);
+        for (let m = 0; m < nm; m++) {
+          const xS = r === 0 ? getX(r) + getSlotW(r) : getX(r);
+          const xN = getX(r + 1);
+          const xM = (xS + xN) / 2;
+          const yT = leftCalc.getY(r, m * 2) + SLOT_HEIGHT / 2 + leftYOff;
+          const yB = leftCalc.getY(r, m * 2 + 1) + SLOT_HEIGHT / 2 + leftYOff;
+          const yM = leftCalc.getY(r + 1, m) + SLOT_HEIGHT / 2 + leftYOff;
+          if (r === 0) {
+            if (leftCalc.isBye(m * 2) && leftCalc.isBye(m * 2 + 1)) continue;
+            if (leftCalc.isBye(m * 2) || leftCalc.isBye(m * 2 + 1)) {
+              const pY = leftCalc.isBye(m * 2) ? yB : yT;
+              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              continue;
+            }
+          }
+          paths.push(<path key={`L-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`L-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`L-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        }
+      }
+
+      // --- 右半分のブラケット線（X座標ミラー） ---
+      for (let r = 0; r < halfRounds; r++) {
+        const nm = halfSize / Math.pow(2, r + 1);
+        for (let m = 0; m < nm; m++) {
+          const xS = r === 0 ? mx(getX(r) + getSlotW(r)) : mx(getX(r));
+          const xN = mx(getX(r + 1));
+          const xM = (xS + xN) / 2;
+          const yT = rightCalc.getY(r, m * 2) + SLOT_HEIGHT / 2 + rightYOff;
+          const yB = rightCalc.getY(r, m * 2 + 1) + SLOT_HEIGHT / 2 + rightYOff;
+          const yM = rightCalc.getY(r + 1, m) + SLOT_HEIGHT / 2 + rightYOff;
+          if (r === 0) {
+            if (rightCalc.isBye(m * 2) && rightCalc.isBye(m * 2 + 1)) continue;
+            if (rightCalc.isBye(m * 2) || rightCalc.isBye(m * 2 + 1)) {
+              const pY = rightCalc.isBye(m * 2) ? yB : yT;
+              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              continue;
+            }
+          }
+          paths.push(<path key={`R-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`R-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`R-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        }
+      }
+
+      // --- 決勝接続線（左SF→中央←右SF） ---
+      const leftFinalX = getX(halfRounds);
+      const leftFinalY = leftCalc.getY(halfRounds, 0) + SLOT_HEIGHT / 2 + leftYOff;
+      const rightFinalX = mx(getX(halfRounds));
+      const rightFinalY = rightCalc.getY(halfRounds, 0) + SLOT_HEIGHT / 2 + rightYOff;
+      const centerX = totalWidth / 2;
+      const centerY = (leftFinalY + rightFinalY) / 2;
+      // 左→中央
+      paths.push(<path key="final-L" d={`M ${leftFinalX} ${leftFinalY} L ${centerX} ${leftFinalY} L ${centerX} ${centerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      // 右→中央
+      paths.push(<path key="final-R" d={`M ${rightFinalX} ${rightFinalY} L ${centerX} ${rightFinalY} L ${centerX} ${centerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      // 決勝マーク（中央ティック）
+      paths.push(<line key="final-tick" x1={centerX - 6} y1={centerY} x2={centerX + 6} y2={centerY} stroke="#1b4d3e" strokeWidth="2" />);
+
+      // --- 左半分の選手スロット ---
+      const elems: React.ReactNode[] = [];
+      let vi = 0;
+      for (let i = 0; i < halfSize; i++) {
+        const slot = i < leftSlotsU.length ? leftSlotsU[i] : null;
+        if (!slot || (slot.isBye && !slot.entry)) continue;
+        vi++;
+        const x = getX(0), y = leftCalc.r0Y[i] + leftYOff;
+        const isWithdrawn = slot.entry?.status === 'withdrawn';
+        const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+        const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+        const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+        let borderCls = 'border-gray-300', bgCls = 'bg-white';
+        if (isWithdrawn) { bgCls = 'bg-orange-50/60'; borderCls = 'border-orange-200'; }
+        else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
+        elems.push(
+          <div key={`UL-slot-${slot.drawPosition}`}
+            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
+            <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{vi}</div>
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
+              {slot.entry ? (
+                <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
+                  <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                    {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
+                  </div>
+                  {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
+                </button>
+              ) : <span className="text-sm text-gray-300">---</span>}
+            </div>
+            {slot.entry && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
+                {isWithdrawn ? (
+                  <>
+                    <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- 右半分の選手スロット（ミラー配置） ---
+      for (let i = 0; i < halfSize; i++) {
+        const slot = i < rightSlotsU.length ? rightSlotsU[i] : null;
+        if (!slot || (slot.isBye && !slot.entry)) continue;
+        vi++;
+        const x = mx(getX(0)) - SLOT_WIDTH;
+        const y = rightCalc.r0Y[i] + rightYOff;
+        const isWithdrawn = slot.entry?.status === 'withdrawn';
+        const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+        const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+        const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+        let borderCls = 'border-gray-300', bgCls = 'bg-white';
+        if (isWithdrawn) { bgCls = 'bg-orange-50/60'; borderCls = 'border-orange-200'; }
+        else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
+        elems.push(
+          <div key={`UR-slot-${slot.drawPosition}`}
+            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
+            <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{vi}</div>
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
+              {slot.entry ? (
+                <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
+                  <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                    {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
+                  </div>
+                  {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
+                </button>
+              ) : <span className="text-sm text-gray-300">---</span>}
+            </div>
+            {slot.entry && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
+                {isWithdrawn ? (
+                  <>
+                    <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="overflow-auto">
+          <div className="relative" style={{ width: totalWidth, height: maxHeight, minWidth: totalWidth }}>
+            <svg className="absolute inset-0 pointer-events-none" width={totalWidth} height={maxHeight}>{paths}</svg>
+            {elems}
+          </div>
+        </div>
+      );
+    };
+
     // 統計ヘッダー
     const statsHeader = draw ? (
       <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
@@ -801,7 +1016,7 @@ export default function EntryRegistration() {
       </div>
     ) : null;
 
-    // ドローサイズ < 8 は単一表示、8以上はPC2列/スマホ1列
+    // ドローサイズ < 8 は単一表示、8以上はPC統一/スマホ分割
     if (drawSize < 8) {
       return (
         <div>
@@ -822,9 +1037,9 @@ export default function EntryRegistration() {
     return (
       <div>
         {statsHeader}
-        {/* PC: 全ラウンド接続された統一ブラケット表示 */}
+        {/* PC: 左山→中央←右山の統一ブラケット */}
         <div className="hidden lg:block">
-          {renderBracketSection(displaySlots, drawSize, 0, 'full')}
+          {renderUnifiedBracket()}
         </div>
         {/* スマホ: 左山・右山を分割表示 */}
         <div className="lg:hidden">

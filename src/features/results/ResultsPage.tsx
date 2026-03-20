@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
-import type { Match, Draw, Entry, Player, Event, Tournament } from '../../db/database';
+import type { Match, Draw, Entry, Player, Event } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import {
   exportTournamentResultAsJpeg,

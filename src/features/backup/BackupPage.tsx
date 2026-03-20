@@ -16,7 +16,6 @@ import {
   Download,
   Upload,
   FolderOpen,
-  Trash2,
   CheckCircle2,
   AlertCircle,
   Loader2,
