@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Entry, type Match } from '../../db/database';
+import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { CheckSquare, UserCheck, UserX, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock } from 'lucide-react';
 
@@ -305,6 +305,52 @@ export default function EntryRegistration() {
     }
   }, []);
 
+  // === リーグ戦の対戦順を生成（サークル法） ===
+  // 3人: 1-2, 2-3, 1-3 / 4人: 1-4, 2-3, 1-3, 2-4, 1-2, 3-4 ...
+  const generateLeagueMatchOrder = (n: number): [number, number][] => {
+    if (n < 2) return [];
+    if (n === 2) return [[0, 1]];
+    // 3人リーグ: 1-2, 2-3, 1-3
+    if (n === 3) return [[0, 1], [1, 2], [0, 2]];
+    // 4人以上: サークル法（ラウンドロビンスケジューリング）
+    const pairs: [number, number][] = [];
+    const isOdd = n % 2 !== 0;
+    const total = isOdd ? n + 1 : n; // 奇数の場合ダミー追加
+    const fixed = 0;
+    const rotating = Array.from({ length: total - 1 }, (_, i) => i + 1);
+    for (let round = 0; round < total - 1; round++) {
+      // 固定位置 vs 最初のローテーション
+      if (!isOdd || rotating[0] < n) {
+        const a = fixed;
+        const b = rotating[0];
+        if (a < n && b < n) pairs.push([Math.min(a, b), Math.max(a, b)]);
+      }
+      // 残りをペア
+      for (let i = 1; i <= (total - 2) / 2; i++) {
+        const a = rotating[i];
+        const b = rotating[total - 2 - i];
+        if (a < n && b < n) pairs.push([Math.min(a, b), Math.max(a, b)]);
+      }
+      // ローテーション
+      rotating.push(rotating.shift()!);
+    }
+    return pairs;
+  };
+
+  // === イベントがリーグかどうか判定 ===
+  const isLeagueEvent = useCallback(async (eventId: string, draw: Draw) => {
+    const event = await db.events.where('eventId').equals(eventId).first();
+    const eventType = event?.type as string | undefined;
+    const ds = draw.drawSize;
+    const isPowerOf2 = ds > 0 && (ds & (ds - 1)) === 0;
+    return (
+      eventType === 'league' || eventType === 'round-robin' ||
+      draw.drawType === 'roundRobin' ||
+      (ds > 0 && !isPowerOf2) ||
+      /リーグ/i.test(event?.name || '')
+    );
+  }, []);
+
   // === エントリー確定（対戦表生成）===
   const handleConfirmEvent = useCallback(async (eventId: string, skipConfirm = false) => {
     // DBから最新データを直接取得（クロージャの古いデータに依存しない）
@@ -312,28 +358,12 @@ export default function EntryRegistration() {
     if (!draw) return;
     if (!skipConfirm && !confirm('エントリーを確定し対戦表を生成しますか？')) return;
 
-    const slots = redistributeByes(
-      draw.slots.map(s => ({
-        ...s, drawPosition: s.position, seed: s.seed,
-        entryId: s.entryId, isBye: s.isBye,
-        entry: null, playerName: '', partnerName: '', affiliation: '',
-      })),
-      draw.drawSize
-    );
-    const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
-
-    // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
-    await db.draws.update(draw.id!, { slots: drawSlots, updatedAt: Date.now() });
-
     // DBから最新のエントリーと選手データを取得
     const eventEntries = await db.entries.where('eventId').equals(eventId).toArray();
     const allPlayers = await db.players.toArray();
     const pMap = new Map(allPlayers.map(p => [p.playerId, p]));
 
-    const newMatches: Omit<Match, 'id'>[] = [];
-    let matchOrder = 1;
-
-    const resolvePlayer = (slot: typeof drawSlots[0]) => {
+    const resolvePlayerFromSlot = (slot: { entryId: string | null; isBye: boolean }) => {
       if (slot.isBye || !slot.entryId) return { name: 'BYE', affiliation: '', entryId: null };
       const entry = eventEntries.find(e => e.entryId === slot.entryId);
       if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
@@ -345,45 +375,99 @@ export default function EntryRegistration() {
       return { name, affiliation: aff, entryId: slot.entryId };
     };
 
-    // 1回戦
-    for (let i = 0; i < drawSlots.length; i += 2) {
-      const s1 = drawSlots[i];
-      const s2 = drawSlots[i + 1];
-      if (!s1 || !s2) continue;
-      if (s1.isBye && s2.isBye) continue;
-      const isWalkover = s1.isBye || s2.isBye;
-      const p1Info = resolvePlayer(s1);
-      const p2Info = resolvePlayer(s2);
+    const isLeague = await isLeagueEvent(eventId, draw);
+    const newMatches: Omit<Match, 'id'>[] = [];
 
-      newMatches.push({
-        eventId, matchId: `M-R1-${matchOrder}`, round: 1, matchOrder,
-        position: Math.floor(i / 2) + 1,
-        player1EntryId: p1Info.entryId, player2EntryId: p2Info.entryId,
-        player1Name: p1Info.name, player2Name: p2Info.name,
-        player1Affiliation: p1Info.affiliation, player2Affiliation: p2Info.affiliation,
-        score: '', winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
-        courtId: null, scheduledTime: null,
-        status: isWalkover ? 'walkover' : 'waiting',
-        refereeId: null, refereeName: '', updatedAt: Date.now()
-      });
-      matchOrder++;
-    }
+    if (isLeague) {
+      // === リーグ戦: ラウンドロビン対戦表生成 ===
+      const playerSlots = draw.slots.filter(s => s.entryId && !s.isBye);
+      const n = playerSlots.length;
+      const matchPairs = generateLeagueMatchOrder(n);
+      let matchOrder = 1;
 
-    // 2回戦以降
-    const totalRounds = Math.log2(draw.drawSize);
-    for (let round = 2; round <= totalRounds; round++) {
-      const matchesInRound = draw.drawSize / Math.pow(2, round);
-      for (let m = 0; m < matchesInRound; m++) {
+      for (const [i, j] of matchPairs) {
+        const p1Info = resolvePlayerFromSlot(playerSlots[i]);
+        const p2Info = resolvePlayerFromSlot(playerSlots[j]);
         newMatches.push({
-          eventId, matchId: `M-R${round}-${m + 1}`, round, matchOrder: matchOrder++,
-          position: m + 1,
-          player1EntryId: null, player2EntryId: null,
-          player1Name: '', player2Name: '',
-          player1Affiliation: '', player2Affiliation: '',
-          score: '', winnerEntryId: null,
-          courtId: null, scheduledTime: null, status: 'waiting',
+          eventId,
+          matchId: `M-L-${matchOrder}`,
+          round: 1,
+          matchOrder,
+          position: matchOrder,
+          player1EntryId: p1Info.entryId,
+          player2EntryId: p2Info.entryId,
+          player1Name: p1Info.name,
+          player2Name: p2Info.name,
+          player1Affiliation: p1Info.affiliation,
+          player2Affiliation: p2Info.affiliation,
+          score: '',
+          winnerEntryId: null,
+          courtId: null,
+          scheduledTime: null,
+          status: 'waiting',
+          refereeId: null,
+          refereeName: '',
+          updatedAt: Date.now()
+        });
+        matchOrder++;
+      }
+    } else {
+      // === トーナメント戦: ブラケット対戦表生成 ===
+      const slots = redistributeByes(
+        draw.slots.map(s => ({
+          ...s, drawPosition: s.position, seed: s.seed,
+          entryId: s.entryId, isBye: s.isBye,
+          entry: null, playerName: '', partnerName: '', affiliation: '',
+        })),
+        draw.drawSize
+      );
+      const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
+
+      // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
+      await db.draws.update(draw.id!, { slots: drawSlots, updatedAt: Date.now() });
+
+      let matchOrder = 1;
+
+      // 1回戦
+      for (let i = 0; i < drawSlots.length; i += 2) {
+        const s1 = drawSlots[i];
+        const s2 = drawSlots[i + 1];
+        if (!s1 || !s2) continue;
+        if (s1.isBye && s2.isBye) continue;
+        const isWalkover = s1.isBye || s2.isBye;
+        const p1Info = resolvePlayerFromSlot(s1);
+        const p2Info = resolvePlayerFromSlot(s2);
+
+        newMatches.push({
+          eventId, matchId: `M-R1-${matchOrder}`, round: 1, matchOrder,
+          position: Math.floor(i / 2) + 1,
+          player1EntryId: p1Info.entryId, player2EntryId: p2Info.entryId,
+          player1Name: p1Info.name, player2Name: p2Info.name,
+          player1Affiliation: p1Info.affiliation, player2Affiliation: p2Info.affiliation,
+          score: '', winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
+          courtId: null, scheduledTime: null,
+          status: isWalkover ? 'walkover' : 'waiting',
           refereeId: null, refereeName: '', updatedAt: Date.now()
         });
+        matchOrder++;
+      }
+
+      // 2回戦以降
+      const totalRounds = Math.log2(draw.drawSize);
+      for (let round = 2; round <= totalRounds; round++) {
+        const matchesInRound = draw.drawSize / Math.pow(2, round);
+        for (let m = 0; m < matchesInRound; m++) {
+          newMatches.push({
+            eventId, matchId: `M-R${round}-${m + 1}`, round, matchOrder: matchOrder++,
+            position: m + 1,
+            player1EntryId: null, player2EntryId: null,
+            player1Name: '', player2Name: '',
+            player1Affiliation: '', player2Affiliation: '',
+            score: '', winnerEntryId: null,
+            courtId: null, scheduledTime: null, status: 'waiting',
+            refereeId: null, refereeName: '', updatedAt: Date.now()
+          });
+        }
       }
     }
 
@@ -396,30 +480,32 @@ export default function EntryRegistration() {
       await db.matches.bulkAdd(newMatches);
     });
 
-    // BYE勝ちの選手を次ラウンドに反映
-    const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
-    for (const wm of walkoverMatches) {
-      const nextRound = wm.round + 1;
-      const nextPosition = Math.ceil(wm.position / 2);
-      const nextMatch = await db.matches
-        .where('eventId').equals(eventId)
-        .filter(m => m.round === nextRound && m.position === nextPosition)
-        .first();
-      if (nextMatch?.id && wm.winnerEntryId) {
-        const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
-        const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
-        const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
-        const isUpper = wm.position % 2 === 1;
-        await db.matches.update(nextMatch.id, {
-          ...(isUpper
-            ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-            : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-          ),
-          updatedAt: Date.now()
-        });
+    // トーナメント戦のみ: BYE勝ちの選手を次ラウンドに反映
+    if (!isLeague) {
+      const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
+      for (const wm of walkoverMatches) {
+        const nextRound = wm.round + 1;
+        const nextPosition = Math.ceil(wm.position / 2);
+        const nextMatch = await db.matches
+          .where('eventId').equals(eventId)
+          .filter(m => m.round === nextRound && m.position === nextPosition)
+          .first();
+        if (nextMatch?.id && wm.winnerEntryId) {
+          const isWinnerP1 = wm.winnerEntryId === wm.player1EntryId;
+          const winnerName = isWinnerP1 ? wm.player1Name : wm.player2Name;
+          const winnerAff = isWinnerP1 ? wm.player1Affiliation : wm.player2Affiliation;
+          const isUpper = wm.position % 2 === 1;
+          await db.matches.update(nextMatch.id, {
+            ...(isUpper
+              ? { player1EntryId: wm.winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+              : { player2EntryId: wm.winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+            ),
+            updatedAt: Date.now()
+          });
+        }
       }
     }
-  }, []);
+  }, [isLeagueEvent]);
 
   const handleConfirmAll = useCallback(async () => {
     // DBから最新のドロー一覧を取得して確定対象を判定
@@ -753,10 +839,10 @@ export default function EntryRegistration() {
     }
 
     return (
-      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden"
+      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-x-auto"
         data-event-id={eventId} data-event-name={eventName}>
-        {/* Event header - sticky */}
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between sticky top-0 z-10">
+        {/* Event header - sticky（モバイル: コントロール折りたたみ時にtop固定） */}
+        <div className="bg-primary-50 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border-main flex items-center justify-between sticky top-0 z-10">
           <button onClick={() => toggleCollapse(eventId)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
             <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
@@ -795,36 +881,56 @@ export default function EntryRegistration() {
       : [];
   const overallStats = computeStats(allSlots);
 
-  // スクロール時のスティッキー種目名表示
+  // スクロール時のスティッキー種目名表示 + コントロール自動折りたたみ
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
+    const desktopEl = contentRef.current;
+    // モバイル: contentRefにはoverflow-y-autoがないため、<main>がスクロールコンテナ
+    const mobileEl = desktopEl?.closest('main') as HTMLElement | null;
+    if (!desktopEl) return;
+
     let lastScrollY = 0;
-    const onScroll = () => {
-      const y = el.scrollTop;
+    const onScroll = (e: Event) => {
+      const target = e.currentTarget as HTMLElement;
+      const y = target.scrollTop;
+
+      // 下スクロールでコントロールを折りたたむ
       if (y > 20 && y > lastScrollY) setControlsOpen(false);
+      // 上に大きくスクロールしたら再表示
+      if (lastScrollY - y > 40) setControlsOpen(true);
       lastScrollY = y;
 
       // スクロール中の種目名検出
       if (showAllEvents) {
-        const sections = el.querySelectorAll('[data-event-name]');
-        let currentName = '';
-        for (const sec of sections) {
-          const rect = (sec as HTMLElement).getBoundingClientRect();
-          const containerRect = el.getBoundingClientRect();
-          if (rect.top <= containerRect.top + 60) {
-            currentName = (sec as HTMLElement).dataset.eventName || '';
+        const container = contentRef.current;
+        if (container) {
+          const sections = container.querySelectorAll('[data-event-name]');
+          let currentName = '';
+          for (const sec of sections) {
+            const rect = (sec as HTMLElement).getBoundingClientRect();
+            if (rect.top <= 100) {
+              currentName = (sec as HTMLElement).dataset.eventName || '';
+            }
           }
+          setStickyEventName(y > 10 ? currentName : '');
         }
-        setStickyEventName(y > 10 ? currentName : '');
       } else {
         setStickyEventName('');
       }
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+
+    // Desktop (lg) と Mobile 両方のスクロールコンテナにリスナー登録
+    desktopEl.addEventListener('scroll', onScroll, { passive: true });
+    if (mobileEl && mobileEl !== desktopEl) {
+      mobileEl.addEventListener('scroll', onScroll, { passive: true });
+    }
+    return () => {
+      desktopEl.removeEventListener('scroll', onScroll);
+      if (mobileEl && mobileEl !== desktopEl) {
+        mobileEl.removeEventListener('scroll', onScroll);
+      }
+    };
   }, [showAllEvents]);
 
   if (!currentTournamentId) {
@@ -838,9 +944,9 @@ export default function EntryRegistration() {
   }
 
   return (
-    <div className="max-w-full mx-auto h-full flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* LEFT: コントロールパネル */}
-      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0 sticky top-0 z-10 lg:self-start">
+    <div className="max-w-full mx-auto lg:h-full flex flex-col lg:flex-row lg:gap-4 p-4">
+      {/* LEFT: コントロールパネル — モバイルでもスティッキー、スクロールで自動折りたたみ */}
+      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0 sticky top-0 z-20 lg:self-start bg-bg-main pb-1">
         <button onClick={() => setControlsOpen(prev => !prev)}
           className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors">
           <div className="flex items-center gap-2">
@@ -912,14 +1018,14 @@ export default function EntryRegistration() {
 
       {/* RIGHT: Main content area */}
       <div className="flex-1 min-w-0 order-2 lg:order-2 flex flex-col min-h-0">
-        {/* スティッキー種目名バー */}
+        {/* スティッキー種目名バー — モバイルでもスティッキー表示 */}
         {stickyEventName && (
-          <div className="bg-primary-600 text-white px-4 py-1.5 rounded-t-lg text-sm font-bold shadow-sm shrink-0">
+          <div className="bg-primary-600 text-white px-4 py-1.5 rounded-t-lg text-sm font-bold shadow-md shrink-0 sticky top-0 z-10 lg:static">
             {stickyEventName}
           </div>
         )}
 
-        <div ref={contentRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
+        <div ref={contentRef} className="flex-1 lg:overflow-y-auto space-y-4 min-h-0">
           {showAllEvents ? (
             events.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-border-main text-gray-500 min-h-[400px]">
