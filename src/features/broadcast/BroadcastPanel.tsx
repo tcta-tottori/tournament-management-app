@@ -1,11 +1,14 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { Volume2, Upload, Square, Play, History, Settings2, ChevronDown, ChevronRight, Mic, Database } from 'lucide-react';
+import { Volume2, Upload, Square, Play, History, Settings2, ChevronDown, ChevronRight, Mic, Database, RefreshCw } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import type { MatchCall, CallLogEntry, VoiceSettings } from './types';
 import { buildCallText } from './callTextBuilder';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
+import { useVoicevoxSynthesis } from './useVoicevoxSynthesis';
+
+type AudioEngine = 'webSpeech' | 'voicevox';
 
 // CSVパーサー
 function parseCSV(text: string): { type: 'singles' | 'doubles'; matches: MatchCall[] } {
@@ -95,8 +98,8 @@ export default function BroadcastPanel() {
   const [dataType, setDataType] = useState<'singles' | 'doubles'>('singles');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [settings, setSettings] = useState<VoiceSettings>({
-    rate: 0.95,
-    pitch: 1.0,
+    rate: 0.88,
+    pitch: 0.92,
     volume: 1.0,
     repeatCount: 1,
   });
@@ -106,10 +109,26 @@ export default function BroadcastPanel() {
   const [activeTab, setActiveTab] = useState<string>('all');
   const [lastCourtNumber, setLastCourtNumber] = useState('');
   const [dbLoading, setDbLoading] = useState(false);
+  const [engine, setEngine] = useState<AudioEngine>(() => {
+    return (localStorage.getItem('broadcast_engine') as AudioEngine) || 'webSpeech';
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const { isSpeaking, voiceName, speak, stop, testVoice } = useSpeechSynthesis();
+  const webSpeech = useSpeechSynthesis();
+  const voicevox = useVoicevoxSynthesis();
+
+  const isSpeaking = engine === 'voicevox' ? voicevox.isSpeaking : webSpeech.isSpeaking;
+
+  const handleEngineChange = useCallback((newEngine: AudioEngine) => {
+    setEngine(newEngine);
+    localStorage.setItem('broadcast_engine', newEngine);
+    if (newEngine === 'voicevox') {
+      voicevox.checkAvailability().then(ok => {
+        if (ok) voicevox.fetchSpeakers();
+      });
+    }
+  }, [voicevox]);
 
   // データベースから種目一覧を取得
   const dbEvents = useLiveQuery(
@@ -366,7 +385,7 @@ export default function BroadcastPanel() {
     setSpeakingMatchId(match.id);
     setMatches(prev => prev.map(m => m.id === match.id ? { ...m, status: 'speaking' as const } : m));
 
-    speak(text, settings, () => {
+    const onComplete = () => {
       setSpeakingMatchId(null);
       setMatches(prev => prev.map(m =>
         m.id === match.id ? { ...m, status: 'done' as const, calledAt: new Date() } : m
@@ -379,8 +398,14 @@ export default function BroadcastPanel() {
         text,
         matchId: match.id,
       }, ...prev]);
-    });
-  }, [settings, speak, affiliationFuriganaMap]);
+    };
+
+    if (engine === 'voicevox') {
+      voicevox.speak(text, settings.repeatCount).then(onComplete);
+    } else {
+      webSpeech.speak(text, settings, onComplete);
+    }
+  }, [settings, engine, webSpeech, voicevox, affiliationFuriganaMap]);
 
   // 再コール
   const handleRecall = useCallback((match: MatchCall) => {
@@ -389,12 +414,13 @@ export default function BroadcastPanel() {
 
   // 停止
   const handleStop = useCallback(() => {
-    stop();
+    voicevox.stop();
+    webSpeech.stop();
     setSpeakingMatchId(null);
     setMatches(prev => prev.map(m =>
       m.status === 'speaking' ? { ...m, status: 'pending' as const } : m
     ));
-  }, [stop]);
+  }, [voicevox, webSpeech]);
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-5xl mx-auto space-y-4">
@@ -462,75 +488,249 @@ export default function BroadcastPanel() {
         </button>
         {showSettings && (
           <div className="px-4 pb-4 space-y-4">
-            {/* 音声情報 */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 rounded-lg border border-pink-200">
-              <span className="text-lg">👩</span>
-              <div>
-                <div className="text-sm font-medium text-pink-700">女性音声</div>
-                <div className="text-[10px] text-pink-500">{voiceName}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* 速度 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  読み上げ速度: {settings.rate.toFixed(2)}
+            {/* 音声エンジン選択 */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">音声エンジン</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="engine"
+                    checked={engine === 'webSpeech'}
+                    onChange={() => handleEngineChange('webSpeech')}
+                    className="accent-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">ブラウザ標準 (Web Speech API)</span>
                 </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.2"
-                  step="0.05"
-                  value={settings.rate}
-                  onChange={e => setSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
-                  className="w-full accent-primary-500"
-                />
-                <div className="flex justify-between text-[10px] text-gray-500">
-                  <span>遅い</span><span>標準</span><span>速い</span>
-                </div>
-              </div>
-
-              {/* 繰り返し回数 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し回数</label>
-                <div className="flex gap-1">
-                  {[1, 2, 3].map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setSettings(s => ({ ...s, repeatCount: n }))}
-                      className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-                        settings.repeatCount === n
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
-                      }`}
-                    >
-                      {n}回
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 音声テスト */}
-              <div className="flex items-end gap-2">
-                <button
-                  onClick={() => testVoice(settings)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
-                >
-                  <Mic className="w-4 h-4" />
-                  音声テスト
-                </button>
-                {isSpeaking && (
-                  <button
-                    onClick={handleStop}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                  >
-                    <Square className="w-4 h-4" />
-                    停止
-                  </button>
-                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="engine"
+                    checked={engine === 'voicevox'}
+                    onChange={() => handleEngineChange('voicevox')}
+                    className="accent-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">VOICEVOX (高品質・要ローカル起動)</span>
+                </label>
               </div>
             </div>
+
+            {engine === 'webSpeech' ? (
+              <>
+                {/* Web Speech API 設定 */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 rounded-lg border border-pink-200">
+                  <span className="text-lg">&#x1f469;</span>
+                  <div>
+                    <div className="text-sm font-medium text-pink-700">女性音声</div>
+                    <div className="text-[10px] text-pink-500">{webSpeech.voiceName}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      読み上げ速度: {settings.rate.toFixed(2)}
+                    </label>
+                    <input
+                      type="range" min="0.5" max="1.2" step="0.05"
+                      value={settings.rate}
+                      onChange={e => setSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
+                      className="w-full accent-primary-500"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-500">
+                      <span>遅い</span><span>標準</span><span>速い</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し回数</label>
+                    <div className="flex gap-1">
+                      {[1, 2, 3].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setSettings(s => ({ ...s, repeatCount: n }))}
+                          className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                            settings.repeatCount === n
+                              ? 'bg-primary-500 text-white'
+                              : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
+                          }`}
+                        >
+                          {n}回
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <button
+                      onClick={() => webSpeech.testVoice(settings)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
+                    >
+                      <Mic className="w-4 h-4" />
+                      音声テスト
+                    </button>
+                    {isSpeaking && (
+                      <button
+                        onClick={handleStop}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                      >
+                        <Square className="w-4 h-4" />
+                        停止
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* VOICEVOX 設定 */}
+                <div className="space-y-3">
+                  {/* 接続状態 */}
+                  <div className="flex items-center gap-3 px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                    <span className={`text-lg ${voicevox.isAvailable ? '' : 'grayscale'}`}>&#x1f399;&#xfe0f;</span>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-purple-700">
+                        VOICEVOX {voicevox.isAvailable ? '接続OK' : '未接続'}
+                      </div>
+                      <div className="text-[10px] text-purple-500">
+                        {voicevox.isAvailable ? `${voicevox.speakers.length}人の話者が利用可能` : 'VOICEVOXアプリを起動してください'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const ok = await voicevox.checkAvailability();
+                        if (ok) voicevox.fetchSpeakers();
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-200 transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      接続確認
+                    </button>
+                  </div>
+
+                  {!voicevox.isAvailable && (
+                    <div className="px-3 py-2 bg-red-50 rounded-lg border border-red-200 text-sm text-red-700">
+                      VOICEVOXが起動していません。VOICEVOXアプリを起動してから接続確認ボタンを押してください。
+                    </div>
+                  )}
+
+                  <div className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+                    GitHub Pages上での利用には、ブラウザの「安全でないコンテンツを許可」設定が必要です。大会当日はローカルで npm run dev を使うか、ブラウザ設定を変更してください。
+                  </div>
+
+                  {voicevox.isAvailable && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 話者選択 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">話者</label>
+                        <select
+                          value={voicevox.speakerId}
+                          onChange={e => voicevox.setSpeakerId(parseInt(e.target.value, 10))}
+                          className="w-full border border-border-main rounded-lg px-3 py-2 text-sm bg-white"
+                        >
+                          {voicevox.speakers.flatMap(speaker =>
+                            speaker.styles.map(style => (
+                              <option key={style.id} value={style.id}>
+                                {speaker.name}（{style.name}）
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+
+                      {/* 繰り返し回数 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し回数</label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3].map(n => (
+                            <button
+                              key={n}
+                              onClick={() => setSettings(s => ({ ...s, repeatCount: n }))}
+                              className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                                settings.repeatCount === n
+                                  ? 'bg-primary-500 text-white'
+                                  : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
+                              }`}
+                            >
+                              {n}回
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 速度 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          速度: {voicevox.speedScale.toFixed(2)}
+                        </label>
+                        <input
+                          type="range" min="0.5" max="2.0" step="0.05"
+                          value={voicevox.speedScale}
+                          onChange={e => voicevox.setSpeedScale(parseFloat(e.target.value))}
+                          className="w-full accent-purple-500"
+                        />
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>遅い</span><span>標準</span><span>速い</span>
+                        </div>
+                      </div>
+
+                      {/* ピッチ */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          ピッチ: {voicevox.pitchScale.toFixed(2)}
+                        </label>
+                        <input
+                          type="range" min="-0.15" max="0.15" step="0.01"
+                          value={voicevox.pitchScale}
+                          onChange={e => voicevox.setPitchScale(parseFloat(e.target.value))}
+                          className="w-full accent-purple-500"
+                        />
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>低い</span><span>標準</span><span>高い</span>
+                        </div>
+                      </div>
+
+                      {/* 音量 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          音量: {voicevox.volumeScale.toFixed(2)}
+                        </label>
+                        <input
+                          type="range" min="0" max="2.0" step="0.05"
+                          value={voicevox.volumeScale}
+                          onChange={e => voicevox.setVolumeScale(parseFloat(e.target.value))}
+                          className="w-full accent-purple-500"
+                        />
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>小</span><span>標準</span><span>大</span>
+                        </div>
+                      </div>
+
+                      {/* テスト・停止 */}
+                      <div className="flex items-end gap-2">
+                        <button
+                          onClick={() => voicevox.speak('音声テストです。放送コールシステムをご利用いただきありがとうございます。')}
+                          disabled={!voicevox.isAvailable}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Mic className="w-4 h-4" />
+                          音声テスト
+                        </button>
+                        {isSpeaking && (
+                          <button
+                            onClick={handleStop}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                          >
+                            <Square className="w-4 h-4" />
+                            停止
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -621,6 +821,7 @@ export default function BroadcastPanel() {
                       onUpdateMatch={updateMatch}
                       onCall={handleCall}
                       onStop={handleStop}
+                      engineDisabled={engine === 'voicevox' && !voicevox.isAvailable}
                     />
                   ))}
                 </div>
@@ -722,6 +923,7 @@ function MatchCard({
   onUpdateMatch,
   onCall,
   onStop,
+  engineDisabled = false,
 }: {
   match: MatchCall;
   isSpeaking: boolean;
@@ -729,6 +931,7 @@ function MatchCard({
   onUpdateMatch: (id: number, field: 'courtNumber' | 'startTime', value: string) => void;
   onCall: (match: MatchCall) => void;
   onStop: () => void;
+  engineDisabled?: boolean;
 }) {
   const bgClass = isSpeaking
     ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
@@ -794,9 +997,9 @@ function MatchCard({
         ) : (
           <button
             onClick={() => onCall(match)}
-            disabled={!match.courtNumber}
+            disabled={!match.courtNumber || engineDisabled}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              match.courtNumber
+              match.courtNumber && !engineDisabled
                 ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}

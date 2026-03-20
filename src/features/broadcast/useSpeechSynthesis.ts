@@ -86,10 +86,8 @@ export function useSpeechSynthesis() {
 
         const utterance = new SpeechSynthesisUtterance(chunks[index]);
         utterance.lang = 'ja-JP';
-        // 自然な速度: ゆっくりめに設定
-        utterance.rate = settings.rate;
-        // 柔らかい女性の声: ピッチを少し高めに
-        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
+            utterance.rate = settings.rate;
+        utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch));
         utterance.volume = settings.volume;
         if (voice) utterance.voice = voice;
 
@@ -128,7 +126,7 @@ export function useSpeechSynthesis() {
     const utterance = new SpeechSynthesisUtterance('音声テストです。放送コールシステムをご利用いただきありがとうございます。');
     utterance.lang = 'ja-JP';
     utterance.rate = settings.rate;
-    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch + 0.25));
+    utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch));
     utterance.volume = settings.volume;
     if (voice) utterance.voice = voice;
     synth.speak(utterance);
