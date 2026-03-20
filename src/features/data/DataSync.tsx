@@ -83,6 +83,39 @@ async function deduplicateFuriganaDict(): Promise<number> {
   return toDelete.length;
 }
 
+/** プレイヤーテーブルの重複削除
+ *  同一 playerId のレコードが複数ある場合、ふりがな情報が最も充実した1件を残す
+ */
+async function deduplicatePlayers(): Promise<number> {
+  const all = await db.players.toArray();
+  const groups = new Map<string, typeof all>();
+
+  for (const p of all) {
+    const key = p.playerId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+
+  const toDelete: number[] = [];
+  for (const [, group] of groups) {
+    if (group.length <= 1) continue;
+    group.sort((a, b) => {
+      const aHas = a.furigana ? 1 : 0;
+      const bHas = b.furigana ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+      return (b.id || 0) - (a.id || 0);
+    });
+    for (let i = 1; i < group.length; i++) {
+      if (group[i].id) toDelete.push(group[i].id!);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await db.players.bulkDelete(toDelete);
+  }
+  return toDelete.length;
+}
+
 /** 所属ふりがなの重複削除
  *  所属名のスペース差・大小文字差を同一とみなし統合
  *  最新の updatedAt を持つエントリを残す
@@ -250,9 +283,11 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
     }
 
     const dedupCount = await deduplicateFuriganaDict();
+    const playerDedupCount = await deduplicatePlayers();
 
     const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
-    if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+    if (dedupCount > 0) details.push(`辞書重複削除: ${dedupCount}件`);
+    if (playerDedupCount > 0) details.push(`選手重複削除: ${playerDedupCount}件`);
     if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
     return { success: true, details };
   }, []);

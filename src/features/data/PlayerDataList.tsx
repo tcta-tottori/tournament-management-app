@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
@@ -7,11 +7,58 @@ import {
   CheckCircle2, AlertCircle, Users, Building2, FileSpreadsheet,
 } from 'lucide-react';
 
+/** プレイヤーテーブルの重複を自動クリーンアップ
+ *  同一 playerId のレコードが複数ある場合、ふりがな情報が最も充実した1件を残す
+ */
+async function deduplicatePlayers(): Promise<number> {
+  const all = await db.players.toArray();
+  const groups = new Map<string, typeof all>();
+
+  for (const p of all) {
+    const key = p.playerId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+
+  const toDelete: number[] = [];
+  for (const [, group] of groups) {
+    if (group.length <= 1) continue;
+    // ふりがなあり > なし、updatedAt/id が新しい方を優先
+    group.sort((a, b) => {
+      const aHas = a.furigana ? 1 : 0;
+      const bHas = b.furigana ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas; // ふりがなある方を先に
+      return (b.id || 0) - (a.id || 0); // 新しい方を先に
+    });
+    // 先頭を残し、残りを削除
+    for (let i = 1; i < group.length; i++) {
+      if (group[i].id) toDelete.push(group[i].id!);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await db.players.bulkDelete(toDelete);
+  }
+  return toDelete.length;
+}
+
 type TabId = 'affiliation' | 'furigana';
 
 export default function PlayerDataList() {
   const players = useLiveQuery(() => db.players.toArray()) || [];
   const affFuriganaEntries = useLiveQuery(() => db.affiliationFurigana.toArray()) || [];
+
+  // マウント時に自動で重複クリーンアップ
+  const dedupeRanRef = useRef(false);
+  useEffect(() => {
+    if (dedupeRanRef.current || players.length === 0) return;
+    dedupeRanRef.current = true;
+    deduplicatePlayers().then(count => {
+      if (count > 0) {
+        console.log(`[PlayerDataList] ${count}件の重複プレイヤーを自動クリーンアップ`);
+      }
+    });
+  }, [players.length]);
 
   const [tab, setTab] = useState<TabId>('affiliation');
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,10 +108,16 @@ export default function PlayerDataList() {
     );
   }, [affiliationList, searchQuery]);
 
-  // === ふりがな一覧データ ===
+  // === ふりがな一覧データ（重複除去済み） ===
   const furiganaList = useMemo(() => {
-    return players
-      .slice()
+    const seen = new Map<string, typeof players[0]>();
+    for (const p of players) {
+      const existing = seen.get(p.playerId);
+      if (!existing || (p.furigana && !existing.furigana) || (p.id || 0) > (existing.id || 0)) {
+        seen.set(p.playerId, p);
+      }
+    }
+    return Array.from(seen.values())
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   }, [players]);
 
