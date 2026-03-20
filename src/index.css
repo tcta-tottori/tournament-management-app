@@ -121,59 +121,60 @@
   overflow: hidden;
 }
 
-/* 極微粒子（type 0）— ほぼ見えない粉塵、ゆっくり浮遊 */
+/* 微粒子（type 0）— 金色の粉塵、ゆっくり浮遊しながら明滅 */
 .header-gold-dust .dust-t0 {
   position: absolute;
   border-radius: 50%;
-  background: rgba(218,185,92,0.7);
+  background: rgba(255,215,120,0.9);
   animation: float-micro 6s ease-in-out infinite alternate;
 }
 
-/* 微粒子（type 1）— 小さな金の粒、ゆらゆら漂う */
+/* 小粒子（type 1）— 小さな金の粒、ゆらゆら漂いキラキラ */
 .header-gold-dust .dust-t1 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,215,120,0.85) 0%, rgba(218,185,92,0.3) 80%, transparent 100%);
+  background: radial-gradient(circle, rgba(255,225,140,1) 0%, rgba(218,185,92,0.5) 70%, transparent 100%);
   animation: float-drift 8s ease-in-out infinite alternate;
 }
 
-/* 小粒子（type 2）— たまにキラッと光るアクセント */
+/* 中粒子（type 2）— キラッと光るアクセント */
 .header-gold-dust .dust-t2 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,235,180,0.9) 0%, rgba(255,215,120,0.4) 50%, transparent 100%);
+  background: radial-gradient(circle, rgba(255,240,190,1) 0%, rgba(255,215,120,0.6) 40%, transparent 100%);
+  box-shadow: 0 0 3px rgba(255,215,120,0.3);
   animation: float-sparkle 7s ease-in-out infinite;
 }
 
-/* 極微粒子の浮遊 — ゆっくり上下にふわふわ */
+/* 微粒子の浮遊 — ゆっくりふわふわ＋控えめに明滅 */
 @keyframes float-micro {
-  0%   { transform: translate(0, 0); opacity: 0.12; }
-  25%  { transform: translate(0.5px, -1.5px); opacity: 0.22; }
-  50%  { transform: translate(-0.3px, -0.5px); opacity: 0.15; }
-  75%  { transform: translate(0.8px, 0.5px); opacity: 0.25; }
-  100% { transform: translate(-0.5px, -1px); opacity: 0.12; }
+  0%   { transform: translate(0, 0); opacity: 0.3; }
+  25%  { transform: translate(0.5px, -1.5px); opacity: 0.55; }
+  50%  { transform: translate(-0.3px, -0.5px); opacity: 0.35; }
+  75%  { transform: translate(0.8px, 0.5px); opacity: 0.6; }
+  100% { transform: translate(-0.5px, -1px); opacity: 0.3; }
 }
 
-/* 微粒子の漂い — やや大きくゆらゆら */
+/* 小粒子の漂い — ゆらゆら＋キラキラ感 */
 @keyframes float-drift {
-  0%   { transform: translate(0, 0); opacity: 0.1; }
-  20%  { transform: translate(1px, -2px); opacity: 0.25; }
-  40%  { transform: translate(-0.5px, -1px); opacity: 0.15; }
-  60%  { transform: translate(1.5px, 0.5px); opacity: 0.3; }
-  80%  { transform: translate(-1px, -1.5px); opacity: 0.18; }
-  100% { transform: translate(0.5px, -0.5px); opacity: 0.12; }
+  0%   { transform: translate(0, 0); opacity: 0.25; }
+  20%  { transform: translate(1px, -2px); opacity: 0.55; }
+  40%  { transform: translate(-0.5px, -1px); opacity: 0.3; }
+  60%  { transform: translate(1.5px, 0.5px); opacity: 0.6; }
+  80%  { transform: translate(-1px, -1.5px); opacity: 0.35; }
+  100% { transform: translate(0.5px, -0.5px); opacity: 0.25; }
 }
 
-/* 小粒子のキラメキ — 漂いながらたまにキラッ */
+/* 中粒子のキラメキ — 漂いながらキラッと光る */
 @keyframes float-sparkle {
-  0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.08; }
-  15%  { transform: translate(1px, -1.5px) scale(0.85); opacity: 0.12; }
-  30%  { transform: translate(-0.5px, -0.5px) scale(0.9); opacity: 0.15; }
-  48%  { transform: translate(0.8px, -1px) scale(0.9); opacity: 0.15; }
-  50%  { transform: translate(1px, -1.2px) scale(1.3); opacity: 0.55; }
-  52%  { transform: translate(1px, -1px) scale(0.9); opacity: 0.15; }
-  70%  { transform: translate(-1px, 0.5px) scale(0.85); opacity: 0.1; }
-  85%  { transform: translate(0.5px, -1px) scale(0.8); opacity: 0.08; }
+  0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
+  15%  { transform: translate(1px, -1.5px) scale(0.85); opacity: 0.3; }
+  30%  { transform: translate(-0.5px, -0.5px) scale(0.9); opacity: 0.35; }
+  48%  { transform: translate(0.8px, -1px) scale(0.95); opacity: 0.35; }
+  50%  { transform: translate(1px, -1.2px) scale(1.4); opacity: 0.85; box-shadow: 0 0 6px rgba(255,215,120,0.6), 0 0 12px rgba(218,185,92,0.3); }
+  52%  { transform: translate(1px, -1px) scale(0.95); opacity: 0.35; }
+  70%  { transform: translate(-1px, 0.5px) scale(0.85); opacity: 0.25; }
+  85%  { transform: translate(0.5px, -1px) scale(0.8); opacity: 0.2; }
 }
 
 /* --- アニメーションのタイミングずらし（自然なランダム感） --- */
