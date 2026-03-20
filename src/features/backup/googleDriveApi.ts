@@ -129,7 +129,8 @@ export function clearToken(): void {
 export function isTokenValid(): boolean {
   const token = localStorage.getItem(TOKEN_KEY) || '';
   const expiry = Number(localStorage.getItem(EXPIRY_KEY) || '0');
-  return !!token && Date.now() < expiry;
+  const scopeOk = localStorage.getItem(SCOPE_KEY) === SCOPES;
+  return !!token && Date.now() < expiry && scopeOk;
 }
 
 // Client ID 管理
@@ -154,13 +155,21 @@ function headers(token: string) {
   };
 }
 
-/** トークンの有効性を確認 */
+/** トークンの有効性とスコープを確認 */
 export async function validateToken(token: string): Promise<boolean> {
   try {
-    const res = await fetch(`${DRIVE_API}/about?fields=user`, {
-      headers: headers(token),
-    });
-    return res.ok;
+    const infoRes = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${encodeURIComponent(token)}`);
+    if (!infoRes.ok) return false;
+    const info = await infoRes.json();
+    const scopes = (info.scope || '').split(' ');
+    // 要求スコープ (drive) がトークンに含まれているか確認
+    const hasRequiredScope = scopes.some((s: string) => s === SCOPES);
+    if (!hasRequiredScope) {
+      console.warn('[GDrive] スコープ不足。付与済み:', scopes, '必要:', SCOPES);
+      clearToken();
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
@@ -189,10 +198,15 @@ async function findFolder(
   let q = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   if (parentId) q += ` and '${parentId}' in parents`;
 
-  const params = new URLSearchParams({ q, fields: 'files(id,name)', pageSize: '1' });
+  const params = new URLSearchParams({ q, fields: 'files(id,name)', pageSize: '10' });
   const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error(`[GDrive] findFolder "${name}" failed:`, res.status, err.error?.message);
+    return null;
+  }
   const data = await res.json();
+  console.log(`[GDrive] findFolder "${name}" (parent=${parentId || 'any'}): found ${data.files?.length || 0} results`);
   return data.files?.[0]?.id || null;
 }
 
@@ -244,12 +258,19 @@ export async function getSharedFolderLink(token: string): Promise<string> {
 const FURIGANA_FOLDER_NAME = 'ふりがな一覧';
 const AFFILIATION_FOLDER_NAME = '所属一覧';
 
-/** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを検索（作成しない） */
+/** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを検索（作成しない）
+ * @returns フォルダID、見つからない場合は null
+ * @throws フォルダ階層が見つからない場合、詳細エラーを throw
+ */
 async function findSubFolderId(token: string, subName: string): Promise<string | null> {
   const rootId = await findFolder(token, ROOT_FOLDER_NAME);
-  if (!rootId) return null;
+  if (!rootId) {
+    throw new Error(`「${ROOT_FOLDER_NAME}」フォルダが見つかりません。Google Drive に接続し直してください。`);
+  }
   const sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
-  if (!sysId) return null;
+  if (!sysId) {
+    throw new Error(`「${ROOT_FOLDER_NAME}/${SUB_FOLDER_NAME}」フォルダが見つかりません。`);
+  }
   return findFolder(token, subName, sysId);
 }
 
@@ -433,7 +454,9 @@ const TOURNAMENT_LIST_FOLDER_NAME = '大会一覧';
 /** 大会一覧フォルダ内のExcelファイル一覧を取得（最新順） */
 export async function listTournamentExcelFiles(token: string): Promise<GoogleDriveFile[]> {
   const folderId = await findSubFolderId(token, TOURNAMENT_LIST_FOLDER_NAME);
-  if (!folderId) return [];
+  if (!folderId) {
+    throw new Error(`「${SUB_FOLDER_NAME}/${TOURNAMENT_LIST_FOLDER_NAME}」フォルダが見つかりません。Google Drive の接続を切断し、再接続してください。`);
+  }
   const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
   const params = new URLSearchParams({
     q,
