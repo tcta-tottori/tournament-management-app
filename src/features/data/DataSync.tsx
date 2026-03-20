@@ -45,6 +45,73 @@ function removeSpaces(s: string): string {
   return s.replace(/[\s\u3000]+/g, '');
 }
 
+/** 正規化キー生成: スペース除去 + 小文字化 */
+function normalizeKey(s: string): string {
+  return s.replace(/[\s\u3000]+/g, '').toLowerCase();
+}
+
+/** ふりがな辞書の重複削除
+ *  名前（スペース差を無視）と所属（大小文字差を無視）が同じエントリを統合
+ *  ※ furiganaDict は name がPKなので、スペース違いの別キーが重複として存在しうる
+ *  最新の updatedAt を持つエントリを残す
+ */
+async function deduplicateFuriganaDict(): Promise<number> {
+  const all = await db.furiganaDict.toArray();
+  const seen = new Map<string, typeof all[0]>();
+  const toDelete: string[] = [];
+
+  for (const entry of all) {
+    const key = normalizeKey(entry.name);
+    const existing = seen.get(key);
+    if (existing) {
+      // updatedAt が新しい方を残す
+      if ((entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+        toDelete.push(existing.name);
+        seen.set(key, entry);
+      } else {
+        toDelete.push(entry.name);
+      }
+    } else {
+      seen.set(key, entry);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await db.furiganaDict.bulkDelete(toDelete);
+  }
+  return toDelete.length;
+}
+
+/** 所属ふりがなの重複削除
+ *  所属名のスペース差・大小文字差を同一とみなし統合
+ *  最新の updatedAt を持つエントリを残す
+ */
+async function deduplicateAffiliation(): Promise<number> {
+  const all = await db.affiliationFurigana.toArray();
+  const seen = new Map<string, typeof all[0]>();
+  const toDelete: number[] = [];
+
+  for (const entry of all) {
+    const key = normalizeKey(entry.name);
+    const existing = seen.get(key);
+    if (existing) {
+      if ((entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+        toDelete.push(existing.id!);
+        seen.set(key, entry);
+      } else {
+        toDelete.push(entry.id!);
+      }
+    } else {
+      seen.set(key, entry);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await db.affiliationFurigana.bulkDelete(toDelete);
+  }
+  return toDelete.length;
+}
+
 export default function DataSync() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
@@ -169,8 +236,12 @@ export default function DataSync() {
         }
       }
 
+      // 重複削除
+      const dedupCount = await deduplicateFuriganaDict();
+
       updateLastSync();
       const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
+      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
       if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
       setResult({ success: true, message: 'ふりがなデータを読み込みました', details });
     } catch (err) {
@@ -241,8 +312,13 @@ export default function DataSync() {
         }
         count++;
       }
+      // 重複削除
+      const dedupCount = await deduplicateAffiliation();
+
       updateLastSync();
-      setResult({ success: true, message: '所属ふりがなを読み込みました', details: [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`] });
+      const details = [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`];
+      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+      setResult({ success: true, message: '所属ふりがなを読み込みました', details });
     } catch (err) {
       setResult({ success: false, message: `読込失敗: ${(err as Error).message}` });
     } finally {
@@ -302,8 +378,26 @@ export default function DataSync() {
         await db.furiganaDict.put({ name: removeSpaces(name), furigana: removeSpaces(furigana), type: 'manual' as const, updatedAt: now });
         count++;
       }
+
+      // 既存選手にも適用
+      let playerCount = 0;
+      const allPlayers = await db.players.toArray();
+      for (const p of allPlayers) {
+        const dictEntry = await db.furiganaDict.get(p.playerId);
+        if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
+          await db.players.update(p.id!, { furigana: dictEntry.furigana });
+          playerCount++;
+        }
+      }
+
+      // 重複削除
+      const dedupCount = await deduplicateFuriganaDict();
+
       updateLastSync();
-      setResult({ success: true, message: `${count}件のふりがなをインポートしました（${file.name}）` });
+      const details = [`ふりがな辞書: ${count}件`];
+      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+      if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
+      setResult({ success: true, message: `${count}件のふりがなをインポートしました（${file.name}）`, details });
     } catch (err) {
       setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
     } finally {
@@ -339,8 +433,13 @@ export default function DataSync() {
         }
         count++;
       }
+      // 重複削除
+      const dedupCount = await deduplicateAffiliation();
+
       updateLastSync();
-      setResult({ success: true, message: `${count}件の所属ふりがなをインポートしました（${file.name}）` });
+      const details2 = [`所属ふりがな: ${count}件`];
+      if (dedupCount > 0) details2.push(`重複削除: ${dedupCount}件`);
+      setResult({ success: true, message: `${count}件の所属ふりがなをインポートしました（${file.name}）`, details: details2 });
     } catch (err) {
       setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
     } finally {
