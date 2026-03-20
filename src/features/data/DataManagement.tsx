@@ -18,9 +18,6 @@ export default function DataManagement() {
         </div>
       </header>
 
-      {/* Google ドライブ連携（ふりがな・所属の読込/書込） */}
-      <DataSync />
-
       {/* ドロー会議システム読込パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
@@ -31,6 +28,9 @@ export default function DataManagement() {
           <DataImport />
         </div>
       </section>
+
+      {/* Google ドライブ連携（ふりがな・所属の読込/書込） */}
+      <DataSync />
 
       {/* 所属・ふりがな一覧パネル */}
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
