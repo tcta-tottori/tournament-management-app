@@ -44,7 +44,7 @@
 }
 
 /* ===========================================================
-   ヘッダー — 深緑背景 + ゴールド波型ライン + 金砂エレガントデザイン
+   ヘッダー — 深緑背景 + 動的ゴールド波 + 金砂散りばめデザイン
    =========================================================== */
 .header-main {
   position: relative;
@@ -58,17 +58,86 @@
   z-index: 2;
 }
 
-/* ゴールド波型ライン — ヘッダー全面 */
-.header-gold-waves {
+/* ===== 動的ゴールド波型ライン ===== */
+.header-gold-waves-container {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
   z-index: 1;
+  overflow: hidden;
 }
 
-/* 金の砂粒エフェクト — ヘッダー全面に散りばめ */
+.header-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 波1: 幅200%で右方向にスクロール */
+.header-wave-1 {
+  width: 200%;
+  animation: wave-scroll-right 20s linear infinite;
+}
+
+/* 波2: 幅200%で左方向にスクロール */
+.header-wave-2 {
+  width: 200%;
+  animation: wave-scroll-left 25s linear infinite;
+}
+
+/* 波3: 上下にゆらぎ */
+.header-wave-3 {
+  width: 100%;
+  animation: wave-float 6s ease-in-out infinite;
+}
+
+@keyframes wave-scroll-right {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes wave-scroll-left {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes wave-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ===== ゴールドシマー（光の走り） ===== */
+.header-shimmer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 215, 120, 0.07) 45%,
+    rgba(255, 225, 150, 0.12) 50%,
+    rgba(255, 215, 120, 0.07) 55%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 8s ease-in-out infinite;
+}
+
+@keyframes shimmer-sweep {
+  0%, 100% { background-position: 200% 0; }
+  50% { background-position: -200% 0; }
+}
+
+/* ===== 金の砂粒エフェクト — 3層構成 ===== */
 .header-gold-dust {
   position: absolute;
   inset: 0;
@@ -79,27 +148,68 @@
   overflow: hidden;
 }
 
-.header-gold-dust .dust {
+/* 微粒子（type 0）— 静かにきらめく */
+.header-gold-dust .dust-t0 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(218,185,92,0.9) 0%, rgba(255,215,120,0.4) 60%, transparent 100%);
-  animation: dust-twinkle 3s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(218,185,92,0.8) 0%, rgba(255,215,120,0.3) 70%, transparent 100%);
+  animation: dust-micro 3s ease-in-out infinite alternate;
 }
 
-@keyframes dust-twinkle {
-  0% { opacity: 0.15; transform: scale(0.8); }
-  50% { opacity: 0.7; transform: scale(1.1); }
-  100% { opacity: 0.25; transform: scale(0.9); }
+/* 中粒子（type 1）— ふわりと漂う */
+.header-gold-dust .dust-t1 {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,215,120,0.9) 0%, rgba(218,185,92,0.4) 50%, transparent 100%);
+  animation: dust-drift 5s ease-in-out infinite alternate;
+}
+
+/* 大粒子（type 2）— 強い輝き＋ハロー */
+.header-gold-dust .dust-t2 {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,235,170,1) 0%, rgba(255,215,120,0.6) 30%, rgba(218,185,92,0.2) 60%, transparent 100%);
+  box-shadow: 0 0 4px rgba(255,215,120,0.4), 0 0 8px rgba(218,185,92,0.2);
+  animation: dust-glow 4s ease-in-out infinite alternate;
+}
+
+@keyframes dust-micro {
+  0% { opacity: 0.1; transform: scale(0.7) translateY(0); }
+  50% { opacity: 0.65; transform: scale(1.05) translateY(-1px); }
+  100% { opacity: 0.15; transform: scale(0.85) translateY(1px); }
+}
+
+@keyframes dust-drift {
+  0% { opacity: 0.15; transform: scale(0.8) translate(0, 0); }
+  33% { opacity: 0.55; transform: scale(1.1) translate(2px, -2px); }
+  66% { opacity: 0.35; transform: scale(0.95) translate(-1px, 1px); }
+  100% { opacity: 0.2; transform: scale(0.85) translate(1px, -1px); }
+}
+
+@keyframes dust-glow {
+  0% { opacity: 0.2; transform: scale(0.8); box-shadow: 0 0 3px rgba(255,215,120,0.2), 0 0 6px rgba(218,185,92,0.1); }
+  50% { opacity: 0.7; transform: scale(1.15); box-shadow: 0 0 6px rgba(255,215,120,0.5), 0 0 12px rgba(218,185,92,0.3); }
+  100% { opacity: 0.25; transform: scale(0.9); box-shadow: 0 0 3px rgba(255,215,120,0.2), 0 0 6px rgba(218,185,92,0.1); }
 }
 
 /* 各砂粒のアニメーションずらし */
-.header-gold-dust .dust:nth-child(odd) { animation-direction: alternate-reverse; }
-.header-gold-dust .dust:nth-child(3n) { animation-duration: 4s; }
-.header-gold-dust .dust:nth-child(5n) { animation-duration: 2.5s; }
-.header-gold-dust .dust:nth-child(7n) { animation-duration: 5s; }
-.header-gold-dust .dust:nth-child(4n+1) { animation-delay: 0.5s; }
-.header-gold-dust .dust:nth-child(6n+2) { animation-delay: 1.2s; }
-.header-gold-dust .dust:nth-child(8n+3) { animation-delay: 2s; }
+.header-gold-dust .dust-t0:nth-child(odd) { animation-direction: alternate-reverse; }
+.header-gold-dust .dust-t0:nth-child(3n) { animation-duration: 4s; }
+.header-gold-dust .dust-t0:nth-child(5n) { animation-duration: 2.2s; }
+.header-gold-dust .dust-t0:nth-child(4n+1) { animation-delay: 0.3s; }
+.header-gold-dust .dust-t0:nth-child(6n+2) { animation-delay: 1s; }
+
+.header-gold-dust .dust-t1:nth-child(odd) { animation-direction: alternate-reverse; }
+.header-gold-dust .dust-t1:nth-child(3n) { animation-duration: 6s; }
+.header-gold-dust .dust-t1:nth-child(5n) { animation-duration: 4s; }
+.header-gold-dust .dust-t1:nth-child(4n+1) { animation-delay: 0.8s; }
+.header-gold-dust .dust-t1:nth-child(6n+2) { animation-delay: 1.5s; }
+
+.header-gold-dust .dust-t2:nth-child(odd) { animation-direction: alternate-reverse; }
+.header-gold-dust .dust-t2:nth-child(3n) { animation-duration: 5s; }
+.header-gold-dust .dust-t2:nth-child(5n) { animation-duration: 3.5s; }
+.header-gold-dust .dust-t2:nth-child(4n+1) { animation-delay: 0.5s; }
+.header-gold-dust .dust-t2:nth-child(6n+2) { animation-delay: 2s; }
 
 .header-logo {
   width: 40px;
