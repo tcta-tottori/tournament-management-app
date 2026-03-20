@@ -128,9 +128,6 @@ export default function AppLayout() {
           </svg>
         </div>
 
-        {/* ゴールドシマー（左から右に光が走る） */}
-        <div className="header-shimmer" />
-
         {/* 金の砂粒エフェクト — 3レイヤー構成 */}
         <div className="header-gold-dust">
           {GOLD_DUST_PARTICLES.map((p, i) => (

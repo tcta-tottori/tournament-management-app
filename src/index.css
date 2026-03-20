@@ -110,33 +110,6 @@
   50% { transform: translateY(-4px); }
 }
 
-/* ===== ゴールドシマー（光の走り） ===== */
-.header-shimmer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    transparent 40%,
-    rgba(255, 215, 120, 0.07) 45%,
-    rgba(255, 225, 150, 0.12) 50%,
-    rgba(255, 215, 120, 0.07) 55%,
-    transparent 60%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer-sweep 8s ease-in-out infinite;
-}
-
-@keyframes shimmer-sweep {
-  0%, 100% { background-position: 200% 0; }
-  50% { background-position: -200% 0; }
-}
-
 /* ===== 金の砂粒エフェクト — 3層構成 ===== */
 .header-gold-dust {
   position: absolute;
@@ -148,66 +121,75 @@
   overflow: hidden;
 }
 
-/* 微粒子（type 0）— 静かにきらめく */
+/* 微粒子（type 0）— 控えめにキラッと光る */
 .header-gold-dust .dust-t0 {
   position: absolute;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(218,185,92,0.8) 0%, rgba(255,215,120,0.3) 70%, transparent 100%);
-  animation: dust-micro 3s ease-in-out infinite alternate;
+  animation: sparkle-subtle 4s ease-in-out infinite;
 }
 
-/* 中粒子（type 1）— ふわりと漂う */
+/* 中粒子（type 1）— 少し明るくキラキラ */
 .header-gold-dust .dust-t1 {
   position: absolute;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255,215,120,0.9) 0%, rgba(218,185,92,0.4) 50%, transparent 100%);
-  animation: dust-drift 5s ease-in-out infinite alternate;
+  animation: sparkle-medium 5s ease-in-out infinite;
 }
 
-/* 大粒子（type 2）— 強い輝き＋ハロー */
+/* 大粒子（type 2）— 一瞬キラッと輝く星 */
 .header-gold-dust .dust-t2 {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,235,170,1) 0%, rgba(255,215,120,0.6) 30%, rgba(218,185,92,0.2) 60%, transparent 100%);
-  box-shadow: 0 0 4px rgba(255,215,120,0.4), 0 0 8px rgba(218,185,92,0.2);
-  animation: dust-glow 4s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(255,240,190,1) 0%, rgba(255,215,120,0.5) 40%, transparent 100%);
+  animation: sparkle-star 6s ease-in-out infinite;
 }
 
-@keyframes dust-micro {
-  0% { opacity: 0.1; transform: scale(0.7) translateY(0); }
-  50% { opacity: 0.65; transform: scale(1.05) translateY(-1px); }
-  100% { opacity: 0.15; transform: scale(0.85) translateY(1px); }
+/* 控えめスパークル — 普段はほぼ見えず、ふわっと光る */
+@keyframes sparkle-subtle {
+  0%, 100% { opacity: 0.08; transform: scale(0.6); }
+  45% { opacity: 0.12; transform: scale(0.7); }
+  50% { opacity: 0.5; transform: scale(1); }
+  55% { opacity: 0.12; transform: scale(0.7); }
 }
 
-@keyframes dust-drift {
-  0% { opacity: 0.15; transform: scale(0.8) translate(0, 0); }
-  33% { opacity: 0.55; transform: scale(1.1) translate(2px, -2px); }
-  66% { opacity: 0.35; transform: scale(0.95) translate(-1px, 1px); }
-  100% { opacity: 0.2; transform: scale(0.85) translate(1px, -1px); }
+/* 中程度スパークル — やや明るくきらめく */
+@keyframes sparkle-medium {
+  0%, 100% { opacity: 0.1; transform: scale(0.7); }
+  40% { opacity: 0.12; transform: scale(0.75); }
+  48% { opacity: 0.55; transform: scale(1.05); }
+  52% { opacity: 0.55; transform: scale(1.05); }
+  60% { opacity: 0.12; transform: scale(0.75); }
 }
 
-@keyframes dust-glow {
-  0% { opacity: 0.2; transform: scale(0.8); box-shadow: 0 0 3px rgba(255,215,120,0.2), 0 0 6px rgba(218,185,92,0.1); }
-  50% { opacity: 0.7; transform: scale(1.15); box-shadow: 0 0 6px rgba(255,215,120,0.5), 0 0 12px rgba(218,185,92,0.3); }
-  100% { opacity: 0.25; transform: scale(0.9); box-shadow: 0 0 3px rgba(255,215,120,0.2), 0 0 6px rgba(218,185,92,0.1); }
+/* 星型スパークル — 一瞬キラッと強く光る */
+@keyframes sparkle-star {
+  0%, 100% { opacity: 0.05; transform: scale(0.5); box-shadow: none; }
+  47% { opacity: 0.08; transform: scale(0.6); box-shadow: none; }
+  50% { opacity: 0.65; transform: scale(1.2); box-shadow: 0 0 4px rgba(255,215,120,0.4), 0 0 8px rgba(218,185,92,0.15); }
+  53% { opacity: 0.08; transform: scale(0.6); box-shadow: none; }
 }
 
-/* 各砂粒のアニメーションずらし */
-.header-gold-dust .dust-t0:nth-child(odd) { animation-direction: alternate-reverse; }
-.header-gold-dust .dust-t0:nth-child(3n) { animation-duration: 4s; }
-.header-gold-dust .dust-t0:nth-child(5n) { animation-duration: 2.2s; }
-.header-gold-dust .dust-t0:nth-child(4n+1) { animation-delay: 0.3s; }
-.header-gold-dust .dust-t0:nth-child(6n+2) { animation-delay: 1s; }
+/* 各砂粒のアニメーションずらし — バラバラのタイミングで光る */
+.header-gold-dust .dust-t0:nth-child(3n)   { animation-duration: 3.5s; }
+.header-gold-dust .dust-t0:nth-child(5n)   { animation-duration: 5s; }
+.header-gold-dust .dust-t0:nth-child(7n)   { animation-duration: 6s; }
+.header-gold-dust .dust-t0:nth-child(2n)   { animation-delay: 0.8s; }
+.header-gold-dust .dust-t0:nth-child(3n+1) { animation-delay: 1.6s; }
+.header-gold-dust .dust-t0:nth-child(5n+2) { animation-delay: 2.5s; }
+.header-gold-dust .dust-t0:nth-child(7n+3) { animation-delay: 3.2s; }
 
-.header-gold-dust .dust-t1:nth-child(odd) { animation-direction: alternate-reverse; }
-.header-gold-dust .dust-t1:nth-child(3n) { animation-duration: 6s; }
-.header-gold-dust .dust-t1:nth-child(5n) { animation-duration: 4s; }
-.header-gold-dust .dust-t1:nth-child(4n+1) { animation-delay: 0.8s; }
-.header-gold-dust .dust-t1:nth-child(6n+2) { animation-delay: 1.5s; }
+.header-gold-dust .dust-t1:nth-child(3n)   { animation-duration: 4.5s; }
+.header-gold-dust .dust-t1:nth-child(5n)   { animation-duration: 6s; }
+.header-gold-dust .dust-t1:nth-child(7n)   { animation-duration: 7s; }
+.header-gold-dust .dust-t1:nth-child(2n)   { animation-delay: 1.2s; }
+.header-gold-dust .dust-t1:nth-child(3n+1) { animation-delay: 2.3s; }
+.header-gold-dust .dust-t1:nth-child(5n+2) { animation-delay: 3.5s; }
 
-.header-gold-dust .dust-t2:nth-child(odd) { animation-direction: alternate-reverse; }
-.header-gold-dust .dust-t2:nth-child(3n) { animation-duration: 5s; }
-.header-gold-dust .dust-t2:nth-child(5n) { animation-duration: 3.5s; }
+.header-gold-dust .dust-t2:nth-child(3n)   { animation-duration: 7s; }
+.header-gold-dust .dust-t2:nth-child(5n)   { animation-duration: 8s; }
+.header-gold-dust .dust-t2:nth-child(2n)   { animation-delay: 2s; }
+.header-gold-dust .dust-t2:nth-child(3n+1) { animation-delay: 4s; }
 .header-gold-dust .dust-t2:nth-child(4n+1) { animation-delay: 0.5s; }
 .header-gold-dust .dust-t2:nth-child(6n+2) { animation-delay: 2s; }
 
