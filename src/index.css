@@ -44,7 +44,7 @@
 }
 
 /* ===========================================================
-   ヘッダー — 深緑背景 + ゴールド波型ラインのエレガントデザイン
+   ヘッダー — 深緑背景 + ゴールド波型ライン + 金砂エレガントデザイン
    =========================================================== */
 .header-main {
   position: relative;
@@ -67,6 +67,39 @@
   pointer-events: none;
   z-index: 1;
 }
+
+/* 金の砂粒エフェクト — ヘッダー全面に散りばめ */
+.header-gold-dust {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.header-gold-dust .dust {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(218,185,92,0.9) 0%, rgba(255,215,120,0.4) 60%, transparent 100%);
+  animation: dust-twinkle 3s ease-in-out infinite alternate;
+}
+
+@keyframes dust-twinkle {
+  0% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+  100% { opacity: 0.25; transform: scale(0.9); }
+}
+
+/* 各砂粒のアニメーションずらし */
+.header-gold-dust .dust:nth-child(odd) { animation-direction: alternate-reverse; }
+.header-gold-dust .dust:nth-child(3n) { animation-duration: 4s; }
+.header-gold-dust .dust:nth-child(5n) { animation-duration: 2.5s; }
+.header-gold-dust .dust:nth-child(7n) { animation-duration: 5s; }
+.header-gold-dust .dust:nth-child(4n+1) { animation-delay: 0.5s; }
+.header-gold-dust .dust:nth-child(6n+2) { animation-delay: 1.2s; }
+.header-gold-dust .dust:nth-child(8n+3) { animation-delay: 2s; }
 
 .header-logo {
   width: 40px;

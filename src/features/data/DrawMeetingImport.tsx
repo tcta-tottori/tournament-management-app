@@ -1,13 +1,16 @@
 import { useState, useCallback, useRef } from 'react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw, FolderOpen } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import {
   getSavedToken as gdriveGetSavedToken,
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
+  listTournamentExcelFiles,
+  downloadTournamentExcel,
+  type GoogleDriveFile,
 } from '../backup/googleDriveApi';
 
 /** Google Drive ブランドアイコン */
@@ -23,6 +26,7 @@ function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
     </svg>
   );
 }
+
 
 /** Google Drive からドロー会議システムの最新バックアップを取得 */
 async function fetchDrawBackupFromGDrive(token: string): Promise<{ data: any; fileName: string }> {
@@ -311,6 +315,10 @@ export default function DataImport() {
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
   const [isLoadingGDrive, setIsLoadingGDrive] = useState(false);
+  const [gdriveFileList, setGdriveFileList] = useState<GoogleDriveFile[]>([]);
+  const [isLoadingFileList, setIsLoadingFileList] = useState(false);
+  const [showFileList, setShowFileList] = useState(false);
+  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Google Drive 接続状態
@@ -349,6 +357,59 @@ export default function DataImport() {
       setImportResult({ success: false, message: `Google Drive 読込失敗: ${(err as Error).message}` });
     } finally {
       setIsLoadingGDrive(false);
+    }
+  }, []);
+
+  // --- Google Drive 大会一覧フォルダからファイル一覧を取得 ---
+  const handleListTournamentFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) {
+      setImportResult({ success: false, message: 'Google Drive に接続されていません。バックアップ画面で接続してください。' });
+      return;
+    }
+    setIsLoadingFileList(true);
+    setImportResult(null);
+    try {
+      const files = await listTournamentExcelFiles(token);
+      setGdriveFileList(files);
+      setShowFileList(true);
+      if (files.length === 0) {
+        setImportResult({ success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' });
+      }
+    } catch (err) {
+      setImportResult({ success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` });
+    } finally {
+      setIsLoadingFileList(false);
+    }
+  }, []);
+
+  // --- Google Drive 大会一覧から選択したファイルを読込（Excel） ---
+  const handleSelectTournamentFile = useCallback(async (file: GoogleDriveFile) => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    setLoadingFileId(file.id);
+    setImportResult(null);
+    try {
+      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      const result = parseDrawExcel(arrayBuffer, file.name);
+      if (!result.events || result.events.length === 0) {
+        setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' });
+        return;
+      }
+      setParsedExcel(result);
+      setParsedData(null);
+      setSummary(null);
+      setImportResult(null);
+      const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
+      setEditTournamentName(cleanTournamentName(rawName));
+      if (result.date) setEditDate(result.date);
+      if (result.venue) setEditVenue(result.venue);
+      if (result.reserveDate) setEditReserveDate(result.reserveDate);
+      setShowFileList(false);
+    } catch (err) {
+      setImportResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
+    } finally {
+      setLoadingFileId(null);
     }
   }, []);
 
@@ -984,26 +1045,87 @@ export default function DataImport() {
       {/* ファイルアップロード */}
       {showDropZone && (
         <div className="space-y-3">
-          {/* Google Drive から読込 */}
+          {/* Google Drive 大会一覧から選択 */}
           <button
-            onClick={handleLoadFromGDrive}
-            disabled={!gdriveConnected || isLoadingGDrive}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+            onClick={handleListTournamentFiles}
+            disabled={!gdriveConnected || isLoadingFileList}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
-            {isLoadingGDrive ? (
+            {isLoadingFileList ? (
               <RefreshCw className="w-4.5 h-4.5 animate-spin" />
             ) : (
               <GoogleDriveIcon className="w-4.5 h-4.5" />
             )}
-            {isLoadingGDrive ? 'Google Drive から読込中...' : 'Google Drive から最新データを読込'}
+            {isLoadingFileList ? '大会一覧を取得中...' : 'Google Drive の大会一覧から選択'}
           </button>
           {!gdriveConnected && (
             <p className="text-[10px] text-gray-400 text-center -mt-1">※ バックアップ画面でGoogle Driveに接続すると利用できます</p>
           )}
 
+          {/* Google Drive 大会一覧ファイルリスト */}
+          {showFileList && gdriveFileList.length > 0 && (
+            <div className="bg-white rounded-lg border border-[#1a73e8]/20 overflow-hidden">
+              <div className="px-4 py-2.5 bg-[#e8f0fe] border-b border-[#1a73e8]/20 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-[#1a73e8]" />
+                  <span className="text-xs font-bold text-[#1a73e8]">大会一覧</span>
+                  <span className="text-[10px] text-gray-500">{gdriveFileList.length}件</span>
+                </div>
+                <button
+                  onClick={() => setShowFileList(false)}
+                  className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  閉じる
+                </button>
+              </div>
+              <div className="max-h-64 overflow-auto divide-y divide-gray-100">
+                {gdriveFileList.map(f => {
+                  const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                  const modDate = new Date(f.modifiedTime);
+                  const isLoading = loadingFileId === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => handleSelectTournamentFile(f)}
+                      disabled={!!loadingFileId}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#e8f0fe]/50 transition-colors disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <RefreshCw className="w-4 h-4 text-[#1a73e8] animate-spin shrink-0" />
+                      ) : (
+                        <FileSpreadsheet className="w-4 h-4 text-[#1a73e8]/60 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+                        <p className="text-[10px] text-gray-400">
+                          更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <Download className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ドロー会議の最新データ読込 */}
+          <button
+            onClick={handleLoadFromGDrive}
+            disabled={!gdriveConnected || isLoadingGDrive}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoadingGDrive ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <GoogleDriveIcon className="w-4 h-4" />
+            )}
+            {isLoadingGDrive ? 'ドロー会議データ読込中...' : 'ドロー会議の最新データから読込'}
+          </button>
+
           <div className="flex items-center gap-3 text-xs text-gray-400">
             <div className="flex-1 border-t border-border-main" />
-            <span>または</span>
+            <span>またはファイルから</span>
             <div className="flex-1 border-t border-border-main" />
           </div>
 
@@ -1012,12 +1134,11 @@ export default function DataImport() {
             onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-border-main rounded-lg p-6 text-center bg-primary-50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
+            className="border-2 border-dashed border-border-main rounded-lg p-5 text-center bg-primary-50/50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
           >
-            <FileJson className="w-10 h-10 text-primary-500 mx-auto mb-2 opacity-60" />
-            <p className="text-sm font-medium text-gray-900">ドロー会議JSON / ドローExcelファイルを読込</p>
-            <p className="text-xs text-gray-500 mt-1">完全バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx) に対応</p>
-            <p className="text-xs text-gray-500 mt-0.5">クリックまたはドラッグ＆ドロップ</p>
+            <FileJson className="w-8 h-8 text-primary-500 mx-auto mb-1.5 opacity-50" />
+            <p className="text-sm font-medium text-gray-700">JSON / Excel ファイルを読込</p>
+            <p className="text-[10px] text-gray-400 mt-1">ドロー会議バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx)</p>
             <input
               ref={fileInputRef}
               type="file"

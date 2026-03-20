@@ -1,5 +1,5 @@
 /**
- * Google Drive API v3 を使ってバックアップファイルを管理するユーティリティ
+ * Google Drive API v3 ユーティリティ
  * Google Identity Services (GIS) で OAuth2 認証を行い、
  * 共有フォルダ「鳥取テニス協会バックアップ」内でファイル管理する
  */
@@ -26,9 +26,6 @@ export interface GoogleDriveFile {
   mimeType: string;
 }
 
-export interface GoogleDriveConfig {
-  accessToken: string;
-}
 
 // ================================================================
 // GIS (Google Identity Services) ローダー
@@ -217,138 +214,16 @@ async function createFolder(
   return data.id;
 }
 
-/** バックアップ用のサブフォルダ ID を取得（なければ作成） */
-let cachedFolderId: string | null = null;
-
-export async function getBackupFolderId(token: string): Promise<string> {
-  if (cachedFolderId) return cachedFolderId;
-
-  // ルートフォルダを検索/作成
-  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
-  if (!rootId) {
-    rootId = await createFolder(token, ROOT_FOLDER_NAME);
-  }
-
-  // サブフォルダを検索/作成
-  let subId = await findFolder(token, SUB_FOLDER_NAME, rootId);
-  if (!subId) {
-    subId = await createFolder(token, SUB_FOLDER_NAME, rootId);
-  }
-
-  cachedFolderId = subId;
-  return subId;
-}
-
 /** フォルダIDキャッシュをクリア */
 export function clearFolderCache(): void {
-  cachedFolderId = null;
-}
-
-// ================================================================
-// ファイル操作
-// ================================================================
-
-/** バックアップファイル一覧を取得 */
-export async function listBackups(config: GoogleDriveConfig): Promise<GoogleDriveFile[]> {
-  const folderId = await getBackupFolderId(config.accessToken);
-  const q = `'${folderId}' in parents and trashed=false and mimeType='application/json'`;
-  const params = new URLSearchParams({
-    q,
-    fields: 'files(id,name,size,modifiedTime,mimeType)',
-    orderBy: 'modifiedTime desc',
-    pageSize: '50',
-  });
-
-  const res = await fetch(`${DRIVE_API}/files?${params}`, {
-    headers: headers(config.accessToken),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `一覧取得失敗 (${res.status})`);
-  }
-
-  const data = await res.json();
-  return (data.files || []).map((f: any) => ({
-    id: f.id,
-    name: f.name,
-    size: f.size || '0',
-    modifiedTime: f.modifiedTime,
-    mimeType: f.mimeType,
-  }));
-}
-
-/** バックアップファイルの内容をダウンロード */
-export async function downloadBackup(config: GoogleDriveConfig, file: GoogleDriveFile): Promise<any> {
-  const res = await fetch(`${DRIVE_API}/files/${file.id}?alt=media`, {
-    headers: headers(config.accessToken),
-  });
-
-  if (!res.ok) {
-    throw new Error(`ダウンロード失敗 (${res.status})`);
-  }
-
-  return res.json();
-}
-
-/** バックアップファイルをアップロード */
-export async function uploadBackup(
-  config: GoogleDriveConfig,
-  fileName: string,
-  content: any
-): Promise<void> {
-  const folderId = await getBackupFolderId(config.accessToken);
-  const jsonStr = JSON.stringify(content, null, 2);
-
-  // multipart upload
-  const metadata = {
-    name: fileName,
-    mimeType: 'application/json',
-    parents: [folderId],
-  };
-
-  const boundary = '----BackupBoundary' + Date.now();
-  const body =
-    `--${boundary}\r\n` +
-    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-    JSON.stringify(metadata) +
-    `\r\n--${boundary}\r\n` +
-    `Content-Type: application/json\r\n\r\n` +
-    jsonStr +
-    `\r\n--${boundary}--`;
-
-  const res = await fetch(`${UPLOAD_API}/files?uploadType=multipart`, {
-    method: 'POST',
-    headers: {
-      ...headers(config.accessToken),
-      'Content-Type': `multipart/related; boundary=${boundary}`,
-    },
-    body,
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `アップロード失敗 (${res.status})`);
-  }
-}
-
-/** バックアップファイルを削除 */
-export async function deleteBackup(config: GoogleDriveConfig, file: GoogleDriveFile): Promise<void> {
-  const res = await fetch(`${DRIVE_API}/files/${file.id}`, {
-    method: 'DELETE',
-    headers: headers(config.accessToken),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `削除失敗 (${res.status})`);
-  }
+  // サブフォルダキャッシュ等をリセット
 }
 
 /** 共有フォルダのリンクを取得 */
 export async function getSharedFolderLink(token: string): Promise<string> {
-  const folderId = await getBackupFolderId(token);
-  return `https://drive.google.com/drive/folders/${folderId}`;
+  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
+  if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
+  return `https://drive.google.com/drive/folders/${rootId}`;
 }
 
 // ================================================================
@@ -480,6 +355,98 @@ export async function uploadFuriganaExcel(token: string, fileName: string, xlsxB
 export async function uploadAffiliationExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
   const folderId = await getSubFolderId(token, AFFILIATION_FOLDER_NAME);
   await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
+}
+
+// ================================================================
+// 時間割フォルダ操作
+// ================================================================
+
+const SCHEDULE_FOLDER_NAME = '時間割';
+
+/** 時間割フォルダ内のExcelファイル一覧を取得（最新順） */
+export async function listScheduleExcelFiles(token: string): Promise<GoogleDriveFile[]> {
+  const folderId = await getSubFolderId(token, SCHEDULE_FOLDER_NAME);
+  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  const params = new URLSearchParams({
+    q,
+    fields: 'files(id,name,size,modifiedTime,mimeType)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '50',
+  });
+  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `時間割一覧取得失敗 (${res.status})`);
+  }
+  const data = await res.json();
+  return (data.files || []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    size: f.size || '0',
+    modifiedTime: f.modifiedTime,
+    mimeType: f.mimeType,
+  }));
+}
+
+/** 時間割フォルダからExcelファイルをダウンロード */
+export async function downloadScheduleExcel(token: string, fileId: string): Promise<ArrayBuffer> {
+  return downloadFileBlob(token, fileId);
+}
+
+/** 時間割フォルダにExcelをアップロード */
+export async function uploadScheduleExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
+  const folderId = await getSubFolderId(token, SCHEDULE_FOLDER_NAME);
+  await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
+}
+
+// ================================================================
+// 大会一覧フォルダ操作（大会運営システム/大会一覧）
+// ================================================================
+
+const TOURNAMENT_LIST_FOLDER_NAME = '大会一覧';
+
+/** 大会運営システム/大会一覧 フォルダIDを取得（なければ作成） */
+async function getTournamentListFolderId(token: string): Promise<string> {
+  // ルートフォルダ
+  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
+  if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
+  // 大会運営システム サブフォルダ
+  let sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
+  if (!sysId) sysId = await createFolder(token, SUB_FOLDER_NAME, rootId);
+  // 大会一覧 サブフォルダ
+  let listId = await findFolder(token, TOURNAMENT_LIST_FOLDER_NAME, sysId);
+  if (!listId) listId = await createFolder(token, TOURNAMENT_LIST_FOLDER_NAME, sysId);
+  return listId;
+}
+
+/** 大会一覧フォルダ内のExcelファイル一覧を取得（最新順） */
+export async function listTournamentExcelFiles(token: string): Promise<GoogleDriveFile[]> {
+  const folderId = await getTournamentListFolderId(token);
+  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  const params = new URLSearchParams({
+    q,
+    fields: 'files(id,name,size,modifiedTime,mimeType)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '50',
+  });
+  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `大会一覧取得失敗 (${res.status})`);
+  }
+  const data = await res.json();
+  return (data.files || []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    size: f.size || '0',
+    modifiedTime: f.modifiedTime,
+    mimeType: f.mimeType,
+  }));
+}
+
+/** 大会一覧フォルダからExcelファイルをダウンロード */
+export async function downloadTournamentExcel(token: string, fileId: string): Promise<ArrayBuffer> {
+  return downloadFileBlob(token, fileId);
 }
 
 /** デフォルトClient IDでOAuth接続を開始 */

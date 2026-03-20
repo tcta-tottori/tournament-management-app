@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  Save, HelpCircle, MoreHorizontal, ExternalLink
+  HelpCircle, ExternalLink
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -21,18 +21,31 @@ const ALL_MAIN_TABS = [
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
-  { id: 'S-10', path: '/backup', label: 'バックアップ', icon: Save },
 ];
 
-// モバイルではメイン8個 + その他5個に分割
-const MOBILE_MAIN_COUNT = 8;
+// モバイルでも全タブ表示（その他ドロップダウン廃止）
+const MOBILE_MAIN_COUNT = 99;
 
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
 
+// 金の砂粒の配置データ（固定位置・サイズ・不透明度）
+const GOLD_DUST_PARTICLES = [
+  { x: 3, y: 15, s: 2.5, o: 0.5 }, { x: 8, y: 42, s: 1.8, o: 0.35 }, { x: 12, y: 8, s: 1.5, o: 0.6 },
+  { x: 17, y: 50, s: 2, o: 0.3 }, { x: 22, y: 25, s: 3, o: 0.45 }, { x: 26, y: 38, s: 1.2, o: 0.55 },
+  { x: 31, y: 12, s: 2.2, o: 0.4 }, { x: 35, y: 45, s: 1.8, o: 0.5 }, { x: 39, y: 30, s: 2.5, o: 0.3 },
+  { x: 44, y: 18, s: 1.5, o: 0.65 }, { x: 48, y: 48, s: 2, o: 0.35 }, { x: 52, y: 10, s: 2.8, o: 0.4 },
+  { x: 56, y: 35, s: 1.3, o: 0.55 }, { x: 60, y: 22, s: 2.2, o: 0.45 }, { x: 64, y: 50, s: 1.8, o: 0.3 },
+  { x: 68, y: 40, s: 2.5, o: 0.5 }, { x: 72, y: 8, s: 1.5, o: 0.6 }, { x: 76, y: 28, s: 2, o: 0.35 },
+  { x: 80, y: 45, s: 3, o: 0.4 }, { x: 84, y: 15, s: 1.8, o: 0.5 }, { x: 88, y: 38, s: 2.2, o: 0.3 },
+  { x: 92, y: 52, s: 1.5, o: 0.55 }, { x: 96, y: 20, s: 2, o: 0.45 }, { x: 5, y: 32, s: 1.2, o: 0.4 },
+  { x: 15, y: 48, s: 1, o: 0.5 }, { x: 28, y: 5, s: 1.8, o: 0.35 }, { x: 42, y: 42, s: 1.5, o: 0.6 },
+  { x: 55, y: 28, s: 2.5, o: 0.3 }, { x: 70, y: 52, s: 1, o: 0.55 }, { x: 85, y: 32, s: 2, o: 0.4 },
+  { x: 20, y: 55, s: 1.5, o: 0.35 }, { x: 37, y: 5, s: 2, o: 0.5 }, { x: 50, y: 55, s: 1.2, o: 0.45 },
+  { x: 63, y: 5, s: 1.8, o: 0.55 }, { x: 78, y: 55, s: 1.5, o: 0.3 }, { x: 90, y: 10, s: 2.5, o: 0.4 },
+];
+
 export default function AppLayout() {
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
 
@@ -56,25 +69,8 @@ export default function AppLayout() {
     return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
   }, [events]);
 
-  // モバイル用: メインタブとその他に分割
-  const mobileMainTabs = useMemo(() => allTabs.slice(0, MOBILE_MAIN_COUNT), [allTabs]);
-  const mobileMoreTabs = useMemo(() => allTabs.slice(MOBILE_MAIN_COUNT), [allTabs]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        setMoreOpen(false);
-      }
-    };
-    if (moreOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside as any);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside as any);
-    };
-  }, [moreOpen]);
+  // モバイル用: 全タブ表示
+  const mobileMainTabs = useMemo(() => allTabs, [allTabs]);
 
   return (
     <div className="flex flex-col h-screen bg-bg-main overflow-hidden">
@@ -103,6 +99,16 @@ export default function AppLayout() {
           {/* 波5 — 最下部の細い波 */}
           <path d="M0,50 C300,46 600,54 900,49 C1100,45 1300,53 1440,50" fill="none" stroke="url(#gold-wave-g)" strokeWidth="0.7" opacity="0.4" />
         </svg>
+
+        {/* 金の砂粒エフェクト */}
+        <div className="header-gold-dust">
+          {GOLD_DUST_PARTICLES.map((p, i) => (
+            <span key={i} className="dust" style={{
+              left: `${p.x}%`, top: `${p.y}%`,
+              width: p.s, height: p.s, opacity: p.o,
+            }} />
+          ))}
+        </div>
 
         {/* ロゴ */}
         <img
@@ -195,41 +201,6 @@ export default function AppLayout() {
             </div>
           </div>
 
-          {/* モバイルのみ「その他」ドロップダウン */}
-          <div className="lg:hidden relative shrink-0" ref={moreRef}>
-            <button
-              onClick={() => setMoreOpen(prev => !prev)}
-              className={`nav-tab ${moreOpen ? 'nav-tab-active' : ''}`}
-            >
-              <MoreHorizontal style={{ width: 16, height: 16 }} />
-              <span>その他</span>
-            </button>
-
-            {moreOpen && (
-              <div className="dropdown-menu dropdown-animate absolute right-0 top-full mt-1 w-52 rounded-xl py-1.5 z-50">
-                {mobileMoreTabs.map((item) => (
-                  <NavLink
-                    key={item.id}
-                    to={item.path}
-                    onClick={() => setMoreOpen(false)}
-                    className={({ isActive }) =>
-                      `dropdown-item ${isActive ? 'dropdown-item-active' : ''}`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <item.icon className="shrink-0 w-4 h-4" />
-                        <span>{item.label}</span>
-                        {isActive && (
-                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#d4e157] shadow-[0_0_6px_rgba(212,225,87,0.6)]" />
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </nav>
 

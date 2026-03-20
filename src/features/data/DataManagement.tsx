@@ -25,7 +25,7 @@ export default function DataManagement() {
       <section className="bg-white rounded-xl card-tottori overflow-hidden">
         <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
           <DatabaseIcon className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">ドロー会議データ読込</h2>
+          <h2 className="font-semibold text-primary-600">大会データ読込</h2>
         </div>
         <div className="p-4">
           <DataImport />

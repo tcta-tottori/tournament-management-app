@@ -101,25 +101,27 @@ export default function EntryRegistration() {
     [currentTournamentId]
   ) || [];
 
+  const eventIds = useMemo(() => events.map(e => e.eventId), [events]);
+
   const allEntries = useLiveQuery(
-    () => currentTournamentId
-      ? db.entries.where('eventId').anyOf(events.map(e => e.eventId)).toArray()
+    () => eventIds.length > 0
+      ? db.entries.where('eventId').anyOf(eventIds).toArray()
       : [],
-    [events]
+    [eventIds]
   ) || [];
 
   const allDraws = useLiveQuery(
-    () => currentTournamentId
-      ? db.draws.where('eventId').anyOf(events.map(e => e.eventId)).toArray()
+    () => eventIds.length > 0
+      ? db.draws.where('eventId').anyOf(eventIds).toArray()
       : [],
-    [events]
+    [eventIds]
   ) || [];
 
   const allMatches = useLiveQuery(
-    () => currentTournamentId
-      ? db.matches.where('eventId').anyOf(events.map(e => e.eventId)).toArray()
+    () => eventIds.length > 0
+      ? db.matches.where('eventId').anyOf(eventIds).toArray()
       : [],
-    [events]
+    [eventIds]
   ) || [];
 
   const players = useLiveQuery(() => db.players.toArray()) || [];
@@ -252,7 +254,8 @@ export default function EntryRegistration() {
   const handleMarkBye = useCallback(async (slot: CheckInSlot) => {
     if (!slot.entry || !slot.entry.id || !slot.entryId) return;
     await db.entries.update(slot.entry.id, { status: 'withdrawn' });
-    const draw = drawMap.get(slot.entry.eventId);
+    // DBから最新のドローを直接取得
+    const draw = await db.draws.where('eventId').equals(slot.entry.eventId).first();
     if (draw && draw.id) {
       const updatedSlots = draw.slots.map(s => s.entryId === slot.entryId ? { ...s, isBye: true } : s);
       await db.draws.update(draw.id, { slots: updatedSlots, updatedAt: Date.now() });
@@ -272,19 +275,22 @@ export default function EntryRegistration() {
       }
     }
     setConfirmedIds(prev => { const next = new Set(prev); next.delete(slot.entryId!); return next; });
-  }, [drawMap]);
+  }, []);
 
   const handleRestore = useCallback(async (slot: CheckInSlot) => {
     if (!slot.entry || !slot.entry.id || !slot.entryId) return;
     await db.entries.update(slot.entry.id, { status: 'active' });
-    const draw = drawMap.get(slot.entry.eventId);
+    // DBから最新のドローと選手データを直接取得
+    const draw = await db.draws.where('eventId').equals(slot.entry.eventId).first();
     if (draw && draw.id) {
       const updatedSlots = draw.slots.map(s => s.entryId === slot.entryId ? { ...s, isBye: false } : s);
       await db.draws.update(draw.id, { slots: updatedSlots, updatedAt: Date.now() });
     }
     const matches = await db.matches.where('eventId').equals(slot.entry.eventId).toArray();
-    const p1 = playerMap.get(slot.entry.playerId);
-    const p2 = slot.entry.partnerId ? playerMap.get(slot.entry.partnerId) : null;
+    const allPlayers = await db.players.toArray();
+    const pMap = new Map(allPlayers.map(p => [p.playerId, p]));
+    const p1 = pMap.get(slot.entry.playerId);
+    const p2 = slot.entry.partnerId ? pMap.get(slot.entry.partnerId) : null;
     const restoredName = p2 ? `${p1?.name || ''} / ${p2.name}` : (p1?.name || '');
     const restoredAffiliation = p1?.affiliation || '';
     for (const match of matches) {
@@ -297,11 +303,12 @@ export default function EntryRegistration() {
         await db.matches.update(match.id!, updates);
       }
     }
-  }, [drawMap, playerMap]);
+  }, []);
 
   // === エントリー確定（対戦表生成）===
   const handleConfirmEvent = useCallback(async (eventId: string, skipConfirm = false) => {
-    const draw = drawMap.get(eventId);
+    // DBから最新データを直接取得（クロージャの古いデータに依存しない）
+    const draw = await db.draws.where('eventId').equals(eventId).first();
     if (!draw) return;
     if (!skipConfirm && !confirm('エントリーを確定し対戦表を生成しますか？')) return;
 
@@ -318,7 +325,11 @@ export default function EntryRegistration() {
     // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
     await db.draws.update(draw.id!, { slots: drawSlots, updatedAt: Date.now() });
 
-    const eventEntries = allEntries.filter(e => e.eventId === eventId);
+    // DBから最新のエントリーと選手データを取得
+    const eventEntries = await db.entries.where('eventId').equals(eventId).toArray();
+    const allPlayers = await db.players.toArray();
+    const pMap = new Map(allPlayers.map(p => [p.playerId, p]));
+
     const newMatches: Omit<Match, 'id'>[] = [];
     let matchOrder = 1;
 
@@ -326,8 +337,8 @@ export default function EntryRegistration() {
       if (slot.isBye || !slot.entryId) return { name: 'BYE', affiliation: '', entryId: null };
       const entry = eventEntries.find(e => e.entryId === slot.entryId);
       if (!entry) return { name: '(不明)', affiliation: '', entryId: slot.entryId };
-      const p1 = playerMap.get(entry.playerId);
-      const p2 = entry.partnerId ? playerMap.get(entry.partnerId) : null;
+      const p1 = pMap.get(entry.playerId);
+      const p2 = entry.partnerId ? pMap.get(entry.partnerId) : null;
       const name = p2 && p1 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
       let aff = p1?.affiliation || '';
       if (p2 && p2.affiliation !== p1?.affiliation) aff = `${p1?.affiliation} / ${p2.affiliation}`;
@@ -408,17 +419,22 @@ export default function EntryRegistration() {
         });
       }
     }
-  }, [drawMap, allEntries, playerMap]);
+  }, []);
 
   const handleConfirmAll = useCallback(async () => {
-    const targets = events.filter(evt => drawMap.has(evt.eventId));
+    // DBから最新のドロー一覧を取得して確定対象を判定
+    const currentDraws = eventIds.length > 0
+      ? await db.draws.where('eventId').anyOf(eventIds).toArray()
+      : [];
+    const drawEventIds = new Set(currentDraws.map(d => d.eventId));
+    const targets = events.filter(evt => drawEventIds.has(evt.eventId));
     if (targets.length === 0) return;
     if (!confirm(`全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`)) return;
     for (const evt of targets) {
       await handleConfirmEvent(evt.eventId, true);
     }
     alert(`全${targets.length}種目の対戦表を確定しました。`);
-  }, [events, drawMap, handleConfirmEvent]);
+  }, [events, eventIds, handleConfirmEvent]);
 
   // Summary stats
   const computeStats = useCallback((slots: CheckInSlot[]) => {
@@ -602,10 +618,10 @@ export default function EntryRegistration() {
     for (let r = 0; r < roundsCount; r++) {
       const numMatches = drawSize / Math.pow(2, r + 1);
       for (let m = 0; m < numMatches; m++) {
-        const sw = getSlotW(r);
-        const x = getX(r) + sw;
+        // Round 0: カード右端から開始、Round 1+: スロット左端から開始して途切れなくする
+        const xArmStart = r === 0 ? getX(r) + getSlotW(r) : getX(r);
         const xNext = getX(r + 1);
-        const xMid = (x + xNext) / 2;
+        const xMid = (xArmStart + xNext) / 2;
 
         const yTop = getCompactY(r, m * 2) + SLOT_HEIGHT / 2;
         const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
@@ -617,13 +633,13 @@ export default function EntryRegistration() {
           if (topBye && botBye) continue;
           if (topBye || botBye) {
             const playerY = topBye ? yBottom : yTop;
-            svgPaths.push(<path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            svgPaths.push(<path key={`r${r}-m${m}-bye`} d={`M ${xArmStart} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
             continue;
           }
         }
 
-        svgPaths.push(<path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-        svgPaths.push(<path key={`r${r}-m${m}-bottom`} d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        svgPaths.push(<path key={`r${r}-m${m}-top`} d={`M ${xArmStart} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        svgPaths.push(<path key={`r${r}-m${m}-bottom`} d={`M ${xArmStart} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
         svgPaths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
       }
     }
@@ -685,20 +701,36 @@ export default function EntryRegistration() {
     }
 
 
-    // 左山/右山ラベル
+    // Left side / Right side ラベル（全体をカバー）
     const halfLabelElements: React.ReactNode[] = [];
     if (drawSize >= 4) {
       const topHalfY = OFFSET_Y;
       const bottomHalfStartIdx = halfSize;
       const bottomHalfY = r0Y[bottomHalfStartIdx] || (nextCompactY / 2 + Y_SPACING);
 
+      // 左山（上半分）の高さを算出
+      const topHalfEndY = bottomHalfY - Y_SPACING * 0.4;
+      const topHalfHeight = Math.max(topHalfEndY - topHalfY, 40);
+
+      // 右山（下半分）の高さを算出
+      const bottomHalfEndY = nextCompactY;
+      const bottomHalfHeight = Math.max(bottomHalfEndY - bottomHalfY, 40);
+
       halfLabelElements.push(
-        <div key="label-left" className="absolute writing-vertical text-xs font-bold text-primary-600 bg-primary-50 px-1 py-2 rounded-r border-l-2 border-primary-500"
-          style={{ left: 0, top: topHalfY }}>左山</div>
+        <div key="label-left" className="absolute flex items-center justify-center"
+          style={{ left: 0, top: topHalfY, width: 22, height: topHalfHeight }}>
+          <div className="bg-primary-500/10 border-l-2 border-primary-500 rounded-r px-0.5 py-1 h-full flex items-center justify-center">
+            <span className="text-[9px] font-bold text-primary-600 tracking-wider" style={{ writingMode: 'vertical-rl' }}>Left side</span>
+          </div>
+        </div>
       );
       halfLabelElements.push(
-        <div key="label-right" className="absolute writing-vertical text-xs font-bold text-orange-600 bg-orange-50 px-1 py-2 rounded-r border-l-2 border-orange-500"
-          style={{ left: 0, top: bottomHalfY }}>右山</div>
+        <div key="label-right" className="absolute flex items-center justify-center"
+          style={{ left: 0, top: bottomHalfY, width: 22, height: bottomHalfHeight }}>
+          <div className="bg-orange-500/10 border-l-2 border-orange-500 rounded-r px-0.5 py-1 h-full flex items-center justify-center">
+            <span className="text-[9px] font-bold text-orange-600 tracking-wider" style={{ writingMode: 'vertical-rl' }}>Right side</span>
+          </div>
+        </div>
       );
     }
 

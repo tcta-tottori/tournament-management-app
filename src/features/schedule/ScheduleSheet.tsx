@@ -2,8 +2,15 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CalendarClock, Zap, Printer, Trash2, Upload, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle } from 'lucide-react';
+import { CalendarClock, Zap, Printer, Trash2, Upload, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import {
+  getSavedToken as gdriveGetSavedToken,
+  isTokenValid as gdriveIsTokenValid,
+  listScheduleExcelFiles,
+  downloadScheduleExcel,
+  type GoogleDriveFile,
+} from '../backup/googleDriveApi';
 import {
   extractMatchesFromDraw,
   autoSchedule,
@@ -135,6 +142,20 @@ function matchStatusColor(status: Match['status']): string {
   }
 }
 
+/** Google Drive ブランドアイコン */
+function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5l5.4 9.35z" fill="#0066DA"/>
+      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L3.45 44.7c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
+      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.85L73.55 76.8z" fill="#EA4335"/>
+      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
+      <path d="M59.85 53H27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L59.85 53z" fill="#2684FC"/>
+      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.2 28h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
+    </svg>
+  );
+}
+
 export default function ScheduleSheet() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const scheduleConfig = useAppStore(state => state.scheduleConfig);
@@ -172,6 +193,12 @@ export default function ScheduleSheet() {
 
   // Excel import
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Google Drive file picker
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveError, setDriveError] = useState('');
 
   // Swap interaction
   const [selectedCell, setSelectedCell] = useState<{
@@ -1076,6 +1103,218 @@ export default function ScheduleSheet() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [currentTournamentId, matchDuration]);
 
+  // --------------- Google Drive Import ---------------
+
+  const handleOpenDrivePicker = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token || !gdriveIsTokenValid()) {
+      setStatusMessage('Google Driveに接続されていません。データページからGoogle Driveに接続してください。');
+      return;
+    }
+    setShowDrivePicker(true);
+    setDriveLoading(true);
+    setDriveError('');
+    setDriveFiles([]);
+    try {
+      const files = await listScheduleExcelFiles(token);
+      setDriveFiles(files);
+      if (files.length === 0) {
+        setDriveError('時間割フォルダにExcelファイルがありません。');
+      }
+    } catch (err) {
+      setDriveError(`ファイル一覧の取得に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setDriveLoading(false);
+    }
+  }, []);
+
+  const handleDriveFileSelect = useCallback(async (file: GoogleDriveFile) => {
+    if (!currentTournamentId) return;
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+
+    setDriveLoading(true);
+    setDriveError('');
+    try {
+      const buffer = await downloadScheduleExcel(token, file.id);
+      const wb = XLSX.read(buffer);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: (string | number | null)[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      // Close picker
+      setShowDrivePicker(false);
+
+      // Reuse the same Excel import logic by creating a synthetic event
+      // Instead of duplicating, we trigger the same parsing flow
+      if (rows.length < 2) {
+        setStatusMessage('Excelのデータが不足しています。');
+        return;
+      }
+
+      // === Excel import logic (same as handleExcelImport) ===
+      const grid = findScheduleGrid(rows);
+      let timeColumns: { colIdx: number; time: string }[] = [];
+      let dataStartIdx = 1;
+
+      if (grid) {
+        timeColumns = grid.timeColumns;
+        dataStartIdx = grid.dataStartIdx;
+      } else {
+        const headerRow = rows[0].map(v => String(v ?? '').trim());
+        for (let c = 1; c < headerRow.length; c++) {
+          const val = headerRow[c];
+          if (/^\d{1,2}:\d{2}$/.test(val)) {
+            timeColumns.push({ colIdx: c, time: val.padStart(5, '0') });
+          }
+        }
+      }
+
+      if (timeColumns.length === 0) {
+        setStatusMessage('Excelに時刻データが見つかりません。');
+        return;
+      }
+
+      const importedStartTime = timeColumns[0].time;
+      let importedDuration = matchDuration;
+      if (timeColumns.length >= 2) {
+        const t1Parts = timeColumns[0].time.split(':');
+        const t2Parts = timeColumns[1].time.split(':');
+        const min1 = parseInt(t1Parts[0]) * 60 + parseInt(t1Parts[1]);
+        const min2 = parseInt(t2Parts[0]) * 60 + parseInt(t2Parts[1]);
+        if (min2 > min1) importedDuration = min2 - min1;
+      }
+
+      const existingCourts = await db.courts.where('tournamentId').equals(currentTournamentId).toArray();
+      const existingCourtNames = new Set(existingCourts.map(c => c.name));
+
+      const importedSlots: ScheduleSlot[] = [];
+      const importedCourtNames: string[] = [];
+
+      for (let r = dataStartIdx; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.length === 0) continue;
+        const rawCourtName = String(row[0] ?? '').trim();
+        if (!rawCourtName) continue;
+        const courtNum = parseInt(rawCourtName, 10);
+        if (isNaN(courtNum)) {
+          if (importedSlots.length > 0) break;
+          continue;
+        }
+        const courtName = String(courtNum);
+        if (!importedCourtNames.includes(courtName)) importedCourtNames.push(courtName);
+
+        if (!existingCourtNames.has(courtName)) {
+          await db.courts.add({
+            tournamentId: currentTournamentId,
+            courtId: `C-${Date.now()}-${r}`,
+            name: courtName,
+            surface: '',
+            isAvailable: true,
+            currentMatchId: null,
+            order: existingCourts.length + importedCourtNames.length,
+          });
+          existingCourtNames.add(courtName);
+        }
+
+        for (const tc of timeColumns) {
+          const cellValue = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
+          if (!cellValue) continue;
+          const slotIdx = timeColumns.indexOf(tc);
+          const matchId = `import-${courtName}-${slotIdx}-${Date.now()}`;
+          importedSlots.push({
+            matchId,
+            courtIndex: importedCourtNames.indexOf(courtName),
+            courtName,
+            timeSlotIndex: slotIdx,
+            startTime: tc.time,
+            eventCode: 'imported',
+            roundLabel: cellValue,
+          });
+        }
+      }
+
+      if (importedSlots.length === 0) {
+        setStatusMessage('Excelからスケジュールデータを読み取れませんでした。');
+        return;
+      }
+
+      // DB matches との紐付け
+      let linkedCount = 0;
+      try {
+        const allEventsForLink = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+        const allMatchesForLink: Match[] = [];
+        const drawsForLink = new Map<string, number>();
+        for (const evt of allEventsForLink) {
+          const matches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+          allMatchesForLink.push(...matches);
+          const draw = await db.draws.where('eventId').equals(evt.eventId).first();
+          if (draw) drawsForLink.set(evt.eventId, draw.drawSize);
+        }
+
+        if (allMatchesForLink.length > 0 && allEventsForLink.length > 0) {
+          const groups = new Map<string, number[]>();
+          for (let i = 0; i < importedSlots.length; i++) {
+            const parsed = parseCellEventRound(importedSlots[i].roundLabel);
+            if (!parsed) continue;
+            const key = `${parsed.eventName}|${parsed.roundLabel}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(i);
+          }
+
+          for (const [key, slotIndices] of groups) {
+            const [eventName, roundLabel] = key.split('|');
+            const matchedEvent = findMatchingEvent(eventName, allEventsForLink);
+            if (!matchedEvent) continue;
+            const totalRounds = drawsForLink.has(matchedEvent.eventId) ? Math.log2(drawsForLink.get(matchedEvent.eventId)!) : null;
+            const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
+            if (roundNum === null) continue;
+
+            const dbMatchesForRound = allMatchesForLink
+              .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum)
+              .sort((a, b) => a.position - b.position);
+            const sortedIndices = [...slotIndices].sort((a, b) => {
+              const sa = importedSlots[a], sb = importedSlots[b];
+              return sa.timeSlotIndex - sb.timeSlotIndex || sa.courtName.localeCompare(sb.courtName);
+            });
+
+            for (let j = 0; j < sortedIndices.length && j < dbMatchesForRound.length; j++) {
+              const idx = sortedIndices[j];
+              importedSlots[idx] = {
+                ...importedSlots[idx],
+                matchId: dbMatchesForRound[j].matchId,
+                eventCode: matchedEvent.eventId,
+              };
+              linkedCount++;
+            }
+          }
+        }
+      } catch (linkErr) {
+        console.warn('Drive Excel紐付けエラー:', linkErr);
+      }
+
+      setStartTime(importedStartTime);
+      setMatchDuration(importedDuration);
+      setScheduleSlots(importedSlots);
+      setAllScheduleMatches([]);
+      setSelectedCell(null);
+
+      const importedCourtNums = importedCourtNames.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      setCourtBlocks({
+        A: importedCourtNums.some(n => n >= 1 && n <= 4),
+        B: importedCourtNums.some(n => n >= 5 && n <= 8),
+        C: importedCourtNums.some(n => n >= 9 && n <= 12),
+        D: importedCourtNums.some(n => n >= 13 && n <= 16),
+      });
+
+      const linkMsg = linkedCount > 0 ? `（${linkedCount}件をDB試合に紐付け済）` : '';
+      setStatusMessage(`Google Drive「${file.name}」から ${importedSlots.length} 件のスケジュールを読み込みました。${linkMsg}`);
+    } catch (err) {
+      setDriveError(`読み込みに失敗しました: ${(err as Error).message}`);
+    } finally {
+      setDriveLoading(false);
+    }
+  }, [currentTournamentId, matchDuration]);
+
   // --------------- Render ---------------
 
   return (
@@ -1208,6 +1447,17 @@ export default function ScheduleSheet() {
             <FileSpreadsheet className="w-4 h-4" />
             <Download className="w-3.5 h-3.5" />
             Excel出力
+          </button>
+
+          {/* Google Drive Import */}
+          <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block" />
+          <button
+            onClick={handleOpenDrivePicker}
+            className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-md font-medium hover:bg-gray-50 shadow-sm transition-colors text-sm"
+          >
+            <GoogleDriveIcon className="w-4 h-4" />
+            <FolderOpen className="w-3.5 h-3.5" />
+            時間割フォルダ
           </button>
         </div>
 
@@ -1629,6 +1879,82 @@ export default function ScheduleSheet() {
                 },
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Google Drive File Picker Modal */}
+      {showDrivePicker && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDrivePicker(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <GoogleDriveIcon className="w-5 h-5" />
+                <h3 className="text-base font-bold text-gray-900">時間割フォルダ</h3>
+              </div>
+              <button onClick={() => setShowDrivePicker(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {driveLoading && driveFiles.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-primary-500" />
+                  <p className="text-sm">ファイル一覧を読み込み中...</p>
+                </div>
+              )}
+              {driveError && (
+                <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+                  {driveError}
+                </div>
+              )}
+              {!driveLoading && driveFiles.length === 0 && !driveError && (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <p className="text-sm">ファイルがありません</p>
+                </div>
+              )}
+              {driveFiles.length > 0 && (
+                <div className="space-y-1">
+                  {driveFiles.map(file => {
+                    const modDate = new Date(file.modifiedTime);
+                    const dateStr = `${modDate.getFullYear()}/${String(modDate.getMonth() + 1).padStart(2, '0')}/${String(modDate.getDate()).padStart(2, '0')} ${String(modDate.getHours()).padStart(2, '0')}:${String(modDate.getMinutes()).padStart(2, '0')}`;
+                    const sizeKB = Math.round(parseInt(file.size || '0') / 1024);
+                    return (
+                      <button
+                        key={file.id}
+                        onClick={() => handleDriveFileSelect(file)}
+                        disabled={driveLoading}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                          <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{file.name}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{dateStr} · {sizeKB > 0 ? `${sizeKB} KB` : '—'}</div>
+                        </div>
+                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {driveLoading && driveFiles.length > 0 && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary-500" />
+                  <span className="ml-2 text-sm text-gray-500">読み込み中...</span>
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <p className="text-xs text-gray-400 text-center">
+                鳥取テニス協会バックアップ &gt; 大会運営システム &gt; 時間割
+              </p>
+            </div>
           </div>
         </div>
       )}
