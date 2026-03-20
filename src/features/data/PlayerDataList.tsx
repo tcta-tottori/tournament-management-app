@@ -47,6 +47,7 @@ type TabId = 'affiliation' | 'furigana';
 export default function PlayerDataList() {
   const players = useLiveQuery(() => db.players.toArray()) || [];
   const affFuriganaEntries = useLiveQuery(() => db.affiliationFurigana.toArray()) || [];
+  const furiganaDictEntries = useLiveQuery(() => db.furiganaDict.toArray()) || [];
 
   // マウント時に自動で重複クリーンアップ
   const dedupeRanRef = useRef(false);
@@ -82,22 +83,28 @@ export default function PlayerDataList() {
     return map;
   }, [affFuriganaEntries]);
 
-  // === 所属一覧データ（選手データ + ランキングデータから抽出） ===
+  // === 所属一覧データ（affiliationFuriganaテーブル + 選手データの所属を統合） ===
   const affiliationList = useMemo(() => {
-    const map = new Map<string, number>();
+    // affiliationFuriganaテーブルの全エントリをベースに
+    const map = new Map<string, { furigana: string; count: number }>();
+    for (const entry of affFuriganaEntries) {
+      map.set(entry.name, { furigana: entry.furigana, count: 0 });
+    }
+    // 選手データから所属を追加（辞書にないものも含む）+ カウント
     for (const p of players) {
       const aff = (p.affiliation || '').trim();
       if (!aff) continue;
-      map.set(aff, (map.get(aff) || 0) + 1);
+      const existing = map.get(aff);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(aff, { furigana: '', count: 1 });
+      }
     }
     return Array.from(map.entries())
-      .map(([name, count]) => ({
-        name,
-        count,
-        furigana: affFuriganaMap.get(name) || '',
-      }))
+      .map(([name, data]) => ({ name, furigana: data.furigana, count: data.count }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  }, [players, affFuriganaMap]);
+  }, [players, affFuriganaEntries]);
 
   const filteredAffiliations = useMemo(() => {
     if (!searchQuery.trim()) return affiliationList;
@@ -108,18 +115,39 @@ export default function PlayerDataList() {
     );
   }, [affiliationList, searchQuery]);
 
-  // === ふりがな一覧データ（重複除去済み） ===
+  // === ふりがな一覧データ（furiganaDictテーブル + 選手データを統合） ===
   const furiganaList = useMemo(() => {
-    const seen = new Map<string, typeof players[0]>();
+    // furiganaDictの全エントリをベースに
+    const map = new Map<string, { name: string; furigana: string; affiliation: string; playerId: string }>();
+    for (const entry of furiganaDictEntries) {
+      map.set(entry.name, {
+        name: entry.name,
+        furigana: entry.furigana || '',
+        affiliation: '',
+        playerId: entry.name,
+      });
+    }
+    // 選手データで補完（所属情報の追加、辞書にない選手の追加）
     for (const p of players) {
-      const existing = seen.get(p.playerId);
-      if (!existing || (p.furigana && !existing.furigana) || (p.id || 0) > (existing.id || 0)) {
-        seen.set(p.playerId, p);
+      const key = p.name.replace(/\s+/g, '');
+      const existing = map.get(key);
+      if (existing) {
+        // 選手データで所属を補完、ふりがなが空なら選手データから
+        if (!existing.affiliation && p.affiliation) existing.affiliation = p.affiliation;
+        if (!existing.furigana && p.furigana) existing.furigana = p.furigana;
+        existing.playerId = p.playerId;
+      } else {
+        map.set(key, {
+          name: p.name,
+          furigana: p.furigana || '',
+          affiliation: p.affiliation || '',
+          playerId: p.playerId,
+        });
       }
     }
-    return Array.from(seen.values())
+    return Array.from(map.values())
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  }, [players]);
+  }, [furiganaDictEntries, players]);
 
   const filteredFurigana = useMemo(() => {
     if (!searchQuery.trim()) return furiganaList;
@@ -153,20 +181,21 @@ export default function PlayerDataList() {
   const handleFuriganaSave = async (playerId: string) => {
     const furigana = editFuriganaValue.trim();
     try {
+      // 選手テーブルにあれば更新
       const player = players.find(p => p.playerId === playerId);
-      if (!player) return;
-      await db.players.update(player.id!, { furigana });
-      // ふりがな辞書にも反映
-      const dictKey = player.name.replace(/\s+/g, '');
-      if (furigana) {
-        await db.furiganaDict.put({
-          name: dictKey,
-          furigana: furigana.replace(/\s+/g, ''),
-          type: 'manual',
-          updatedAt: Date.now(),
-        });
+      if (player?.id) {
+        await db.players.update(player.id, { furigana });
       }
-      setStatus({ message: `「${player.name}」のふりがなを更新しました。`, isError: false });
+      // ふりがな辞書に必ず反映
+      const dictKey = player ? player.name.replace(/\s+/g, '') : playerId;
+      await db.furiganaDict.put({
+        name: dictKey,
+        furigana: furigana.replace(/\s+/g, ''),
+        type: 'manual',
+        updatedAt: Date.now(),
+      });
+      const displayName = player?.name || playerId;
+      setStatus({ message: `「${displayName}」のふりがなを更新しました。`, isError: false });
       setEditingPlayerId(null);
     } catch (error: any) {
       setStatus({ message: `更新失敗: ${error.message}`, isError: true });
@@ -192,8 +221,8 @@ export default function PlayerDataList() {
       } else {
         const data = furiganaList.map(p => ({
           '選手名': p.name,
-          'ふりがな': p.furigana || '',
-          '所属': p.affiliation || '',
+          'ふりがな': p.furigana,
+          '所属': p.affiliation,
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
