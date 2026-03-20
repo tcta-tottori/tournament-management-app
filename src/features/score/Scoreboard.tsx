@@ -19,6 +19,8 @@ import {
   ChevronRight,
   Printer,
   MapPin,
+  Layers,
+  Eye,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -45,8 +47,10 @@ export default function Scoreboard() {
 
   // -- Event navigation (前種目/次種目) --
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(-1);
+  const [showAllEvents, setShowAllEvents] = useState(true); // デフォルト: 全種目表示
   const [viewMode, setViewMode] = useState<ViewMode>('bracket');
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
+  const [selectedAllEventId, setSelectedAllEventId] = useState<string | null>(null); // 全種目表示時の選択中種目
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [scoreInput, setScoreInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,12 +65,21 @@ export default function Scoreboard() {
   ) || [];
 
   const selectedEventId = events[selectedEventIdx]?.eventId || '';
+  const eventIds = useMemo(() => events.map(e => e.eventId), [events]);
 
   const matches = useLiveQuery(
     () => selectedEventId
       ? db.matches.where('eventId').equals(selectedEventId).toArray()
       : [],
     [selectedEventId]
+  ) || [];
+
+  // 全種目表示用: 全イベントの試合データ
+  const allMatches = useLiveQuery(
+    () => eventIds.length > 0
+      ? db.matches.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    [eventIds]
   ) || [];
 
   const courts = useLiveQuery(
@@ -76,12 +89,28 @@ export default function Scoreboard() {
     [currentTournamentId]
   ) || [];
 
+  // 全種目表示用: 全イベントのドローデータ
+  const allDrawsData = useLiveQuery(
+    () => eventIds.length > 0
+      ? db.draws.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    [eventIds]
+  ) || [];
+
   const drawData = useLiveQuery(
     () => selectedEventId
       ? db.draws.where('eventId').equals(selectedEventId).first()
       : undefined,
     [selectedEventId]
   );
+
+  // 全種目表示用: 全イベントのエントリーデータ
+  const allEntries = useLiveQuery(
+    () => eventIds.length > 0
+      ? db.entries.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    [eventIds]
+  ) || [];
 
   const entries = useLiveQuery(
     () => selectedEventId
@@ -92,15 +121,16 @@ export default function Scoreboard() {
 
   const players = useLiveQuery(() => db.players.toArray()) || [];
 
-  // -- Default to previous event (前種目表示) --
+  // -- Default: 全種目表示。個別表示に切り替えた場合のみidx選択 --
   useEffect(() => {
     if (initializedRef.current) return;
     if (events.length === 0) return;
-    // Default: show the second-to-last event (前種目), or last if only one
-    const idx = events.length >= 2 ? events.length - 2 : events.length - 1;
-    setSelectedEventIdx(idx);
+    if (!showAllEvents) {
+      const idx = events.length >= 2 ? events.length - 2 : events.length - 1;
+      setSelectedEventIdx(idx);
+    }
     initializedRef.current = true;
-  }, [events]);
+  }, [events, showAllEvents]);
 
   // -- Build draw slot data --
   const editedSlots: DrawSlotData[] = useMemo(() => {
@@ -156,6 +186,106 @@ export default function Scoreboard() {
     const realPlayers = editedSlots.filter(s => !s.isBye);
     return realPlayers.length >= 2 && realPlayers.length <= 5 && drawData.drawSize <= 8;
   }, [drawData, editedSlots]);
+
+  // -- 全種目表示用ヘルパー: 種目ごとのデータ構築 --
+  const perEventData = useMemo(() => {
+    if (!showAllEvents) return [];
+    return events.map(evt => {
+      const evtMatches = allMatches.filter(m => m.eventId === evt.eventId);
+      const evtDraw = allDrawsData.find(d => d.eventId === evt.eventId);
+      const evtEntries = allEntries.filter(e => e.eventId === evt.eventId);
+
+      const evtSlots: DrawSlotData[] = evtDraw?.slots
+        ? evtDraw.slots.map(s => {
+            let name = 'BYE';
+            let affiliation = '';
+            if (!s.isBye && s.entryId) {
+              const entry = evtEntries.find(e => e.entryId === s.entryId);
+              if (entry) {
+                const p1 = players.find(p => p.playerId === entry.playerId);
+                const isDoubles = !!entry.partnerId;
+                const p2 = isDoubles ? players.find(p => p.playerId === entry.partnerId) : null;
+                name = isDoubles && p1 && p2 ? `${p1.name} / ${p2.name}` : (p1?.name || '(不明)');
+                affiliation = isDoubles && p1 && p2 && p1.affiliation !== p2.affiliation
+                  ? `${p1.affiliation} / ${p2.affiliation}`
+                  : (p1?.affiliation || '');
+              }
+            }
+            return { position: s.position, entryId: s.entryId, seed: s.seed, isBye: s.isBye, name, affiliation };
+          }).sort((a, b) => a.position - b.position)
+        : [];
+
+      const evtMatchResults: MatchResult[] = evtMatches.map(m => {
+        const court = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+        return {
+          round: m.round, position: m.position,
+          player1Name: m.player1Name, player2Name: m.player2Name,
+          winnerEntryId: m.winnerEntryId,
+          player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
+          score: m.score, status: m.status, courtId: m.courtId,
+          courtName: court?.name || '', scheduledTime: m.scheduledTime,
+        };
+      });
+
+      const realPlayers = evtSlots.filter(s => !s.isBye);
+      const evtIsRoundRobin = evtDraw
+        ? (evtDraw.drawType === 'roundRobin' ||
+           (evtDraw.drawType !== 'tournament' && realPlayers.length >= 2 && realPlayers.length <= 5 && evtDraw.drawSize <= 8))
+        : false;
+
+      const total = evtMatches.filter(m => m.player1Name && m.player2Name && m.status !== 'walkover').length;
+      const finished = evtMatches.filter(m => m.status === 'finished').length;
+      const playing = evtMatches.filter(m => m.status === 'playing').length;
+      const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
+
+      return {
+        event: evt,
+        matches: evtMatches,
+        draw: evtDraw,
+        slots: evtSlots,
+        matchResults: evtMatchResults,
+        isRoundRobin: evtIsRoundRobin,
+        totalRounds: evtDraw ? Math.log2(evtDraw.drawSize) : 1,
+        progress: { total, finished, playing, pct },
+      };
+    }).filter(d => d.matches.length > 0);
+  }, [showAllEvents, events, allMatches, allDrawsData, allEntries, players, courts]);
+
+  // -- 全種目表示時の選択中マッチ --
+  const selectedAllMatch: ScoreInputMatch | null = useMemo(() => {
+    if (!showAllEvents || !selectedMatchKey || !selectedAllEventId) return null;
+    const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
+    if (!evtData) return null;
+
+    const buildMatch = (m: typeof allMatches[0]): ScoreInputMatch => ({
+      matchId: m.matchId, dbId: m.id!, round: m.round, position: m.position,
+      matchOrder: m.matchOrder, player1Name: m.player1Name, player2Name: m.player2Name,
+      player1Affiliation: m.player1Affiliation, player2Affiliation: m.player2Affiliation,
+      player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
+      score: m.score, winnerEntryId: m.winnerEntryId, courtId: m.courtId,
+      status: m.status, scheduledTime: m.scheduledTime,
+      eventName: evtData.event.name, updatedAt: m.updatedAt,
+    });
+
+    // bracket key: "round-position"
+    const parts = selectedMatchKey.split('-');
+    if (parts.length === 2) {
+      const round = parseInt(parts[0]);
+      const position = parseInt(parts[1]);
+      if (!isNaN(round) && !isNaN(position)) {
+        const m = evtData.matches.find(mt => mt.round === round && mt.position === position);
+        if (m) return buildMatch(m);
+      }
+    }
+    // league key: "entryId1-entryId2"
+    const lm = evtData.matches.find(m => {
+      const k1 = `${m.player1EntryId}-${m.player2EntryId}`;
+      const k2 = `${m.player2EntryId}-${m.player1EntryId}`;
+      return selectedMatchKey === k1 || selectedMatchKey === k2;
+    });
+    if (lm) return buildMatch(lm);
+    return null;
+  }, [showAllEvents, selectedMatchKey, selectedAllEventId, perEventData, allMatches]);
 
   // -- Total rounds for round name --
   const totalRounds = drawData ? Math.log2(drawData.drawSize) : 1;
@@ -227,7 +357,8 @@ export default function Scoreboard() {
 
   // -- Court status summary --
   const courtStatus = useMemo(() => {
-    const playing = matches.filter(m => m.status === 'playing');
+    const src = showAllEvents ? allMatches : matches;
+    const playing = src.filter(m => m.status === 'playing');
     return courts
       .sort((a, b) => a.order - b.order)
       .map(c => {
@@ -239,7 +370,7 @@ export default function Scoreboard() {
             : null,
         };
       });
-  }, [courts, matches]);
+  }, [courts, matches, showAllEvents, allMatches]);
 
   // -- Event navigation handlers --
   const handlePrevEvent = () => {
@@ -421,30 +552,58 @@ export default function Scoreboard() {
 
           {/* View mode toggle */}
           <div className="flex items-center gap-2">
+            {/* 全種目 / 個別 切替 */}
             <div className="flex rounded-lg border border-border-main overflow-hidden">
               <button
-                onClick={() => { setViewMode('bracket'); setSelectedMatchKey(null); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
-                  viewMode === 'bracket'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                onClick={() => { setShowAllEvents(true); setSelectedMatchKey(null); }}
+                className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {isRoundRobin ? <LayoutGrid className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
-                {isRoundRobin ? 'リーグ' : 'ブラケット'}
+                <Layers className="w-3.5 h-3.5" />全種目
               </button>
               <button
-                onClick={() => { setViewMode('table'); setSelectedMatchKey(null); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                onClick={() => {
+                  setShowAllEvents(false);
+                  setSelectedMatchKey(null);
+                  if (selectedEventIdx < 0 && events.length > 0) {
+                    setSelectedEventIdx(events.length >= 2 ? events.length - 2 : 0);
+                  }
+                }}
+                className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  !showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <Table2 className="w-3.5 h-3.5" />
-                テーブル
+                <Eye className="w-3.5 h-3.5" />個別
               </button>
             </div>
+
+            {!showAllEvents && (
+              <div className="flex rounded-lg border border-border-main overflow-hidden">
+                <button
+                  onClick={() => { setViewMode('bracket'); setSelectedMatchKey(null); }}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                    viewMode === 'bracket'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {isRoundRobin ? <LayoutGrid className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
+                  {isRoundRobin ? 'リーグ' : 'ブラケット'}
+                </button>
+                <button
+                  onClick={() => { setViewMode('table'); setSelectedMatchKey(null); }}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                    viewMode === 'table'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  テーブル
+                </button>
+              </div>
+            )}
             <button
               onClick={handlePrintBracket}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white text-gray-600 border border-border-main rounded-lg hover:bg-gray-50 transition-colors print:hidden"
@@ -455,45 +614,47 @@ export default function Scoreboard() {
           </div>
         </div>
 
-        {/* Event navigator with prev/next */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrevEvent}
-            disabled={selectedEventIdx <= 0}
-            className="p-2 rounded-lg border border-border-main text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors print:hidden"
-            title="前種目"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        {/* Event navigator — 個別表示時のみ */}
+        {!showAllEvents && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrevEvent}
+              disabled={selectedEventIdx <= 0}
+              className="p-2 rounded-lg border border-border-main text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors print:hidden"
+              title="前種目"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <select
-            value={selectedEventIdx >= 0 ? selectedEventIdx : ''}
-            onChange={e => {
-              setSelectedEventIdx(Number(e.target.value));
-              setSelectedMatchKey(null);
-            }}
-            className="flex-1 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
-          >
-            <option value="" disabled>-- 種目を選択 --</option>
-            {events.map((e, i) => (
-              <option key={e.eventId} value={i}>
-                {e.name} ({e.type})
-              </option>
-            ))}
-          </select>
+            <select
+              value={selectedEventIdx >= 0 ? selectedEventIdx : ''}
+              onChange={e => {
+                setSelectedEventIdx(Number(e.target.value));
+                setSelectedMatchKey(null);
+              }}
+              className="flex-1 border-border-main rounded-lg shadow-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 text-sm px-3 py-2 bg-white border outline-none font-medium"
+            >
+              <option value="" disabled>-- 種目を選択 --</option>
+              {events.map((e, i) => (
+                <option key={e.eventId} value={i}>
+                  {e.name} ({e.type})
+                </option>
+              ))}
+            </select>
 
-          <button
-            onClick={handleNextEvent}
-            disabled={selectedEventIdx >= events.length - 1}
-            className="p-2 rounded-lg border border-border-main text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors print:hidden"
-            title="次種目"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+            <button
+              onClick={handleNextEvent}
+              disabled={selectedEventIdx >= events.length - 1}
+              className="p-2 rounded-lg border border-border-main text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors print:hidden"
+              title="次種目"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
-        {/* Progress bar */}
-        {selectedEventId && matches.length > 0 && (
+        {/* Progress bar — 個別表示時 */}
+        {!showAllEvents && selectedEventId && matches.length > 0 && (
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
@@ -509,10 +670,35 @@ export default function Scoreboard() {
             </span>
           </div>
         )}
+        {/* Progress bar — 全種目表示時（集計） */}
+        {showAllEvents && perEventData.length > 0 && (() => {
+          const agg = perEventData.reduce((a, d) => ({
+            total: a.total + d.progress.total,
+            finished: a.finished + d.progress.finished,
+            playing: a.playing + d.progress.playing,
+          }), { total: 0, finished: 0, playing: 0 });
+          const pct = agg.total > 0 ? Math.round((agg.finished / agg.total) * 100) : 0;
+          return (
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary-500 rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="font-medium whitespace-nowrap">
+                {agg.finished}/{agg.total} 完了
+                {agg.playing > 0 && (
+                  <span className="text-green-600 ml-1">({agg.playing} 試合中)</span>
+                )}
+              </span>
+            </div>
+          );
+        })()}
       </header>
 
       {/* ===== COURT STATUS BAR ===== */}
-      {courtStatus.length > 0 && selectedEventId && (
+      {courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
         <div className="flex gap-2 overflow-x-auto pb-1 print:hidden shrink-0">
           {courtStatus.map(c => (
             <div
@@ -536,7 +722,107 @@ export default function Scoreboard() {
       )}
 
       {/* ===== MAIN CONTENT ===== */}
-      {!selectedEventId || selectedEventIdx < 0 ? (
+      {showAllEvents ? (
+        /* ===== 全種目表示 ===== */
+        <div className="flex-1 flex flex-col gap-6 overflow-auto">
+          {perEventData.length === 0 ? (
+            <div className="flex items-center justify-center p-8 bg-white rounded-xl border border-border-main shadow-sm min-h-64">
+              <p className="font-semibold text-gray-500">試合データがありません</p>
+            </div>
+          ) : (
+            perEventData.map(evtData => {
+              const makeEvtRoundName = (round: number) => getRoundName(round, evtData.totalRounds);
+              return (
+                <section key={evtData.event.eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+                  {/* Event header */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-border-main">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        {evtData.isRoundRobin
+                          ? <LayoutGrid className="w-4 h-4 text-primary-500" />
+                          : <GitBranch className="w-4 h-4 text-primary-500" />
+                        }
+                        {evtData.event.name}
+                        <span className="text-xs font-normal text-gray-500">({evtData.event.type})</span>
+                      </h2>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {evtData.progress.finished}/{evtData.progress.total} 完了
+                        {evtData.progress.playing > 0 && (
+                          <span className="text-green-600 ml-1">({evtData.progress.playing} 試合中)</span>
+                        )}
+                      </span>
+                    </div>
+                    {/* Per-event mini progress bar */}
+                    <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary-500 rounded-full transition-all duration-500"
+                        style={{ width: `${evtData.progress.pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Bracket / League */}
+                  <div className="min-h-[200px]">
+                    {evtData.slots.length > 0 && evtData.draw ? (
+                      evtData.isRoundRobin ? (
+                        <ScoreboardLeague
+                          slots={evtData.slots}
+                          matchResults={evtData.matchResults}
+                          onMatchSelect={(e1, e2) => {
+                            setSelectedAllEventId(evtData.event.eventId);
+                            const key = `${e1}-${e2}`;
+                            setSelectedMatchKey(prev => {
+                              const altKey = `${e2}-${e1}`;
+                              if (prev === key || prev === altKey) return null;
+                              return key;
+                            });
+                          }}
+                          selectedMatchKey={selectedAllEventId === evtData.event.eventId ? selectedMatchKey : null}
+                        />
+                      ) : (
+                        <ScoreboardBracket
+                          slots={evtData.slots}
+                          drawSize={evtData.draw.drawSize}
+                          matchResults={evtData.matchResults}
+                          eventType={evtData.event.type}
+                          selectedMatchId={selectedAllEventId === evtData.event.eventId ? selectedMatchKey : null}
+                          onMatchSelect={(round, pos) => {
+                            setSelectedAllEventId(evtData.event.eventId);
+                            const key = `${round}-${pos}`;
+                            setSelectedMatchKey(prev => prev === key ? null : key);
+                          }}
+                        />
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                        <MonitorPlay className="w-12 h-12 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-500">試合を生成してください</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })
+          )}
+
+          {/* Score input dialog for all-events mode */}
+          {selectedAllMatch && (
+            <ScoreInputDialog
+              match={selectedAllMatch}
+              courts={courts.filter(c => c.isAvailable).map(c => ({
+                courtId: c.courtId,
+                name: c.name,
+                isAvailable: c.isAvailable,
+              }))}
+              onClose={() => { setSelectedMatchKey(null); setSelectedAllEventId(null); }}
+              onMatchUpdate={() => {}}
+              getRoundName={(round) => {
+                const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
+                return evtData ? getRoundName(round, evtData.totalRounds) : `${round}回戦`;
+              }}
+            />
+          )}
+        </div>
+      ) : !selectedEventId || selectedEventIdx < 0 ? (
         <div className="flex items-center justify-center p-8 bg-white rounded-xl border border-border-main shadow-sm min-h-64">
           <p className="font-semibold text-gray-500">種目を選択してください</p>
         </div>

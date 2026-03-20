@@ -935,6 +935,8 @@ ${printableMatches.map(m => {
           eventsWithMatches.map(evt => {
             const eventMatches = (allMatchesByEvent.get(evt.eventId) || []).filter(m => m.status !== 'walkover');
             const eventDraw = allDraws.get(evt.eventId);
+            const ds = eventDraw?.drawSize || 0;
+            const isLeagueEvent = eventDraw?.drawType === 'roundRobin' || (ds > 0 && (ds & (ds - 1)) !== 0) || /リーグ/i.test(evt.name || '');
             const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
             const finishedCount = eventMatches.filter(m => m.status === 'finished').length;
             const isActive = selectedEventId === evt.eventId;
@@ -1003,7 +1005,7 @@ ${printableMatches.map(m => {
                     </colgroup>
                     <tbody className="text-sm">
                   {Array.from(roundGroups.entries()).map(([round, roundMatches]) => {
-                    const roundLabel = getRoundName(round, evTotalRounds);
+                    const roundLabel = isLeagueEvent ? 'リーグ戦' : getRoundName(round, evTotalRounds);
                     const rFinished = roundMatches.filter(m => m.status === 'finished').length;
                     return (
                       <React.Fragment key={round}>
