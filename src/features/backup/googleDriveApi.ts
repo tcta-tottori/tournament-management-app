@@ -8,7 +8,7 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const ROOT_FOLDER_NAME = '鳥取テニス協会バックアップ';
 const SUB_FOLDER_NAME = '大会運営システム';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive';
 
 /** デフォルト OAuth2 Client ID（全ユーザー共通） */
 export const DEFAULT_CLIENT_ID = '316429350105-v1tpv97kkq6jkg9gmu57aqt7btic6qod.apps.googleusercontent.com';
@@ -233,8 +233,17 @@ export async function getSharedFolderLink(token: string): Promise<string> {
 const FURIGANA_FOLDER_NAME = 'ふりがな一覧';
 const AFFILIATION_FOLDER_NAME = '所属一覧';
 
+/** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを検索（作成しない） */
+async function findSubFolderId(token: string, subName: string): Promise<string | null> {
+  const rootId = await findFolder(token, ROOT_FOLDER_NAME);
+  if (!rootId) return null;
+  const sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
+  if (!sysId) return null;
+  return findFolder(token, subName, sysId);
+}
+
 /** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを取得（なければ作成） */
-async function getSubFolderId(token: string, subName: string): Promise<string> {
+async function getOrCreateSubFolderId(token: string, subName: string): Promise<string> {
   let rootId = await findFolder(token, ROOT_FOLDER_NAME);
   if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
   let sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
@@ -277,7 +286,8 @@ async function downloadFileBlob(token: string, fileId: string): Promise<ArrayBuf
 
 /** ふりがな一覧フォルダから最新Excelをダウンロード */
 export async function downloadFuriganaExcel(token: string): Promise<{ data: ArrayBuffer; fileName: string } | null> {
-  const folderId = await getSubFolderId(token, FURIGANA_FOLDER_NAME);
+  const folderId = await findSubFolderId(token, FURIGANA_FOLDER_NAME);
+  if (!folderId) return null;
   const file = await getLatestXlsx(token, folderId);
   if (!file) return null;
   const data = await downloadFileBlob(token, file.id);
@@ -286,7 +296,8 @@ export async function downloadFuriganaExcel(token: string): Promise<{ data: Arra
 
 /** 所属一覧フォルダから最新Excelをダウンロード */
 export async function downloadAffiliationExcel(token: string): Promise<{ data: ArrayBuffer; fileName: string } | null> {
-  const folderId = await getSubFolderId(token, AFFILIATION_FOLDER_NAME);
+  const folderId = await findSubFolderId(token, AFFILIATION_FOLDER_NAME);
+  if (!folderId) return null;
   const file = await getLatestXlsx(token, folderId);
   if (!file) return null;
   const data = await downloadFileBlob(token, file.id);
@@ -349,13 +360,13 @@ async function uploadXlsxToFolder(
 
 /** ふりがな一覧フォルダにExcelをアップロード */
 export async function uploadFuriganaExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
-  const folderId = await getSubFolderId(token, FURIGANA_FOLDER_NAME);
+  const folderId = await getOrCreateSubFolderId(token, FURIGANA_FOLDER_NAME);
   await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
 }
 
 /** 所属一覧フォルダにExcelをアップロード */
 export async function uploadAffiliationExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
-  const folderId = await getSubFolderId(token, AFFILIATION_FOLDER_NAME);
+  const folderId = await getOrCreateSubFolderId(token, AFFILIATION_FOLDER_NAME);
   await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
 }
 
@@ -367,7 +378,8 @@ const SCHEDULE_FOLDER_NAME = '時間割';
 
 /** 時間割フォルダ内のExcelファイル一覧を取得（最新順） */
 export async function listScheduleExcelFiles(token: string): Promise<GoogleDriveFile[]> {
-  const folderId = await getSubFolderId(token, SCHEDULE_FOLDER_NAME);
+  const folderId = await findSubFolderId(token, SCHEDULE_FOLDER_NAME);
+  if (!folderId) return [];
   const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
   const params = new URLSearchParams({
     q,
@@ -397,7 +409,7 @@ export async function downloadScheduleExcel(token: string, fileId: string): Prom
 
 /** 時間割フォルダにExcelをアップロード */
 export async function uploadScheduleExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
-  const folderId = await getSubFolderId(token, SCHEDULE_FOLDER_NAME);
+  const folderId = await getOrCreateSubFolderId(token, SCHEDULE_FOLDER_NAME);
   await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
 }
 
@@ -407,23 +419,10 @@ export async function uploadScheduleExcel(token: string, fileName: string, xlsxB
 
 const TOURNAMENT_LIST_FOLDER_NAME = '大会一覧';
 
-/** 大会運営システム/大会一覧 フォルダIDを取得（なければ作成） */
-async function getTournamentListFolderId(token: string): Promise<string> {
-  // ルートフォルダ
-  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
-  if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
-  // 大会運営システム サブフォルダ
-  let sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
-  if (!sysId) sysId = await createFolder(token, SUB_FOLDER_NAME, rootId);
-  // 大会一覧 サブフォルダ
-  let listId = await findFolder(token, TOURNAMENT_LIST_FOLDER_NAME, sysId);
-  if (!listId) listId = await createFolder(token, TOURNAMENT_LIST_FOLDER_NAME, sysId);
-  return listId;
-}
-
 /** 大会一覧フォルダ内のExcelファイル一覧を取得（最新順） */
 export async function listTournamentExcelFiles(token: string): Promise<GoogleDriveFile[]> {
-  const folderId = await getTournamentListFolderId(token);
+  const folderId = await findSubFolderId(token, TOURNAMENT_LIST_FOLDER_NAME);
+  if (!folderId) return [];
   const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
   const params = new URLSearchParams({
     q,
