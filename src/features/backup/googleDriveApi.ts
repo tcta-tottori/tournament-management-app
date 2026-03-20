@@ -19,14 +19,14 @@ const EXPIRY_KEY = 'gdrive_backup_expiry';
 const CLIENT_ID_KEY = 'gdrive_client_id';
 const SCOPE_KEY = 'gdrive_backup_scope';
 
-// スコープ変更時に古いトークンを自動無効化
+// スコープ変更時（または初回スコープ記録時）に古いトークンを自動無効化
 (() => {
   const savedScope = localStorage.getItem(SCOPE_KEY);
-  if (savedScope && savedScope !== SCOPES) {
+  if (savedScope !== SCOPES) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EXPIRY_KEY);
+    localStorage.setItem(SCOPE_KEY, SCOPES);
   }
-  localStorage.setItem(SCOPE_KEY, SCOPES);
 })();
 
 export interface GoogleDriveFile {
