@@ -17,6 +17,17 @@ export const DEFAULT_CLIENT_ID = '316429350105-v1tpv97kkq6jkg9gmu57aqt7btic6qod.
 const TOKEN_KEY = 'gdrive_backup_token';
 const EXPIRY_KEY = 'gdrive_backup_expiry';
 const CLIENT_ID_KEY = 'gdrive_client_id';
+const SCOPE_KEY = 'gdrive_backup_scope';
+
+// スコープ変更時に古いトークンを自動無効化
+(() => {
+  const savedScope = localStorage.getItem(SCOPE_KEY);
+  if (savedScope && savedScope !== SCOPES) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
+  }
+  localStorage.setItem(SCOPE_KEY, SCOPES);
+})();
 
 export interface GoogleDriveFile {
   id: string;
