@@ -112,7 +112,11 @@ async function deduplicateAffiliation(): Promise<number> {
   return toDelete.length;
 }
 
-export default function DataSync() {
+interface DataSyncProps {
+  onConnectionChange?: () => void;
+}
+
+export default function DataSync({ onConnectionChange }: DataSyncProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
@@ -174,13 +178,14 @@ export default function DataSync() {
         setGdriveFolderLink(link);
       } catch { /* ignore */ }
       setResult({ success: true, message: `Google ドライブに接続しました（${email}）` });
+      onConnectionChange?.();
     } catch (err) {
       setResult({ success: false, message: `接続に失敗しました: ${(err as Error).message}` });
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, []);
+  }, [onConnectionChange]);
 
   // --- Google Drive 切断 ---
   const handleDisconnect = useCallback(() => {
@@ -192,7 +197,8 @@ export default function DataSync() {
     setUserEmail('');
     setGdriveFolderLink('');
     setResult({ success: true, message: 'Google ドライブから切断しました' });
-  }, []);
+    onConnectionChange?.();
+  }, [onConnectionChange]);
 
   // --- Google Drive からふりがな読込 ---
   const handleDownloadFurigana = useCallback(async () => {

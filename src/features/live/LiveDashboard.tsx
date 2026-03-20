@@ -110,6 +110,28 @@ function DonutChart({
 // Tennis Court SVG block
 // ---------------------------------------------------------------------------
 
+/** Vertical court SVG lines overlay */
+function VerticalCourtLines({ status }: { status: string }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.3)'
+    : status === 'ready' ? 'rgba(59,130,246,0.25)'
+    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
+    : 'rgba(148,163,184,0.18)';
+  return (
+    <svg viewBox="0 0 60 110" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+      <rect x="4" y="4" width="52" height="102" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
+      <line x1="2" y1="55" x2="58" y2="55" stroke={color} strokeWidth="2" />
+      <line x1="10" y1="30" x2="50" y2="30" stroke={color} strokeWidth="0.8" />
+      <line x1="10" y1="80" x2="50" y2="80" stroke={color} strokeWidth="0.8" />
+      <line x1="10" y1="4" x2="10" y2="106" stroke={color} strokeWidth="0.8" />
+      <line x1="50" y1="4" x2="50" y2="106" stroke={color} strokeWidth="0.8" />
+      <line x1="30" y1="30" x2="30" y2="80" stroke={color} strokeWidth="0.8" />
+      <line x1="30" y1="4" x2="30" y2="8" stroke={color} strokeWidth="0.8" />
+      <line x1="30" y1="102" x2="30" y2="106" stroke={color} strokeWidth="0.8" />
+    </svg>
+  );
+}
+
+/** Single vertical court card for block-based layout */
 function TennisCourtBlock({
   cs,
   isSelected,
@@ -119,71 +141,51 @@ function TennisCourtBlock({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const isPlaying = cs.status === 'playing';
-  const isReady = cs.status === 'ready';
-  const isUnavailable = cs.status === 'unavailable';
-
-  // Court colors
-  const courtFill = isPlaying ? '#bbf7d0' : isReady ? '#dbeafe' : isUnavailable ? '#e5e7eb' : '#f0fdf4';
-  const lineFill = isPlaying ? '#16a34a' : isReady ? '#3b82f6' : isUnavailable ? '#9ca3af' : '#86efac';
-  const borderColor = isPlaying ? 'border-green-500' : isReady ? 'border-blue-400' : isUnavailable ? 'border-gray-300' : 'border-green-200';
-  const glowClass = isPlaying ? 'shadow-[0_0_16px_rgba(22,163,74,0.25)]' : '';
+  const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+    playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]' },
+    ready: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', glow: '' },
+    empty: { bg: 'bg-white/80', border: 'border-emerald-200', text: 'text-gray-600', glow: '' },
+    unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
+  };
+  const style = statusStyles[cs.status];
 
   return (
     <button
       onClick={onSelect}
-      className={`relative rounded-xl border-2 p-2 transition-all cursor-pointer flex flex-col items-center
-        ${borderColor} ${glowClass}
-        ${isSelected ? 'ring-2 ring-primary-500 ring-offset-2 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-lg'}
+      className={`relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
+        ${style.bg} ${style.border} ${style.glow}
+        ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
       `}
-      style={{ width: 150, minHeight: 110 }}
+      style={{ aspectRatio: '1 / 1.7', width: '100%' }}
     >
-      {/* Tennis court SVG */}
-      <svg viewBox="0 0 120 68" className="w-full" style={{ maxWidth: 130 }}>
-        {/* Court surface */}
-        <rect x="2" y="2" width="116" height="64" rx="3" fill={courtFill} stroke={lineFill} strokeWidth="2" />
-        {/* Center line (net) */}
-        <line x1="60" y1="2" x2="60" y2="66" stroke={lineFill} strokeWidth="2" strokeDasharray="4 2" />
-        {/* Service boxes */}
-        <rect x="20" y="2" width="80" height="64" fill="none" stroke={lineFill} strokeWidth="1" opacity="0.5" />
-        <line x1="20" y1="34" x2="100" y2="34" stroke={lineFill} strokeWidth="1" opacity="0.5" />
-        {/* Service center lines */}
-        <line x1="20" y1="34" x2="60" y2="34" stroke={lineFill} strokeWidth="0.8" opacity="0.4" />
-        <line x1="60" y1="34" x2="100" y2="34" stroke={lineFill} strokeWidth="0.8" opacity="0.4" />
-        {/* Center service marks */}
-        <line x1="60" y1="18" x2="60" y2="50" stroke={lineFill} strokeWidth="0.8" opacity="0.3" />
-      </svg>
-
-      {/* Court name */}
-      <div className={`mt-1 text-xs font-bold ${isPlaying ? 'text-green-700' : isReady ? 'text-blue-600' : isUnavailable ? 'text-gray-400' : 'text-gray-600'}`}>
-        {cs.court.name}
+      <VerticalCourtLines status={cs.status} />
+      <div className="relative z-10 flex flex-col items-center justify-center h-full p-1">
+        {cs.status === 'playing' && (
+          <span className="absolute top-0.5 right-0.5 flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">
+            <Play className="w-2 h-2 fill-white" /> LIVE
+          </span>
+        )}
+        <div className={`text-lg md:text-xl font-bold ${style.text} leading-none`}>
+          {cs.court.name.replace(/[^\d]/g, '') || cs.court.name}
+        </div>
+        {cs.currentMatch && (
+          <div className="mt-0.5 w-full space-y-0">
+            <p className="text-[8px] md:text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
+            <p className="text-[7px] text-green-500 text-center">vs</p>
+            <p className="text-[8px] md:text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
+          </div>
+        )}
+        {!cs.currentMatch && cs.nextMatch && (
+          <div className="mt-0.5 w-full space-y-0">
+            <p className="text-[8px] md:text-[9px] text-blue-600 truncate text-center leading-tight">{cs.nextMatch.player1Name}</p>
+            <p className="text-[7px] text-blue-400 text-center">vs</p>
+            <p className="text-[8px] md:text-[9px] text-blue-600 truncate text-center leading-tight">{cs.nextMatch.player2Name}</p>
+          </div>
+        )}
+        {!cs.currentMatch && !cs.nextMatch && cs.status !== 'unavailable' && (
+          <p className="text-[8px] text-gray-400 mt-0.5">空き</p>
+        )}
       </div>
-
-      {/* Status badge */}
-      {isPlaying && (
-        <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-green-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">
-          <Play className="w-2.5 h-2.5 fill-white" /> LIVE
-        </span>
-      )}
-
-      {/* Match info */}
-      {cs.currentMatch && (
-        <div className="mt-0.5 text-center w-full px-1">
-          <p className="text-[10px] font-semibold text-green-800 truncate">{cs.currentMatch.player1Name}</p>
-          <p className="text-[8px] text-green-500 font-bold">VS</p>
-          <p className="text-[10px] font-semibold text-green-800 truncate">{cs.currentMatch.player2Name}</p>
-        </div>
-      )}
-      {!cs.currentMatch && cs.nextMatch && (
-        <div className="mt-0.5 text-center w-full px-1">
-          <p className="text-[10px] text-blue-500 truncate">{cs.nextMatch.player1Name}</p>
-          <p className="text-[8px] text-blue-300 font-bold">VS</p>
-          <p className="text-[10px] text-blue-500 truncate">{cs.nextMatch.player2Name}</p>
-        </div>
-      )}
-      {!cs.currentMatch && !cs.nextMatch && !isUnavailable && (
-        <p className="mt-1 text-[10px] text-gray-400">空き</p>
-      )}
     </button>
   );
 }
@@ -312,14 +314,17 @@ export default function LiveDashboard() {
     unavailable: courtStatusList.filter(c => c.status === 'unavailable').length,
   }), [courtStatusList]);
 
-  // -- Group courts in rows of 4 --
-  const courtRows = useMemo(() => {
-    const rows: CourtStatus[][] = [];
+  // -- Group courts into blocks of 4 (venue-style layout) --
+  const courtBlocks = useMemo(() => {
+    const blocks: CourtStatus[][] = [];
     for (let i = 0; i < courtStatusList.length; i += 4) {
-      rows.push(courtStatusList.slice(i, i + 4));
+      blocks.push(courtStatusList.slice(i, i + 4));
     }
-    return rows;
+    return blocks;
   }, [courtStatusList]);
+
+  // HQ position: after block index 1 (between courts 5-8 and 9-12) for 16-court venues
+  const hqAfterBlock = courtBlocks.length >= 4 ? 1 : -1;
 
   // -- Event progress --
   const eventProgress = useMemo(() => {
@@ -480,20 +485,49 @@ export default function LiveDashboard() {
             </div>
           </div>
 
-          {/* Court grid: 4 per row */}
-          <div className="flex flex-col gap-3 items-center">
-            {courtRows.map((row, rowIdx) => (
-              <div key={rowIdx} className="flex gap-3 flex-wrap justify-center">
-                {row.map(cs => (
-                  <TennisCourtBlock
-                    key={cs.court.courtId}
-                    cs={cs}
-                    isSelected={selectedCourtId === cs.court.courtId}
-                    onSelect={() => setSelectedCourtId(
-                      selectedCourtId === cs.court.courtId ? null : cs.court.courtId
-                    )}
-                  />
-                ))}
+          {/* Block-based court layout (venue map style) */}
+          <div className="flex flex-col gap-2 items-center">
+            {courtBlocks.map((block, blockIdx) => (
+              <div key={blockIdx} className="contents">
+                {/* Court block */}
+                <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      {block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}〜{block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {block.map(cs => (
+                      <TennisCourtBlock
+                        key={cs.court.courtId}
+                        cs={cs}
+                        isSelected={selectedCourtId === cs.court.courtId}
+                        onSelect={() => setSelectedCourtId(
+                          selectedCourtId === cs.court.courtId ? null : cs.court.courtId
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {/* HQ marker between blocks */}
+                {blockIdx === hqAfterBlock && (
+                  <div className="flex items-center gap-2 py-1 w-full max-w-lg justify-center">
+                    <div className="flex-1 h-px bg-amber-300" />
+                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-3 py-1.5 shadow-sm">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
+                      <span className="text-xs font-bold text-amber-700">本部</span>
+                    </div>
+                    <div className="flex-1 h-px bg-amber-300" />
+                  </div>
+                )}
+                {/* Passage indicator between blocks (except after HQ) */}
+                {blockIdx < courtBlocks.length - 1 && blockIdx !== hqAfterBlock && (
+                  <div className="flex items-center gap-2 w-full max-w-lg">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-[9px] text-gray-400">通路</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
