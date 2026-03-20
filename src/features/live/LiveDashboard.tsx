@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -403,6 +403,74 @@ export default function LiveDashboard() {
 
   const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
+  // -- Bulk first match call --
+  const hasWaitingMatchesWithCourts = useMemo(() => {
+    return courts.some(court => {
+      if (!court.isAvailable) return false;
+      return allMatches.some(
+        m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready')
+      );
+    });
+  }, [courts, allMatches]);
+
+  const handleBulkFirstCall = useCallback(async () => {
+    if (!currentTournamentId) return;
+
+    if (courts.length === 0) return;
+
+    // For each available court, find the first (earliest) match that is 'waiting' or 'ready'
+    const firstMatches: { match: Match; court: Court }[] = [];
+
+    for (const court of courts) {
+      if (!court.isAvailable) continue;
+      const courtMatches = allMatches
+        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready'))
+        .sort((a, b) => {
+          // Sort by scheduledTime, then by matchOrder
+          if (a.scheduledTime && b.scheduledTime) {
+            return a.scheduledTime.localeCompare(b.scheduledTime);
+          }
+          return (a.matchOrder || 0) - (b.matchOrder || 0);
+        });
+
+      if (courtMatches.length > 0) {
+        firstMatches.push({ match: courtMatches[0], court });
+      }
+    }
+
+    if (firstMatches.length === 0) {
+      alert('コールする試合がありません。');
+      return;
+    }
+
+    const confirmed = confirm(
+      `${firstMatches.length}コートの初戦を一斉にコールします。よろしいですか？\n\n` +
+      firstMatches.map(fm =>
+        `${fm.court.name}: ${fm.match.player1Name} vs ${fm.match.player2Name}`
+      ).join('\n')
+    );
+
+    if (!confirmed) return;
+
+    // Update all matches to 'playing' status
+    for (const fm of firstMatches) {
+      if (fm.match.id) {
+        await db.matches.update(fm.match.id, {
+          status: 'playing',
+          updatedAt: Date.now(),
+        });
+        // Also set court's currentMatchId
+        if (fm.court.id) {
+          await db.courts.update(fm.court.id, {
+            currentMatchId: fm.match.matchId,
+          });
+        }
+      }
+    }
+
+    alert(`${firstMatches.length}コートの初戦をコールしました。`);
+  }, [currentTournamentId, courts, allMatches]);
+
   // =========================================================================
   // RENDER
   // =========================================================================
@@ -421,6 +489,16 @@ export default function LiveDashboard() {
               {currentTournament ? currentTournament.name : '大会を選択してください'}
             </p>
           </div>
+          {/* Bulk first match call */}
+          {hasWaitingMatchesWithCourts && (
+            <button
+              onClick={handleBulkFirstCall}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-700 hover:to-emerald-700 shadow-md transition-all"
+            >
+              <Play className="w-4 h-4" />
+              全コート初戦一斉コール
+            </button>
+          )}
           {/* Current time */}
           <div className="text-right">
             <div className="text-3xl font-black text-gray-900 font-mono tracking-tight">{timeStr}</div>

@@ -2,6 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ScheduleSlot, ScheduleMatch } from '../features/schedule/scheduleEngine';
 
+// インポート済み時間割アイテム
+export interface ImportedScheduleItem {
+  eventName: string;     // 種目名 (e.g., "男子シングルスA級")
+  roundLabel: string;    // "1R", "2R", "QF", "SF", "F"
+  matchOrder: number;    // order within schedule (1, 2, 3...)
+  courtName: string;     // "1", "2", etc.
+  startTime: string;     // "09:00"
+  player1Hint?: string;  // optional player name hint for matching
+  player2Hint?: string;
+}
+
 // スケジュール設定（ページ遷移しても保持）
 export interface ScheduleConfig {
   startTime: string;
@@ -23,6 +34,10 @@ interface AppState {
   setScheduleSlots: (slots: ScheduleSlot[]) => void;
   allScheduleMatches: ScheduleMatch[];
   setAllScheduleMatches: (matches: ScheduleMatch[]) => void;
+
+  // インポート済み時間割
+  importedSchedule: ImportedScheduleItem[];
+  setImportedSchedule: (items: ImportedScheduleItem[]) => void;
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -45,6 +60,8 @@ export const useAppStore = create<AppState>()(
       setScheduleSlots: (slots) => set({ scheduleSlots: slots }),
       allScheduleMatches: [],
       setAllScheduleMatches: (matches) => set({ allScheduleMatches: matches }),
+      importedSchedule: [],
+      setImportedSchedule: (items) => set({ importedSchedule: items }),
     }),
     {
       name: 'tennis-tournament-storage', // localStorage に保存

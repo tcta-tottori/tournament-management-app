@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw, FolderOpen, X, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
+import type { ImportedScheduleItem } from '../../stores/appStore';
 import {
   getSavedToken as gdriveGetSavedToken,
   getSavedClientId,
@@ -302,6 +304,106 @@ function cleanTournamentName(name: string): string {
     .trim();
 }
 
+/** 時間割Excelをパースする */
+function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
+  const wb = XLSX.read(data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<any>(ws, { header: 1 });
+
+  const items: ImportedScheduleItem[] = [];
+  let globalOrder = 0;
+
+  if (!rows || rows.length === 0) return items;
+
+  // Detect format:
+  // Format 1: Grid format - row 0 has court names as columns, subsequent rows have time + matches
+  // Format 2: List format - each row is a match with columns (コート, 時刻, 種目, 回戦, etc.)
+  const firstRow = rows[0] as any[];
+
+  // Check if first row looks like list headers
+  const headerStr = (firstRow || []).map((c: any) => String(c || '').trim().toLowerCase()).join(',');
+  const isListFormat = /コート|court/.test(headerStr) && (/時刻|時間|time/.test(headerStr) || /種目|event/.test(headerStr));
+
+  if (isListFormat) {
+    // List format: try to find columns by header names
+    const headers = firstRow.map((c: any) => String(c || '').trim());
+    let courtIdx = -1, timeIdx = -1, eventIdx = -1, roundIdx = -1;
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      if (/^(コート|court|コート名)$/i.test(h)) courtIdx = i;
+      else if (/^(時刻|時間|開始時刻|time|開始)$/i.test(h)) timeIdx = i;
+      else if (/^(種目|event|イベント|種目名|カテゴリ)$/i.test(h)) eventIdx = i;
+      else if (/^(回戦|ラウンド|round|R)$/i.test(h)) roundIdx = i;
+    }
+
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri] as any[];
+      if (!row || row.length < 2) continue;
+      const courtVal = courtIdx >= 0 ? String(row[courtIdx] || '').trim() : '';
+      const timeVal = timeIdx >= 0 ? String(row[timeIdx] || '').trim() : '';
+      const eventVal = eventIdx >= 0 ? String(row[eventIdx] || '').trim() : '';
+      const roundVal = roundIdx >= 0 ? String(row[roundIdx] || '').trim() : '1R';
+      if (!courtVal && !timeVal && !eventVal) continue;
+      globalOrder++;
+      items.push({
+        eventName: eventVal,
+        roundLabel: roundVal || '1R',
+        matchOrder: globalOrder,
+        courtName: courtVal,
+        startTime: normalizeScheduleTime(timeVal),
+      });
+    }
+  } else {
+    // Grid format: columns are courts, rows are time slots
+    // First row should have court identifiers
+    const courtNames = firstRow.slice(1).map((c: any) => String(c || '').trim()).filter(c => c);
+    if (courtNames.length === 0) return items;
+
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri] as any[];
+      if (!row || !row[0]) continue;
+      const time = normalizeScheduleTime(String(row[0]).trim());
+      for (let ci = 0; ci < courtNames.length; ci++) {
+        const cell = String(row[ci + 1] || '').trim();
+        if (!cell) continue;
+        globalOrder++;
+        // Parse cell: "男子S A級 1R" or similar
+        const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
+        const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
+        const roundLabel = roundMatch ? roundMatch[0] : '1R';
+        items.push({
+          eventName,
+          roundLabel,
+          matchOrder: globalOrder,
+          courtName: courtNames[ci],
+          startTime: time,
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+/** 時刻文字列を正規化 */
+function normalizeScheduleTime(raw: string): string {
+  const trimmed = raw.trim();
+  // Excel のシリアル値 (0-1) の場合
+  const num = Number(trimmed);
+  if (!isNaN(num) && num >= 0 && num < 1) {
+    const totalMinutes = Math.round(num * 24 * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+  // "9:00" or "09:00" 形式
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (match) {
+    return `${match[1].padStart(2, '0')}:${match[2]}`;
+  }
+  return trimmed;
+}
+
 interface DataImportProps {
   gdriveConnected?: boolean;
   onGDriveConnectionChange?: () => void;
@@ -326,6 +428,17 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const [showFileList, setShowFileList] = useState(false);
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scheduleFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 時間割インポート
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleItems, setScheduleItems] = useState<ImportedScheduleItem[]>([]);
+  const [scheduleFileName, setScheduleFileName] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [isLoadingScheduleGDrive, setIsLoadingScheduleGDrive] = useState(false);
+  const [scheduleGDriveFiles, setScheduleGDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [showScheduleFileList, setShowScheduleFileList] = useState(false);
+  const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
 
   // Google Drive 接続状態（propsから受け取り、フォールバックとして自前チェック）
   const gdriveConnected = gdriveConnectedProp ?? (!!getSavedClientId() && gdriveIsTokenValid());
@@ -480,6 +593,80 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       }
     };
     reader.readAsArrayBuffer(file);
+  }, []);
+
+  // --- Schedule Excel handler ---
+  const handleScheduleFile = useCallback((file: File) => {
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    if (ext !== 'xlsx' && ext !== 'xls') {
+      setScheduleError('対応していないファイル形式です。.xlsx / .xls ファイルを選択してください。');
+      return;
+    }
+    setScheduleFileName(file.name);
+    setScheduleError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const items = parseScheduleExcel(arrayBuffer);
+        if (items.length === 0) {
+          setScheduleError('時間割データを検出できませんでした。Excelの形式を確認してください。');
+          return;
+        }
+        setScheduleItems(items);
+        useAppStore.getState().setImportedSchedule(items);
+      } catch (err) {
+        setScheduleError(`Excelファイルの解析に失敗しました: ${(err as Error).message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
+  // --- Google Drive: 時間割ファイル一覧取得 ---
+  const handleListScheduleFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) {
+      setScheduleError('Google Drive に接続されていません。');
+      return;
+    }
+    setIsLoadingScheduleGDrive(true);
+    setScheduleError('');
+    try {
+      const files = await listTournamentExcelFiles(token);
+      setScheduleGDriveFiles(files);
+      setShowScheduleFileList(true);
+      if (files.length === 0) {
+        setScheduleError('Google Drive にファイルがありません。');
+      }
+    } catch (err) {
+      setScheduleError(`ファイル一覧の取得に失敗: ${(err as Error).message}`);
+    } finally {
+      setIsLoadingScheduleGDrive(false);
+    }
+  }, []);
+
+  // --- Google Drive: 時間割ファイル選択 ---
+  const handleSelectScheduleFile = useCallback(async (file: GoogleDriveFile) => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    setLoadingScheduleFileId(file.id);
+    setScheduleError('');
+    try {
+      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      const items = parseScheduleExcel(arrayBuffer);
+      if (items.length === 0) {
+        setScheduleError('時間割データを検出できませんでした。');
+        return;
+      }
+      setScheduleItems(items);
+      setScheduleFileName(file.name);
+      useAppStore.getState().setImportedSchedule(items);
+      setShowScheduleFileList(false);
+    } catch (err) {
+      setScheduleError(`ファイル読込失敗: ${(err as Error).message}`);
+    } finally {
+      setLoadingScheduleFileId(null);
+    }
   }, []);
 
   // --- File dispatcher: detect type by extension ---
@@ -1593,6 +1780,194 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
           </div>
         </div>
       )}
+      {/* ── 時間割読込セクション ── */}
+      <div className="border border-border-main rounded-lg overflow-hidden">
+        <button
+          onClick={() => setScheduleOpen(!scheduleOpen)}
+          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          {scheduleOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <CalendarClock className="w-4 h-4 text-primary-500" />
+          時間割読込
+          {scheduleItems.length > 0 && (
+            <span className="ml-auto text-xs font-normal text-green-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              {scheduleItems.length}試合読込済
+            </span>
+          )}
+        </button>
+        {scheduleOpen && (
+          <div className="p-4 space-y-3 border-t border-border-main">
+            <p className="text-xs text-gray-500">
+              試合順・コート・時刻が記載された時間割Excelを読み込みます。エントリー確定前に読み込むことで、後のスケジュール作成に活用できます。
+            </p>
+
+            {/* Google Drive から取得 */}
+            <button
+              onClick={handleListScheduleFiles}
+              disabled={!gdriveConnected || isLoadingScheduleGDrive}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoadingScheduleGDrive ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <GoogleDriveIcon className="w-4 h-4" />
+              )}
+              {isLoadingScheduleGDrive ? '取得中...' : 'Google Drive から時間割を選択'}
+            </button>
+
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <div className="flex-1 border-t border-border-main" />
+              <span>またはファイルから</span>
+              <div className="flex-1 border-t border-border-main" />
+            </div>
+
+            {/* ローカルファイル選択 */}
+            <button
+              onClick={() => scheduleFileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-border-main rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              時間割Excelを選択 (.xlsx)
+            </button>
+            <input
+              ref={scheduleFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleScheduleFile(file);
+                e.target.value = '';
+              }}
+            />
+
+            {/* エラー表示 */}
+            {scheduleError && (
+              <div className="p-3 rounded-lg text-sm flex items-start gap-2 bg-red-50 text-red-800 border border-red-200">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{scheduleError}</span>
+              </div>
+            )}
+
+            {/* 読込成功サマリー */}
+            {scheduleItems.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                  <div className="flex items-center gap-2 text-sm font-bold text-green-700">
+                    <CheckCircle2 className="w-4 h-4" />
+                    時間割読込成功
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">
+                    {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
+                    {scheduleItems.length}試合 / {new Set(scheduleItems.map(i => i.courtName)).size}コート の時間割を読み込みました
+                  </p>
+                </div>
+
+                {/* プレビューテーブル */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">#</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">コート</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">時刻</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">種目</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">回戦</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {scheduleItems.map((item, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-2 py-1 text-gray-500">{item.matchOrder}</td>
+                          <td className="px-2 py-1 text-gray-900">{item.courtName}</td>
+                          <td className="px-2 py-1 text-gray-900">{item.startTime}</td>
+                          <td className="px-2 py-1 text-gray-700">{item.eventName || '-'}</td>
+                          <td className="px-2 py-1 text-gray-500">{item.roundLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* クリアボタン */}
+                <button
+                  onClick={() => {
+                    setScheduleItems([]);
+                    setScheduleFileName('');
+                    useAppStore.getState().setImportedSchedule([]);
+                  }}
+                  className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                >
+                  時間割をクリア
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Google Drive 時間割ファイル選択ポップアップ */}
+      {showScheduleFileList && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowScheduleFileList(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <CalendarClock className="w-5 h-5 text-primary-500" />
+                <h3 className="text-base font-bold text-gray-900">時間割ファイルを選択</h3>
+                <span className="text-xs text-gray-400">{scheduleGDriveFiles.length}件</span>
+              </div>
+              <button onClick={() => setShowScheduleFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {scheduleGDriveFiles.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <p className="text-sm">ファイルがありません</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {scheduleGDriveFiles.map(f => {
+                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                    const modDate = new Date(f.modifiedTime);
+                    const isLoading = loadingScheduleFileId === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => handleSelectScheduleFile(f)}
+                        disabled={!!loadingScheduleFileId}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <p className="text-xs text-gray-400 text-center">時間割Excelファイルを選択してください</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Google Drive 大会一覧ポップアップ - createPortal で画面中央表示 */}
       {showFileList && createPortal(
         <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
