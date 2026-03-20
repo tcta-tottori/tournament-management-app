@@ -22,6 +22,11 @@ export default function DataManagement() {
     setGdriveVersion(v => v + 1);
   }, []);
 
+  // データ読込成功時に所属・ふりがな一覧パネルを自動展開
+  const handleDataLoaded = useCallback(() => {
+    setPlayerListOpen(true);
+  }, []);
+
   // 初回マウント時にも接続状態を評価
   useEffect(() => {
     setGdriveVersion(v => v + 1);
@@ -42,7 +47,7 @@ export default function DataManagement() {
       </header>
 
       {/* Google ドライブ連携（接続 + 全Drive機能を統合） */}
-      <DataSync onConnectionChange={handleConnectionChange} />
+      <DataSync onConnectionChange={handleConnectionChange} onDataLoaded={handleDataLoaded} />
 
       {/* 大会データ読込パネル */}
       <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">

@@ -1688,98 +1688,111 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       )}
 
       {/* インポート成功 - おしゃれな大会情報表示 */}
-      {importResult?.success && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 text-white shadow-lg">
-          {/* 背景装飾 */}
-          <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+      {importResult?.success && (() => {
+        const msg = importResult.message;
+        const playerMatch = msg.match(/(\d+)名/);
+        const eventMatch = msg.match(/(\d+)種目/);
+        const drawMatch = msg.match(/(\d+)ドロー/);
+        const entryMatch = msg.match(/(\d+)エントリー/);
+        const stats = [
+          { icon: Users, value: playerMatch?.[1] || '0', label: '選手', delay: '0.3s' },
+          { icon: Trophy, value: eventMatch?.[1] || '0', label: '種目', delay: '0.45s' },
+          { icon: Dices, value: drawMatch?.[1] || entryMatch?.[1] || '0', label: drawMatch ? 'ドロー' : 'エントリー', delay: '0.6s' },
+        ];
+        return (
+        <div className="relative overflow-hidden rounded-2xl shadow-xl animate-[fadeIn_0.5s_ease-out]">
+          {/* グラデーション背景 */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-[#0a2618]" />
+
+          {/* メッシュグラデーション装飾 */}
+          <div className="absolute inset-0 opacity-30"
+            style={{ background: 'radial-gradient(circle at 20% 20%, rgba(212,225,87,0.3) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(61,126,166,0.3) 0%, transparent 50%)' }} />
+
+          {/* パーティクル装飾 */}
+          <div className="absolute top-4 right-8 w-2 h-2 bg-accent rounded-full animate-[pulse_2s_ease-in-out_infinite]" />
+          <div className="absolute top-12 right-16 w-1.5 h-1.5 bg-white/30 rounded-full animate-[pulse_2.5s_ease-in-out_0.5s_infinite]" />
+          <div className="absolute top-8 right-24 w-1 h-1 bg-accent/60 rounded-full animate-[pulse_3s_ease-in-out_1s_infinite]" />
+          <div className="absolute bottom-16 left-6 w-1.5 h-1.5 bg-white/20 rounded-full animate-[pulse_2.8s_ease-in-out_0.3s_infinite]" />
+          <div className="absolute bottom-20 left-16 w-1 h-1 bg-accent/40 rounded-full animate-[pulse_2.2s_ease-in-out_0.8s_infinite]" />
+
+          {/* 幾何学模様の背景装飾 */}
+          <div className="absolute -top-8 -right-8 w-48 h-48 border border-white/[0.07] rounded-full" />
+          <div className="absolute -top-4 -right-4 w-36 h-36 border border-white/[0.05] rounded-full" />
+          <div className="absolute -bottom-12 -left-12 w-40 h-40 border border-white/[0.07] rounded-full" />
 
           <div className="relative p-5">
-            {/* ヘッダー */}
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full backdrop-blur-sm">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold">インポート完了</p>
-                <p className="text-[10px] text-white/70">データを正常に取り込みました</p>
-              </div>
+            {/* 成功バッジ */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 mb-4 rounded-full bg-accent/20 backdrop-blur-sm border border-accent/30 animate-[slideDown_0.4s_ease-out]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+              <span className="text-[11px] font-semibold text-accent tracking-wide">インポート完了</span>
             </div>
 
             {/* 大会名 */}
-            <h3 className="text-lg font-bold mb-3 leading-tight">
+            <h3 className="text-xl font-bold text-white mb-1 leading-tight animate-[slideDown_0.5s_ease-out]">
               {editTournamentName || '大会名未設定'}
             </h3>
+            <p className="text-[11px] text-white/50 mb-4 animate-[slideDown_0.55s_ease-out]">データを正常に取り込みました</p>
 
             {/* 大会情報 */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-4 text-sm">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-5 animate-[slideDown_0.6s_ease-out]">
               {editDate && (
-                <div className="flex items-center gap-1.5 text-white/90">
-                  <Calendar className="w-3.5 h-3.5 text-white/60" />
+                <div className="flex items-center gap-1.5 text-sm text-white/80">
+                  <Calendar className="w-3.5 h-3.5 text-accent/70" />
                   <span>{editDate}</span>
                 </div>
               )}
               {editVenue && (
-                <div className="flex items-center gap-1.5 text-white/90">
-                  <MapPin className="w-3.5 h-3.5 text-white/60" />
+                <div className="flex items-center gap-1.5 text-sm text-white/80">
+                  <MapPin className="w-3.5 h-3.5 text-accent/70" />
                   <span>{editVenue}</span>
                 </div>
               )}
               {editReserveDate && (
-                <div className="flex items-center gap-1.5 text-white/90">
-                  <CalendarClock className="w-3.5 h-3.5 text-white/60" />
+                <div className="flex items-center gap-1.5 text-sm text-white/80">
+                  <CalendarClock className="w-3.5 h-3.5 text-accent/70" />
                   <span>予備日 {editReserveDate}</span>
                 </div>
               )}
             </div>
 
             {/* 統計カード */}
-            <div className="grid grid-cols-3 gap-2">
-              {(() => {
-                // インポート結果メッセージから数値を抽出
-                const msg = importResult.message;
-                const playerMatch = msg.match(/(\d+)名/);
-                const eventMatch = msg.match(/(\d+)種目/);
-                const drawMatch = msg.match(/(\d+)ドロー/);
-                const entryMatch = msg.match(/(\d+)エントリー/);
-                return (
-                  <>
-                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
-                      <Users className="w-5 h-5 mx-auto mb-1 text-white/80" />
-                      <p className="text-xl font-bold">{playerMatch?.[1] || '0'}</p>
-                      <p className="text-[10px] text-white/60">選手</p>
+            <div className="grid grid-cols-3 gap-2.5">
+              {stats.map(({ icon: Icon, value, label, delay }) => (
+                <div
+                  key={label}
+                  className="group relative overflow-hidden rounded-xl bg-white/[0.08] backdrop-blur-sm border border-white/[0.1] p-3 text-center hover:bg-white/[0.14] transition-all duration-300 animate-[slideUp_0.5s_ease-out_both]"
+                  style={{ animationDelay: delay }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-white/[0.03] to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center justify-center w-8 h-8 mx-auto mb-1.5 rounded-lg bg-accent/15">
+                      <Icon className="w-4 h-4 text-accent" />
                     </div>
-                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
-                      <Trophy className="w-5 h-5 mx-auto mb-1 text-white/80" />
-                      <p className="text-xl font-bold">{eventMatch?.[1] || '0'}</p>
-                      <p className="text-[10px] text-white/60">種目</p>
-                    </div>
-                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
-                      <Dices className="w-5 h-5 mx-auto mb-1 text-white/80" />
-                      <p className="text-xl font-bold">{drawMatch?.[1] || entryMatch?.[1] || '0'}</p>
-                      <p className="text-[10px] text-white/60">{drawMatch ? 'ドロー' : 'エントリー'}</p>
-                    </div>
-                  </>
-                );
-              })()}
+                    <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
+                    <p className="text-[10px] text-white/50 mt-0.5">{label}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* フッター */}
-          <div className="bg-black/10 px-5 py-2.5 flex items-center justify-between">
-            <p className="text-[10px] text-white/50">
-              <Download className="w-3 h-3 inline mr-1" />
+          <div className="relative border-t border-white/[0.08] px-5 py-2.5 flex items-center justify-between bg-black/15 backdrop-blur-sm">
+            <p className="text-[10px] text-white/40 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
               {importResult.message}
             </p>
             <button
               onClick={reset}
-              className="text-[10px] font-medium text-white/70 hover:text-white transition-colors"
+              className="text-[11px] font-medium text-accent/80 hover:text-accent transition-colors flex items-center gap-1"
             >
-              新しいインポート →
+              新しいインポート
+              <RefreshCw className="w-3 h-3" />
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
       {/* ── 時間割読込セクション ── */}
       <div className="border border-border-main rounded-lg overflow-hidden">
         <button

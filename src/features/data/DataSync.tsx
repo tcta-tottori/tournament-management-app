@@ -148,9 +148,10 @@ async function deduplicateAffiliation(): Promise<number> {
 
 interface DataSyncProps {
   onConnectionChange?: () => void;
+  onDataLoaded?: () => void;
 }
 
-export default function DataSync({ onConnectionChange }: DataSyncProps) {
+export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
@@ -344,6 +345,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       const r = { success: true, message: 'ふりがなデータを読み込みました', details: res.details };
       setResult(r);
       setModalResult(r);
+      onDataLoaded?.();
     } catch (err) {
       const s = updateStep(steps, 0, { status: 'error', label: 'ふりがな読込に失敗' });
       setModalSteps(s);
@@ -354,7 +356,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync, updateStep, doDownloadFurigana]);
+  }, [updateLastSync, updateStep, doDownloadFurigana, onDataLoaded]);
 
   // --- Google Drive からふりがな書込（モーダル付き） ---
   const handleUploadFurigana = useCallback(async () => {
@@ -424,6 +426,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       const r = { success: true, message: '所属ふりがなを読み込みました', details: res.details };
       setResult(r);
       setModalResult(r);
+      onDataLoaded?.();
     } catch (err) {
       const s = updateStep(steps, 0, { status: 'error', label: '所属読込に失敗' });
       setModalSteps(s);
@@ -434,7 +437,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync, updateStep, doDownloadAffiliation]);
+  }, [updateLastSync, updateStep, doDownloadAffiliation, onDataLoaded]);
 
   // --- Google Drive に所属書込（モーダル付き） ---
   const handleUploadAffiliation = useCallback(async () => {
@@ -535,6 +538,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
         : { success: true, message: 'ふりがな・所属データを一括読込しました', details: allDetails };
       setResult(r);
       setModalResult(r);
+      if (!hasError) onDataLoaded?.();
     } catch (err) {
       steps = updateStep(steps, 0, { status: 'error', label: `読込失敗: ${(err as Error).message}` });
       setModalSteps([...steps]);
@@ -545,7 +549,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync, updateStep, doDownloadFurigana, doDownloadAffiliation]);
+  }, [updateLastSync, updateStep, doDownloadFurigana, doDownloadAffiliation, onDataLoaded]);
 
   // --- Excelからふりがなインポート ---
   const handleExcelFurigana = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -588,6 +592,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
       if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
       setResult({ success: true, message: `${count}件のふりがなをインポートしました（${file.name}）`, details });
+      onDataLoaded?.();
     } catch (err) {
       setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
     } finally {
@@ -595,7 +600,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       setProcessingLabel('');
       if (excelFuriganaRef.current) excelFuriganaRef.current.value = '';
     }
-  }, [updateLastSync]);
+  }, [updateLastSync, onDataLoaded]);
 
   // --- Excelから所属インポート ---
   const handleExcelAff = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -630,6 +635,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       const details2 = [`所属ふりがな: ${count}件`];
       if (dedupCount > 0) details2.push(`重複削除: ${dedupCount}件`);
       setResult({ success: true, message: `${count}件の所属ふりがなをインポートしました（${file.name}）`, details: details2 });
+      onDataLoaded?.();
     } catch (err) {
       setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
     } finally {
@@ -637,7 +643,7 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       setProcessingLabel('');
       if (excelAffRef.current) excelAffRef.current.value = '';
     }
-  }, [updateLastSync]);
+  }, [updateLastSync, onDataLoaded]);
 
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {

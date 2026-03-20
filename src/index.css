@@ -44,6 +44,22 @@
 }
 
 /* ===========================================================
+   インポート完了アニメーション
+   =========================================================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===========================================================
    ヘッダー — 深緑背景 + 動的ゴールド波 + 金砂散りばめデザイン
    =========================================================== */
 .header-main {
