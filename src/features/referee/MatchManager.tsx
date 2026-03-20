@@ -836,7 +836,7 @@ ${printableMatches.map(m => {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto">
       {/* TOP: プルダウン式コントロールパネル */}
-      <div className="shrink-0 mb-3">
+      <div className="shrink-0 mb-3 sticky top-0 z-10 bg-bg-main pt-0">
         <button
           onClick={() => setControlsOpen(prev => !prev)}
           className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors"

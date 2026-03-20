@@ -301,7 +301,12 @@ function cleanTournamentName(name: string): string {
     .trim();
 }
 
-export default function DataImport() {
+interface DataImportProps {
+  gdriveConnected?: boolean;
+  onGDriveConnectionChange?: () => void;
+}
+
+export default function DataImport({ gdriveConnected: gdriveConnectedProp }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -321,14 +326,14 @@ export default function DataImport() {
   const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Google Drive 接続状態
-  const gdriveConnected = !!getSavedClientId() && gdriveIsTokenValid();
+  // Google Drive 接続状態（propsから受け取り、フォールバックとして自前チェック）
+  const gdriveConnected = gdriveConnectedProp ?? (!!getSavedClientId() && gdriveIsTokenValid());
 
   // --- Google Drive からドロー会議データを読み込む ---
   const handleLoadFromGDrive = useCallback(async () => {
     const token = gdriveGetSavedToken();
     if (!token) {
-      setImportResult({ success: false, message: 'Google Drive に接続されていません。バックアップ画面で接続してください。' });
+      setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
       return;
     }
     setIsLoadingGDrive(true);
@@ -364,7 +369,7 @@ export default function DataImport() {
   const handleListTournamentFiles = useCallback(async () => {
     const token = gdriveGetSavedToken();
     if (!token) {
-      setImportResult({ success: false, message: 'Google Drive に接続されていません。バックアップ画面で接続してください。' });
+      setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
       return;
     }
     setIsLoadingFileList(true);
@@ -1059,7 +1064,7 @@ export default function DataImport() {
             {isLoadingFileList ? '大会一覧を取得中...' : 'Google Drive の大会一覧から選択'}
           </button>
           {!gdriveConnected && (
-            <p className="text-[10px] text-gray-400 text-center -mt-1">※ バックアップ画面でGoogle Driveに接続すると利用できます</p>
+            <p className="text-[10px] text-gray-400 text-center -mt-1">※ 上部の Google ドライブ連携から接続すると利用できます</p>
           )}
 
           {/* Google Drive 大会一覧ファイルリスト */}

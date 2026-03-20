@@ -407,7 +407,7 @@ export default function Scoreboard() {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-4 print:p-0 print:space-y-2">
       {/* ===== HEADER ===== */}
-      <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0">
+      <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0 sticky top-0 z-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">

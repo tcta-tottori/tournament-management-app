@@ -1309,7 +1309,7 @@ export default function ScheduleSheet() {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-4">
       {/* Header */}
-      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main sticky top-0 z-10">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
           <CalendarClock className="w-6 h-6 text-primary-500" />
           時間割シート

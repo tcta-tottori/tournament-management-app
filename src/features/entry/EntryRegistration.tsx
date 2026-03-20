@@ -554,213 +554,187 @@ export default function EntryRegistration() {
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
     const displaySlots = redistributeByes(slots, drawSize);
-    const roundsCount = Math.log2(drawSize);
     const halfSize = drawSize / 2;
 
-    const isSlotBye = (i: number): boolean => {
-      const slot = i < displaySlots.length ? displaySlots[i] : null;
-      return !slot || (slot.isBye && !slot.entry);
-    };
-
-    // Round 0: コンパクトなY位置を計算
-    const r0Y: number[] = new Array(drawSize).fill(0);
-    let nextCompactY = OFFSET_Y;
-    for (let matchIdx = 0; matchIdx < drawSize / 2; matchIdx++) {
-      const topIdx = matchIdx * 2;
-      const botIdx = matchIdx * 2 + 1;
-      const topBye = isSlotBye(topIdx);
-      const botBye = isSlotBye(botIdx);
-
-      // 左山と右山の境界にスペースを追加
-      if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
-        nextCompactY += Y_SPACING * 0.8;
-      }
-
-      if (topBye && botBye) {
-        r0Y[topIdx] = nextCompactY;
-        r0Y[botIdx] = nextCompactY;
-      } else if (topBye) {
-        r0Y[topIdx] = nextCompactY;
-        r0Y[botIdx] = nextCompactY;
-        nextCompactY += Y_SPACING;
-      } else if (botBye) {
-        r0Y[topIdx] = nextCompactY;
-        r0Y[botIdx] = nextCompactY;
-        nextCompactY += Y_SPACING;
-      } else {
-        r0Y[topIdx] = nextCompactY;
-        r0Y[botIdx] = nextCompactY + Y_SPACING;
-        nextCompactY += Y_SPACING * 2;
-      }
-    }
-
-    const getCompactY = (r: number, i: number): number => {
-      if (r === 0) return r0Y[i];
-      return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
-    };
-
-    // Round 0 は選手カード表示(SLOT_WIDTH)、Round 1以降は線のみ(LINE_ONLY_W)
     const LINE_ONLY_W = 40;
     const getX = (r: number): number => {
       if (r === 0) return OFFSET_X;
-      // Round 0 のカード幅 + gap + (r-1) * 線のみ幅
       return OFFSET_X + SLOT_WIDTH + X_SPACING + (r - 1) * LINE_ONLY_W;
     };
-    // 各ラウンドのスロット描画幅（Round 0はカード幅、以降は線のみ幅）
     const getSlotW = (r: number): number => r === 0 ? SLOT_WIDTH : LINE_ONLY_W;
 
-    // Container dimensions (接続線は優勝まで描画)
-    const containerWidth = getX(roundsCount) + OFFSET_X;
-    const containerHeight = nextCompactY + SLOT_HEIGHT;
+    // === ブラケットセクション描画ヘルパー（左山/右山それぞれ独立描画） ===
+    const renderBracketSection = (
+      sectionSlots: CheckInSlot[],
+      sectionDrawSize: number,
+      globalVisibleOffset: number,
+      keyPrefix: string,
+      label?: { text: string; colorClass: string; borderClass: string; bgClass: string }
+    ) => {
+      const sectionRoundsCount = Math.log2(sectionDrawSize);
+      const isBye = (i: number): boolean => {
+        const s = i < sectionSlots.length ? sectionSlots[i] : null;
+        return !s || (s.isBye && !s.entry);
+      };
 
-    // === SVG ブラケット線 (優勝まで全ラウンド描画) ===
-    const svgPaths: React.ReactNode[] = [];
-    for (let r = 0; r < roundsCount; r++) {
-      const numMatches = drawSize / Math.pow(2, r + 1);
-      for (let m = 0; m < numMatches; m++) {
-        // Round 0: カード右端から開始、Round 1+: スロット左端から開始して途切れなくする
-        const xArmStart = r === 0 ? getX(r) + getSlotW(r) : getX(r);
-        const xNext = getX(r + 1);
-        const xMid = (xArmStart + xNext) / 2;
-
-        const yTop = getCompactY(r, m * 2) + SLOT_HEIGHT / 2;
-        const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
-        const yMid = getCompactY(r + 1, m) + SLOT_HEIGHT / 2;
-
-        if (r === 0) {
-          const topBye = isSlotBye(m * 2);
-          const botBye = isSlotBye(m * 2 + 1);
-          if (topBye && botBye) continue;
-          if (topBye || botBye) {
-            const playerY = topBye ? yBottom : yTop;
-            svgPaths.push(<path key={`r${r}-m${m}-bye`} d={`M ${xArmStart} ${playerY} L ${xNext} ${playerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-            continue;
-          }
-        }
-
-        svgPaths.push(<path key={`r${r}-m${m}-top`} d={`M ${xArmStart} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-        svgPaths.push(<path key={`r${r}-m${m}-bottom`} d={`M ${xArmStart} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-        svgPaths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      // Y位置計算（セクション内で独立）
+      const r0Y: number[] = new Array(sectionDrawSize).fill(0);
+      let nextY = OFFSET_Y;
+      for (let mi = 0; mi < sectionDrawSize / 2; mi++) {
+        const t = mi * 2, b = mi * 2 + 1;
+        const tBye = isBye(t), bBye = isBye(b);
+        if (tBye && bBye) { r0Y[t] = nextY; r0Y[b] = nextY; }
+        else if (tBye) { r0Y[t] = nextY; r0Y[b] = nextY; nextY += Y_SPACING; }
+        else if (bBye) { r0Y[t] = nextY; r0Y[b] = nextY; nextY += Y_SPACING; }
+        else { r0Y[t] = nextY; r0Y[b] = nextY + Y_SPACING; nextY += Y_SPACING * 2; }
       }
-    }
 
-    // === 全ラウンドのスロット描画 ===
-    const allSlotElements: React.ReactNode[] = [];
+      const getY = (r: number, i: number): number => {
+        if (r === 0) return r0Y[i];
+        return (getY(r - 1, i * 2) + getY(r - 1, i * 2 + 1)) / 2;
+      };
 
-    // Round 0: 選手スロット
-    let visibleIndex = 0;
-    for (let i = 0; i < drawSize; i++) {
-      const slot = i < displaySlots.length ? displaySlots[i] : null;
-      if (!slot || (slot.isBye && !slot.entry)) continue;
-      visibleIndex++;
-      const x = getX(0);
-      const y = r0Y[i];
+      const secWidth = getX(sectionRoundsCount) + OFFSET_X;
+      const secHeight = nextY + SLOT_HEIGHT;
 
-      const isWithdrawn = slot.entry?.status === 'withdrawn';
-      const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
-      const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
-      const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+      // SVG ブラケット線
+      const paths: React.ReactNode[] = [];
+      for (let r = 0; r < sectionRoundsCount; r++) {
+        const nm = sectionDrawSize / Math.pow(2, r + 1);
+        for (let m = 0; m < nm; m++) {
+          const xS = r === 0 ? getX(r) + getSlotW(r) : getX(r);
+          const xN = getX(r + 1);
+          const xM = (xS + xN) / 2;
+          const yT = getY(r, m * 2) + SLOT_HEIGHT / 2;
+          const yB = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
+          const yM = getY(r + 1, m) + SLOT_HEIGHT / 2;
+          if (r === 0) {
+            if (isBye(m * 2) && isBye(m * 2 + 1)) continue;
+            if (isBye(m * 2) || isBye(m * 2 + 1)) {
+              const pY = isBye(m * 2) ? yB : yT;
+              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              continue;
+            }
+          }
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        }
+      }
 
-      let statusDotColor = '#d1d5db';
-      if (isWithdrawn) statusDotColor = '#ef4444';
-      else if (isConfirmed) statusDotColor = '#22c55e';
-
-      let borderClass = 'border-gray-300';
-      let bgClass = 'bg-white';
-      if (isWithdrawn) { bgClass = 'bg-red-50/60'; borderClass = 'border-red-200'; }
-      else if (isConfirmed) { bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
-
-      allSlotElements.push(
-        <div key={`slot-${slot.drawPosition}`}
-          className={`absolute flex items-center border rounded shadow-sm transition-all ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
-          style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
-          <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{visibleIndex}</div>
-          {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
-          <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
-            {slot.entry ? (
-              <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
-                <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
-                  {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
-                </div>
-                {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
-              </button>
-            ) : <span className="text-sm text-gray-300">---</span>}
-          </div>
-          <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} /></div>
-          {slot.entry && (
-            <div className="flex-shrink-0 mr-1">
-              {isWithdrawn ? (
-                <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
-              ) : (
-                <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
-              )}
+      // 選手スロット描画
+      const elems: React.ReactNode[] = [];
+      let vi = globalVisibleOffset;
+      for (let i = 0; i < sectionDrawSize; i++) {
+        const slot = i < sectionSlots.length ? sectionSlots[i] : null;
+        if (!slot || (slot.isBye && !slot.entry)) continue;
+        vi++;
+        const x = getX(0), y = r0Y[i];
+        const isWithdrawn = slot.entry?.status === 'withdrawn';
+        const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
+        const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
+        const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
+        let dotColor = '#d1d5db';
+        if (isWithdrawn) dotColor = '#ef4444';
+        else if (isConfirmed) dotColor = '#22c55e';
+        let borderCls = 'border-gray-300', bgCls = 'bg-white';
+        if (isWithdrawn) { bgCls = 'bg-red-50/60'; borderCls = 'border-red-200'; }
+        else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
+        elems.push(
+          <div key={`${keyPrefix}-slot-${slot.drawPosition}`}
+            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+            style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
+            <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{vi}</div>
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
+              {slot.entry ? (
+                <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
+                  <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                    {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
+                  </div>
+                  {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
+                </button>
+              ) : <span className="text-sm text-gray-300">---</span>}
             </div>
-          )}
+            <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: dotColor }} /></div>
+            {slot.entry && (
+              <div className="flex-shrink-0 mr-1">
+                {isWithdrawn ? (
+                  <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
+                ) : (
+                  <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Left/Right ラベル
+      const labelEl = label ? (
+        <div className="absolute flex items-center justify-center"
+          style={{ left: 0, top: OFFSET_Y, width: 22, height: Math.max(nextY - OFFSET_Y, 40) }}>
+          <div className={`${label.bgClass} border-l-2 ${label.borderClass} rounded-r px-0.5 py-1 h-full flex items-center justify-center`}>
+            <span className={`text-[9px] font-bold ${label.colorClass} tracking-wider`} style={{ writingMode: 'vertical-rl' }}>{label.text}</span>
+          </div>
+        </div>
+      ) : null;
+
+      return (
+        <div className="overflow-auto">
+          <div className="relative" style={{ width: secWidth, height: secHeight, minWidth: secWidth }}>
+            {labelEl}
+            <svg className="absolute inset-0 pointer-events-none" width={secWidth} height={secHeight}>{paths}</svg>
+            {elems}
+          </div>
+        </div>
+      );
+    };
+
+    // 統計ヘッダー
+    const statsHeader = draw ? (
+      <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+          ドロー <strong className="text-gray-800">{draw.drawSize}</strong>
+        </span>
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          エントリー <strong className="text-gray-800">{slots.filter(s => s.entry && !s.isBye).length}</strong>
+        </span>
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+          欠場 <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
+        </span>
+      </div>
+    ) : null;
+
+    // ドローサイズ < 8 は単一表示、8以上はPC2列/スマホ1列
+    if (drawSize < 8) {
+      return (
+        <div>
+          {statsHeader}
+          {renderBracketSection(displaySlots, drawSize, 0, 'full')}
         </div>
       );
     }
 
-
-    // Left side / Right side ラベル（全体をカバー）
-    const halfLabelElements: React.ReactNode[] = [];
-    if (drawSize >= 4) {
-      const topHalfY = OFFSET_Y;
-      const bottomHalfStartIdx = halfSize;
-      const bottomHalfY = r0Y[bottomHalfStartIdx] || (nextCompactY / 2 + Y_SPACING);
-
-      // 左山（上半分）の高さを算出
-      const topHalfEndY = bottomHalfY - Y_SPACING * 0.4;
-      const topHalfHeight = Math.max(topHalfEndY - topHalfY, 40);
-
-      // 右山（下半分）の高さを算出
-      const bottomHalfEndY = nextCompactY;
-      const bottomHalfHeight = Math.max(bottomHalfEndY - bottomHalfY, 40);
-
-      halfLabelElements.push(
-        <div key="label-left" className="absolute flex items-center justify-center"
-          style={{ left: 0, top: topHalfY, width: 22, height: topHalfHeight }}>
-          <div className="bg-primary-500/10 border-l-2 border-primary-500 rounded-r px-0.5 py-1 h-full flex items-center justify-center">
-            <span className="text-[9px] font-bold text-primary-600 tracking-wider" style={{ writingMode: 'vertical-rl' }}>Left side</span>
-          </div>
-        </div>
-      );
-      halfLabelElements.push(
-        <div key="label-right" className="absolute flex items-center justify-center"
-          style={{ left: 0, top: bottomHalfY, width: 22, height: bottomHalfHeight }}>
-          <div className="bg-orange-500/10 border-l-2 border-orange-500 rounded-r px-0.5 py-1 h-full flex items-center justify-center">
-            <span className="text-[9px] font-bold text-orange-600 tracking-wider" style={{ writingMode: 'vertical-rl' }}>Right side</span>
-          </div>
-        </div>
-      );
+    // 左山・右山に分割
+    const leftSlots = displaySlots.slice(0, halfSize);
+    const rightSlots = displaySlots.slice(halfSize);
+    let leftVisCount = 0;
+    for (const s of leftSlots) {
+      if (s && !(s.isBye && !s.entry)) leftVisCount++;
     }
 
     return (
       <div>
-        {draw && (
-          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5 text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-              ドロー <strong className="text-gray-800">{draw.drawSize}</strong>
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              エントリー <strong className="text-gray-800">{slots.filter(s => s.entry && !s.isBye).length}</strong>
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-              欠場 <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
-            </span>
-          </div>
-        )}
-
-        <div className="overflow-auto">
-          <div className="relative" style={{ width: containerWidth, height: containerHeight, minWidth: containerWidth }}>
-            {halfLabelElements}
-            <svg className="absolute inset-0 pointer-events-none" width={containerWidth} height={containerHeight}>
-              {svgPaths}
-            </svg>
-            {allSlotElements}
-          </div>
+        {statsHeader}
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          {renderBracketSection(leftSlots, halfSize, 0, 'left',
+            { text: 'Left side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
+          {renderBracketSection(rightSlots, halfSize, leftVisCount, 'right',
+            { text: 'Right side', colorClass: 'text-orange-600', borderClass: 'border-orange-500', bgClass: 'bg-orange-500/10' })}
         </div>
       </div>
     );
@@ -866,7 +840,7 @@ export default function EntryRegistration() {
   return (
     <div className="max-w-full mx-auto h-full flex flex-col lg:flex-row lg:gap-4 p-4">
       {/* LEFT: コントロールパネル */}
-      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0">
+      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0 sticky top-0 z-10 lg:self-start">
         <button onClick={() => setControlsOpen(prev => !prev)}
           className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors">
           <div className="flex items-center gap-2">
