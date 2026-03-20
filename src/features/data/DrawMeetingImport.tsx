@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw, FolderOpen } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw, FolderOpen, X, Loader2 } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import {
@@ -1073,53 +1074,6 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
             <p className="text-[10px] text-gray-400 text-center -mt-1">※ 上部の Google ドライブ連携から接続すると利用できます</p>
           )}
 
-          {/* Google Drive 大会一覧ファイルリスト */}
-          {showFileList && gdriveFileList.length > 0 && (
-            <div className="bg-white rounded-lg border border-[#1a73e8]/20 overflow-hidden">
-              <div className="px-4 py-2.5 bg-[#e8f0fe] border-b border-[#1a73e8]/20 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-[#1a73e8]" />
-                  <span className="text-xs font-bold text-[#1a73e8]">大会一覧</span>
-                  <span className="text-[10px] text-gray-500">{gdriveFileList.length}件</span>
-                </div>
-                <button
-                  onClick={() => setShowFileList(false)}
-                  className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  閉じる
-                </button>
-              </div>
-              <div className="max-h-64 overflow-auto divide-y divide-gray-100">
-                {gdriveFileList.map(f => {
-                  const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
-                  const modDate = new Date(f.modifiedTime);
-                  const isLoading = loadingFileId === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => handleSelectTournamentFile(f)}
-                      disabled={!!loadingFileId}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#e8f0fe]/50 transition-colors disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <RefreshCw className="w-4 h-4 text-[#1a73e8] animate-spin shrink-0" />
-                      ) : (
-                        <FileSpreadsheet className="w-4 h-4 text-[#1a73e8]/60 shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
-                        <p className="text-[10px] text-gray-400">
-                          更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      <Download className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* ドロー会議の最新データ読込 */}
           <button
             onClick={handleLoadFromGDrive}
@@ -1638,6 +1592,71 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
             </button>
           </div>
         </div>
+      )}
+      {/* Google Drive 大会一覧ポップアップ - createPortal で画面中央表示 */}
+      {showFileList && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <GoogleDriveIcon className="w-5 h-5" />
+                <h3 className="text-base font-bold text-gray-900">大会一覧</h3>
+                <span className="text-xs text-gray-400">{gdriveFileList.length}件</span>
+              </div>
+              <button onClick={() => setShowFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {gdriveFileList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <p className="text-sm">ファイルがありません</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {gdriveFileList.map(f => {
+                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                    const modDate = new Date(f.modifiedTime);
+                    const isLoading = loadingFileId === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => handleSelectTournamentFile(f)}
+                        disabled={!!loadingFileId}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <p className="text-xs text-gray-400 text-center">
+                鳥取テニス協会バックアップ &gt; 大会運営システム &gt; 大会一覧
+              </p>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
