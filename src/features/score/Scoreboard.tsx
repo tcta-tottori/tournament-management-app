@@ -731,7 +731,6 @@ export default function Scoreboard() {
             </div>
           ) : (
             perEventData.map(evtData => {
-              const makeEvtRoundName = (round: number) => getRoundName(round, evtData.totalRounds);
               return (
                 <section key={evtData.event.eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
                   {/* Event header */}
@@ -819,6 +818,7 @@ export default function Scoreboard() {
                 const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
                 return evtData ? getRoundName(round, evtData.totalRounds) : `${round}回戦`;
               }}
+              isLeague={perEventData.find(d => d.event.eventId === selectedAllEventId)?.isRoundRobin}
             />
           )}
         </div>
@@ -874,6 +874,7 @@ export default function Scoreboard() {
               onClose={() => setSelectedMatchKey(null)}
               onMatchUpdate={() => {}}
               getRoundName={makeRoundName}
+              isLeague={isRoundRobin}
             />
           )}
         </div>

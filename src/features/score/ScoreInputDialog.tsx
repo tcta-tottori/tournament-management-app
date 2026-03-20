@@ -47,6 +47,7 @@ interface ScoreInputDialogProps {
   onMatchUpdate: () => void;
   getRoundName: (round: number) => string;
   bestOf?: number; // 何セットマッチか（デフォルト1セットマッチ）
+  isLeague?: boolean; // リーグ戦の場合は次ラウンド進出を行わない
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,7 @@ export default function ScoreInputDialog({
   onMatchUpdate,
   getRoundName,
   bestOf = 1,
+  isLeague = false,
 }: ScoreInputDialogProps) {
   // セットスコア入力（最大3セット）
   const maxSets = bestOf >= 3 ? 3 : 1;
@@ -238,24 +240,26 @@ export default function ScoreInputDialog({
         status: 'finished', score: scoreStr, winnerEntryId, updatedAt: Date.now(),
       });
 
-      // 次ラウンドへ勝者を反映
-      const dbMatch = await db.matches.get(match.dbId);
-      if (dbMatch) {
-        const nextRound = match.round + 1;
-        const nextPosition = Math.ceil(match.position / 2);
-        const nextMatch = await db.matches
-          .where('eventId').equals(dbMatch.eventId)
-          .filter(m => m.round === nextRound && m.position === nextPosition)
-          .first();
-        if (nextMatch?.id) {
-          const isUpper = match.position % 2 === 1;
-          await db.matches.update(nextMatch.id, {
-            ...(isUpper
-              ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-              : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-            ),
-            updatedAt: Date.now(),
-          });
+      // 次ラウンドへ勝者を反映（リーグ戦では不要）
+      if (!isLeague) {
+        const dbMatch = await db.matches.get(match.dbId);
+        if (dbMatch) {
+          const nextRound = match.round + 1;
+          const nextPosition = Math.ceil(match.position / 2);
+          const nextMatch = await db.matches
+            .where('eventId').equals(dbMatch.eventId)
+            .filter(m => m.round === nextRound && m.position === nextPosition)
+            .first();
+          if (nextMatch?.id) {
+            const isUpper = match.position % 2 === 1;
+            await db.matches.update(nextMatch.id, {
+              ...(isUpper
+                ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+                : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+              ),
+              updatedAt: Date.now(),
+            });
+          }
         }
       }
       onMatchUpdate();
@@ -267,23 +271,25 @@ export default function ScoreInputDialog({
     if (!confirm('この試合をリセットしますか？')) return;
     setIsProcessing(true);
     try {
-      const dbMatch = await db.matches.get(match.dbId);
-      if (dbMatch) {
-        const nextRound = match.round + 1;
-        const nextPosition = Math.ceil(match.position / 2);
-        const nextMatch = await db.matches
-          .where('eventId').equals(dbMatch.eventId)
-          .filter(m => m.round === nextRound && m.position === nextPosition)
-          .first();
-        if (nextMatch?.id) {
-          const isUpper = match.position % 2 === 1;
-          await db.matches.update(nextMatch.id, {
-            ...(isUpper
-              ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
-              : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
-            ),
-            updatedAt: Date.now(),
-          });
+      if (!isLeague) {
+        const dbMatch = await db.matches.get(match.dbId);
+        if (dbMatch) {
+          const nextRound = match.round + 1;
+          const nextPosition = Math.ceil(match.position / 2);
+          const nextMatch = await db.matches
+            .where('eventId').equals(dbMatch.eventId)
+            .filter(m => m.round === nextRound && m.position === nextPosition)
+            .first();
+          if (nextMatch?.id) {
+            const isUpper = match.position % 2 === 1;
+            await db.matches.update(nextMatch.id, {
+              ...(isUpper
+                ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
+                : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
+              ),
+              updatedAt: Date.now(),
+            });
+          }
         }
       }
       await db.matches.update(match.dbId, {

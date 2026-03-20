@@ -339,34 +339,40 @@ export default function MatchManager() {
       updatedAt: Date.now(),
     });
 
-    // 次ラウンドへの自動進出
+    // 次ラウンドへの自動進出（リーグ戦では不要）
     if (selectedEventId) {
-      const nextRound = m.round + 1;
-      const nextPosition = Math.ceil(m.position / 2);
-      const nextMatch = await db.matches
-        .where('eventId').equals(selectedEventId)
-        .filter(nm => nm.round === nextRound && nm.position === nextPosition)
-        .first();
+      const eventDraw = await db.draws.where('eventId').equals(selectedEventId).first();
+      const ds = eventDraw?.drawSize || 0;
+      const isLeague = eventDraw?.drawType === 'roundRobin' || (ds > 0 && (ds & (ds - 1)) !== 0);
 
-      if (nextMatch?.id) {
-        const isUpper = m.position % 2 === 1;
-        if (winnerEntryId) {
-          await db.matches.update(nextMatch.id, {
-            ...(isUpper
-              ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-              : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-            ),
-            updatedAt: Date.now(),
-          });
-        } else {
-          await db.matches.update(nextMatch.id, {
-            ...(isUpper
-              ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
-              : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
-            ),
-            ...(nextMatch.winnerEntryId ? { winnerEntryId: null, score: '', status: 'waiting' } : {}),
-            updatedAt: Date.now(),
-          });
+      if (!isLeague) {
+        const nextRound = m.round + 1;
+        const nextPosition = Math.ceil(m.position / 2);
+        const nextMatch = await db.matches
+          .where('eventId').equals(selectedEventId)
+          .filter(nm => nm.round === nextRound && nm.position === nextPosition)
+          .first();
+
+        if (nextMatch?.id) {
+          const isUpper = m.position % 2 === 1;
+          if (winnerEntryId) {
+            await db.matches.update(nextMatch.id, {
+              ...(isUpper
+                ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+                : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+              ),
+              updatedAt: Date.now(),
+            });
+          } else {
+            await db.matches.update(nextMatch.id, {
+              ...(isUpper
+                ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
+                : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
+              ),
+              ...(nextMatch.winnerEntryId ? { winnerEntryId: null, score: '', status: 'waiting' } : {}),
+              updatedAt: Date.now(),
+            });
+          }
         }
       }
     }

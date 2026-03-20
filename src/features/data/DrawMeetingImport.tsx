@@ -834,9 +834,15 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
           };
         });
 
+        // drawType を判定: drawSize が2のべき乗でなければリーグ戦
+        const ds = result.drawSize;
+        const isPowerOf2 = ds > 0 && (ds & (ds - 1)) === 0;
+        const drawType: 'tournament' | 'roundRobin' = isPowerOf2 ? 'tournament' : 'roundRobin';
+
         await db.draws.add({
           eventId,
           drawSize: result.drawSize,
+          drawType,
           slots,
           updatedAt: now,
         });
