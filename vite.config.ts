@@ -3,9 +3,19 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// ビルド時のタイムスタンプを環境変数として埋め込み
+const buildTimestamp = new Date().toLocaleString('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit',
+});
+
 // https://vite.dev/config/
 export default defineConfig({
   base: '/tournament-management-app/',
+  define: {
+    __BUILD_TIMESTAMP__: JSON.stringify(buildTimestamp),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -14,6 +24,20 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        // ナビゲーションリクエストはネットワーク優先でキャッシュの陳腐化を防ぐ
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/],
+        runtimeCaching: [
+          {
+            urlPattern: /\.(?:js|css)$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'static-resources',
+              expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 },
+            },
+          },
+        ],
       },
       includeAssets: ['logo.png'],
       manifest: {

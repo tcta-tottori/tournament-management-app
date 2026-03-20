@@ -136,7 +136,10 @@ export default function AppLayout() {
             <span className="hidden sm:inline">ドロー会議</span>
             <ExternalLink className="w-3 h-3" />
           </a>
-          <span className="header-version">v1.0</span>
+          <div className="flex flex-col items-center">
+            <span className="header-version">v1.1</span>
+            <span className="text-[8px] text-white/40 leading-tight mt-0.5 whitespace-nowrap">{__BUILD_TIMESTAMP__}</span>
+          </div>
         </div>
       </header>
 

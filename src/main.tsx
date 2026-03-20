@@ -9,6 +9,26 @@ import { loadSeedDataIfNeeded } from './db/database'
 // 初期データ（ふりがな・所属ふりがな）をプリロード
 loadSeedDataIfNeeded();
 
+// PWA Service Worker 更新検知 — 新バージョン検出時に自動リロード
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then((registration) => {
+    registration.addEventListener('updatefound', () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          // 新バージョンがアクティブ化されたらリロード
+          window.location.reload();
+        }
+      });
+    });
+  });
+  // 起動時に即座にアップデートを確認
+  navigator.serviceWorker.getRegistration().then((reg) => {
+    reg?.update();
+  });
+}
+
 import EntryRegistration from './features/entry/EntryRegistration'
 import DrawGenerator from './features/draw/DrawGenerator'
 import DrawBoard from './features/draw/DrawBoard'
