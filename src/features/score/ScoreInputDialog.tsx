@@ -329,13 +329,13 @@ export default function ScoreInputDialog({
   const roundName = getRoundName(match.round);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
 
       {/* Dialog */}
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 m-auto shrink-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
