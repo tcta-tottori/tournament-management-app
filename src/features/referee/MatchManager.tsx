@@ -119,19 +119,23 @@ export default function MatchManager() {
   const buildMatchCall = useCallback((m: Match, courtNum: string): MatchCall | null => {
     if (!m.player1Name || !m.player2Name) return null;
 
-    const getPos = (entryId: string | null) => {
-      if (!entryId || !drawData?.slots) return 0;
-      const slot = drawData.slots.find(s => s.entryId === entryId);
+    const getPos = (entryId: string | null, eventId?: string) => {
+      if (!entryId) return 0;
+      // 該当種目のdrawを使用（選択種目以外の試合にも対応）
+      const draw = eventId ? allDraws.get(eventId) : drawData;
+      if (!draw?.slots) return 0;
+      const slot = draw.slots.find((s: DrawSlot) => s.entryId === entryId);
       return slot?.position ?? 0;
     };
 
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
-      if (!entryId) return { name: fallbackName, aff: fallbackAff };
+      if (!entryId) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
       const entry = entries.find(e => e.entryId === entryId);
-      if (!entry) return { name: fallbackName, aff: fallbackAff };
+      if (!entry) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
       const player = players.find(p => p.playerId === entry.playerId);
-      if (!player) return { name: fallbackName, aff: fallbackAff };
-      return { name: player.furigana || player.name, aff: player.affiliation };
+      if (!player) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
+      const affReading = affiliationFuriganaMap[player.affiliation] || player.affiliation;
+      return { name: player.furigana || player.name, aff: affReading };
     };
 
     const isDoubles = currentEvent?.type === 'Doubles';
@@ -172,12 +176,12 @@ export default function MatchManager() {
         id: m.id || 0,
         eventName: currentEvent?.name || '',
         round: `${roundName} #${m.position}`,
-        numberA: getPos(m.player1EntryId),
+        numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
         affA: p1.aff,
         pairNameA: partnerA.name,
         pairAffA: partnerA.aff,
-        numberB: getPos(m.player2EntryId),
+        numberB: getPos(m.player2EntryId, m.eventId),
         nameB: p2.name,
         affB: p2.aff,
         pairNameB: partnerB.name,
@@ -195,10 +199,10 @@ export default function MatchManager() {
         id: m.id || 0,
         eventName: currentEvent?.name || '',
         round: `${roundName} #${m.position}`,
-        numberA: getPos(m.player1EntryId),
+        numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
         affA: p1.aff,
-        numberB: getPos(m.player2EntryId),
+        numberB: getPos(m.player2EntryId, m.eventId),
         nameB: p2.name,
         affB: p2.aff,
         type: 'singles',
@@ -207,7 +211,7 @@ export default function MatchManager() {
         startTime: m.scheduledTime || '',
       };
     }
-  }, [drawData, entries, players, currentEvent, totalRounds]);
+  }, [drawData, allDraws, entries, players, currentEvent, totalRounds, affiliationFuriganaMap]);
 
   // コール実行
   const handleVoiceCall = useCallback((m: Match, courtNum: string) => {
@@ -999,14 +1003,14 @@ ${printableMatches.map(m => {
 
                 {/* 試合リスト - 固定列幅テーブル */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse" style={{ tableLayout: 'fixed' }}>
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '480px' }}>
                     <colgroup>
-                      <col style={{ width: '44px' }} />   {/* # */}
+                      <col style={{ width: '36px' }} />    {/* # */}
                       <col />                              {/* Player 1 */}
-                      <col style={{ width: '32px' }} />    {/* vs */}
+                      <col style={{ width: '28px' }} />    {/* vs */}
                       <col />                              {/* Player 2 */}
-                      <col style={{ width: '80px' }} />    {/* Score */}
-                      <col style={{ width: '64px' }} />    {/* Status */}
+                      <col style={{ width: '72px' }} />    {/* Score */}
+                      <col style={{ width: '56px' }} />    {/* Status */}
                       <col style={{ width: '130px' }} />   {/* Actions */}
                     </colgroup>
                     <tbody className="text-sm">

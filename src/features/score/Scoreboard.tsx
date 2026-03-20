@@ -427,24 +427,27 @@ export default function Scoreboard() {
         updatedAt: Date.now()
       });
 
-      const nextRound = match.round + 1;
-      const nextPosition = Math.ceil(match.position / 2);
-      const nextMatch = await db.matches
-        .where('eventId').equals(match.eventId)
-        .filter(m => m.round === nextRound && m.position === nextPosition)
-        .first();
+      // 次ラウンドへの自動進出（リーグ戦では不要）
+      if (!isRoundRobin) {
+        const nextRound = match.round + 1;
+        const nextPosition = Math.ceil(match.position / 2);
+        const nextMatch = await db.matches
+          .where('eventId').equals(match.eventId)
+          .filter(m => m.round === nextRound && m.position === nextPosition)
+          .first();
 
-      if (nextMatch?.id) {
-        const winnerName = winnerNum === 1 ? match.player1Name : match.player2Name;
-        const winnerAff = winnerNum === 1 ? match.player1Affiliation : match.player2Affiliation;
-        const isUpper = match.position % 2 === 1;
-        await db.matches.update(nextMatch.id, {
-          ...(isUpper
-            ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
-            : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
-          ),
-          updatedAt: Date.now()
-        });
+        if (nextMatch?.id) {
+          const winnerName = winnerNum === 1 ? match.player1Name : match.player2Name;
+          const winnerAff = winnerNum === 1 ? match.player1Affiliation : match.player2Affiliation;
+          const isUpper = match.position % 2 === 1;
+          await db.matches.update(nextMatch.id, {
+            ...(isUpper
+              ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+              : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }
+            ),
+            updatedAt: Date.now()
+          });
+        }
       }
 
       setEditingMatchId(null);
@@ -461,22 +464,25 @@ export default function Scoreboard() {
     if (!confirm('この試合を待機状態に戻しますか？')) return;
     setIsProcessing(true);
     try {
-      const nextRound = match.round + 1;
-      const nextPosition = Math.ceil(match.position / 2);
-      const nextMatch = await db.matches
-        .where('eventId').equals(match.eventId)
-        .filter(m => m.round === nextRound && m.position === nextPosition)
-        .first();
+      // 次ラウンドのクリア（リーグ戦では不要）
+      if (!isRoundRobin) {
+        const nextRound = match.round + 1;
+        const nextPosition = Math.ceil(match.position / 2);
+        const nextMatch = await db.matches
+          .where('eventId').equals(match.eventId)
+          .filter(m => m.round === nextRound && m.position === nextPosition)
+          .first();
 
-      if (nextMatch?.id) {
-        const isUpper = match.position % 2 === 1;
-        await db.matches.update(nextMatch.id, {
-          ...(isUpper
-            ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
-            : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
-          ),
-          updatedAt: Date.now()
-        });
+        if (nextMatch?.id) {
+          const isUpper = match.position % 2 === 1;
+          await db.matches.update(nextMatch.id, {
+            ...(isUpper
+              ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
+              : { player2EntryId: null, player2Name: '', player2Affiliation: '' }
+            ),
+            updatedAt: Date.now()
+          });
+        }
       }
 
       await db.matches.update(match.id, {
@@ -545,22 +551,22 @@ export default function Scoreboard() {
               <MonitorPlay className="w-6 h-6 text-primary-500" />
               スコアボード
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
               トーナメント／リーグの対戦状況・スコア管理
             </p>
           </div>
 
           {/* View mode toggle */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* 全種目 / 個別 切替 */}
             <div className="flex rounded-lg border border-border-main overflow-hidden">
               <button
                 onClick={() => { setShowAllEvents(true); setSelectedMatchKey(null); }}
-                className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                   showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />全種目
+                <Layers className="w-3.5 h-3.5" /><span className="hidden xs:inline">全種目</span><span className="xs:hidden">全</span>
               </button>
               <button
                 onClick={() => {
@@ -570,11 +576,11 @@ export default function Scoreboard() {
                     setSelectedEventIdx(events.length >= 2 ? events.length - 2 : 0);
                   }
                 }}
-                className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                   !showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <Eye className="w-3.5 h-3.5" />個別
+                <Eye className="w-3.5 h-3.5" /><span className="hidden xs:inline">個別</span><span className="xs:hidden">1</span>
               </button>
             </div>
 
@@ -582,18 +588,18 @@ export default function Scoreboard() {
               <div className="flex rounded-lg border border-border-main overflow-hidden">
                 <button
                   onClick={() => { setViewMode('bracket'); setSelectedMatchKey(null); }}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                     viewMode === 'bracket'
                       ? 'bg-primary-500 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   {isRoundRobin ? <LayoutGrid className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
-                  {isRoundRobin ? 'リーグ' : 'ブラケット'}
+                  {isRoundRobin ? 'リーグ' : 'トーナメント'}
                 </button>
                 <button
                   onClick={() => { setViewMode('table'); setSelectedMatchKey(null); }}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                     viewMode === 'table'
                       ? 'bg-primary-500 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -606,10 +612,10 @@ export default function Scoreboard() {
             )}
             <button
               onClick={handlePrintBracket}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white text-gray-600 border border-border-main rounded-lg hover:bg-gray-50 transition-colors print:hidden"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-medium bg-white text-gray-600 border border-border-main rounded-lg hover:bg-gray-50 transition-colors print:hidden"
             >
               <Printer className="w-3.5 h-3.5" />
-              印刷
+              <span className="hidden sm:inline">印刷</span>
             </button>
           </div>
         </div>
@@ -900,7 +906,7 @@ export default function Scoreboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="font-bold text-gray-900 whitespace-nowrap">{m.player1Name}</p>
+                          <p className="font-bold text-gray-900 truncate">{m.player1Name}</p>
                           <p className="text-xs text-gray-500">{m.player1Affiliation}</p>
                         </div>
                         {editingMatchId === m.matchId && (
@@ -913,7 +919,7 @@ export default function Scoreboard() {
                       <div className="text-center text-xs text-gray-500">vs</div>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="font-bold text-gray-900 whitespace-nowrap">{m.player2Name}</p>
+                          <p className="font-bold text-gray-900 truncate">{m.player2Name}</p>
                           <p className="text-xs text-gray-500">{m.player2Affiliation}</p>
                         </div>
                         {editingMatchId === m.matchId && (
@@ -962,23 +968,23 @@ export default function Scoreboard() {
                 待機中 ({waitingMatches.length})
               </h2>
               <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
                   <thead className="bg-primary-50 text-xs font-semibold text-gray-900">
                     <tr>
-                      <th className="py-2 px-3 w-10 border-b-2 border-border-main">#</th>
-                      <th className="py-2 px-3 border-b-2 border-border-main">対戦</th>
-                      <th className="py-2 px-3 w-32 border-b-2 border-border-main">コート</th>
-                      <th className="py-2 px-3 w-24 border-b-2 border-border-main"></th>
+                      <th className="py-2 px-2 sm:px-3 w-8 sm:w-10 border-b-2 border-border-main">#</th>
+                      <th className="py-2 px-2 sm:px-3 border-b-2 border-border-main">対戦</th>
+                      <th className="py-2 px-2 sm:px-3 w-24 sm:w-32 border-b-2 border-border-main">コート</th>
+                      <th className="py-2 px-2 sm:px-3 w-20 sm:w-24 border-b-2 border-border-main"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {waitingMatches.map((m, idx) => (
                       <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
-                        <td className="py-2 px-3 font-mono text-gray-500">{m.matchOrder}</td>
-                        <td className="py-2 px-3">
-                          <span className="font-medium whitespace-nowrap">{m.player1Name}</span>
-                          <span className="text-gray-500 mx-2">vs</span>
-                          <span className="font-medium whitespace-nowrap">{m.player2Name}</span>
+                        <td className="py-2 px-2 sm:px-3 font-mono text-gray-500">{m.matchOrder}</td>
+                        <td className="py-2 px-2 sm:px-3">
+                          <span className="font-medium">{m.player1Name}</span>
+                          <span className="text-gray-500 mx-1 sm:mx-2">vs</span>
+                          <span className="font-medium">{m.player2Name}</span>
                         </td>
                         <td className="py-2 px-3">
                           <select value={m.courtId || ''} onChange={e => handleAssignCourt(m.matchId, e.target.value)}
