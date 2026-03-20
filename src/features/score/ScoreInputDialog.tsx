@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { buildCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -334,7 +335,7 @@ export default function ScoreInputDialog({
   const canCall = !!match.courtId && !isFinished;
   const roundName = getRoundName(match.round);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
@@ -554,6 +555,7 @@ export default function ScoreInputDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
