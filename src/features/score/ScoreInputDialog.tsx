@@ -335,17 +335,17 @@ export default function ScoreInputDialog({
   const roundName = getRoundName(match.round);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
 
       {/* Dialog */}
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 m-auto shrink-0"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 m-auto shrink-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-4">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 text-primary-200 text-xs">
@@ -379,11 +379,11 @@ export default function ScoreInputDialog({
         </div>
 
         {/* Players */}
-        <div className="px-6 py-5">
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+        <div className="px-4 sm:px-6 py-4 sm:py-5">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 sm:gap-3 items-center">
             {/* Player 1 */}
             <div className={`text-center ${match.winnerEntryId === match.player1EntryId && isFinished ? '' : ''}`}>
-              <p className={`font-bold text-lg leading-tight ${
+              <p className={`font-bold text-base sm:text-lg leading-tight ${
                 match.winnerEntryId === match.player1EntryId && isFinished ? 'text-primary-600' : 'text-gray-900'
               }`}>
                 {match.player1Name || '(未定)'}
@@ -398,7 +398,7 @@ export default function ScoreInputDialog({
 
             {/* Player 2 */}
             <div className="text-center">
-              <p className={`font-bold text-lg leading-tight ${
+              <p className={`font-bold text-base sm:text-lg leading-tight ${
                 match.winnerEntryId === match.player2EntryId && isFinished ? 'text-primary-600' : 'text-gray-900'
               }`}>
                 {match.player2Name || '(未定)'}
@@ -412,11 +412,11 @@ export default function ScoreInputDialog({
         </div>
 
         {/* Score Input */}
-        <div className="px-6 pb-4">
-          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+        <div className="px-4 sm:px-6 pb-4">
+          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-3">
             {/* コート */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 w-14 shrink-0">コート</span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
               <select
                 value={match.courtId ?? ''}
                 onChange={e => handleAssignCourt(e.target.value)}
@@ -493,7 +493,7 @@ export default function ScoreInputDialog({
         </div>
 
         {/* Actions */}
-        <div className="px-6 pb-5 space-y-2">
+        <div className="px-4 sm:px-6 pb-4 sm:pb-5 space-y-2">
           <div className="flex flex-wrap gap-2">
             {canReady && (
               <button onClick={handleReadyMatch} disabled={isProcessing}

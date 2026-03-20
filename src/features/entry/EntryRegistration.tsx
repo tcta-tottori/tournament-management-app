@@ -848,18 +848,18 @@ export default function EntryRegistration() {
             <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
             {isConfirmedEvent && <Lock className="w-3 h-3 text-green-600" />}
           </button>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors">
-              <UserCheck className="w-3 h-3" />全員受付
+              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors min-h-[32px]">
+              <UserCheck className="w-3.5 h-3.5" />全員受付
             </button>
             <button onClick={(e) => { e.stopPropagation(); handleConfirmEvent(eventId); }}
-              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${isConfirmedEvent ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-orange-500 hover:bg-orange-600'}`}>
-              <Lock className="w-3 h-3" />{isConfirmedEvent ? '再確定' : '確定'}
+              className={`flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-orange-500 hover:bg-orange-600'}`}>
+              <Lock className="w-3.5 h-3.5" />{isConfirmedEvent ? '再確定' : '確定'}
             </button>
             <button onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
-              <RotateCcw className="w-3 h-3" />
+              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors min-h-[32px]">
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
             <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
             <span className="text-gray-500">/</span>

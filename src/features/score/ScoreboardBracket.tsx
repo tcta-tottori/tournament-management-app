@@ -13,10 +13,25 @@ interface ScoreboardBracketProps {
 
 const SLOT_HEIGHT = 40;
 const SLOT_WIDTH = 200;
+const SLOT_WIDTH_MOBILE = 160;
 const Y_SPACING = 48;
 const X_SPACING = 60;
+const X_SPACING_MOBILE = 40;
 const OFFSET_X = 24;
+const OFFSET_X_MOBILE = 12;
 const OFFSET_Y = 32;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+}
 
 export default function ScoreboardBracket({
   slots,
@@ -26,8 +41,11 @@ export default function ScoreboardBracket({
   selectedMatchId,
   onMatchSelect,
 }: ScoreboardBracketProps) {
+  const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
-  const slotW = isDoubles ? 280 : SLOT_WIDTH;
+  const slotW = isDoubles ? (isMobile ? 220 : 280) : (isMobile ? SLOT_WIDTH_MOBILE : SLOT_WIDTH);
+  const xSpacing = isMobile ? X_SPACING_MOBILE : X_SPACING;
+  const offsetX = isMobile ? OFFSET_X_MOBILE : OFFSET_X;
   const roundsCount = Math.log2(drawSize);
   const halfSize = drawSize / 2;
 
@@ -86,9 +104,9 @@ export default function ScoreboardBracket({
     if (r === 0) return r0Y[i];
     return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
   };
-  const getX = (r: number) => OFFSET_X + r * (slotW + X_SPACING);
+  const getX = (r: number) => offsetX + r * (slotW + xSpacing);
 
-  const containerWidth = OFFSET_X * 2 + roundsCount * (slotW + X_SPACING) + slotW;
+  const containerWidth = offsetX * 2 + roundsCount * (slotW + xSpacing) + slotW;
   const containerHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
 
   // --- SVGパス ---

@@ -144,34 +144,54 @@ export default function ScheduleGenerator() {
 
       const slots = autoSchedule(allScheduleMatches, config);
 
-      // Build matchId -> slot map
+      // scheduleEngine matchId → DB matchId のマッピングを構築
+      // eventId + round + position で紐付け（matchId形式が異なるため）
+      const allDbMatchesForLink: { eventId: string; matchId: string; round: number; position: number; id?: number }[] = [];
+      for (const evt of allEvents) {
+        const dbMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+        allDbMatchesForLink.push(...dbMatches);
+      }
+
+      // engine matchId → schedule slot
       const slotMap = new Map(slots.map(s => [s.matchId, s]));
+      // engine matchId → ScheduleMatch
+      const schedMatchMap = new Map(allScheduleMatches.map(m => [m.matchId, m]));
+
+      // DB match (eventId|round|position) → engine matchId の逆引き
+      const dbKeyToEngineMatch = new Map<string, ScheduleMatch>();
+      for (const sm of allScheduleMatches) {
+        dbKeyToEngineMatch.set(`${sm.eventCode}|${sm.round}|${sm.matchNumInRound}`, sm);
+      }
 
       // Update existing matches in DB
       let updatedCount = 0;
-      for (const evt of allEvents) {
-        const dbMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
-        for (const m of dbMatches) {
-          const scheduled = slotMap.get(m.matchId);
-          if (scheduled && m.id) {
-            const courtId = courtNameToId.get(scheduled.courtName) || null;
-            await db.matches.update(m.id, {
-              courtId,
-              scheduledTime: scheduled.startTime,
-              updatedAt: Date.now(),
-            });
-            updatedCount++;
-          }
+      for (const dbm of allDbMatchesForLink) {
+        const key = `${dbm.eventId}|${dbm.round}|${dbm.position}`;
+        const engineMatch = dbKeyToEngineMatch.get(key);
+        if (!engineMatch) continue;
+        const scheduled = slotMap.get(engineMatch.matchId);
+        if (scheduled && dbm.id) {
+          const courtId = courtNameToId.get(scheduled.courtName) || null;
+          await db.matches.update(dbm.id, {
+            courtId,
+            scheduledTime: scheduled.startTime,
+            updatedAt: Date.now(),
+          });
+          updatedCount++;
         }
       }
 
       // Create matches that don't exist yet in DB
       let createdCount = 0;
       for (const slot of slots) {
-        const schedMatch = allScheduleMatches.find(m => m.matchId === slot.matchId);
+        const schedMatch = schedMatchMap.get(slot.matchId);
         if (!schedMatch) continue;
 
-        const existing = await db.matches.where('matchId').equals(slot.matchId).first();
+        // DB に同じ eventId+round+position の試合があるか確認
+        const existingKey = `${schedMatch.eventCode}|${schedMatch.round}|${schedMatch.matchNumInRound}`;
+        const existing = allDbMatchesForLink.find(m =>
+          `${m.eventId}|${m.round}|${m.position}` === existingKey
+        );
         if (!existing) {
           const courtId = courtNameToId.get(slot.courtName) || null;
           await db.matches.add({

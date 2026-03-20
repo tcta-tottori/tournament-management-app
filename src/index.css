@@ -295,10 +295,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 4px;
+  padding: 10px 10px;
   min-height: 44px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   color: rgba(255, 255, 255, 0.5);
@@ -306,6 +306,14 @@
   border: none;
   background: none;
   cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .nav-tab {
+    gap: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
 }
 
 .nav-tab:hover {

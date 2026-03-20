@@ -343,36 +343,36 @@ export default function DrawBoard() {
                )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* 表示切替ボタン */}
               <div className="flex rounded-md border border-border-main overflow-hidden">
                 <button
                   onClick={() => setViewMode('tournament')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                     viewMode === 'tournament'
                       ? 'bg-primary-500 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <GitBranch className="w-3.5 h-3.5" />
-                  トーナメント
+                  <span className="hidden sm:inline">トーナメント</span><span className="sm:hidden">T</span>
                 </button>
                 <button
                   onClick={() => setViewMode('roundRobin')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-2 text-xs font-medium transition-colors ${
                     viewMode === 'roundRobin'
                       ? 'bg-primary-500 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  リーグ
+                  <span className="hidden sm:inline">リーグ</span><span className="sm:hidden">L</span>
                 </button>
               </div>
               {selectedPosition !== null && viewMode === 'tournament' && (
                 <button
                   onClick={() => setSelectedPosition(null)}
-                  className="flex items-center gap-2 bg-primary-50 text-gray-900 px-4 py-2.5 rounded-md font-medium hover:bg-gray-200 shadow-sm transition-colors text-sm"
+                  className="flex items-center gap-1.5 bg-primary-50 text-gray-900 px-3 sm:px-4 py-2 rounded-md font-medium hover:bg-gray-200 shadow-sm transition-colors text-xs sm:text-sm"
                 >
                   選択解除
                 </button>
@@ -380,35 +380,35 @@ export default function DrawBoard() {
               <button
                 onClick={handleExportExcel}
                 disabled={!drawData}
-                className="flex items-center gap-2 bg-primary-500 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-1.5 bg-primary-500 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <FileSpreadsheet className="w-4 h-4" />
-                <Download className="w-3.5 h-3.5" />
-                Excel出力
+                <Download className="w-3.5 h-3.5 hidden sm:block" />
+                Excel
               </button>
               <button
                 onClick={handleExportResultJpeg}
                 disabled={!drawData}
-                className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-md font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-1.5 bg-orange-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Image className="w-4 h-4" />
-                結果JPEG
+                <span className="hidden sm:inline">結果</span>JPEG
               </button>
               <button
                 onClick={handleExportResultExcel}
                 disabled={!drawData}
-                className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-md font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-1.5 bg-teal-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <FileSpreadsheet className="w-4 h-4" />
-                結果Excel
+                <span className="hidden sm:inline">結果</span>Excel
               </button>
               <button
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges || isSaving}
-                className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                className="flex items-center gap-1.5 bg-green-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Save className="w-4 h-4" />
-                {isSaving ? '保存中...' : '変更を保存'}
+                {isSaving ? '保存中...' : '保存'}
               </button>
             </div>
           </div>

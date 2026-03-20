@@ -142,29 +142,29 @@ export default function ScoreboardLeague({
   };
 
   return (
-    <div className="overflow-auto p-4 sm:p-6" style={{ width: '100%', height: '100%' }}>
+    <div className="overflow-auto p-2 sm:p-4 md:p-6" style={{ width: '100%', height: '100%' }}>
       <div className="inline-block min-w-full">
-        <table className="border-collapse border-2 border-gray-900 text-sm">
+        <table className="border-collapse border-2 border-gray-900 text-xs sm:text-sm">
           <thead>
             <tr>
               {/* ヘッダー左上: "決勝リーグ" */}
-              <th className="border-2 border-gray-900 bg-gray-50 px-3 py-2 text-center font-bold min-w-[200px]">
+              <th className="border-2 border-gray-900 bg-gray-50 px-2 sm:px-3 py-2 text-center font-bold min-w-[120px] sm:min-w-[200px]">
                 決勝リーグ
               </th>
               {/* 各選手の列ヘッダー */}
               {players.map((p, i) => (
                 <th
                   key={`col-${i}`}
-                  className="border-2 border-gray-900 bg-gray-50 px-3 py-2 text-center font-bold whitespace-nowrap min-w-[100px]"
+                  className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold whitespace-nowrap min-w-[70px] sm:min-w-[100px]"
                 >
                   {p.name}
                 </th>
               ))}
-              <th className="border-2 border-gray-900 bg-gray-50 px-3 py-2 text-center font-bold min-w-[80px]">
-                勝　敗
+              <th className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold min-w-[50px] sm:min-w-[80px]">
+                勝敗
               </th>
-              <th className="border-2 border-gray-900 bg-gray-50 px-3 py-2 text-center font-bold min-w-[70px]">
-                順　位
+              <th className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold min-w-[40px] sm:min-w-[70px]">
+                順位
               </th>
             </tr>
           </thead>
@@ -187,7 +187,7 @@ export default function ScoreboardLeague({
                     return (
                       <td
                         key={`cell-${rowIdx}-${colIdx}`}
-                        className="border-2 border-gray-900 bg-gray-200 relative min-w-[100px]"
+                        className="border-2 border-gray-900 bg-gray-200 relative min-w-[70px] sm:min-w-[100px]"
                       >
                         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
                           <line x1="0" y1="0" x2="100%" y2="100%" stroke="#374151" strokeWidth="1.5" />
