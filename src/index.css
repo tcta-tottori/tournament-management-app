@@ -466,3 +466,31 @@
   writing-mode: vertical-rl;
   text-orientation: upright;
 }
+
+/* ===========================================================
+   Google Drive ローディングモーダル
+   =========================================================== */
+@keyframes drive-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes drive-spin-reverse {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes drive-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.92); }
+}
+
+.drive-modal-spin {
+  animation: drive-spin 1.2s linear infinite;
+}
+
+.drive-modal-spin-reverse {
+  animation: drive-spin-reverse 1.8s linear infinite;
+}
+
+.drive-modal-pulse {
+  animation: drive-pulse 2s ease-in-out infinite;
+}

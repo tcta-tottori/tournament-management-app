@@ -5,8 +5,9 @@ import type { AffiliationFurigana } from '../../db/database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
-  Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2,
+  Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
 } from 'lucide-react';
+import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
   getSavedToken as gdriveGetSavedToken,
   getSavedClientId,
@@ -127,6 +128,12 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
   const excelFuriganaRef = useRef<HTMLInputElement>(null);
   const excelAffRef = useRef<HTMLInputElement>(null);
 
+  // ローディングモーダル用state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
+  const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
+
   // DB counts for display
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
   const affiliationCount = useLiveQuery(() => db.affiliationFurigana.count()) ?? 0;
@@ -200,66 +207,129 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
     onConnectionChange?.();
   }, [onConnectionChange]);
 
-  // --- Google Drive からふりがな読込 ---
+  // --- ヘルパー: モーダルステップ更新 ---
+  const updateStep = useCallback((steps: LoadingStep[], index: number, patch: Partial<LoadingStep>): LoadingStep[] => {
+    const next = [...steps];
+    next[index] = { ...next[index], ...patch };
+    return next;
+  }, []);
+
+  // --- 内部: ふりがな読込処理（モーダルステップ対応） ---
+  const doDownloadFurigana = useCallback(async (token: string): Promise<{ success: boolean; details: string[] }> => {
+    const file = await downloadFuriganaExcel(token);
+    if (!file) throw new Error('「ふりがな一覧」フォルダにExcelファイルがありません');
+
+    const wb = XLSX.read(file.data, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<any>(ws);
+
+    const now = Date.now();
+    let dictCount = 0;
+    for (const row of rows) {
+      const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
+      const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+      if (!name || !furigana) continue;
+      const key = removeSpaces(name);
+      await db.furiganaDict.put({
+        name: key,
+        furigana: removeSpaces(furigana),
+        type: 'manual' as const,
+        updatedAt: now,
+      });
+      dictCount++;
+    }
+
+    let playerCount = 0;
+    const allPlayers = await db.players.toArray();
+    for (const p of allPlayers) {
+      const dictEntry = await db.furiganaDict.get(p.playerId);
+      if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
+        await db.players.update(p.id!, { furigana: dictEntry.furigana });
+        playerCount++;
+      }
+    }
+
+    const dedupCount = await deduplicateFuriganaDict();
+
+    const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
+    if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+    if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
+    return { success: true, details };
+  }, []);
+
+  // --- 内部: 所属読込処理（モーダルステップ対応） ---
+  const doDownloadAffiliation = useCallback(async (token: string): Promise<{ success: boolean; details: string[] }> => {
+    const file = await downloadAffiliationExcel(token);
+    if (!file) throw new Error('「所属一覧」フォルダにExcelファイルがありません');
+
+    const wb = XLSX.read(file.data, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<any>(ws);
+
+    const now = Date.now();
+    let count = 0;
+    for (const row of rows) {
+      const name = String(row['所属名'] || row['name'] || '').trim();
+      const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+      if (!name || !furigana) continue;
+      const existing = await db.affiliationFurigana.where('name').equals(name).first();
+      if (existing) {
+        await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
+      } else {
+        await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
+      }
+      count++;
+    }
+    const dedupCount = await deduplicateAffiliation();
+
+    const details = [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`];
+    if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+    return { success: true, details };
+  }, []);
+
+  // --- Google Drive からふりがな読込（モーダル付き） ---
   const handleDownloadFurigana = useCallback(async () => {
+    const steps: LoadingStep[] = [
+      { label: 'ふりがな一覧を読込中...', status: 'loading' },
+    ];
+    setModalTitle('ふりがな読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('ふりがな読込中...');
     setResult(null);
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
-      const file = await downloadFuriganaExcel(token);
-      if (!file) throw new Error('「ふりがな一覧」フォルダにExcelファイルがありません');
-
-      const wb = XLSX.read(file.data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-
-      const now = Date.now();
-      let dictCount = 0;
-      for (const row of rows) {
-        const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
-        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-        if (!name || !furigana) continue;
-        const key = removeSpaces(name);
-        await db.furiganaDict.put({
-          name: key,
-          furigana: removeSpaces(furigana),
-          type: 'manual' as const,
-          updatedAt: now,
-        });
-        dictCount++;
-      }
-
-      // 既存選手にも適用
-      let playerCount = 0;
-      const allPlayers = await db.players.toArray();
-      for (const p of allPlayers) {
-        const dictEntry = await db.furiganaDict.get(p.playerId);
-        if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
-          await db.players.update(p.id!, { furigana: dictEntry.furigana });
-          playerCount++;
-        }
-      }
-
-      // 重複削除
-      const dedupCount = await deduplicateFuriganaDict();
-
+      const res = await doDownloadFurigana(token);
+      const s = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了' });
+      setModalSteps(s);
       updateLastSync();
-      const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
-      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
-      if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
-      setResult({ success: true, message: 'ふりがなデータを読み込みました', details });
+      const r = { success: true, message: 'ふりがなデータを読み込みました', details: res.details };
+      setResult(r);
+      setModalResult(r);
     } catch (err) {
-      setResult({ success: false, message: `読込失敗: ${(err as Error).message}` });
+      const s = updateStep(steps, 0, { status: 'error', label: 'ふりがな読込に失敗' });
+      setModalSteps(s);
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      setModalResult(r);
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync]);
+  }, [updateLastSync, updateStep, doDownloadFurigana]);
 
-  // --- Google Drive からふりがな書込 ---
+  // --- Google Drive からふりがな書込（モーダル付き） ---
   const handleUploadFurigana = useCallback(async () => {
+    const steps: LoadingStep[] = [
+      { label: 'ふりがなデータを書込中...', status: 'loading' },
+    ];
+    setModalTitle('ふりがな書込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('ふりがな書込中...');
     setResult(null);
@@ -280,61 +350,66 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
       const fileName = `ふりがなデータ.xlsx`;
       await uploadFuriganaExcel(token, fileName, buf);
-      setResult({ success: true, message: `ふりがなデータ（${data.length}件）を Google ドライブに保存しました` });
+      const s = updateStep(steps, 0, { status: 'done', label: 'ふりがなデータを書込完了' });
+      setModalSteps(s);
+      const r = { success: true, message: `ふりがなデータ（${data.length}件）を Google ドライブに保存しました` };
+      setResult(r);
+      setModalResult(r);
     } catch (err) {
-      setResult({ success: false, message: `書込失敗: ${(err as Error).message}` });
+      const s = updateStep(steps, 0, { status: 'error', label: 'ふりがな書込に失敗' });
+      setModalSteps(s);
+      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
+      setResult(r);
+      setModalResult(r);
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, []);
+  }, [updateStep]);
 
-  // --- Google Drive から所属読込 ---
+  // --- Google Drive から所属読込（モーダル付き） ---
   const handleDownloadAffiliation = useCallback(async () => {
+    const steps: LoadingStep[] = [
+      { label: '所属一覧を読込中...', status: 'loading' },
+    ];
+    setModalTitle('所属読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('所属読込中...');
     setResult(null);
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
-      const file = await downloadAffiliationExcel(token);
-      if (!file) throw new Error('「所属一覧」フォルダにExcelファイルがありません');
-
-      const wb = XLSX.read(file.data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-
-      const now = Date.now();
-      let count = 0;
-      for (const row of rows) {
-        const name = String(row['所属名'] || row['name'] || '').trim();
-        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-        if (!name || !furigana) continue;
-        const existing = await db.affiliationFurigana.where('name').equals(name).first();
-        if (existing) {
-          await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
-        } else {
-          await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
-        }
-        count++;
-      }
-      // 重複削除
-      const dedupCount = await deduplicateAffiliation();
-
+      const res = await doDownloadAffiliation(token);
+      const s = updateStep(steps, 0, { status: 'done', label: '所属一覧を読込完了' });
+      setModalSteps(s);
       updateLastSync();
-      const details = [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`];
-      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
-      setResult({ success: true, message: '所属ふりがなを読み込みました', details });
+      const r = { success: true, message: '所属ふりがなを読み込みました', details: res.details };
+      setResult(r);
+      setModalResult(r);
     } catch (err) {
-      setResult({ success: false, message: `読込失敗: ${(err as Error).message}` });
+      const s = updateStep(steps, 0, { status: 'error', label: '所属読込に失敗' });
+      setModalSteps(s);
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      setModalResult(r);
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync]);
+  }, [updateLastSync, updateStep, doDownloadAffiliation]);
 
-  // --- Google Drive に所属書込 ---
+  // --- Google Drive に所属書込（モーダル付き） ---
   const handleUploadAffiliation = useCallback(async () => {
+    const steps: LoadingStep[] = [
+      { label: '所属データを書込中...', status: 'loading' },
+    ];
+    setModalTitle('所属書込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('所属書込中...');
     setResult(null);
@@ -354,14 +429,88 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
       const fileName = `所属ふりがな.xlsx`;
       await uploadAffiliationExcel(token, fileName, buf);
-      setResult({ success: true, message: `所属ふりがな（${data.length}件）を Google ドライブに保存しました` });
+      const s = updateStep(steps, 0, { status: 'done', label: '所属データを書込完了' });
+      setModalSteps(s);
+      const r = { success: true, message: `所属ふりがな（${data.length}件）を Google ドライブに保存しました` };
+      setResult(r);
+      setModalResult(r);
     } catch (err) {
-      setResult({ success: false, message: `書込失敗: ${(err as Error).message}` });
+      const s = updateStep(steps, 0, { status: 'error', label: '所属書込に失敗' });
+      setModalSteps(s);
+      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
+      setResult(r);
+      setModalResult(r);
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, []);
+  }, [updateStep]);
+
+  // --- 一括読込（ふりがな＋所属） ---
+  const handleBulkDownload = useCallback(async () => {
+    let steps: LoadingStep[] = [
+      { label: 'ふりがな一覧を読込中...', status: 'loading' },
+      { label: '所属一覧', status: 'waiting' },
+    ];
+    setModalTitle('一括読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalOpen(true);
+    setIsProcessing(true);
+    setProcessingLabel('一括読込中...');
+    setResult(null);
+
+    const allDetails: string[] = [];
+    let hasError = false;
+
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Google ドライブに接続してください');
+
+      // Step 1: ふりがな読込
+      try {
+        const res = await doDownloadFurigana(token);
+        steps = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了', detail: res.details[1] });
+        allDetails.push('【ふりがな】', ...res.details);
+      } catch (err) {
+        steps = updateStep(steps, 0, { status: 'error', label: `ふりがな読込失敗: ${(err as Error).message}` });
+        allDetails.push(`【ふりがな】読込失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+
+      // Step 2: 所属読込
+      steps = updateStep(steps, 1, { status: 'loading', label: '所属一覧を読込中...' });
+      setModalSteps([...steps]);
+
+      try {
+        const res = await doDownloadAffiliation(token);
+        steps = updateStep(steps, 1, { status: 'done', label: '所属一覧を読込完了', detail: res.details[1] });
+        allDetails.push('【所属】', ...res.details);
+      } catch (err) {
+        steps = updateStep(steps, 1, { status: 'error', label: `所属読込失敗: ${(err as Error).message}` });
+        allDetails.push(`【所属】読込失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+
+      setModalSteps([...steps]);
+      updateLastSync();
+
+      const r = hasError
+        ? { success: false, message: '一部の読込に失敗しました', details: allDetails }
+        : { success: true, message: 'ふりがな・所属データを一括読込しました', details: allDetails };
+      setResult(r);
+      setModalResult(r);
+    } catch (err) {
+      steps = updateStep(steps, 0, { status: 'error', label: `読込失敗: ${(err as Error).message}` });
+      setModalSteps([...steps]);
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+      setProcessingLabel('');
+    }
+  }, [updateLastSync, updateStep, doDownloadFurigana, doDownloadAffiliation]);
 
   // --- Excelからふりがなインポート ---
   const handleExcelFurigana = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -462,8 +611,21 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
       })
     : null;
 
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setModalResult(null);
+  }, []);
+
   return (
     <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+      {/* Google Drive ローディングモーダル */}
+      <DriveLoadingModal
+        open={modalOpen}
+        title={modalTitle}
+        steps={modalSteps}
+        result={modalResult}
+        onClose={handleModalClose}
+      />
       {/* Header */}
       <div className="bg-gradient-to-r from-[#e8f0fe] to-[#fce8e6] px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -527,6 +689,18 @@ export default function DataSync({ onConnectionChange }: DataSyncProps) {
                 <LogOut className="w-3.5 h-3.5" /> 切断
               </button>
             </div>
+
+            {/* 一括読込ボタン */}
+            <button
+              onClick={handleBulkDownload}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#1a73e8] to-[#8e24aa] rounded-xl hover:from-[#1557b0] hover:to-[#6a1b9a] disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
+            >
+              <Layers className="w-4 h-4" />
+              <GoogleDriveIcon className="w-4 h-4" />
+              ふりがな・所属を一括読込
+              {isProcessing && processingLabel.includes('一括') && <RefreshCw className="w-4 h-4 animate-spin" />}
+            </button>
 
             {/* ふりがな操作 */}
             <div className="border border-blue-100 rounded-lg overflow-hidden">
