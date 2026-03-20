@@ -131,15 +131,28 @@ function VerticalCourtLines({ status }: { status: string }) {
   );
 }
 
+/** Format elapsed time from updatedAt timestamp */
+function formatElapsed(updatedAt: number | undefined): string {
+  if (!updatedAt) return '';
+  const diff = Math.max(0, Math.floor((Date.now() - updatedAt) / 1000));
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 /** Single vertical court card for block-based layout */
 function TennisCourtBlock({
   cs,
   isSelected,
   onSelect,
+  eventName,
 }: {
   cs: CourtStatus;
   isSelected: boolean;
   onSelect: () => void;
+  eventName?: string;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
     playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]' },
@@ -148,6 +161,8 @@ function TennisCourtBlock({
     unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
   };
   const style = statusStyles[cs.status];
+  const courtNum = cs.court.name.replace(/[^\d]/g, '') || cs.court.name;
+  const elapsed = cs.currentMatch?.status === 'playing' ? formatElapsed(cs.currentMatch.updatedAt) : '';
 
   return (
     <button
@@ -159,31 +174,54 @@ function TennisCourtBlock({
       style={{ aspectRatio: '1 / 1.7', width: '100%' }}
     >
       <VerticalCourtLines status={cs.status} />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full p-1">
-        {cs.status === 'playing' && (
-          <span className="absolute top-0.5 right-0.5 flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">
-            <Play className="w-2 h-2 fill-white" /> LIVE
-          </span>
-        )}
-        <div className={`text-lg md:text-xl font-bold ${style.text} leading-none`}>
-          {cs.court.name.replace(/[^\d]/g, '') || cs.court.name}
+      <div className="relative z-10 flex flex-col items-center justify-between h-full py-1.5 px-1">
+        {/* Top: LIVE badge + court number */}
+        <div className="w-full flex items-start justify-between">
+          <div className={`text-base sm:text-lg md:text-xl font-black ${style.text} leading-none pl-0.5`}>
+            {courtNum}
+          </div>
+          {cs.status === 'playing' && (
+            <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0">
+              <Play className="w-2 h-2 fill-white" /> LIVE
+            </span>
+          )}
         </div>
-        {cs.currentMatch && (
-          <div className="mt-0.5 w-full space-y-0">
-            <p className="text-[8px] md:text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
-            <p className="text-[7px] text-green-500 text-center">vs</p>
-            <p className="text-[8px] md:text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
+
+        {/* Middle: event name + players */}
+        {cs.currentMatch ? (
+          <div className="w-full flex-1 flex flex-col items-center justify-center min-h-0 gap-0.5">
+            {eventName && (
+              <p className="text-[9px] sm:text-[10px] font-bold text-green-600/80 truncate w-full text-center leading-none">{eventName}</p>
+            )}
+            <p className="text-[10px] sm:text-xs font-bold text-green-900 truncate w-full text-center leading-tight">{cs.currentMatch.player1Name}</p>
+            <p className="text-[8px] sm:text-[9px] font-medium text-green-500 leading-none">vs</p>
+            <p className="text-[10px] sm:text-xs font-bold text-green-900 truncate w-full text-center leading-tight">{cs.currentMatch.player2Name}</p>
+          </div>
+        ) : cs.nextMatch ? (
+          <div className="w-full flex-1 flex flex-col items-center justify-center min-h-0 gap-0.5">
+            <p className="text-[9px] sm:text-[10px] font-semibold text-blue-500/80 truncate w-full text-center leading-none">次の試合</p>
+            <p className="text-[10px] sm:text-xs font-bold text-blue-700 truncate w-full text-center leading-tight">{cs.nextMatch.player1Name}</p>
+            <p className="text-[8px] sm:text-[9px] font-medium text-blue-400 leading-none">vs</p>
+            <p className="text-[10px] sm:text-xs font-bold text-blue-700 truncate w-full text-center leading-tight">{cs.nextMatch.player2Name}</p>
+          </div>
+        ) : cs.status === 'unavailable' ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[10px] sm:text-xs text-gray-400 font-medium">使用不可</p>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[10px] sm:text-xs text-gray-400 font-medium">空き</p>
           </div>
         )}
-        {!cs.currentMatch && cs.nextMatch && (
-          <div className="mt-0.5 w-full space-y-0">
-            <p className="text-[8px] md:text-[9px] text-blue-600 truncate text-center leading-tight">{cs.nextMatch.player1Name}</p>
-            <p className="text-[7px] text-blue-400 text-center">vs</p>
-            <p className="text-[8px] md:text-[9px] text-blue-600 truncate text-center leading-tight">{cs.nextMatch.player2Name}</p>
+
+        {/* Bottom: elapsed time */}
+        {elapsed ? (
+          <div className="w-full flex items-center justify-center gap-1">
+            <Timer className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600" />
+            <span className="text-[10px] sm:text-xs font-mono font-bold text-green-700 tabular-nums">{elapsed}</span>
           </div>
-        )}
-        {!cs.currentMatch && !cs.nextMatch && cs.status !== 'unavailable' && (
-          <p className="text-[8px] text-gray-400 mt-0.5">空き</p>
+        ) : (
+          <div className="h-3 sm:h-4" />
         )}
       </div>
     </button>
@@ -200,9 +238,9 @@ export default function LiveDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
 
-  // Tick clock every 30s
+  // Tick clock every second (for elapsed time display)
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -217,6 +255,12 @@ export default function LiveDashboard() {
     () => currentTournamentId ? db.events.where('tournamentId').equals(currentTournamentId).toArray() : [],
     [currentTournamentId]
   ) || [];
+
+  const eventNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    events.forEach(e => map.set(e.eventId, e.name));
+    return map;
+  }, [events]);
 
   const eventIds = useMemo(() => events.map(e => e.eventId).sort().join(','), [events]);
   const allMatches = useLiveQuery(async () => {
@@ -497,16 +541,21 @@ export default function LiveDashboard() {
                     </span>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
-                    {block.map(cs => (
-                      <TennisCourtBlock
-                        key={cs.court.courtId}
-                        cs={cs}
-                        isSelected={selectedCourtId === cs.court.courtId}
-                        onSelect={() => setSelectedCourtId(
-                          selectedCourtId === cs.court.courtId ? null : cs.court.courtId
-                        )}
-                      />
-                    ))}
+                    {block.map(cs => {
+                      const match = cs.currentMatch || cs.nextMatch;
+                      const evtName = match ? eventNameMap.get(match.eventId) : undefined;
+                      return (
+                        <TennisCourtBlock
+                          key={cs.court.courtId}
+                          cs={cs}
+                          isSelected={selectedCourtId === cs.court.courtId}
+                          onSelect={() => setSelectedCourtId(
+                            selectedCourtId === cs.court.courtId ? null : cs.court.courtId
+                          )}
+                          eventName={evtName}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
                 {/* HQ marker between blocks */}

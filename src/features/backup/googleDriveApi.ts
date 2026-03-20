@@ -257,6 +257,8 @@ export async function getSharedFolderLink(token: string): Promise<string> {
 
 const FURIGANA_FOLDER_NAME = 'ふりがな一覧';
 const AFFILIATION_FOLDER_NAME = '所属一覧';
+const BACKUP_FOLDER_NAME = 'バックアップ';
+const RESULTS_FOLDER_NAME = '大会結果';
 
 /** ルートフォルダ/大会運営システム配下の特定サブフォルダIDを検索（作成しない）
  * @returns フォルダID、見つからない場合は null
@@ -491,4 +493,194 @@ export async function connectWithDefaultClientId(): Promise<string> {
   saveClientId(clientId);
   const token = await requestAccessToken(clientId);
   return token;
+}
+
+// ================================================================
+// バックアップフォルダ操作
+// ================================================================
+
+/** バックアップフォルダにJSONファイルをアップロード */
+export async function uploadBackupJson(
+  token: string,
+  fileName: string,
+  jsonString: string,
+): Promise<void> {
+  const folderId = await getOrCreateSubFolderId(token, BACKUP_FOLDER_NAME);
+
+  // 既存ファイルを検索して上書き
+  const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
+  const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
+  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
+  const existingId = searchData.files?.[0]?.id;
+
+  const metadata = {
+    name: fileName,
+    mimeType: 'application/json',
+    ...(existingId ? {} : { parents: [folderId] }),
+  };
+
+  const boundary = '----BackupBoundary' + Date.now();
+  const metaPart = JSON.stringify(metadata);
+
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaPart}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${jsonString}\r\n` +
+    `--${boundary}--`;
+
+  const url = existingId
+    ? `${UPLOAD_API}/files/${existingId}?uploadType=multipart`
+    : `${UPLOAD_API}/files?uploadType=multipart`;
+  const method = existingId ? 'PATCH' : 'POST';
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...headers(token),
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `バックアップアップロード失敗 (${res.status})`);
+  }
+}
+
+/** バックアップフォルダ内のJSONファイル一覧を取得（最新順） */
+export async function listBackupFiles(token: string): Promise<GoogleDriveFile[]> {
+  const folderId = await findSubFolderId(token, BACKUP_FOLDER_NAME);
+  if (!folderId) return [];
+  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/json' or name contains '.json')`;
+  const params = new URLSearchParams({
+    q,
+    fields: 'files(id,name,size,modifiedTime,mimeType)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '50',
+  });
+  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `バックアップ一覧取得失敗 (${res.status})`);
+  }
+  const data = await res.json();
+  return (data.files || []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    size: f.size || '0',
+    modifiedTime: f.modifiedTime,
+    mimeType: f.mimeType,
+  }));
+}
+
+/** バックアップファイルをテキスト文字列としてダウンロード */
+export async function downloadBackupFile(token: string, fileId: string): Promise<string> {
+  const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+    headers: headers(token),
+  });
+  if (!res.ok) throw new Error(`バックアップダウンロード失敗 (${res.status})`);
+  return res.text();
+}
+
+// ================================================================
+// 大会結果フォルダ操作
+// ================================================================
+
+/** 大会結果フォルダにファイルをアップロード */
+export async function uploadResultFile(
+  token: string,
+  fileName: string,
+  data: ArrayBuffer | string,
+  mimeType: string,
+): Promise<void> {
+  const folderId = await getOrCreateSubFolderId(token, RESULTS_FOLDER_NAME);
+
+  // 既存ファイルを検索して上書き
+  const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
+  const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
+  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
+  const existingId = searchData.files?.[0]?.id;
+
+  const metadata = {
+    name: fileName,
+    mimeType,
+    ...(existingId ? {} : { parents: [folderId] }),
+  };
+
+  const boundary = '----ResultBoundary' + Date.now();
+  const metaPart = JSON.stringify(metadata);
+
+  // Build multipart body (バイナリ対応)
+  const encoder = new TextEncoder();
+  const pre = encoder.encode(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaPart}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
+  );
+  const post = encoder.encode(`\r\n--${boundary}--`);
+
+  const dataBytes = typeof data === 'string'
+    ? encoder.encode(data)
+    : new Uint8Array(data);
+
+  const body = new Uint8Array(pre.length + dataBytes.length + post.length);
+  body.set(pre, 0);
+  body.set(dataBytes, pre.length);
+  body.set(post, pre.length + dataBytes.length);
+
+  const url = existingId
+    ? `${UPLOAD_API}/files/${existingId}?uploadType=multipart`
+    : `${UPLOAD_API}/files?uploadType=multipart`;
+  const method = existingId ? 'PATCH' : 'POST';
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...headers(token),
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `大会結果アップロード失敗 (${res.status})`);
+  }
+}
+
+/** 大会結果フォルダ内のファイル一覧を取得（最新順） */
+export async function listResultFiles(token: string): Promise<GoogleDriveFile[]> {
+  const folderId = await findSubFolderId(token, RESULTS_FOLDER_NAME);
+  if (!folderId) return [];
+  const q = `'${folderId}' in parents and trashed=false`;
+  const params = new URLSearchParams({
+    q,
+    fields: 'files(id,name,size,modifiedTime,mimeType)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '50',
+  });
+  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `大会結果一覧取得失敗 (${res.status})`);
+  }
+  const data = await res.json();
+  return (data.files || []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    size: f.size || '0',
+    modifiedTime: f.modifiedTime,
+    mimeType: f.mimeType,
+  }));
+}
+
+/** 大会結果フォルダのWebリンクを取得 */
+export async function getResultsFolderLink(token: string): Promise<string> {
+  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
+  if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
+  let sysId = await findFolder(token, SUB_FOLDER_NAME, rootId);
+  if (!sysId) sysId = await createFolder(token, SUB_FOLDER_NAME, rootId);
+  let resultsId = await findFolder(token, RESULTS_FOLDER_NAME, sysId);
+  if (!resultsId) resultsId = await createFolder(token, RESULTS_FOLDER_NAME, sysId);
+  return `https://drive.google.com/drive/folders/${resultsId}`;
 }

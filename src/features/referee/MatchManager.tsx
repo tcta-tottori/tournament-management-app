@@ -1232,14 +1232,14 @@ ${printableMatches.map(m => {
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.color}`}>{st.text}</span>
                                     </td>
                                     <td className="py-1.5 px-2 text-center">
-                                      <div className="flex items-center gap-0.5 justify-center">
-                                        {/* 印刷ボタン - 常に表示 */}
+                                      <div className="flex items-center gap-1 justify-center">
+                                        {/* 対戦票印刷 */}
                                         <button
                                           onClick={() => handlePrintMatch(m)}
-                                          className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-                                          title="この試合を印刷"
+                                          className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-all shadow-sm hover:shadow"
+                                          title="対戦票印刷"
                                         >
-                                          <FileText className="w-3.5 h-3.5" />
+                                          <Printer className="w-4 h-4" />
                                         </button>
                                         {/* スコア入力/修正 */}
                                         {hasPlayers && !isWalkover && (
@@ -1248,14 +1248,14 @@ ${printableMatches.map(m => {
                                               if (!isActive) setSelectedEventId(m.eventId);
                                               startEdit(m);
                                             }}
-                                            className={`p-1.5 rounded-md transition-colors ${
+                                            className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                               m.status === 'finished'
-                                                ? 'text-slate-300 hover:text-orange-500 hover:bg-orange-50 opacity-0 group-hover:opacity-100'
-                                                : 'text-slate-400 hover:text-primary-500 hover:bg-primary-50'
+                                                ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50 hover:border-orange-300'
+                                                : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50 hover:border-primary-300'
                                             }`}
                                             title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
                                           >
-                                            <Edit3 className="w-3.5 h-3.5" />
+                                            <Edit3 className="w-4 h-4" />
                                           </button>
                                         )}
                                         {/* 音声コール */}
@@ -1263,10 +1263,10 @@ ${printableMatches.map(m => {
                                           isThisSpeaking ? (
                                             <button
                                               onClick={handleVoiceStop}
-                                              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md transition-colors animate-pulse"
+                                              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-300 transition-all shadow-sm animate-pulse"
                                               title="停止"
                                             >
-                                              <Square className="w-3.5 h-3.5" />
+                                              <Square className="w-4 h-4" />
                                             </button>
                                           ) : (
                                             <button
@@ -1274,14 +1274,14 @@ ${printableMatches.map(m => {
                                                 if (!isActive) setSelectedEventId(m.eventId);
                                                 toggleCallTarget(m);
                                               }}
-                                              className={`p-1.5 rounded-md transition-colors ${
+                                              className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                                 isCallTarget
-                                                  ? 'text-emerald-600 bg-emerald-50'
-                                                  : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'
+                                                  ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
+                                                  : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300'
                                               }`}
                                               title="音声コール"
                                             >
-                                              <Volume2 className="w-3.5 h-3.5" />
+                                              <Volume2 className="w-4 h-4" />
                                             </button>
                                           )
                                         )}

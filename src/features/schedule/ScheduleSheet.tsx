@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -49,16 +50,21 @@ function abbreviateEventName(name: string): string {
 
 /** インポートされたセルテキスト（例: "男子B 1R"）から種目名部分を抽出 */
 function extractImportedEventName(cellText: string): string {
-  // 末尾のラウンド表記を除去: 1R, 2R, QF, SF, F, １R 等
+  // 末尾のラウンド表記を除去: 1R, 2R, QF, SF, F, １R, 1回戦, 準決勝, 決勝 等
   // 全角→半角変換してからパース
   const normalized = cellText
-    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[\u3000]+/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
     .trim();
-  // "男子B 1R" → "男子B", "男子AQF" → "男子A", "女子45" → "女子45"
-  const match = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
-  return match ? match[1].trim() : normalized;
+  // 英語ラウンドラベル
+  const engMatch = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
+  if (engMatch) return engMatch[1].trim();
+  // 日本語ラウンドラベル
+  const jpMatch = normalized.match(/^(.+?)\s*(\d+回戦|準々決勝|準決勝|決勝)$/);
+  if (jpMatch) return jpMatch[1].trim();
+  return normalized;
 }
 
 /** scheduleEngine matchId → DB matchId のマッピングを構築 (eventId+round+position) */
@@ -92,13 +98,29 @@ function applyMatchMapping(slots: ScheduleSlot[], mapping: Map<string, string>):
 /** セルテキストから種目名とラウンド番号をパース */
 function parseCellEventRound(cellText: string): { eventName: string; roundLabel: string } | null {
   const normalized = cellText
-    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[\u3000]+/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
     .trim();
-  const match = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
-  if (!match) return null;
-  return { eventName: match[1].trim(), roundLabel: match[2].toUpperCase() };
+
+  // 英語ラウンドラベル: 1R, 2R, QF, SF, F
+  const engMatch = normalized.match(/^(.+?)\s*(\d+R|QF|SF|F)$/i);
+  if (engMatch) return { eventName: engMatch[1].trim(), roundLabel: engMatch[2].toUpperCase() };
+
+  // 日本語ラウンドラベル: 1回戦, 2回戦, 準々決勝, 準決勝, 決勝
+  const jpMatch = normalized.match(/^(.+?)\s*((\d+)回戦|準々決勝|準決勝|決勝)$/);
+  if (jpMatch) {
+    const roundText = jpMatch[2];
+    let roundLabel: string;
+    if (roundText === '決勝') roundLabel = 'F';
+    else if (roundText === '準決勝') roundLabel = 'SF';
+    else if (roundText === '準々決勝') roundLabel = 'QF';
+    else roundLabel = `${jpMatch[3]}R`;
+    return { eventName: jpMatch[1].trim(), roundLabel };
+  }
+
+  return null;
 }
 
 /** ラウンドラベルからラウンド番号を算出 */
@@ -113,22 +135,48 @@ function parseRoundFromLabel(label: string, totalRounds: number | null): number 
   return null;
 }
 
-/** 種目名を DB event に照合（あいまいマッチング） */
+/** 種目名を DB event に照合（あいまいマッチング、最も具体的なマッチを優先） */
 function findMatchingEvent(
   cellEventName: string,
   events: { eventId: string; name: string }[],
 ): { eventId: string; name: string } | undefined {
+  // 完全一致
+  const exact = events.find(e => e.name === cellEventName);
+  if (exact) return exact;
+
+  // 略称一致
+  const abbrMatch = events.find(e => abbreviateEventName(e.name) === abbreviateEventName(cellEventName));
+  if (abbrMatch) return abbrMatch;
+
   const norm = cellEventName.replace(/[級組]/g, '').trim();
-  return (
-    events.find(e => e.name === cellEventName) ||
-    events.find(e => e.name.includes(cellEventName)) ||
-    events.find(e => cellEventName.includes(e.name)) ||
-    events.find(e => abbreviateEventName(e.name) === abbreviateEventName(cellEventName)) ||
-    events.find(e => {
+
+  // DB種目名がセル名を含む（最短一致=最も具体的な種目を優先）
+  const includesMatches = events
+    .filter(e => e.name.includes(cellEventName))
+    .sort((a, b) => a.name.length - b.name.length);
+  if (includesMatches.length > 0) return includesMatches[0];
+
+  // セル名がDB種目名を含む（最長一致=最も具体的な種目を優先）
+  const reverseMatches = events
+    .filter(e => cellEventName.includes(e.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (reverseMatches.length > 0) return reverseMatches[0];
+
+  // 正規化あいまいマッチ（最長一致優先）
+  const normMatches = events
+    .filter(e => {
       const n = e.name.replace(/[級組]/g, '').trim();
       return n.includes(norm) || norm.includes(n);
     })
-  );
+    .sort((a, b) => {
+      const na = a.name.replace(/[級組]/g, '').trim();
+      const nb = b.name.replace(/[級組]/g, '').trim();
+      // 長い方（より具体的）を優先
+      return nb.length - na.length;
+    });
+  if (normMatches.length > 0) return normMatches[0];
+
+  return undefined;
 }
 
 /** Google Drive ブランドアイコン */
@@ -1946,9 +1994,9 @@ export default function ScheduleSheet() {
         </div>
       )}
 
-      {/* Google Drive File Picker Modal */}
-      {showDrivePicker && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDrivePicker(false)}>
+      {/* Google Drive File Picker Modal - createPortal で確実に画面中央表示 */}
+      {showDrivePicker && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowDrivePicker(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
@@ -2019,7 +2067,8 @@ export default function ScheduleSheet() {
               </p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

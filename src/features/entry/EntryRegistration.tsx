@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserX, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock } from 'lucide-react';
+import { CheckSquare, UserCheck, UserX, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban } from 'lucide-react';
 
 type CheckInSlot = {
   drawPosition: number;
@@ -569,11 +569,10 @@ export default function EntryRegistration() {
             const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
             const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
 
-            let statusDotColor = '#d1d5db';
             let borderClass = 'border-gray-300';
             let bgClass = 'bg-white';
-            if (isWithdrawn) { statusDotColor = '#ef4444'; bgClass = 'bg-red-50/60'; borderClass = 'border-red-200'; }
-            else if (isConfirmed) { statusDotColor = '#22c55e'; bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
+            if (isWithdrawn) { bgClass = 'bg-orange-50/60'; borderClass = 'border-orange-200'; }
+            else if (isConfirmed) { bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
 
             return (
               <div key={`league-card-${slot.drawPosition}`}
@@ -591,13 +590,18 @@ export default function EntryRegistration() {
                     </button>
                   ) : <span className="text-sm text-gray-300">---</span>}
                 </div>
-                <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusDotColor }} /></div>
                 {slot.entry && (
-                  <div className="flex-shrink-0 mr-1">
+                  <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
                     {isWithdrawn ? (
-                      <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
+                      <>
+                        <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                      </>
                     ) : (
-                      <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                      </>
                     )}
                   </div>
                 )}
@@ -720,11 +724,8 @@ export default function EntryRegistration() {
         const isConfirmed = slot.entryId ? confirmedIds.has(slot.entryId) : false;
         const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
         const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
-        let dotColor = '#d1d5db';
-        if (isWithdrawn) dotColor = '#ef4444';
-        else if (isConfirmed) dotColor = '#22c55e';
         let borderCls = 'border-gray-300', bgCls = 'bg-white';
-        if (isWithdrawn) { bgCls = 'bg-red-50/60'; borderCls = 'border-red-200'; }
+        if (isWithdrawn) { bgCls = 'bg-orange-50/60'; borderCls = 'border-orange-200'; }
         else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
         elems.push(
           <div key={`${keyPrefix}-slot-${slot.drawPosition}`}
@@ -742,13 +743,18 @@ export default function EntryRegistration() {
                 </button>
               ) : <span className="text-sm text-gray-300">---</span>}
             </div>
-            <div className="flex-shrink-0 mr-1"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: dotColor }} /></div>
             {slot.entry && (
-              <div className="flex-shrink-0 mr-1">
+              <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
                 {isWithdrawn ? (
-                  <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-0.5 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3 h-3" /></button>
+                  <>
+                    <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                  </>
                 ) : (
-                  <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="BYEにする"><UserX className="w-3 h-3" /></button>
+                  <>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                  </>
                 )}
               </div>
             )}
@@ -790,7 +796,7 @@ export default function EntryRegistration() {
         </span>
         <span className="flex items-center gap-1.5 text-gray-600">
           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-          欠場 <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
+          DEF <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
         </span>
       </div>
     ) : null;
@@ -816,7 +822,12 @@ export default function EntryRegistration() {
     return (
       <div>
         {statsHeader}
-        <div className="grid grid-cols-1 lg:grid-cols-2">
+        {/* PC: 全ラウンド接続された統一ブラケット表示 */}
+        <div className="hidden lg:block">
+          {renderBracketSection(displaySlots, drawSize, 0, 'full')}
+        </div>
+        {/* スマホ: 左山・右山を分割表示 */}
+        <div className="lg:hidden">
           {renderBracketSection(leftSlots, halfSize, 0, 'left',
             { text: 'Left side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
           {renderBracketSection(rightSlots, halfSize, leftVisCount, 'right',
@@ -864,7 +875,7 @@ export default function EntryRegistration() {
             <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
             <span className="text-gray-500">/</span>
             <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
-            {stats.absent > 0 && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} 欠場</span>}
+            {stats.absent > 0 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} DEF</span>}
           </div>
         </div>
 

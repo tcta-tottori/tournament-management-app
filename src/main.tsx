@@ -39,6 +39,8 @@ import CourtSchedule from './features/schedule/CourtSchedule'
 import LiveDashboard from './features/live/LiveDashboard'
 
 import Manual from './features/manual/Manual'
+import BackupPage from './features/backup/BackupPage';
+import ResultsPage from './features/results/ResultsPage';
 // BroadcastPanel は Scoreboard の MatchActionPanel に統合済み
 
 createRoot(document.getElementById('root')!).render(
@@ -59,8 +61,10 @@ createRoot(document.getElementById('root')!).render(
           <Route path="score" element={<Scoreboard />} />
           <Route path="schedule" element={<CourtSchedule />} />
           <Route path="dashboard" element={<LiveDashboard />} />
+          <Route path="results" element={<ResultsPage />} />
 
           <Route path="manual" element={<Manual />} />
+          <Route path="backup" element={<BackupPage />} />
           {/* broadcast は Scoreboard の MatchActionPanel に統合済み */}
         </Route>
       </Routes>

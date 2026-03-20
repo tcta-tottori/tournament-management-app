@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  HelpCircle, ExternalLink
+  HelpCircle, ExternalLink, Medal, HardDrive
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -20,7 +20,9 @@ const ALL_MAIN_TABS = [
   { id: 'S-06b', path: '/schedule-sheet', label: '時間割', icon: CalendarClock },
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
+  { id: 'S-10', path: '/results', label: '結果', icon: Medal },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
+  { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
 ];
 
 /** 抽選・ドロー表タブを非表示にするパス */
