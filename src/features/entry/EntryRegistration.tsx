@@ -48,12 +48,15 @@ function generateByePositions(drawSize: number, numByes: number): number[] {
 }
 
 function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
-  const entrySlots = slots.filter(s => !(s.isBye && !s.entry));
+  // DEF選手（isBye=true, entryId有）は通常のBYE（isBye=true, entryId無）と区別し、
+  // 元のドロー位置を維持する
+  const isRealBye = (s: CheckInSlot) => s.isBye && !s.entryId;
+  const entrySlots = slots.filter(s => !isRealBye(s));
   const numByes = drawSize - entrySlots.length;
   if (numByes <= 0) return slots;
 
   const halfPos = drawSize / 2;
-  const hasByeInFirstHalf = slots.some(s => s.isBye && !s.entry && s.drawPosition <= halfPos);
+  const hasByeInFirstHalf = slots.some(s => isRealBye(s) && s.drawPosition <= halfPos);
   if (hasByeInFirstHalf) {
     if (slots.length >= drawSize) return slots;
     const existingPos = new Set(slots.map(s => s.drawPosition));
