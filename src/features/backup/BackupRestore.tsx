@@ -233,11 +233,7 @@ function GoogleDriveSection({ setStatus }: { setStatus: (s: any) => void }) {
 
   // Google ドライブに接続 (OAuth2 ポップアップ)
   const handleConnect = async () => {
-    const cid = clientId || clientIdInput.trim();
-    if (!cid) {
-      setStatus({ type: 'error', message: 'Client ID を入力してください' });
-      return;
-    }
+    const cid = clientId || clientIdInput.trim() || getSavedClientId();
     setIsConnecting(true);
     try {
       await loadGisScript();

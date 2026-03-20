@@ -10,6 +10,9 @@ const ROOT_FOLDER_NAME = '鳥取テニス協会バックアップ';
 const SUB_FOLDER_NAME = '大会運営システム';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
+/** デフォルト OAuth2 Client ID（全ユーザー共通） */
+export const DEFAULT_CLIENT_ID = '316429350105-v1tpv97kkq6jkg9gmu57aqt7btic6qod.apps.googleusercontent.com';
+
 // localStorage キー
 const TOKEN_KEY = 'gdrive_backup_token';
 const EXPIRY_KEY = 'gdrive_backup_expiry';
@@ -123,7 +126,7 @@ export function isTokenValid(): boolean {
 
 // Client ID 管理
 export function getSavedClientId(): string {
-  return localStorage.getItem(CLIENT_ID_KEY) || '';
+  return localStorage.getItem(CLIENT_ID_KEY) || DEFAULT_CLIENT_ID;
 }
 
 export function saveClientId(clientId: string): void {
@@ -346,4 +349,144 @@ export async function deleteBackup(config: GoogleDriveConfig, file: GoogleDriveF
 export async function getSharedFolderLink(token: string): Promise<string> {
   const folderId = await getBackupFolderId(token);
   return `https://drive.google.com/drive/folders/${folderId}`;
+}
+
+// ================================================================
+// ふりがな一覧・所属一覧 フォルダ操作
+// ================================================================
+
+const FURIGANA_FOLDER_NAME = 'ふりがな一覧';
+const AFFILIATION_FOLDER_NAME = '所属一覧';
+
+/** ルートフォルダ配下の特定サブフォルダIDを取得（なければ作成） */
+async function getSubFolderId(token: string, subName: string): Promise<string> {
+  let rootId = await findFolder(token, ROOT_FOLDER_NAME);
+  if (!rootId) rootId = await createFolder(token, ROOT_FOLDER_NAME);
+  let subId = await findFolder(token, subName, rootId);
+  if (!subId) subId = await createFolder(token, subName, rootId);
+  return subId;
+}
+
+/** 指定フォルダ内の最新 xlsx ファイルを取得 */
+async function getLatestXlsx(
+  token: string,
+  folderId: string,
+): Promise<GoogleDriveFile | null> {
+  // xlsx の MIME: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  // Google Sheets の場合もあるので拡張対応
+  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  const params = new URLSearchParams({
+    q,
+    fields: 'files(id,name,size,modifiedTime,mimeType)',
+    orderBy: 'modifiedTime desc',
+    pageSize: '1',
+  });
+  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const file = data.files?.[0];
+  if (!file) return null;
+  return { id: file.id, name: file.name, size: file.size || '0', modifiedTime: file.modifiedTime, mimeType: file.mimeType };
+}
+
+/** ファイルのバイナリをダウンロード */
+async function downloadFileBlob(token: string, fileId: string): Promise<ArrayBuffer> {
+  const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+    headers: headers(token),
+  });
+  if (!res.ok) throw new Error(`ダウンロード失敗 (${res.status})`);
+  return res.arrayBuffer();
+}
+
+/** ふりがな一覧フォルダから最新Excelをダウンロード */
+export async function downloadFuriganaExcel(token: string): Promise<{ data: ArrayBuffer; fileName: string } | null> {
+  const folderId = await getSubFolderId(token, FURIGANA_FOLDER_NAME);
+  const file = await getLatestXlsx(token, folderId);
+  if (!file) return null;
+  const data = await downloadFileBlob(token, file.id);
+  return { data, fileName: file.name };
+}
+
+/** 所属一覧フォルダから最新Excelをダウンロード */
+export async function downloadAffiliationExcel(token: string): Promise<{ data: ArrayBuffer; fileName: string } | null> {
+  const folderId = await getSubFolderId(token, AFFILIATION_FOLDER_NAME);
+  const file = await getLatestXlsx(token, folderId);
+  if (!file) return null;
+  const data = await downloadFileBlob(token, file.id);
+  return { data, fileName: file.name };
+}
+
+/** フォルダに xlsx ファイルをアップロード（同名があれば上書き） */
+async function uploadXlsxToFolder(
+  token: string,
+  folderId: string,
+  fileName: string,
+  xlsxBuffer: ArrayBuffer,
+): Promise<void> {
+  // 既存ファイルを検索して上書き
+  const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
+  const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
+  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
+  const existingId = searchData.files?.[0]?.id;
+
+  const metadata = {
+    name: fileName,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ...(existingId ? {} : { parents: [folderId] }),
+  };
+
+  const boundary = '----XlsxBoundary' + Date.now();
+  const metaPart = JSON.stringify(metadata);
+
+  // Build multipart body
+  const encoder = new TextEncoder();
+  const pre = encoder.encode(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaPart}\r\n--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`
+  );
+  const post = encoder.encode(`\r\n--${boundary}--`);
+  const body = new Uint8Array(pre.length + xlsxBuffer.byteLength + post.length);
+  body.set(pre, 0);
+  body.set(new Uint8Array(xlsxBuffer), pre.length);
+  body.set(post, pre.length + xlsxBuffer.byteLength);
+
+  const url = existingId
+    ? `${UPLOAD_API}/files/${existingId}?uploadType=multipart`
+    : `${UPLOAD_API}/files?uploadType=multipart`;
+  const method = existingId ? 'PATCH' : 'POST';
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...headers(token),
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `アップロード失敗 (${res.status})`);
+  }
+}
+
+/** ふりがな一覧フォルダにExcelをアップロード */
+export async function uploadFuriganaExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
+  const folderId = await getSubFolderId(token, FURIGANA_FOLDER_NAME);
+  await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
+}
+
+/** 所属一覧フォルダにExcelをアップロード */
+export async function uploadAffiliationExcel(token: string, fileName: string, xlsxBuffer: ArrayBuffer): Promise<void> {
+  const folderId = await getSubFolderId(token, AFFILIATION_FOLDER_NAME);
+  await uploadXlsxToFolder(token, folderId, fileName, xlsxBuffer);
+}
+
+/** デフォルトClient IDでOAuth接続を開始 */
+export async function connectWithDefaultClientId(): Promise<string> {
+  await loadGisScript();
+  const clientId = getSavedClientId();
+  saveClientId(clientId);
+  const token = await requestAccessToken(clientId);
+  return token;
 }
