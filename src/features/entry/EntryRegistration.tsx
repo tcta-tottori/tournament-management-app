@@ -17,6 +17,76 @@ const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
   l55d: '女子55歳以上ダブルス', mbd: '男子B級ダブルス', lbd: '女子B級ダブルス',
 };
 
+// 日本語略称 ↔ 正式名の双方向マッピング（Excel時間割の略称とドロー会議システムの正式名）
+const JP_ABBREV_PAIRS: [string, string][] = [
+  // シングルス
+  ['男子A', '一般男子シングルス'],
+  ['男子B', '男子B級シングルス'],
+  ['男子C', '男子C級シングルス'],
+  ['男子35', '男子35歳以上シングルス'],
+  ['男子45', '男子45歳以上シングルス'],
+  ['男子55', '男子55歳以上シングルス'],
+  ['男子65', '男子65歳以上シングルス'],
+  ['女子A', '一般女子シングルス'],
+  ['女子B', '女子B級シングルス'],
+  ['女子C', '女子C級シングルス'],
+  ['女子45', '女子45歳以上シングルス'],
+  ['女子55', '女子55歳以上シングルス'],
+  ['女子65', '女子65歳以上シングルス'],
+  // ダブルス
+  ['男子AD', '一般男子ダブルス'],
+  ['男子BD', '男子B級ダブルス'],
+  ['男子CD', '男子C級ダブルス'],
+  ['男子35D', '男子35歳以上ダブルス'],
+  ['男子45D', '男子45歳以上ダブルス'],
+  ['男子55D', '男子55歳以上ダブルス'],
+  ['男子65D', '男子65歳以上ダブルス'],
+  ['女子AD', '一般女子ダブルス'],
+  ['女子BD', '女子B級ダブルス'],
+  ['女子45D', '女子45歳以上ダブルス'],
+  ['女子55D', '女子55歳以上ダブルス'],
+  ['女子65D', '女子65歳以上ダブルス'],
+];
+
+/** 種目名の柔軟マッチング: 略称・正式名・部分一致など複数の戦略で比較 */
+function matchEventName(schedName: string, dbName: string): boolean {
+  // 1. 完全一致
+  if (schedName === dbName) return true;
+
+  // 2. 空白・全角半角を正規化して比較
+  const normA = schedName.replace(/[　\s]+/g, '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toLowerCase();
+  const normB = dbName.replace(/[　\s]+/g, '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toLowerCase();
+  if (normA === normB) return true;
+
+  // 3. 部分一致（双方向）
+  if (normA.length >= 2 && normB.length >= 2) {
+    if (normB.includes(normA) || normA.includes(normB)) return true;
+  }
+
+  // 4. 日本語略称パターンマッチング
+  for (const [abbrev, formal] of JP_ABBREV_PAIRS) {
+    const normAbbrev = abbrev.toLowerCase();
+    const normFormal = formal.replace(/[　\s]+/g, '').toLowerCase();
+    // schedName が略称で dbName が正式名
+    if (normA === normAbbrev && normB === normFormal) return true;
+    // schedName が正式名で dbName が略称
+    if (normA === normFormal && normB === normAbbrev) return true;
+  }
+
+  // 5. コア部分を抽出して比較（シングルス/ダブルス/級/歳以上 を除去）
+  const stripSuffix = (s: string) => s
+    .replace(/シングルス|ダブルス/g, '')
+    .replace(/級/g, '')
+    .replace(/歳以上/g, '')
+    .replace(/一般/g, '')
+    .trim();
+  const coreA = stripSuffix(normA);
+  const coreB = stripSuffix(normB);
+  if (coreA.length >= 2 && coreB.length >= 2 && coreA === coreB) return true;
+
+  return false;
+}
+
 type CheckInSlot = {
   drawPosition: number;
   seed: number;
@@ -430,20 +500,14 @@ export default function EntryRegistration() {
     // key: eventId|roundLabel
     const scheduleGrouped = new Map<string, typeof importedSchedule>();
     for (const item of importedSchedule) {
-      // 種目名マッチング（略称→正式名変換も試行）
+      // 種目名マッチング（略称→正式名変換 + 柔軟マッチング）
       let matchedEventId: string | null = null;
       const resolvedName = SCHEDULE_CODE_TO_NAME[item.eventName.toLowerCase()] || item.eventName;
-      const normalizedResolved = normalizeEventName(resolvedName);
       for (const evt of allEvents) {
-        if (evt.name.includes(resolvedName) || resolvedName.includes(evt.name) ||
-            normalizeEventName(evt.name) === normalizedResolved) {
+        if (matchEventName(resolvedName, evt.name)) {
           matchedEventId = evt.eventId;
           break;
         }
-      }
-      // eventNameMapでも試行
-      if (!matchedEventId) {
-        matchedEventId = eventNameMap.get(normalizedResolved) || null;
       }
       if (!matchedEventId) continue;
 

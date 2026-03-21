@@ -320,9 +320,18 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
         const cell = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
         if (!cell) continue;
         globalOrder++;
-        const rawEventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
-        const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
-        const roundLabel = roundMatch ? roundMatch[0] : '1R';
+        // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）
+        const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝|\bF\b)/);
+        const roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '') : '1R';
+        // ラウンドラベルを除去して種目名を抽出
+        const rawEventName = cell
+          .replace(/\d+\s*R/g, '')
+          .replace(/Q\s*F/g, '')
+          .replace(/S\s*F/g, '')
+          .replace(/準々決勝|準決勝|決勝/g, '')
+          .replace(/(?:^|\s)F(?:\s|$)/g, ' ')  // 独立した "F" のみ除去
+          .replace(/F$/g, '')                   // 末尾の "F" を除去
+          .trim();
         // EVENT_MAPで略称→正式名に変換
         const mapped = EVENT_MAP[rawEventName.toLowerCase()];
         const eventName = mapped ? mapped.name : rawEventName;
@@ -388,9 +397,17 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
           const cell = String(row[ci + 1] || '').trim();
           if (!cell) continue;
           globalOrder++;
-          const rawEventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
-          const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
-          const roundLabel = roundMatch ? roundMatch[0] : '1R';
+          // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）
+          const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝|\bF\b)/);
+          const roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '') : '1R';
+          const rawEventName = cell
+            .replace(/\d+\s*R/g, '')
+            .replace(/Q\s*F/g, '')
+            .replace(/S\s*F/g, '')
+            .replace(/準々決勝|準決勝|決勝/g, '')
+            .replace(/(?:^|\s)F(?:\s|$)/g, ' ')
+            .replace(/F$/g, '')
+            .trim();
           // EVENT_MAPで略称→正式名に変換
           const mapped3 = EVENT_MAP[rawEventName.toLowerCase()];
           const eventName = mapped3 ? mapped3.name : rawEventName;
@@ -1739,9 +1756,13 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {scheduleItems.map((item, i) => (
+                    {[...scheduleItems].sort((a, b) => {
+                      const timeCmp = a.startTime.localeCompare(b.startTime);
+                      if (timeCmp !== 0) return timeCmp;
+                      return (parseInt(a.courtName) || 0) - (parseInt(b.courtName) || 0);
+                    }).map((item, i) => (
                       <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-2 py-1 text-gray-500">{item.matchOrder}</td>
+                        <td className="px-2 py-1 text-gray-500">{i + 1}</td>
                         <td className="px-2 py-1 text-gray-900">{item.courtName}</td>
                         <td className="px-2 py-1 text-gray-900">{item.startTime}</td>
                         <td className="px-2 py-1 text-gray-700">{item.eventName || '-'}</td>
