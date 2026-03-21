@@ -5,6 +5,18 @@ import { useAppStore } from '../../stores/appStore';
 import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 
+// 略称→正式名マッピング（時間割の略称がストアに残っている場合のフォールバック用）
+const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
+  ms: '一般男子シングルス', ls: '一般女子シングルス',
+  m35s: '男子35歳以上シングルス', m45s: '男子45歳以上シングルス',
+  m55s: '男子55歳以上シングルス', m65s: '男子65歳以上シングルス',
+  l45s: '女子45歳以上シングルス', mbs: '男子B級シングルス', lbs: '女子B級シングルス',
+  md: '一般男子ダブルス', ld: '一般女子ダブルス',
+  m45d: '男子45歳以上ダブルス', m55d: '男子55歳以上ダブルス',
+  m65d: '男子65歳以上ダブルス', l45d: '女子45歳以上ダブルス',
+  l55d: '女子55歳以上ダブルス', mbd: '男子B級ダブルス', lbd: '女子B級ダブルス',
+};
+
 type CheckInSlot = {
   drawPosition: number;
   seed: number;
@@ -418,14 +430,20 @@ export default function EntryRegistration() {
     // key: eventId|roundLabel
     const scheduleGrouped = new Map<string, typeof importedSchedule>();
     for (const item of importedSchedule) {
-      // 種目名マッチング
+      // 種目名マッチング（略称→正式名変換も試行）
       let matchedEventId: string | null = null;
+      const resolvedName = SCHEDULE_CODE_TO_NAME[item.eventName.toLowerCase()] || item.eventName;
+      const normalizedResolved = normalizeEventName(resolvedName);
       for (const evt of allEvents) {
-        if (evt.name.includes(item.eventName) || item.eventName.includes(evt.name) ||
-            normalizeEventName(evt.name) === normalizeEventName(item.eventName)) {
+        if (evt.name.includes(resolvedName) || resolvedName.includes(evt.name) ||
+            normalizeEventName(evt.name) === normalizedResolved) {
           matchedEventId = evt.eventId;
           break;
         }
+      }
+      // eventNameMapでも試行
+      if (!matchedEventId) {
+        matchedEventId = eventNameMap.get(normalizedResolved) || null;
       }
       if (!matchedEventId) continue;
 

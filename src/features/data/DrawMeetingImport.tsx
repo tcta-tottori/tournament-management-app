@@ -320,9 +320,12 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
         const cell = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
         if (!cell) continue;
         globalOrder++;
-        const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
+        const rawEventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
         const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
         const roundLabel = roundMatch ? roundMatch[0] : '1R';
+        // EVENT_MAPで略称→正式名に変換
+        const mapped = EVENT_MAP[rawEventName.toLowerCase()];
+        const eventName = mapped ? mapped.name : rawEventName;
         items.push({
           eventName,
           roundLabel,
@@ -385,9 +388,12 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
           const cell = String(row[ci + 1] || '').trim();
           if (!cell) continue;
           globalOrder++;
-          const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
+          const rawEventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
           const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
           const roundLabel = roundMatch ? roundMatch[0] : '1R';
+          // EVENT_MAPで略称→正式名に変換
+          const mapped3 = EVENT_MAP[rawEventName.toLowerCase()];
+          const eventName = mapped3 ? mapped3.name : rawEventName;
           items.push({
             eventName,
             roundLabel,
