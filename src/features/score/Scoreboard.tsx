@@ -627,14 +627,14 @@ export default function Scoreboard() {
       {!headerVisible && (
         <button
           onClick={() => setHeaderVisible(true)}
-          className="fixed top-2 right-2 z-50 bg-primary-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-bold hover:bg-primary-600 transition-colors print:hidden flex items-center gap-1"
+          className="fixed bottom-20 right-3 z-50 bg-primary-600 text-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all print:hidden"
+          title="メニュー表示"
         >
-          <Eye className="w-3.5 h-3.5" />
-          メニュー
+          <Eye className="w-5 h-5" />
         </button>
       )}
       {/* ===== HEADER ===== */}
-      <header className={`flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0 sticky top-0 z-10 transition-all duration-300 ${!headerVisible ? 'hidden' : ''}`}>
+      <header className={`flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0 z-10 transition-all duration-300 ${!headerVisible ? 'hidden' : ''}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -794,7 +794,7 @@ export default function Scoreboard() {
       </header>
 
       {/* ===== COURT STATUS BAR ===== */}
-      {headerVisible && courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
+      {!headerVisible ? null : courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
         <div className="flex gap-2 overflow-x-auto pb-1 print:hidden shrink-0">
           {courtStatus.map(c => {
             const isOver = c.matchInfo && c.startedAt > 0 && (clockTick - c.startedAt) > matchDuration * 60 * 1000;
@@ -842,7 +842,7 @@ export default function Scoreboard() {
               return (
                 <section key={evtData.event.eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
                   {/* Event header — sticky */}
-                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-border-main sticky top-0 z-[5]">
+                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-border-main sticky -top-4 md:-top-6 z-[5] shadow-sm">
                     <div className="flex items-center justify-between">
                       <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                         {evtData.isRoundRobin
@@ -1150,8 +1150,8 @@ export default function Scoreboard() {
                         <tr key={m.matchId} className={`border-b border-border-main hover:bg-primary-50 ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
                           <td className="py-2 px-3 font-mono text-gray-500">{m.matchOrder}</td>
                           <td className="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">{winner}</td>
-                          <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{loser || 'BYE'}</td>
-                          <td className="py-2 px-3 font-mono">{m.score || (m.status === 'walkover' ? 'W/O' : '-')}</td>
+                          <td className="py-2 px-3 text-gray-600 whitespace-nowrap">{loser || 'BYE'}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-gray-800">{m.score || (m.status === 'walkover' ? 'W/O' : '-')}</td>
                           <td className="py-2 px-3">
                             <button onClick={() => handleResetMatch(m.matchId)} disabled={isProcessing}
                               className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-50" title="リセット">

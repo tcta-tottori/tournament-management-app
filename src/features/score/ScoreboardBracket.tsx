@@ -270,7 +270,7 @@ export default function ScoreboardBracket({
                 <div className="flex items-center gap-1">
                   <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
                   <span className="text-sm font-bold text-primary-600 truncate">{displayName}</span>
-                  {matchResult.score && <span className="text-[9px] text-gray-700 font-bold ml-auto shrink-0">{matchResult.score}</span>}
+                  {matchResult.score && <span className="text-[9px] text-gray-900 font-bold ml-auto shrink-0">{matchResult.score}</span>}
                 </div>
               ) : matchResult && matchResult.status === 'playing' ? (
                 <>
@@ -328,7 +328,7 @@ export default function ScoreboardBracket({
                   <span className="text-xs font-medium text-gray-800 truncate flex-1" title={winnerName}>{winnerName}</span>
                   {renderStatusBadge(matchResult)}
                 </div>
-                {matchResult.score && <div className="text-[9px] text-gray-700 font-bold truncate">{matchResult.score}</div>}
+                {matchResult.score && <div className="text-[9px] text-gray-900 font-bold truncate">{matchResult.score}</div>}
               </>
             ) : matchResult && matchResult.status === 'playing' ? (
               <>

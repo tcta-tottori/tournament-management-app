@@ -4,6 +4,8 @@ import { db } from '../../db/database';
 import { buildCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db as appDb } from '../../db/database';
 import {
   X,
   Trophy,
@@ -109,6 +111,14 @@ export default function ScoreInputDialog({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { isSpeaking, speak, stop } = useSpeechSynthesis();
+
+  // 所属ふりがなマップ（音声コール用）
+  const affiliationFuriganaMap = useLiveQuery(async () => {
+    const all = await appDb.affiliationFurigana.toArray();
+    const map: Record<string, string> = {};
+    for (const a of all) map[a.name] = a.furigana;
+    return map;
+  }) || {} as Record<string, string>;
 
   // 試合が変わったらスコアを同期
   useEffect(() => {
@@ -463,7 +473,7 @@ export default function ScoreInputDialog({
       type: 'singles', status: 'pending', courtNumber,
       startTime: match.scheduledTime ?? '',
     };
-    speak(buildCallText(callData, courtNumber, match.scheduledTime ?? ''), DEFAULT_VOICE);
+    speak(buildCallText(callData, courtNumber, match.scheduledTime ?? '', affiliationFuriganaMap), DEFAULT_VOICE);
   };
 
   if (!match) return null;
