@@ -297,11 +297,9 @@ export default function MatchManager() {
     for (const court of courts) {
       if (!court.isAvailable) continue;
       const courtMatches = allMatchesFlat
-        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready'))
-        .sort((a, b) => {
-          if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
-          return (a.matchOrder || 0) - (b.matchOrder || 0);
-        });
+        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready')
+          && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE')
+        .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0));
       if (courtMatches.length > 0) firstMatches.push({ match: courtMatches[0], court });
     }
 
@@ -1063,7 +1061,7 @@ ${printableMatches.map(m => {
               <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ListOrdered className="w-5 h-5 text-white" />
-                  <span className="font-bold text-white text-sm">対戦順（時間割・コート順）</span>
+                  <span className="font-bold text-white text-sm">対戦順</span>
                   <span className="text-white/70 text-xs">{globalSortedMatches.length}試合</span>
                 </div>
               </div>
@@ -1077,7 +1075,7 @@ ${printableMatches.map(m => {
                     <col />
                     <col style={{ width: '100px' }} />
                     <col style={{ width: '48px' }} />
-                    <col style={{ width: '52px' }} />
+                    <col style={{ width: '72px' }} />
                     <col style={{ width: '110px' }} />
                   </colgroup>
                   <thead>
@@ -1094,82 +1092,119 @@ ${printableMatches.map(m => {
                     </tr>
                   </thead>
                   <tbody>
-                    {globalSortedMatches.map((m) => {
-                      const st = statusLabels[m.status] || statusLabels.waiting;
-                      const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
-                      const eventDraw = allDraws.get(m.eventId);
-                      const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
-                      const rName = getRoundName(m.round, evTotalRounds);
-                      const hasPlayers = !!m.player1Name && !!m.player2Name;
-                      return (
-                        <tr key={m.matchId} className={`border-b border-gray-100 ${!hasPlayers ? 'opacity-40' : ''} ${m.status === 'playing' ? 'bg-green-50' : m.status === 'finished' ? 'bg-gray-50' : ''}`}>
-                          <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{m.matchOrder}</td>
-                          <td className="py-2 px-2 text-center text-xs font-mono text-gray-600">{m.round === 1 ? (m.scheduledTime || '-') : '-'}</td>
-                          <td className="py-2 px-2">
-                            <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
-                          </td>
-                          <td className="py-2 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
-                          <td className="py-2 px-2">
-                            <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
-                          </td>
-                          <td className="py-2 px-2">
-                            <div className="text-[10px] text-gray-500 truncate">{m.eventName}</div>
-                            <div className="text-[10px] font-medium text-gray-700">{rName}</div>
-                          </td>
-                          <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{courtObj?.name || '-'}</td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${st.color}`}>{st.text}</span>
-                          </td>
-                          <td className="py-1.5 px-2 text-center">
-                            <div className="flex items-center gap-1 justify-center">
-                              <button
-                                onClick={() => handlePrintMatch(m)}
-                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
-                                title="対戦票印刷"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                              {hasPlayers && m.status !== 'walkover' && (
-                                <button
-                                  onClick={() => startEdit(m)}
-                                  className={`p-1 rounded border transition-all ${
-                                    m.status === 'finished'
-                                      ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
-                                      : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
-                                  }`}
-                                  title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              {hasPlayers && m.status !== 'walkover' && (
-                                speakingMatchId === m.matchId ? (
+                    {(() => {
+                      let lastTime = '';
+                      return globalSortedMatches.map((m) => {
+                        const st = statusLabels[m.status] || statusLabels.waiting;
+                        const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+                        const eventDraw = allDraws.get(m.eventId);
+                        const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
+                        const rName = getRoundName(m.round, evTotalRounds);
+                        const hasPlayers = !!m.player1Name && !!m.player2Name
+                          && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+                        const showTimeSep = m.scheduledTime && m.scheduledTime !== lastTime;
+                        if (m.scheduledTime) lastTime = m.scheduledTime;
+                        const sb = standbyInfo.get(m.matchId);
+                        let statusDisplay: { text: string; color: string };
+                        if (m.status === 'playing') {
+                          statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
+                        } else if (m.status === 'finished') {
+                          statusDisplay = st;
+                        } else if (sb?.type === 'court') {
+                          statusDisplay = { text: '次コート', color: 'bg-amber-100 text-amber-700' };
+                        } else if (sb?.type === 'standby') {
+                          statusDisplay = { text: sb.label, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
+                        } else if (!hasPlayers) {
+                          statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
+                        } else {
+                          statusDisplay = st;
+                        }
+                        return (
+                          <React.Fragment key={m.matchId}>
+                            {showTimeSep && (
+                              <tr className="bg-gray-800">
+                                <td colSpan={9} className="py-1 px-3 text-[10px] font-bold text-white tracking-wider">
+                                  {m.scheduledTime}〜
+                                </td>
+                              </tr>
+                            )}
+                            <tr className={`border-b border-gray-100 ${
+                              !hasPlayers ? 'opacity-30' : ''
+                            } ${
+                              m.status === 'playing' ? 'bg-green-50' :
+                              m.status === 'finished' ? 'bg-gray-50/60' :
+                              sb?.type === 'court' ? 'bg-amber-50/40' :
+                              sb?.type === 'standby' ? 'bg-orange-50/30' : ''
+                            }`}>
+                              <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{m.matchOrder}</td>
+                              <td className="py-2 px-2 text-center text-xs font-mono text-gray-400">{m.scheduledTime || ''}</td>
+                              <td className="py-2 px-2">
+                                <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
+                              </td>
+                              <td className="py-2 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
+                              <td className="py-2 px-2">
+                                <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="text-[10px] text-gray-500 truncate">{m.eventName}</div>
+                                <div className="text-[10px] font-medium text-gray-700">{rName}</div>
+                              </td>
+                              <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{courtObj?.name || '-'}</td>
+                              <td className="py-2 px-2 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
+                              </td>
+                              <td className="py-1.5 px-2 text-center">
+                                <div className="flex items-center gap-1 justify-center">
                                   <button
-                                    onClick={handleVoiceStop}
-                                    className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
-                                    title="停止"
+                                    onClick={() => handlePrintMatch(m)}
+                                    className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
+                                    title="対戦票印刷"
                                   >
-                                    <Square className="w-3.5 h-3.5" />
+                                    <Printer className="w-3.5 h-3.5" />
                                   </button>
-                                ) : (
-                                  <button
-                                    onClick={() => toggleCallTarget(m)}
-                                    className={`p-1 rounded border transition-all ${
-                                      callTargetMatchId === m.matchId
-                                        ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
-                                        : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
-                                    }`}
-                                    title="音声コール"
-                                  >
-                                    <Volume2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                                  {hasPlayers && m.status !== 'walkover' && (
+                                    <button
+                                      onClick={() => startEdit(m)}
+                                      className={`p-1 rounded border transition-all ${
+                                        m.status === 'finished'
+                                          ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
+                                          : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
+                                      }`}
+                                      title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {hasPlayers && m.status !== 'walkover' && (
+                                    speakingMatchId === m.matchId ? (
+                                      <button
+                                        onClick={handleVoiceStop}
+                                        className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
+                                        title="停止"
+                                      >
+                                        <Square className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => toggleCallTarget(m)}
+                                        className={`p-1 rounded border transition-all ${
+                                          callTargetMatchId === m.matchId
+                                            ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
+                                            : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
+                                        }`}
+                                        title="音声コール"
+                                      >
+                                        <Volume2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
