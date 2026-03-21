@@ -1193,10 +1193,9 @@ export default function EntryRegistration() {
       const target = e.currentTarget as HTMLElement;
       const y = target.scrollTop;
 
-      // 下スクロールでコントロールを折りたたむ
-      if (y > 20 && y > lastScrollY) setControlsOpen(false);
-      // 上に大きくスクロールしたら再表示
-      if (lastScrollY - y > 40) setControlsOpen(true);
+      // モバイルのみ: 下スクロールでコントロールを折りたたむ（再表示はボタンクリックのみ）
+      const isMobile = window.innerWidth < 1024;
+      if (isMobile && y > 20 && y > lastScrollY) setControlsOpen(false);
       lastScrollY = y;
 
       // スクロール中の種目名検出
