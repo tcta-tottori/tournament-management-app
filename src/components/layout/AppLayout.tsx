@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
@@ -9,6 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import logoUrl from '/logo.png?url';
+import VersionInfoModal from '../ui/VersionInfoModal';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -68,6 +69,7 @@ for (let i = 0; i < 10; i++) {
 export default function AppLayout() {
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
 
   // 現在の大会に紐づく種目を取得
   const events = useLiveQuery(
@@ -176,10 +178,14 @@ export default function AppLayout() {
             <span className="hidden sm:inline">ドロー会議</span>
             <ExternalLink className="w-3 h-3" />
           </a>
-          <div className="flex flex-col items-center">
+          <button
+            onClick={() => setVersionModalOpen(true)}
+            className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
+            title="バージョン情報・更新履歴"
+          >
             <span className="header-version">v1.2</span>
             <span className="text-[8px] text-white/40 leading-tight mt-0.5 whitespace-nowrap">{__BUILD_TIMESTAMP__}</span>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -253,6 +259,9 @@ export default function AppLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* バージョン情報モーダル */}
+      <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />
     </div>
   );
 }
