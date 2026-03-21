@@ -263,10 +263,10 @@ export default function ScheduleSheet() {
       const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
       if (roundNum === null) continue;
 
-      // Get DB matches for this event+round, sorted by position
+      // Get DB matches for this event+round, sorted by matchOrder (対戦順ページと同じ順序)
       const dbMatchesForRound = allMatches
         .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum)
-        .sort((a, b) => a.position - b.position);
+        .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
 
       // Sort schedule indices by time then court
       const sortedIndices = [...indices].sort((a, b) => {
