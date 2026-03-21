@@ -144,13 +144,26 @@ export default function ScoreInputDialog({
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [match?.matchId, match?.status, match?.updatedAt]);
 
-  // タイブレーク判定（各セット）
+  // タイブレーク判定（各セット）— 6-6 TB (7-6) & 8-8 TB (9-8) に対応
   const tiebreakFlags = useMemo(() => {
     return sets.map(s => {
       const p1 = parseInt(s.p1);
       const p2 = parseInt(s.p2);
       if (isNaN(p1) || isNaN(p2)) return false;
-      return (p1 === 7 && p2 === 6) || (p1 === 6 && p2 === 7);
+      return (p1 === 7 && p2 === 6) || (p1 === 6 && p2 === 7)
+          || (p1 === 9 && p2 === 8) || (p1 === 8 && p2 === 9);
+    });
+  }, [sets]);
+
+  // タイブレーク敗者側判定（'p1' or 'p2' — TB入力欄を敗者側に表示）
+  const tiebreakLoserSide = useMemo(() => {
+    return sets.map(s => {
+      const p1 = parseInt(s.p1);
+      const p2 = parseInt(s.p2);
+      if (isNaN(p1) || isNaN(p2)) return null;
+      if ((p1 === 7 && p2 === 6) || (p1 === 9 && p2 === 8)) return 'p2' as const;
+      if ((p1 === 6 && p2 === 7) || (p1 === 8 && p2 === 9)) return 'p1' as const;
+      return null;
     });
   }, [sets]);
 
@@ -381,106 +394,143 @@ export default function ScoreInputDialog({
 
         {/* Players */}
         <div className="px-4 sm:px-6 py-4 sm:py-5">
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 sm:gap-3 items-center">
-            {/* Player 1 */}
-            <div className={`text-center ${match.winnerEntryId === match.player1EntryId && isFinished ? '' : ''}`}>
-              <p className={`font-bold text-base sm:text-lg leading-tight ${
-                match.winnerEntryId === match.player1EntryId && isFinished ? 'text-primary-600' : 'text-gray-900'
-              }`}>
-                {match.player1Name || '(未定)'}
-                {match.winnerEntryId === match.player1EntryId && isFinished && (
-                  <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />
-                )}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">{match.player1Affiliation}</p>
-            </div>
+          {(() => {
+            const isP1Winner = isFinished && match.winnerEntryId === match.player1EntryId;
+            const isP2Winner = isFinished && match.winnerEntryId === match.player2EntryId;
+            const isP1Loser = isFinished && match.winnerEntryId && !isP1Winner;
+            const isP2Loser = isFinished && match.winnerEntryId && !isP2Winner;
+            return (
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-2 sm:gap-3 items-center">
+                {/* Player 1 */}
+                <div className="text-center">
+                  <p className={`font-bold text-base sm:text-lg leading-tight ${
+                    isP1Winner ? 'text-primary-600' : isP1Loser ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
+                    {match.player1Name || '(未定)'}
+                    {isP1Winner && <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${isP1Loser ? 'text-gray-300' : 'text-gray-500'}`}>{match.player1Affiliation}</p>
+                </div>
 
-            <div className="text-gray-300 font-bold text-sm">VS</div>
+                <div className="text-gray-300 font-bold text-sm">VS</div>
 
-            {/* Player 2 */}
-            <div className="text-center">
-              <p className={`font-bold text-base sm:text-lg leading-tight ${
-                match.winnerEntryId === match.player2EntryId && isFinished ? 'text-primary-600' : 'text-gray-900'
-              }`}>
-                {match.player2Name || '(未定)'}
-                {match.winnerEntryId === match.player2EntryId && isFinished && (
-                  <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />
-                )}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">{match.player2Affiliation}</p>
-            </div>
-          </div>
+                {/* Player 2 */}
+                <div className="text-center">
+                  <p className={`font-bold text-base sm:text-lg leading-tight ${
+                    isP2Winner ? 'text-primary-600' : isP2Loser ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
+                    {match.player2Name || '(未定)'}
+                    {isP2Winner && <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${isP2Loser ? 'text-gray-300' : 'text-gray-500'}`}>{match.player2Affiliation}</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
-        {/* Score Input */}
+        {/* Score Input — 試合中・終了時のみ表示 */}
         <div className="px-4 sm:px-6 pb-4">
           <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-3">
-            {/* コート */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
-              <select
-                value={match.courtId ?? ''}
-                onChange={e => handleAssignCourt(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-              >
-                <option value="">未割当</option>
-                {courts.map(c => (
-                  <option key={c.courtId} value={c.courtId}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* コート — 終了後は非表示 */}
+            {!isFinished && (
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
+                <select
+                  value={match.courtId ?? ''}
+                  onChange={e => handleAssignCourt(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                >
+                  <option value="">未割当</option>
+                  {courts.map(c => {
+                    const isCurrentCourt = c.courtId === match.courtId;
+                    const isOccupied = !c.isAvailable && !isCurrentCourt;
+                    if (isOccupied) return null;
+                    return (
+                      <option key={c.courtId} value={c.courtId}>{c.name}</option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
 
-            {/* セットスコア入力 */}
-            <div className="space-y-2">
-              <span className="text-xs text-gray-500">スコア</span>
-              {sets.map((set, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">
-                    {maxSets > 1 ? `Set${i + 1}` : ''}
-                  </span>
-                  <div className="flex items-center gap-1 flex-1 justify-center">
-                    <input
-                      ref={el => { inputRefs.current[i * 3] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={2}
-                      placeholder="0"
-                      value={set.p1}
-                      onChange={e => handleSetChange(i, 'p1', e.target.value)}
-                      className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                    />
-                    <span className="text-gray-400 font-bold">-</span>
-                    <input
-                      ref={el => { inputRefs.current[i * 3 + 1] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={2}
-                      placeholder="0"
-                      value={set.p2}
-                      onChange={e => handleSetChange(i, 'p2', e.target.value)}
-                      className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                    />
-                    {/* タイブレーク入力欄（7-6 or 6-7 の場合のみ表示） */}
-                    {tiebreakFlags[i] && (
-                      <>
-                        <span className="text-gray-300 text-xs">(</span>
+            {/* セットスコア入力 — 試合中・終了時のみ */}
+            {(match.status === 'playing' || isFinished) && (
+              <div className="space-y-2">
+                <span className="text-xs text-gray-500">スコア</span>
+                {sets.map((set, i) => {
+                  const loserSide = tiebreakLoserSide[i];
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">
+                        {maxSets > 1 ? `Set${i + 1}` : ''}
+                      </span>
+                      <div className="flex items-center gap-1 flex-1 justify-center">
                         <input
-                          ref={el => { inputRefs.current[i * 3 + 2] = el; }}
+                          ref={el => { inputRefs.current[i * 3] = el; }}
                           type="text"
                           inputMode="numeric"
                           maxLength={2}
-                          placeholder="TB"
-                          value={tiebreaks[i] || ''}
-                          onChange={e => handleTiebreakChange(i, e.target.value)}
-                          className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none"
+                          placeholder="0"
+                          value={set.p1}
+                          onChange={e => handleSetChange(i, 'p1', e.target.value)}
+                          disabled={isFinished}
+                          className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                         />
-                        <span className="text-gray-300 text-xs">)</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                        {/* タイブレーク — P1側が敗者の場合ここに表示 */}
+                        {tiebreakFlags[i] && loserSide === 'p1' && (
+                          <>
+                            <span className="text-gray-300 text-[10px]">(</span>
+                            <input
+                              ref={el => { inputRefs.current[i * 3 + 2] = el; }}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={2}
+                              placeholder="TB"
+                              value={tiebreaks[i] || ''}
+                              onChange={e => handleTiebreakChange(i, e.target.value)}
+                              disabled={isFinished}
+                              className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                            />
+                            <span className="text-gray-300 text-[10px]">)</span>
+                          </>
+                        )}
+                        <span className="text-gray-400 font-bold">-</span>
+                        <input
+                          ref={el => { inputRefs.current[i * 3 + 1] = el; }}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={2}
+                          placeholder="0"
+                          value={set.p2}
+                          onChange={e => handleSetChange(i, 'p2', e.target.value)}
+                          disabled={isFinished}
+                          className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                        />
+                        {/* タイブレーク — P2側が敗者の場合ここに表示 */}
+                        {tiebreakFlags[i] && loserSide === 'p2' && (
+                          <>
+                            <span className="text-gray-300 text-[10px]">(</span>
+                            <input
+                              ref={el => { inputRefs.current[i * 3 + 2] = el; }}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={2}
+                              placeholder="TB"
+                              value={tiebreaks[i] || ''}
+                              onChange={e => handleTiebreakChange(i, e.target.value)}
+                              disabled={isFinished}
+                              className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                            />
+                            <span className="text-gray-300 text-[10px]">)</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* 自動勝者判定表示 */}
             {autoWinner && canFinish && (
@@ -489,6 +539,10 @@ export default function ScoreInputDialog({
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
                 </span>
               </div>
+            )}
+            {/* スコア未入力時のヒント */}
+            {canFinish && !autoWinner && (
+              <p className="text-center text-xs text-gray-400">スコアを入力すると勝者が自動判定されます</p>
             )}
           </div>
         </div>
@@ -508,26 +562,11 @@ export default function ScoreInputDialog({
                 <Play className="w-4 h-4" /> 試合開始
               </button>
             )}
-            {canFinish && (
-              <>
-                {autoWinner ? (
-                  <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25">
-                    <Trophy className="w-4 h-4" /> 結果確定
-                  </button>
-                ) : (
-                  <>
-                    <button onClick={() => handleFinishMatch(1)} disabled={isProcessing}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 transition-colors truncate">
-                      <Trophy className="w-4 h-4 shrink-0" /> {match.player1Name?.split(/[/／]/)[0] || 'P1'} 勝利
-                    </button>
-                    <button onClick={() => handleFinishMatch(2)} disabled={isProcessing}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 transition-colors truncate">
-                      <Trophy className="w-4 h-4 shrink-0" /> {match.player2Name?.split(/[/／]/)[0] || 'P2'} 勝利
-                    </button>
-                  </>
-                )}
-              </>
+            {canFinish && autoWinner && (
+              <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25">
+                <Trophy className="w-4 h-4" /> 結果確定
+              </button>
             )}
           </div>
 

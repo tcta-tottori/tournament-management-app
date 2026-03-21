@@ -535,26 +535,28 @@ export default function MatchActionPanel({
                 </button>
               )}
 
-              {canFinish && (
-                <>
+              {canFinish && (() => {
+                // スコアから勝者を自動判定
+                const setParts = scoreInput.trim().split(/\s+/);
+                let p1w = 0, p2w = 0;
+                for (const part of setParts) {
+                  const sm = part.match(/^(\d+)-(\d+)/);
+                  if (sm) { const a = +sm[1], b = +sm[2]; if (a > b) p1w++; else if (b > a) p2w++; }
+                }
+                const aw = p1w > p2w ? 1 : p2w > p1w ? 2 : null;
+                return aw ? (
                   <button
-                    onClick={() => handleFinishMatch(1)}
+                    onClick={() => handleFinishMatch(aw as 1 | 2)}
                     disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25"
                   >
                     <Trophy className="w-4 h-4" />
-                    {match.player1Name || 'P1'} 勝利
+                    結果確定
                   </button>
-                  <button
-                    onClick={() => handleFinishMatch(2)}
-                    disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 transition-colors"
-                  >
-                    <Trophy className="w-4 h-4" />
-                    {match.player2Name || 'P2'} 勝利
-                  </button>
-                </>
-              )}
+                ) : (
+                  <p className="text-xs text-gray-400">スコアを入力すると勝者が自動判定されます</p>
+                );
+              })()}
             </div>
 
             {/* Reset */}

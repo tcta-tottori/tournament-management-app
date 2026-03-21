@@ -34,6 +34,7 @@ export type MatchResult = {
   courtId: string | null;
   courtName: string;
   scheduledTime: string | null;
+  updatedAt?: number;
 };
 
 export default function DrawBoard() {

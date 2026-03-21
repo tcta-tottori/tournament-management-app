@@ -1,6 +1,24 @@
 import React from 'react';
-import { Trophy } from 'lucide-react';
+import { Trophy, Timer } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../../features/draw/DrawBoard';
+
+/** フルネームから苗字を抽出 */
+function getSurname(name: string): string {
+  if (!name) return '';
+  if (name.includes('/') || name.includes('／')) {
+    return name.split(/[/／]/).map(n => getSurname(n.trim())).join('/');
+  }
+  const parts = name.trim().split(/\s+/);
+  return parts[0] || name;
+}
+
+/** 経過時間を H:MM 形式で返す */
+function formatElapsed(startedAt: number): string {
+  const diff = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
 
 interface ScoreboardBracketProps {
   slots: DrawSlotData[];
@@ -254,13 +272,28 @@ export default function ScoreboardBracket({
                   <span className="text-sm font-bold text-primary-600 truncate">{displayName}</span>
                   {matchResult.score && <span className="text-[9px] text-gray-400 ml-auto shrink-0">{matchResult.score}</span>}
                 </div>
-              ) : matchResult && (matchResult.status === 'playing' || matchResult.status === 'ready') ? (
+              ) : matchResult && matchResult.status === 'playing' ? (
                 <>
                   <div className="flex items-center gap-1">
                     <span className="text-xs font-medium text-gray-800 truncate flex-1">
                       {matchResult.player1Name && matchResult.player2Name
-                        ? `${matchResult.player1Name} vs ${matchResult.player2Name}`
-                        : matchResult.player1Name || matchResult.player2Name || '決勝'}
+                        ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
+                        : getSurname(matchResult.player1Name || matchResult.player2Name || '決勝')}
+                    </span>
+                    {renderStatusBadge(matchResult)}
+                  </div>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
+                    {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
+                  </div>
+                </>
+              ) : matchResult && matchResult.status === 'ready' ? (
+                <>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium text-gray-800 truncate flex-1">
+                      {matchResult.player1Name && matchResult.player2Name
+                        ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
+                        : getSurname(matchResult.player1Name || matchResult.player2Name || '決勝')}
                     </span>
                     {renderStatusBadge(matchResult)}
                   </div>
@@ -294,7 +327,6 @@ export default function ScoreboardBracket({
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-medium text-gray-800 truncate flex-1" title={winnerName}>{winnerName}</span>
                   {renderStatusBadge(matchResult)}
-                  {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none shrink-0">{matchResult.courtName}</span>}
                 </div>
                 {matchResult.score && <div className="text-[9px] text-gray-400 truncate">{matchResult.score}</div>}
               </>
@@ -303,14 +335,14 @@ export default function ScoreboardBracket({
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-medium text-gray-800 truncate flex-1">
                     {matchResult.player1Name && matchResult.player2Name
-                      ? `${matchResult.player1Name} vs ${matchResult.player2Name}`
-                      : matchResult.player1Name || matchResult.player2Name || ''}
+                      ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
+                      : getSurname(matchResult.player1Name || matchResult.player2Name || '')}
                   </span>
                   {renderStatusBadge(matchResult)}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                  {matchResult.scheduledTime && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                  {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
                 </div>
               </>
             ) : matchResult && matchResult.status === 'ready' ? (
@@ -318,8 +350,8 @@ export default function ScoreboardBracket({
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-medium text-gray-800 truncate flex-1">
                     {matchResult.player1Name && matchResult.player2Name
-                      ? `${matchResult.player1Name} vs ${matchResult.player2Name}`
-                      : matchResult.player1Name || matchResult.player2Name || ''}
+                      ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
+                      : getSurname(matchResult.player1Name || matchResult.player2Name || '')}
                   </span>
                   {renderStatusBadge(matchResult)}
                 </div>
@@ -332,8 +364,8 @@ export default function ScoreboardBracket({
               <div className="flex items-center justify-between w-full">
                 <span className="text-xs text-gray-400 truncate">
                   {matchResult?.player1Name && matchResult?.player2Name
-                    ? `${matchResult.player1Name} vs ${matchResult.player2Name}`
-                    : matchResult?.player1Name || matchResult?.player2Name || ''}
+                    ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
+                    : getSurname(matchResult?.player1Name || matchResult?.player2Name || '')}
                 </span>
                 <div className="flex items-center gap-1">
                   {matchResult?.scheduledTime && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}

@@ -21,6 +21,7 @@ import {
   MapPin,
   Layers,
   Eye,
+  Trophy,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,24 @@ function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds - 1) return '準決勝';
   if (round === totalRounds - 2) return '準々決勝';
   return `${round}回戦`;
+}
+
+/** フルネームから苗字を抽出（ダブルス "A / B" にも対応） */
+function getSurname(name: string): string {
+  if (!name) return '';
+  if (name.includes('/') || name.includes('／')) {
+    return name.split(/[/／]/).map(n => getSurname(n.trim())).join('/');
+  }
+  const parts = name.trim().split(/\s+/);
+  return parts[0] || name;
+}
+
+/** 経過時間を H:MM 形式で返す */
+function formatElapsedMinutes(startedAt: number, now: number): string {
+  const diff = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +140,13 @@ export default function Scoreboard() {
 
   const players = useLiveQuery(() => db.players.toArray()) || [];
 
+  // -- 経過時間表示用タイマー（30秒ごと更新） --
+  const [clockTick, setClockTick] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   // -- Default: 全種目表示。個別表示に切り替えた場合のみidx選択 --
   useEffect(() => {
     if (initializedRef.current) return;
@@ -173,6 +199,7 @@ export default function Scoreboard() {
         courtId: m.courtId,
         courtName: court?.name || '',
         scheduledTime: m.scheduledTime,
+        updatedAt: m.updatedAt,
       };
     }),
     [matches, courts]
@@ -224,6 +251,7 @@ export default function Scoreboard() {
           player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
           score: m.score, status: m.status, courtId: m.courtId,
           courtName: court?.name || '', scheduledTime: m.scheduledTime,
+          updatedAt: m.updatedAt,
         };
       });
 
@@ -363,14 +391,26 @@ export default function Scoreboard() {
       .sort((a, b) => a.order - b.order)
       .map(c => {
         const currentMatch = playing.find(m => m.courtId === c.courtId);
+        if (!currentMatch) return { ...c, matchInfo: null as string | null, startedAt: 0, eventName: '' };
+        const evt = events.find(e => e.eventId === currentMatch.eventId);
         return {
           ...c,
-          matchInfo: currentMatch
-            ? `${currentMatch.player1Name} vs ${currentMatch.player2Name}`
-            : null,
+          matchInfo: `${getSurname(currentMatch.player1Name)} vs ${getSurname(currentMatch.player2Name)}`,
+          startedAt: currentMatch.updatedAt || 0,
+          eventName: evt?.name || '',
         };
       });
-  }, [courts, matches, showAllEvents, allMatches]);
+  }, [courts, matches, showAllEvents, allMatches, events]);
+
+  // -- 使用中コートの判定（playing/ready で courtId が割り当て済み） --
+  const occupiedCourtIds = useMemo(() => {
+    const src = showAllEvents ? allMatches : matches;
+    return new Set(
+      src
+        .filter(m => (m.status === 'playing' || m.status === 'ready') && m.courtId)
+        .map(m => m.courtId!)
+    );
+  }, [showAllEvents, allMatches, matches]);
 
   // -- Event navigation handlers --
   const handlePrevEvent = () => {
@@ -720,7 +760,13 @@ export default function Scoreboard() {
               <MapPin className="w-3 h-3" />
               <span className="font-bold">{c.name}</span>
               {c.matchInfo && (
-                <span className="text-green-600 truncate max-w-[160px]">{c.matchInfo}</span>
+                <>
+                  {c.eventName && <span className="text-[10px] text-green-500 truncate max-w-[80px]">{c.eventName}</span>}
+                  <span className="text-green-600 truncate max-w-[120px]">{c.matchInfo}</span>
+                  {c.startedAt > 0 && (
+                    <span className="text-[10px] text-green-500 font-mono whitespace-nowrap">{formatElapsedMinutes(c.startedAt, clockTick)}</span>
+                  )}
+                </>
               )}
             </div>
           ))}
@@ -816,7 +862,7 @@ export default function Scoreboard() {
               courts={courts.filter(c => c.isAvailable).map(c => ({
                 courtId: c.courtId,
                 name: c.name,
-                isAvailable: c.isAvailable,
+                isAvailable: !occupiedCourtIds.has(c.courtId) || c.courtId === selectedAllMatch.courtId,
               }))}
               onClose={() => { setSelectedMatchKey(null); setSelectedAllEventId(null); }}
               onMatchUpdate={() => {}}
@@ -875,7 +921,7 @@ export default function Scoreboard() {
               courts={courts.filter(c => c.isAvailable).map(c => ({
                 courtId: c.courtId,
                 name: c.name,
-                isAvailable: c.isAvailable,
+                isAvailable: !occupiedCourtIds.has(c.courtId) || c.courtId === selectedMatch.courtId,
               }))}
               onClose={() => setSelectedMatchKey(null)}
               onMatchUpdate={() => {}}
@@ -894,69 +940,80 @@ export default function Scoreboard() {
                 <Play className="w-4 h-4" /> 進行中 ({activeMatches.length})
               </h2>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {activeMatches.map(m => (
-                  <div key={m.matchId} className="bg-white rounded-xl shadow-sm border-2 border-green-600/40 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-xs font-mono text-gray-500">#{m.matchOrder} R{m.round}</span>
-                      {m.courtId && <span className="text-xs bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">{getCourtName(m.courtId)}</span>}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.status === 'playing' ? 'bg-green-100 text-green-600' : 'bg-primary-50 text-primary-500'}`}>
-                        {m.status === 'playing' ? '試合中' : '準備完了'}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="font-bold text-gray-900 truncate">{m.player1Name}</p>
-                          <p className="text-xs text-gray-500">{m.player1Affiliation}</p>
+                {activeMatches.map(m => {
+                  // テーブルビュー用: スコアから勝者自動判定
+                  const tableAutoWinner = (() => {
+                    if (!scoreInput || editingMatchId !== m.matchId) return null;
+                    const setParts = scoreInput.trim().split(/\s+/);
+                    let p1w = 0, p2w = 0;
+                    for (const part of setParts) {
+                      const sm = part.match(/^(\d+)-(\d+)/);
+                      if (sm) { const a = +sm[1], b = +sm[2]; if (a > b) p1w++; else if (b > a) p2w++; }
+                    }
+                    if (p1w > p2w) return 1 as const;
+                    if (p2w > p1w) return 2 as const;
+                    return null;
+                  })();
+                  return (
+                    <div key={m.matchId} className="bg-white rounded-xl shadow-sm border-2 border-green-600/40 p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs font-mono text-gray-500">#{m.matchOrder} R{m.round}</span>
+                        {m.courtId && <span className="text-xs bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">{getCourtName(m.courtId)}</span>}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.status === 'playing' ? 'bg-green-100 text-green-600' : 'bg-primary-50 text-primary-500'}`}>
+                          {m.status === 'playing' ? '試合中' : '準備完了'}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="flex-1">
+                            <p className="font-bold text-gray-900 truncate">{m.player1Name}</p>
+                            <p className="text-xs text-gray-500">{m.player1Affiliation}</p>
+                          </div>
                         </div>
-                        {editingMatchId === m.matchId && (
-                          <button onClick={() => handleFinishMatch(m.matchId, 1)} disabled={isProcessing}
-                            className="ml-2 bg-primary-500 text-white text-sm px-3 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50">
-                            勝利
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-center text-xs text-gray-500">vs</div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="font-bold text-gray-900 truncate">{m.player2Name}</p>
-                          <p className="text-xs text-gray-500">{m.player2Affiliation}</p>
+                        <div className="text-center text-xs text-gray-500">vs</div>
+                        <div className="flex items-center">
+                          <div className="flex-1">
+                            <p className="font-bold text-gray-900 truncate">{m.player2Name}</p>
+                            <p className="text-xs text-gray-500">{m.player2Affiliation}</p>
+                          </div>
                         </div>
-                        {editingMatchId === m.matchId && (
-                          <button onClick={() => handleFinishMatch(m.matchId, 2)} disabled={isProcessing}
-                            className="ml-2 bg-primary-500 text-white text-sm px-3 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50">
-                            勝利
-                          </button>
-                        )}
                       </div>
+                      {editingMatchId === m.matchId ? (
+                        <div className="mt-3 pt-3 border-t border-border-main space-y-2">
+                          <input
+                            type="text" placeholder="スコア (例: 6-4 6-3)" value={scoreInput}
+                            onChange={e => setScoreInput(e.target.value)}
+                            className="w-full border border-border-main rounded-lg px-2 py-1 text-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none"
+                          />
+                          {tableAutoWinner ? (
+                            <button onClick={() => handleFinishMatch(m.matchId, tableAutoWinner)} disabled={isProcessing}
+                              className="w-full text-xs bg-primary-600 text-white px-3 py-2 rounded-md font-bold hover:bg-primary-700 disabled:opacity-50">
+                              <Trophy className="w-3 h-3 inline mr-1" />
+                              結果確定 ({tableAutoWinner === 1 ? getSurname(m.player1Name) : getSurname(m.player2Name)} 勝利)
+                            </button>
+                          ) : (
+                            <p className="text-xs text-gray-400 text-center">スコアを入力すると勝者が自動判定されます</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-3 pt-3 border-t border-border-main flex gap-2">
+                          {m.status === 'ready' && (
+                            <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing}
+                              className="text-xs bg-green-600 text-white px-3 py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50">
+                              開始
+                            </button>
+                          )}
+                          {m.status === 'playing' && (
+                            <button onClick={() => { setEditingMatchId(m.matchId); setScoreInput(''); }}
+                              className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600">
+                              <Check className="w-3 h-3 inline mr-1" />結果入力
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {editingMatchId === m.matchId ? (
-                      <div className="mt-3 pt-3 border-t border-border-main">
-                        <input
-                          type="text" placeholder="スコア (例: 6-4 6-3)" value={scoreInput}
-                          onChange={e => setScoreInput(e.target.value)}
-                          className="w-full border border-border-main rounded-lg px-2 py-1 text-sm mb-2 focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none"
-                        />
-                        <p className="text-xs text-gray-500">スコア入力後、勝者ボタンを押してください</p>
-                      </div>
-                    ) : (
-                      <div className="mt-3 pt-3 border-t border-border-main flex gap-2">
-                        {m.status === 'ready' && (
-                          <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing}
-                            className="text-xs bg-green-600 text-white px-3 py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50">
-                            開始
-                          </button>
-                        )}
-                        {m.status === 'playing' && (
-                          <button onClick={() => { setEditingMatchId(m.matchId); setScoreInput(''); }}
-                            className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600">
-                            <Check className="w-3 h-3 inline mr-1" />結果入力
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -990,7 +1047,7 @@ export default function Scoreboard() {
                           <select value={m.courtId || ''} onChange={e => handleAssignCourt(m.matchId, e.target.value)}
                             className="w-full border-border-main rounded-lg text-xs px-2 py-1 bg-white border">
                             <option value="">未割当</option>
-                            {courts.filter(c => c.isAvailable).map(c => (
+                            {courts.filter(c => c.isAvailable && (!occupiedCourtIds.has(c.courtId) || c.courtId === m.courtId)).map(c => (
                               <option key={c.courtId} value={c.courtId}>{c.name}</option>
                             ))}
                           </select>
