@@ -261,12 +261,15 @@ function excelTimeToString(val: unknown): string | null {
   return null;
 }
 
-/** 「コートNO.」行を自動検出してスケジュールグリッドの開始行を見つける */
+/** 「コートNO.」行を自動検出してスケジュールグリッドの開始行を見つける
+ *  複数のパターン（パターン1, パターン2等）がある場合は最後のグリッドを使用 */
 function findScheduleGrid(rows: any[]): {
   headerRowIdx: number;
   dataStartIdx: number;
   timeColumns: { colIdx: number; time: string }[];
 } | null {
+  let lastMatch: { headerRowIdx: number; dataStartIdx: number; timeColumns: { colIdx: number; time: string }[] } | null = null;
+
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r] as any[];
     if (!row || row.length < 2) continue;
@@ -281,10 +284,10 @@ function findScheduleGrid(rows: any[]): {
       if (time) timeColumns.push({ colIdx: c, time });
     }
     if (timeColumns.length > 0) {
-      return { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
+      lastMatch = { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
     }
   }
-  return null;
+  return lastMatch;
 }
 
 /** 全角英数字→半角に変換 + 全角スペース→半角 */

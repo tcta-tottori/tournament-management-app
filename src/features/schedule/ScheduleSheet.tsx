@@ -374,12 +374,13 @@ export default function ScheduleSheet() {
     return null;
   };
 
-  /** 「コートNO.」行を自動検出 */
+  /** 「コートNO.」行を自動検出（複数パターンがある場合は最後を使用） */
   const findScheduleGrid = (rows: (string | number | null)[][]): {
     headerRowIdx: number;
     dataStartIdx: number;
     timeColumns: { colIdx: number; time: string }[];
   } | null => {
+    let lastMatch: { headerRowIdx: number; dataStartIdx: number; timeColumns: { colIdx: number; time: string }[] } | null = null;
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       if (!row || row.length < 2) continue;
@@ -391,10 +392,10 @@ export default function ScheduleSheet() {
         if (time) timeColumns.push({ colIdx: c, time });
       }
       if (timeColumns.length > 0) {
-        return { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
+        lastMatch = { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
       }
     }
-    return null;
+    return lastMatch;
   };
 
   /** セルテキストから種目名とラウンドラベルをパース */
