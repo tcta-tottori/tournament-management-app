@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
 import type { AffiliationFurigana } from '../../db/database';
@@ -6,6 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
+  X, Loader2, CalendarClock, FileJson,
 } from 'lucide-react';
 import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
@@ -23,6 +25,11 @@ import {
   clearToken,
   clearFolderCache,
   loadGisScript,
+  listTournamentExcelFiles,
+  downloadTournamentExcel,
+  listScheduleExcelFiles,
+  downloadScheduleExcel,
+  type GoogleDriveFile,
 } from '../backup/googleDriveApi';
 
 const LS_KEY_LAST_SYNC = 'dataSyncLastTimestamp';
@@ -51,21 +58,14 @@ function normalizeKey(s: string): string {
   return s.replace(/[\s\u3000]+/g, '').toLowerCase();
 }
 
-/** ふりがな辞書の重複削除
- *  名前（スペース差を無視）と所属（大小文字差を無視）が同じエントリを統合
- *  ※ furiganaDict は name がPKなので、スペース違いの別キーが重複として存在しうる
- *  最新の updatedAt を持つエントリを残す
- */
 async function deduplicateFuriganaDict(): Promise<number> {
   const all = await db.furiganaDict.toArray();
   const seen = new Map<string, typeof all[0]>();
   const toDelete: string[] = [];
-
   for (const entry of all) {
     const key = normalizeKey(entry.name);
     const existing = seen.get(key);
     if (existing) {
-      // updatedAt が新しい方を残す
       if ((entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
         toDelete.push(existing.name);
         seen.set(key, entry);
@@ -76,26 +76,18 @@ async function deduplicateFuriganaDict(): Promise<number> {
       seen.set(key, entry);
     }
   }
-
-  if (toDelete.length > 0) {
-    await db.furiganaDict.bulkDelete(toDelete);
-  }
+  if (toDelete.length > 0) await db.furiganaDict.bulkDelete(toDelete);
   return toDelete.length;
 }
 
-/** プレイヤーテーブルの重複削除
- *  同一 playerId のレコードが複数ある場合、ふりがな情報が最も充実した1件を残す
- */
 async function deduplicatePlayers(): Promise<number> {
   const all = await db.players.toArray();
   const groups = new Map<string, typeof all>();
-
   for (const p of all) {
     const key = p.playerId;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(p);
   }
-
   const toDelete: number[] = [];
   for (const [, group] of groups) {
     if (group.length <= 1) continue;
@@ -109,22 +101,14 @@ async function deduplicatePlayers(): Promise<number> {
       if (group[i].id) toDelete.push(group[i].id!);
     }
   }
-
-  if (toDelete.length > 0) {
-    await db.players.bulkDelete(toDelete);
-  }
+  if (toDelete.length > 0) await db.players.bulkDelete(toDelete);
   return toDelete.length;
 }
 
-/** 所属ふりがなの重複削除
- *  所属名のスペース差・大小文字差を同一とみなし統合
- *  最新の updatedAt を持つエントリを残す
- */
 async function deduplicateAffiliation(): Promise<number> {
   const all = await db.affiliationFurigana.toArray();
   const seen = new Map<string, typeof all[0]>();
   const toDelete: number[] = [];
-
   for (const entry of all) {
     const key = normalizeKey(entry.name);
     const existing = seen.get(key);
@@ -139,19 +123,122 @@ async function deduplicateAffiliation(): Promise<number> {
       seen.set(key, entry);
     }
   }
-
-  if (toDelete.length > 0) {
-    await db.affiliationFurigana.bulkDelete(toDelete);
-  }
+  if (toDelete.length > 0) await db.affiliationFurigana.bulkDelete(toDelete);
   return toDelete.length;
 }
+
+// ============================================================
+// 共有ヘルパー hooks
+// ============================================================
+
+function useModalState() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
+  const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
+  const [modalProgress, setModalProgress] = useState(0);
+
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setModalResult(null);
+  }, []);
+
+  const handleTimeout = useCallback(() => {
+    setModalResult({ success: false, message: '読み込みがタイムアウトしました（8秒以上応答なし）' });
+  }, []);
+
+  const updateStep = useCallback((steps: LoadingStep[], index: number, patch: Partial<LoadingStep>): LoadingStep[] => {
+    const next = [...steps];
+    next[index] = { ...next[index], ...patch };
+    return next;
+  }, []);
+
+  return {
+    modalOpen, setModalOpen, modalTitle, setModalTitle,
+    modalSteps, setModalSteps, modalResult, setModalResult,
+    modalProgress, setModalProgress,
+    handleModalClose, handleTimeout, updateStep,
+  };
+}
+
+// ============================================================
+// ふりがな・所属の内部読込処理
+// ============================================================
+
+async function doDownloadFurigana(token: string): Promise<{ success: boolean; details: string[] }> {
+  const file = await downloadFuriganaExcel(token);
+  if (!file) throw new Error('「ふりがな一覧」フォルダにExcelファイルがありません');
+  const wb = XLSX.read(file.data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<any>(ws);
+  const now = Date.now();
+  let dictCount = 0;
+  for (const row of rows) {
+    const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
+    const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+    if (!name || !furigana) continue;
+    const key = removeSpaces(name);
+    await db.furiganaDict.put({ name: key, furigana: removeSpaces(furigana), type: 'manual' as const, updatedAt: now });
+    dictCount++;
+  }
+  let playerCount = 0;
+  const allPlayers = await db.players.toArray();
+  for (const p of allPlayers) {
+    const dictEntry = await db.furiganaDict.get(p.playerId);
+    if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
+      await db.players.update(p.id!, { furigana: dictEntry.furigana });
+      playerCount++;
+    }
+  }
+  const dedupCount = await deduplicateFuriganaDict();
+  const playerDedupCount = await deduplicatePlayers();
+  const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
+  if (dedupCount > 0) details.push(`辞書重複削除: ${dedupCount}件`);
+  if (playerDedupCount > 0) details.push(`選手重複削除: ${playerDedupCount}件`);
+  if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
+  return { success: true, details };
+}
+
+async function doDownloadAffiliation(token: string): Promise<{ success: boolean; details: string[] }> {
+  const file = await downloadAffiliationExcel(token);
+  if (!file) throw new Error('「所属一覧」フォルダにExcelファイルがありません');
+  const wb = XLSX.read(file.data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<any>(ws);
+  const now = Date.now();
+  let count = 0;
+  for (const row of rows) {
+    const name = String(row['所属名'] || row['name'] || '').trim();
+    const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+    if (!name || !furigana) continue;
+    const existing = await db.affiliationFurigana.where('name').equals(name).first();
+    if (existing) {
+      await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
+    } else {
+      await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
+    }
+    count++;
+  }
+  const dedupCount = await deduplicateAffiliation();
+  const details = [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`];
+  if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+  return { success: true, details };
+}
+
+// ============================================================
+// DataSync メインコンポーネント（Google ドライブ連携）
+// ============================================================
 
 interface DataSyncProps {
   onConnectionChange?: () => void;
   onDataLoaded?: () => void;
+  /** GDriveから大会Excelダウンロード完了時 */
+  onTournamentExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
+  /** GDriveから時間割Excelダウンロード完了時 */
+  onScheduleExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
 }
 
-export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncProps) {
+export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded }: DataSyncProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
@@ -159,21 +246,22 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
   const [gdriveFolderLink, setGdriveFolderLink] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-  const excelFuriganaRef = useRef<HTMLInputElement>(null);
-  const excelAffRef = useRef<HTMLInputElement>(null);
 
-  // ローディングモーダル用state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
-  const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
-  const [modalProgress, setModalProgress] = useState(0);
+  const modal = useModalState();
 
-  // DB counts for display
+  // 大会一覧ファイルリスト
+  const [gdriveFileList, setGdriveFileList] = useState<GoogleDriveFile[]>([]);
+  const [showFileList, setShowFileList] = useState(false);
+  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
+  // 時間割ファイルリスト
+  const [scheduleGDriveFiles, setScheduleGDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [showScheduleFileList, setShowScheduleFileList] = useState(false);
+  const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
+
+  // DB counts
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
   const affiliationCount = useLiveQuery(() => db.affiliationFurigana.count()) ?? 0;
 
-  // Check connection on mount
   useEffect(() => {
     const checkConnection = async () => {
       const connected = !!getSavedClientId() && gdriveIsTokenValid();
@@ -189,7 +277,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
           } catch { /* ignore */ }
         }
       }
-      // Pre-load GIS script
       loadGisScript().catch(() => {});
     };
     checkConnection();
@@ -242,430 +329,195 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     onConnectionChange?.();
   }, [onConnectionChange]);
 
-  // --- ヘルパー: モーダルステップ更新 ---
-  const updateStep = useCallback((steps: LoadingStep[], index: number, patch: Partial<LoadingStep>): LoadingStep[] => {
-    const next = [...steps];
-    next[index] = { ...next[index], ...patch };
-    return next;
-  }, []);
-
-  // --- 内部: ふりがな読込処理（モーダルステップ対応） ---
-  const doDownloadFurigana = useCallback(async (token: string): Promise<{ success: boolean; details: string[] }> => {
-    const file = await downloadFuriganaExcel(token);
-    if (!file) throw new Error('「ふりがな一覧」フォルダにExcelファイルがありません');
-
-    const wb = XLSX.read(file.data, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<any>(ws);
-
-    const now = Date.now();
-    let dictCount = 0;
-    for (const row of rows) {
-      const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
-      const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-      if (!name || !furigana) continue;
-      const key = removeSpaces(name);
-      await db.furiganaDict.put({
-        name: key,
-        furigana: removeSpaces(furigana),
-        type: 'manual' as const,
-        updatedAt: now,
-      });
-      dictCount++;
-    }
-
-    let playerCount = 0;
-    const allPlayers = await db.players.toArray();
-    for (const p of allPlayers) {
-      const dictEntry = await db.furiganaDict.get(p.playerId);
-      if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
-        await db.players.update(p.id!, { furigana: dictEntry.furigana });
-        playerCount++;
-      }
-    }
-
-    const dedupCount = await deduplicateFuriganaDict();
-    const playerDedupCount = await deduplicatePlayers();
-
-    const details = [`ファイル: ${file.fileName}`, `ふりがな辞書: ${dictCount}件`];
-    if (dedupCount > 0) details.push(`辞書重複削除: ${dedupCount}件`);
-    if (playerDedupCount > 0) details.push(`選手重複削除: ${playerDedupCount}件`);
-    if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
-    return { success: true, details };
-  }, []);
-
-  // --- 内部: 所属読込処理（モーダルステップ対応） ---
-  const doDownloadAffiliation = useCallback(async (token: string): Promise<{ success: boolean; details: string[] }> => {
-    const file = await downloadAffiliationExcel(token);
-    if (!file) throw new Error('「所属一覧」フォルダにExcelファイルがありません');
-
-    const wb = XLSX.read(file.data, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<any>(ws);
-
-    const now = Date.now();
-    let count = 0;
-    for (const row of rows) {
-      const name = String(row['所属名'] || row['name'] || '').trim();
-      const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-      if (!name || !furigana) continue;
-      const existing = await db.affiliationFurigana.where('name').equals(name).first();
-      if (existing) {
-        await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
-      } else {
-        await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
-      }
-      count++;
-    }
-    const dedupCount = await deduplicateAffiliation();
-
-    const details = [`ファイル: ${file.fileName}`, `所属ふりがな: ${count}件`];
-    if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
-    return { success: true, details };
-  }, []);
-
-  // --- Google Drive からふりがな読込（モーダル付き） ---
-  const handleDownloadFurigana = useCallback(async () => {
-    const steps: LoadingStep[] = [
-      { label: 'ふりがな一覧を読込中...', status: 'loading' },
-    ];
-    setModalTitle('ふりがな読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsProcessing(true);
-    setProcessingLabel('ふりがな読込中...');
-    setResult(null);
-    try {
-      const token = gdriveGetSavedToken();
-      if (!token) throw new Error('Google ドライブに接続してください');
-      setModalProgress(30);
-      const res = await doDownloadFurigana(token);
-      setModalProgress(100);
-      const s = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了' });
-      setModalSteps(s);
-      updateLastSync();
-      const r = { success: true, message: 'ふりがなデータを読み込みました', details: res.details };
-      setResult(r);
-      setModalResult(r);
-      onDataLoaded?.();
-    } catch (err) {
-      const s = updateStep(steps, 0, { status: 'error', label: 'ふりがな読込に失敗' });
-      setModalSteps(s);
-      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
-      setResult(r);
-      setModalResult(r);
-    } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-    }
-  }, [updateLastSync, updateStep, doDownloadFurigana, onDataLoaded]);
-
-  // --- Google Drive からふりがな書込（モーダル付き） ---
-  const handleUploadFurigana = useCallback(async () => {
-    const steps: LoadingStep[] = [
-      { label: 'ふりがなデータを書込中...', status: 'loading' },
-    ];
-    setModalTitle('ふりがな書込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsProcessing(true);
-    setProcessingLabel('ふりがな書込中...');
-    setResult(null);
-    try {
-      const token = gdriveGetSavedToken();
-      if (!token) throw new Error('Google ドライブに接続してください');
-      setModalProgress(20);
-      const allDict = await db.furiganaDict.toArray();
-      const sorted = allDict.sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
-      const data = sorted.map(d => ({
-        '氏名': d.name,
-        'ふりがな': d.furigana,
-        'ソース': d.type,
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      ws['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 10 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'ふりがな');
-      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
-      setModalProgress(60);
-      const fileName = `ふりがなデータ.xlsx`;
-      await uploadFuriganaExcel(token, fileName, buf);
-      setModalProgress(100);
-      const s = updateStep(steps, 0, { status: 'done', label: 'ふりがなデータを書込完了' });
-      setModalSteps(s);
-      const r = { success: true, message: `ふりがなデータ（${data.length}件）を Google ドライブに保存しました` };
-      setResult(r);
-      setModalResult(r);
-    } catch (err) {
-      const s = updateStep(steps, 0, { status: 'error', label: 'ふりがな書込に失敗' });
-      setModalSteps(s);
-      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
-      setResult(r);
-      setModalResult(r);
-    } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-    }
-  }, [updateStep]);
-
-  // --- Google Drive から所属読込（モーダル付き） ---
-  const handleDownloadAffiliation = useCallback(async () => {
-    const steps: LoadingStep[] = [
-      { label: '所属一覧を読込中...', status: 'loading' },
-    ];
-    setModalTitle('所属読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsProcessing(true);
-    setProcessingLabel('所属読込中...');
-    setResult(null);
-    try {
-      const token = gdriveGetSavedToken();
-      if (!token) throw new Error('Google ドライブに接続してください');
-      setModalProgress(30);
-      const res = await doDownloadAffiliation(token);
-      setModalProgress(100);
-      const s = updateStep(steps, 0, { status: 'done', label: '所属一覧を読込完了' });
-      setModalSteps(s);
-      updateLastSync();
-      const r = { success: true, message: '所属ふりがなを読み込みました', details: res.details };
-      setResult(r);
-      setModalResult(r);
-      onDataLoaded?.();
-    } catch (err) {
-      const s = updateStep(steps, 0, { status: 'error', label: '所属読込に失敗' });
-      setModalSteps(s);
-      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
-      setResult(r);
-      setModalResult(r);
-    } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-    }
-  }, [updateLastSync, updateStep, doDownloadAffiliation, onDataLoaded]);
-
-  // --- Google Drive に所属書込（モーダル付き） ---
-  const handleUploadAffiliation = useCallback(async () => {
-    const steps: LoadingStep[] = [
-      { label: '所属データを書込中...', status: 'loading' },
-    ];
-    setModalTitle('所属書込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsProcessing(true);
-    setProcessingLabel('所属書込中...');
-    setResult(null);
-    try {
-      const token = gdriveGetSavedToken();
-      if (!token) throw new Error('Google ドライブに接続してください');
-      setModalProgress(20);
-      const allAff = await db.affiliationFurigana.toArray();
-      const sorted = allAff.filter(a => a.furigana).sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
-      const data = sorted.map(a => ({
-        '所属名': a.name,
-        'ふりがな': a.furigana,
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      ws['!cols'] = [{ wch: 25 }, { wch: 30 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '所属一覧');
-      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
-      setModalProgress(60);
-      const fileName = `所属ふりがな.xlsx`;
-      await uploadAffiliationExcel(token, fileName, buf);
-      setModalProgress(100);
-      const s = updateStep(steps, 0, { status: 'done', label: '所属データを書込完了' });
-      setModalSteps(s);
-      const r = { success: true, message: `所属ふりがな（${data.length}件）を Google ドライブに保存しました` };
-      setResult(r);
-      setModalResult(r);
-    } catch (err) {
-      const s = updateStep(steps, 0, { status: 'error', label: '所属書込に失敗' });
-      setModalSteps(s);
-      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
-      setResult(r);
-      setModalResult(r);
-    } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-    }
-  }, [updateStep]);
-
   // --- 一括読込（ふりがな＋所属） ---
   const handleBulkDownload = useCallback(async () => {
     let steps: LoadingStep[] = [
       { label: 'ふりがな一覧を読込中...', status: 'loading' },
       { label: '所属一覧', status: 'waiting' },
     ];
-    setModalTitle('一括読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
+    modal.setModalTitle('一括読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('一括読込中...');
     setResult(null);
-
     const allDetails: string[] = [];
     let hasError = false;
-
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
-
-      setModalProgress(10);
-
-      // Step 1: ふりがな読込
+      modal.setModalProgress(10);
       try {
         const res = await doDownloadFurigana(token);
-        setModalProgress(50);
-        steps = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了', detail: res.details[1] });
+        modal.setModalProgress(50);
+        steps = modal.updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了', detail: res.details[1] });
         allDetails.push('【ふりがな】', ...res.details);
       } catch (err) {
-        setModalProgress(50);
-        steps = updateStep(steps, 0, { status: 'error', label: `ふりがな読込失敗: ${(err as Error).message}` });
+        modal.setModalProgress(50);
+        steps = modal.updateStep(steps, 0, { status: 'error', label: `ふりがな読込失敗: ${(err as Error).message}` });
         allDetails.push(`【ふりがな】読込失敗: ${(err as Error).message}`);
         hasError = true;
       }
-
-      // Step 2: 所属読込
-      steps = updateStep(steps, 1, { status: 'loading', label: '所属一覧を読込中...' });
-      setModalSteps([...steps]);
-
+      steps = modal.updateStep(steps, 1, { status: 'loading', label: '所属一覧を読込中...' });
+      modal.setModalSteps([...steps]);
       try {
         const res = await doDownloadAffiliation(token);
-        setModalProgress(100);
-        steps = updateStep(steps, 1, { status: 'done', label: '所属一覧を読込完了', detail: res.details[1] });
+        modal.setModalProgress(100);
+        steps = modal.updateStep(steps, 1, { status: 'done', label: '所属一覧を読込完了', detail: res.details[1] });
         allDetails.push('【所属】', ...res.details);
       } catch (err) {
-        setModalProgress(100);
-        steps = updateStep(steps, 1, { status: 'error', label: `所属読込失敗: ${(err as Error).message}` });
+        modal.setModalProgress(100);
+        steps = modal.updateStep(steps, 1, { status: 'error', label: `所属読込失敗: ${(err as Error).message}` });
         allDetails.push(`【所属】読込失敗: ${(err as Error).message}`);
         hasError = true;
       }
-
-      setModalSteps([...steps]);
+      modal.setModalSteps([...steps]);
       updateLastSync();
-
       const r = hasError
         ? { success: false, message: '一部の読込に失敗しました', details: allDetails }
         : { success: true, message: 'ふりがな・所属データを一括読込しました', details: allDetails };
       setResult(r);
-      setModalResult(r);
+      modal.setModalResult(r);
       if (!hasError) onDataLoaded?.();
     } catch (err) {
-      steps = updateStep(steps, 0, { status: 'error', label: `読込失敗: ${(err as Error).message}` });
-      setModalSteps([...steps]);
+      steps = modal.updateStep(steps, 0, { status: 'error', label: `読込失敗: ${(err as Error).message}` });
+      modal.setModalSteps([...steps]);
       const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
       setResult(r);
-      setModalResult(r);
+      modal.setModalResult(r);
     } finally {
       setIsProcessing(false);
       setProcessingLabel('');
     }
-  }, [updateLastSync, updateStep, doDownloadFurigana, doDownloadAffiliation, onDataLoaded]);
+  }, [updateLastSync, modal, onDataLoaded]);
 
-  // --- Excelからふりがなインポート ---
-  const handleExcelFurigana = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsProcessing(true);
-    setProcessingLabel('Excel読込中...');
-    setResult(null);
+  // --- GDrive 大会一覧ファイルリスト取得 ---
+  const handleListTournamentFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    const steps: LoadingStep[] = [{ label: '大会一覧フォルダを取得中...', status: 'loading' }];
+    modal.setModalTitle('大会一覧');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-      const now = Date.now();
-      let count = 0;
-      for (const row of rows) {
-        const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
-        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-        if (!name || !furigana) continue;
-        await db.furiganaDict.put({ name: removeSpaces(name), furigana: removeSpaces(furigana), type: 'manual' as const, updatedAt: now });
-        count++;
+      modal.setModalProgress(30);
+      const files = await listTournamentExcelFiles(token);
+      modal.setModalProgress(100);
+      setGdriveFileList(files);
+      if (files.length === 0) {
+        steps[0] = { ...steps[0], status: 'error', label: '大会一覧フォルダにファイルがありません' };
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' });
+      } else {
+        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: true, message: `${files.length}件のファイルが見つかりました` });
+        setTimeout(() => { modal.setModalOpen(false); setShowFileList(true); }, 500);
       }
-
-      // 既存選手にも適用
-      let playerCount = 0;
-      const allPlayers = await db.players.toArray();
-      for (const p of allPlayers) {
-        const dictEntry = await db.furiganaDict.get(p.playerId);
-        if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
-          await db.players.update(p.id!, { furigana: dictEntry.furigana });
-          playerCount++;
-        }
-      }
-
-      // 重複削除
-      const dedupCount = await deduplicateFuriganaDict();
-
-      updateLastSync();
-      const details = [`ふりがな辞書: ${count}件`];
-      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
-      if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
-      setResult({ success: true, message: `${count}件のふりがなをインポートしました（${file.name}）`, details });
-      onDataLoaded?.();
     } catch (err) {
-      setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
-    } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-      if (excelFuriganaRef.current) excelFuriganaRef.current.value = '';
+      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` });
     }
-  }, [updateLastSync, onDataLoaded]);
+  }, [modal]);
 
-  // --- Excelから所属インポート ---
-  const handleExcelAff = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsProcessing(true);
-    setProcessingLabel('Excel読込中...');
-    setResult(null);
+  // --- GDrive 大会ファイル選択→ダウンロード ---
+  const handleSelectTournamentFile = useCallback(async (file: GoogleDriveFile) => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    setShowFileList(false);
+    let steps: LoadingStep[] = [
+      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
+    ];
+    modal.setModalTitle('大会データ読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setLoadingFileId(file.id);
     try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-      const now = Date.now();
-      let count = 0;
-      for (const row of rows) {
-        const name = String(row['所属名'] || row['name'] || '').trim();
-        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
-        if (!name || !furigana) continue;
-        const existing = await db.affiliationFurigana.where('name').equals(name).first();
-        if (existing) {
-          await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
-        } else {
-          await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
-        }
-        count++;
-      }
-      // 重複削除
-      const dedupCount = await deduplicateAffiliation();
-
-      updateLastSync();
-      const details2 = [`所属ふりがな: ${count}件`];
-      if (dedupCount > 0) details2.push(`重複削除: ${dedupCount}件`);
-      setResult({ success: true, message: `${count}件の所属ふりがなをインポートしました（${file.name}）`, details: details2 });
-      onDataLoaded?.();
+      modal.setModalProgress(30);
+      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      modal.setModalProgress(100);
+      steps[0] = { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: true, message: `ダウンロード完了` });
+      onTournamentExcelLoaded?.(arrayBuffer, file.name);
     } catch (err) {
-      setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
+      steps[0] = { ...steps[0], status: 'error', label: `読込失敗: ${(err as Error).message}` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
     } finally {
-      setIsProcessing(false);
-      setProcessingLabel('');
-      if (excelAffRef.current) excelAffRef.current.value = '';
+      setLoadingFileId(null);
     }
-  }, [updateLastSync, onDataLoaded]);
+  }, [modal, onTournamentExcelLoaded]);
+
+  // --- GDrive 時間割ファイルリスト取得 ---
+  const handleListScheduleFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    const steps: LoadingStep[] = [{ label: '時間割フォルダを取得中...', status: 'loading' }];
+    modal.setModalTitle('時間割');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    try {
+      modal.setModalProgress(30);
+      const files = await listScheduleExcelFiles(token);
+      modal.setModalProgress(100);
+      setScheduleGDriveFiles(files);
+      if (files.length === 0) {
+        steps[0] = { ...steps[0], status: 'error', label: '時間割フォルダにファイルがありません' };
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: false, message: 'Google Drive の「時間割」フォルダにファイルがありません。' });
+      } else {
+        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: true, message: `${files.length}件のファイルが見つかりました` });
+        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 500);
+      }
+    } catch (err) {
+      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `ファイル一覧の取得に失敗: ${(err as Error).message}` });
+    }
+  }, [modal]);
+
+  // --- GDrive 時間割ファイル選択→ダウンロード ---
+  const handleSelectScheduleFile = useCallback(async (file: GoogleDriveFile) => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    setShowScheduleFileList(false);
+    let steps: LoadingStep[] = [
+      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
+    ];
+    modal.setModalTitle('時間割読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setLoadingScheduleFileId(file.id);
+    try {
+      modal.setModalProgress(30);
+      const arrayBuffer = await downloadScheduleExcel(token, file.id);
+      modal.setModalProgress(100);
+      steps[0] = { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: true, message: `ダウンロード完了` });
+      onScheduleExcelLoaded?.(arrayBuffer, file.name);
+    } catch (err) {
+      steps[0] = { ...steps[0], status: 'error', label: `読込失敗: ${(err as Error).message}` };
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
+    } finally {
+      setLoadingScheduleFileId(null);
+    }
+  }, [modal, onScheduleExcelLoaded]);
 
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {
@@ -674,22 +526,19 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
       })
     : null;
 
-  const handleModalClose = useCallback(() => {
-    setModalOpen(false);
-    setModalResult(null);
-  }, []);
-
   return (
     <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      {/* Google Drive ローディングモーダル */}
+      {/* ローディングモーダル */}
       <DriveLoadingModal
-        open={modalOpen}
-        title={modalTitle}
-        steps={modalSteps}
-        progress={modalProgress}
-        result={modalResult}
-        onClose={handleModalClose}
+        open={modal.modalOpen}
+        title={modal.modalTitle}
+        steps={modal.modalSteps}
+        progress={modal.modalProgress}
+        result={modal.modalResult}
+        onClose={modal.handleModalClose}
+        onTimeout={modal.handleTimeout}
       />
+
       {/* Header */}
       <div className="bg-gradient-to-r from-[#e8f0fe] to-[#fce8e6] px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -706,7 +555,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
               <span>最終同期: {formattedLastSync}</span>
             </div>
           )}
-          {/* DB統計 */}
           <div className="hidden sm:flex items-center gap-2 text-[10px]">
             <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">
               <Users className="w-3 h-3 inline mr-0.5" />ふりがな {furiganaDictCount}
@@ -718,12 +566,11 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* 接続セクション */}
+      <div className="p-4 space-y-3">
         {!isConnected ? (
           <div className="text-center py-4">
             <p className="text-sm text-gray-500 mb-3">
-              Google ドライブに接続して、ふりがな・所属データの読込/書込を行います
+              Google ドライブに接続して、データの読込/書込を行います
             </p>
             <button
               onClick={handleConnect}
@@ -738,20 +585,28 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
           </div>
         ) : (
           <>
-            {/* 接続情報バー */}
+            {/* 接続情報 + フォルダ表示 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex items-center gap-2 text-xs text-gray-600">
                 <span className="w-2 h-2 bg-green-500 rounded-full" />
                 <span>{userEmail || 'Google ドライブ接続中'}</span>
+              </div>
+              <div className="flex items-center gap-2">
                 {gdriveFolderLink && (
-                  <a href={gdriveFolderLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[#1a73e8] hover:underline">
-                    <FolderOpen className="w-3.5 h-3.5" /> フォルダを開く
+                  <a
+                    href={gdriveFolderLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#1a73e8] bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    フォルダ
                   </a>
                 )}
+                <button onClick={handleDisconnect} className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors">
+                  <LogOut className="w-3.5 h-3.5" /> 切断
+                </button>
               </div>
-              <button onClick={handleDisconnect} className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors">
-                <LogOut className="w-3.5 h-3.5" /> 切断
-              </button>
             </div>
 
             {/* 一括読込ボタン */}
@@ -766,86 +621,24 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
               {isProcessing && processingLabel.includes('一括') && <RefreshCw className="w-4 h-4 animate-spin" />}
             </button>
 
-            {/* ふりがな操作 */}
-            <div className="border border-blue-100 rounded-lg overflow-hidden">
-              <div className="bg-blue-50 px-3 py-2 flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-blue-800">ふりがな一覧</h3>
-                <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-auto">{furiganaDictCount}件</span>
-              </div>
-              <div className="p-3 flex flex-wrap gap-2">
-                <button
-                  onClick={handleDownloadFurigana}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-50 transition-colors shadow-sm"
-                >
-                  <GoogleDriveIcon className="w-3.5 h-3.5" />
-                  <Download className="w-3.5 h-3.5" />
-                  ドライブから読込
-                  {isProcessing && processingLabel.includes('ふりがな読込') && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                </button>
-                <button
-                  onClick={handleUploadFurigana}
-                  disabled={isProcessing || furiganaDictCount === 0}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-50 transition-colors border border-[#1a73e8]/20"
-                >
-                  <GoogleDriveIcon className="w-3.5 h-3.5" />
-                  <Upload className="w-3.5 h-3.5" />
-                  ドライブに書込
-                  {isProcessing && processingLabel.includes('ふりがな書込') && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                </button>
-                <div className="w-px h-8 bg-gray-200 mx-1 self-center hidden sm:block" />
-                <input ref={excelFuriganaRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelFurigana} />
-                <button
-                  onClick={() => excelFuriganaRef.current?.click()}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  Excelから読込
-                </button>
-              </div>
-            </div>
-
-            {/* 所属操作 */}
-            <div className="border border-purple-100 rounded-lg overflow-hidden">
-              <div className="bg-purple-50 px-3 py-2 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-purple-600" />
-                <h3 className="text-sm font-bold text-purple-800">所属一覧</h3>
-                <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full ml-auto">{affiliationCount}件</span>
-              </div>
-              <div className="p-3 flex flex-wrap gap-2">
-                <button
-                  onClick={handleDownloadAffiliation}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
-                >
-                  <GoogleDriveIcon className="w-3.5 h-3.5" />
-                  <Download className="w-3.5 h-3.5" />
-                  ドライブから読込
-                  {isProcessing && processingLabel.includes('所属読込') && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                </button>
-                <button
-                  onClick={handleUploadAffiliation}
-                  disabled={isProcessing || affiliationCount === 0}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors border border-purple-200"
-                >
-                  <GoogleDriveIcon className="w-3.5 h-3.5" />
-                  <Upload className="w-3.5 h-3.5" />
-                  ドライブに書込
-                  {isProcessing && processingLabel.includes('所属書込') && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                </button>
-                <div className="w-px h-8 bg-gray-200 mx-1 self-center hidden sm:block" />
-                <input ref={excelAffRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelAff} />
-                <button
-                  onClick={() => excelAffRef.current?.click()}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  Excelから読込
-                </button>
-              </div>
+            {/* 大会データ読込 + 時間割読込 */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleListTournamentFiles}
+                disabled={isProcessing}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 transition-colors border border-[#1a73e8]/15"
+              >
+                <FileJson className="w-4 h-4" />
+                大会データ読込
+              </button>
+              <button
+                onClick={handleListScheduleFiles}
+                disabled={isProcessing}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 transition-colors border border-[#1a73e8]/15"
+              >
+                <CalendarClock className="w-4 h-4" />
+                時間割読込
+              </button>
             </div>
           </>
         )}
@@ -874,6 +667,484 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
           </div>
         )}
       </div>
+
+      {/* ── 大会ファイル選択ポップアップ ── */}
+      {showFileList && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <GoogleDriveIcon className="w-5 h-5" />
+                <h3 className="text-base font-bold text-gray-900">大会一覧</h3>
+                <span className="text-xs text-gray-400">{gdriveFileList.length}件</span>
+              </div>
+              <button onClick={() => setShowFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {gdriveFileList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <p className="text-sm">ファイルがありません</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {gdriveFileList.map(f => {
+                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                    const modDate = new Date(f.modifiedTime);
+                    const isLoading = loadingFileId === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => handleSelectTournamentFile(f)}
+                        disabled={!!loadingFileId}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-600" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <p className="text-xs text-gray-400 text-center">鳥取テニス協会バックアップ &gt; 大会運営システム &gt; 大会一覧</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── 時間割ファイル選択ポップアップ ── */}
+      {showScheduleFileList && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowScheduleFileList(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <CalendarClock className="w-5 h-5 text-primary-500" />
+                <h3 className="text-base font-bold text-gray-900">時間割ファイルを選択</h3>
+                <span className="text-xs text-gray-400">{scheduleGDriveFiles.length}件</span>
+              </div>
+              <button onClick={() => setShowScheduleFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {scheduleGDriveFiles.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <p className="text-sm">ファイルがありません</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {scheduleGDriveFiles.map(f => {
+                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                    const modDate = new Date(f.modifiedTime);
+                    const isLoading = loadingScheduleFileId === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => handleSelectScheduleFile(f)}
+                        disabled={!!loadingScheduleFileId}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-600" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <p className="text-xs text-gray-400 text-center">時間割Excelファイルを選択してください</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </section>
+  );
+}
+
+// ============================================================
+// ふりがな・所属操作パネル（所属・ふりがな一覧セクション用）
+// ============================================================
+
+interface FuriganaAffOpsProps {
+  gdriveConnected: boolean;
+  onDataLoaded?: () => void;
+}
+
+export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: FuriganaAffOpsProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingLabel, setProcessingLabel] = useState('');
+  const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
+  const excelFuriganaRef = useRef<HTMLInputElement>(null);
+  const excelAffRef = useRef<HTMLInputElement>(null);
+
+  const modal = useModalState();
+  const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
+  const affiliationCount = useLiveQuery(() => db.affiliationFurigana.count()) ?? 0;
+
+  const updateLastSync = useCallback(() => {
+    const now = new Date().toISOString();
+    try { localStorage.setItem(LS_KEY_LAST_SYNC, now); } catch { /* ignore */ }
+  }, []);
+
+  // --- GDrive ふりがな読込 ---
+  const handleDownloadFurigana = useCallback(async () => {
+    const steps: LoadingStep[] = [{ label: 'ふりがな一覧を読込中...', status: 'loading' }];
+    modal.setModalTitle('ふりがな読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setIsProcessing(true);
+    setProcessingLabel('ふりがな読込中...');
+    setResult(null);
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Google ドライブに接続してください');
+      modal.setModalProgress(30);
+      const res = await doDownloadFurigana(token);
+      modal.setModalProgress(100);
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了' }));
+      updateLastSync();
+      const r = { success: true, message: 'ふりがなデータを読み込みました', details: res.details };
+      setResult(r);
+      modal.setModalResult(r);
+      onDataLoaded?.();
+    } catch (err) {
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'error', label: 'ふりがな読込に失敗' }));
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      modal.setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+      setProcessingLabel('');
+    }
+  }, [updateLastSync, modal, onDataLoaded]);
+
+  // --- GDrive ふりがな書込 ---
+  const handleUploadFurigana = useCallback(async () => {
+    const steps: LoadingStep[] = [{ label: 'ふりがなデータを書込中...', status: 'loading' }];
+    modal.setModalTitle('ふりがな書込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Google ドライブに接続してください');
+      modal.setModalProgress(20);
+      const allDict = await db.furiganaDict.toArray();
+      const sorted = allDict.sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
+      const data = sorted.map(d => ({ '氏名': d.name, 'ふりがな': d.furigana, 'ソース': d.type }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 10 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'ふりがな');
+      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      modal.setModalProgress(60);
+      await uploadFuriganaExcel(token, 'ふりがなデータ.xlsx', buf);
+      modal.setModalProgress(100);
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'done', label: 'ふりがなデータを書込完了' }));
+      const r = { success: true, message: `ふりがなデータ（${data.length}件）を保存しました` };
+      setResult(r);
+      modal.setModalResult(r);
+    } catch (err) {
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'error', label: 'ふりがな書込に失敗' }));
+      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
+      setResult(r);
+      modal.setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [modal]);
+
+  // --- GDrive 所属読込 ---
+  const handleDownloadAffiliation = useCallback(async () => {
+    const steps: LoadingStep[] = [{ label: '所属一覧を読込中...', status: 'loading' }];
+    modal.setModalTitle('所属読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Google ドライブに接続してください');
+      modal.setModalProgress(30);
+      const res = await doDownloadAffiliation(token);
+      modal.setModalProgress(100);
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'done', label: '所属一覧を読込完了' }));
+      updateLastSync();
+      const r = { success: true, message: '所属ふりがなを読み込みました', details: res.details };
+      setResult(r);
+      modal.setModalResult(r);
+      onDataLoaded?.();
+    } catch (err) {
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'error', label: '所属読込に失敗' }));
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      modal.setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [updateLastSync, modal, onDataLoaded]);
+
+  // --- GDrive 所属書込 ---
+  const handleUploadAffiliation = useCallback(async () => {
+    const steps: LoadingStep[] = [{ label: '所属データを書込中...', status: 'loading' }];
+    modal.setModalTitle('所属書込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Google ドライブに接続してください');
+      modal.setModalProgress(20);
+      const allAff = await db.affiliationFurigana.toArray();
+      const sorted = allAff.filter(a => a.furigana).sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
+      const data = sorted.map(a => ({ '所属名': a.name, 'ふりがな': a.furigana }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 25 }, { wch: 30 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '所属一覧');
+      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      modal.setModalProgress(60);
+      await uploadAffiliationExcel(token, '所属ふりがな.xlsx', buf);
+      modal.setModalProgress(100);
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'done', label: '所属データを書込完了' }));
+      const r = { success: true, message: `所属ふりがな（${data.length}件）を保存しました` };
+      setResult(r);
+      modal.setModalResult(r);
+    } catch (err) {
+      modal.setModalSteps(modal.updateStep(steps, 0, { status: 'error', label: '所属書込に失敗' }));
+      const r = { success: false, message: `書込失敗: ${(err as Error).message}` };
+      setResult(r);
+      modal.setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [modal]);
+
+  // --- Excelからふりがなインポート ---
+  const handleExcelFurigana = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(ws);
+      const now = Date.now();
+      let count = 0;
+      for (const row of rows) {
+        const name = String(row['氏名'] || row['選手名'] || row['漢字'] || row['name'] || '').trim();
+        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+        if (!name || !furigana) continue;
+        await db.furiganaDict.put({ name: removeSpaces(name), furigana: removeSpaces(furigana), type: 'manual' as const, updatedAt: now });
+        count++;
+      }
+      let playerCount = 0;
+      const allPlayers = await db.players.toArray();
+      for (const p of allPlayers) {
+        const dictEntry = await db.furiganaDict.get(p.playerId);
+        if (dictEntry && dictEntry.furigana && p.furigana !== dictEntry.furigana) {
+          await db.players.update(p.id!, { furigana: dictEntry.furigana });
+          playerCount++;
+        }
+      }
+      const dedupCount = await deduplicateFuriganaDict();
+      updateLastSync();
+      const details = [`ふりがな辞書: ${count}件`];
+      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+      if (playerCount > 0) details.push(`選手に適用: ${playerCount}名`);
+      setResult({ success: true, message: `${count}件のふりがなをインポートしました`, details });
+      onDataLoaded?.();
+    } catch (err) {
+      setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
+    } finally {
+      setIsProcessing(false);
+      if (excelFuriganaRef.current) excelFuriganaRef.current.value = '';
+    }
+  }, [updateLastSync, onDataLoaded]);
+
+  // --- Excelから所属インポート ---
+  const handleExcelAff = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(ws);
+      const now = Date.now();
+      let count = 0;
+      for (const row of rows) {
+        const name = String(row['所属名'] || row['name'] || '').trim();
+        const furigana = String(row['ふりがな'] || row['furigana'] || '').trim();
+        if (!name || !furigana) continue;
+        const existing = await db.affiliationFurigana.where('name').equals(name).first();
+        if (existing) {
+          await db.affiliationFurigana.update(existing.id!, { furigana, updatedAt: now });
+        } else {
+          await db.affiliationFurigana.add({ name, furigana, updatedAt: now } as AffiliationFurigana);
+        }
+        count++;
+      }
+      const dedupCount = await deduplicateAffiliation();
+      updateLastSync();
+      const details = [`所属ふりがな: ${count}件`];
+      if (dedupCount > 0) details.push(`重複削除: ${dedupCount}件`);
+      setResult({ success: true, message: `${count}件の所属ふりがなをインポートしました`, details });
+      onDataLoaded?.();
+    } catch (err) {
+      setResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
+    } finally {
+      setIsProcessing(false);
+      if (excelAffRef.current) excelAffRef.current.value = '';
+    }
+  }, [updateLastSync, onDataLoaded]);
+
+  return (
+    <div className="space-y-4">
+      <DriveLoadingModal
+        open={modal.modalOpen}
+        title={modal.modalTitle}
+        steps={modal.modalSteps}
+        progress={modal.modalProgress}
+        result={modal.modalResult}
+        onClose={modal.handleModalClose}
+        onTimeout={modal.handleTimeout}
+      />
+
+      {/* ふりがな操作 */}
+      <div className="border border-blue-100 rounded-lg overflow-hidden">
+        <div className="bg-blue-50 px-3 py-2 flex items-center gap-2">
+          <Users className="w-4 h-4 text-blue-600" />
+          <h3 className="text-sm font-bold text-blue-800">ふりがな一覧</h3>
+          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-auto">{furiganaDictCount}件</span>
+        </div>
+        <div className="p-3 flex flex-wrap gap-2">
+          <button
+            onClick={handleDownloadFurigana}
+            disabled={isProcessing || !gdriveConnected}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-50 transition-colors shadow-sm"
+          >
+            <GoogleDriveIcon className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5" />
+            ドライブから読込
+          </button>
+          <button
+            onClick={handleUploadFurigana}
+            disabled={isProcessing || !gdriveConnected || furiganaDictCount === 0}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-50 transition-colors border border-[#1a73e8]/20"
+          >
+            <GoogleDriveIcon className="w-3.5 h-3.5" />
+            <Upload className="w-3.5 h-3.5" />
+            ドライブに書込
+          </button>
+          <div className="w-px h-8 bg-gray-200 mx-1 self-center hidden sm:block" />
+          <input ref={excelFuriganaRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelFurigana} />
+          <button
+            onClick={() => excelFuriganaRef.current?.click()}
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Excelから読込
+          </button>
+        </div>
+      </div>
+
+      {/* 所属操作 */}
+      <div className="border border-purple-100 rounded-lg overflow-hidden">
+        <div className="bg-purple-50 px-3 py-2 flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-purple-600" />
+          <h3 className="text-sm font-bold text-purple-800">所属一覧</h3>
+          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full ml-auto">{affiliationCount}件</span>
+        </div>
+        <div className="p-3 flex flex-wrap gap-2">
+          <button
+            onClick={handleDownloadAffiliation}
+            disabled={isProcessing || !gdriveConnected}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            <GoogleDriveIcon className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5" />
+            ドライブから読込
+          </button>
+          <button
+            onClick={handleUploadAffiliation}
+            disabled={isProcessing || !gdriveConnected || affiliationCount === 0}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors border border-purple-200"
+          >
+            <GoogleDriveIcon className="w-3.5 h-3.5" />
+            <Upload className="w-3.5 h-3.5" />
+            ドライブに書込
+          </button>
+          <div className="w-px h-8 bg-gray-200 mx-1 self-center hidden sm:block" />
+          <input ref={excelAffRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelAff} />
+          <button
+            onClick={() => excelAffRef.current?.click()}
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Excelから読込
+          </button>
+        </div>
+      </div>
+
+      {/* 結果メッセージ */}
+      {result && (
+        <div className={`p-3 rounded-lg text-sm ${
+          result.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="flex items-start gap-2">
+            {result.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+            <div>
+              <p className="font-medium">{result.message}</p>
+              {result.details && result.details.length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-xs opacity-90">
+                  {result.details.map((d, i) => <li key={i}>{d}</li>)}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

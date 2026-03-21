@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Database as DatabaseIcon, ListChecks, FileJson, ChevronDown, ChevronRight } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
 } from '../backup/googleDriveApi';
 import PlayerDataList from './PlayerDataList';
 import DataImport from './DrawMeetingImport';
-import DataSync from './DataSync';
+import DataSync, { FuriganaAffiliationOps } from './DataSync';
 
 export default function DataManagement() {
   // 共有 Google Drive 接続状態（再レンダリングトリガー用）
@@ -17,6 +17,10 @@ export default function DataManagement() {
   const [dataImportOpen, setDataImportOpen] = useState(true);
   const [playerListOpen, setPlayerListOpen] = useState(false);
 
+  // GDriveからダウンロードされたデータを DrawMeetingImport に渡すための state
+  const [externalTournamentExcel, setExternalTournamentExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
+  const [externalScheduleExcel, setExternalScheduleExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
+
   // DataSync の接続/切断時に再評価をトリガー
   const handleConnectionChange = useCallback(() => {
     setGdriveVersion(v => v + 1);
@@ -25,6 +29,18 @@ export default function DataManagement() {
   // データ読込成功時に所属・ふりがな一覧パネルを自動展開
   const handleDataLoaded = useCallback(() => {
     setPlayerListOpen(true);
+  }, []);
+
+  // GDriveから大会Excelがダウンロードされたとき
+  const handleTournamentExcelLoaded = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
+    setExternalTournamentExcel({ arrayBuffer, fileName });
+    setDataImportOpen(true);
+  }, []);
+
+  // GDriveから時間割Excelがダウンロードされたとき
+  const handleScheduleExcelLoaded = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
+    setExternalScheduleExcel({ arrayBuffer, fileName });
+    setDataImportOpen(true);
   }, []);
 
   // 初回マウント時にも接続状態を評価
@@ -46,10 +62,15 @@ export default function DataManagement() {
         </div>
       </header>
 
-      {/* Google ドライブ連携（接続 + 全Drive機能を統合） */}
-      <DataSync onConnectionChange={handleConnectionChange} onDataLoaded={handleDataLoaded} />
+      {/* Google ドライブ連携（接続 + 一括読込 + フォルダ + 大会/時間割読込） */}
+      <DataSync
+        onConnectionChange={handleConnectionChange}
+        onDataLoaded={handleDataLoaded}
+        onTournamentExcelLoaded={handleTournamentExcelLoaded}
+        onScheduleExcelLoaded={handleScheduleExcelLoaded}
+      />
 
-      {/* 大会データ読込パネル */}
+      {/* 大会データ読込パネル（Excelボタン方式） */}
       <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
         <button
           onClick={() => setDataImportOpen(!dataImportOpen)}
@@ -57,18 +78,21 @@ export default function DataManagement() {
         >
           <div className="flex items-center gap-2">
             {dataImportOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-            <FileJson className="w-5 h-5 text-primary-500" />
+            <FileSpreadsheet className="w-5 h-5 text-primary-500" />
             <h2 className="font-semibold text-primary-600">大会データ読込</h2>
           </div>
         </button>
         {dataImportOpen && (
           <div className="p-4">
-            <DataImport gdriveConnected={gdriveConnected} onGDriveConnectionChange={handleConnectionChange} />
+            <DataImport
+              externalTournamentExcel={externalTournamentExcel}
+              externalScheduleExcel={externalScheduleExcel}
+            />
           </div>
         )}
       </section>
 
-      {/* 所属・ふりがな一覧パネル */}
+      {/* 所属・ふりがな一覧パネル（ふりがな/所属操作 + 一覧） */}
       <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
         <button
           onClick={() => setPlayerListOpen(!playerListOpen)}
@@ -81,7 +105,10 @@ export default function DataManagement() {
           </div>
         </button>
         {playerListOpen && (
-          <div className="p-5">
+          <div className="p-5 space-y-5">
+            {/* ふりがな・所属のGDrive読込/書込 + Excel読込 */}
+            <FuriganaAffiliationOps gdriveConnected={gdriveConnected} onDataLoaded={handleDataLoaded} />
+            {/* 一覧表示 */}
             <PlayerDataList />
           </div>
         )}

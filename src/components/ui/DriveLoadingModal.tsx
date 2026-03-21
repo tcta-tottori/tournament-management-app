@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -28,9 +29,45 @@ interface DriveLoadingModalProps {
   progress?: number; // 0-100 の進捗率
   result?: { success: boolean; message: string; details?: string[] } | null;
   onClose?: () => void;
+  /** タイムアウト（ms）。進捗が一定時間変化しない場合エラーを出して閉じる。0で無効。デフォルト8000ms */
+  timeoutMs?: number;
+  /** タイムアウト時に呼ばれるコールバック */
+  onTimeout?: () => void;
 }
 
-export default function DriveLoadingModal({ open, title, steps, progress, result, onClose }: DriveLoadingModalProps) {
+export default function DriveLoadingModal({ open, title, steps, progress, result, onClose, timeoutMs = 8000, onTimeout }: DriveLoadingModalProps) {
+  // 8秒タイムアウト: progressが変化しないまま8秒経過 → onTimeout → 自動閉じ
+  const lastProgressRef = useRef<number>(0);
+  const lastChangeRef = useRef<number>(Date.now());
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!open || !!result || timeoutMs <= 0) {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      return;
+    }
+    // 進捗が変化したら時刻リセット
+    if (progress !== lastProgressRef.current) {
+      lastProgressRef.current = progress ?? 0;
+      lastChangeRef.current = Date.now();
+    }
+    timerRef.current = setInterval(() => {
+      if (Date.now() - lastChangeRef.current > timeoutMs) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        onTimeout?.();
+      }
+    }, 1000);
+    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+  }, [open, progress, result, timeoutMs, onTimeout]);
+
+  // open時にタイムスタンプリセット
+  useEffect(() => {
+    if (open) {
+      lastProgressRef.current = 0;
+      lastChangeRef.current = Date.now();
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const isFinished = !!result;
@@ -59,14 +96,23 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
         {/* Content */}
         <div className="px-5 py-4">
           {!isFinished && (
-            /* ローディングアニメーション */
+            /* ローディングアニメーション — カラフルな1段リング */
             <div className="flex justify-center py-4">
-              <div className="relative w-16 h-16">
-                {/* 外側リング */}
+              <div className="relative w-14 h-14">
+                {/* 背景リング */}
                 <div className="absolute inset-0 rounded-full border-[3px] border-gray-100" />
-                <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-[#1a73e8] border-r-[#34a853] drive-modal-spin" />
-                {/* 内側パルス */}
-                <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-[#fbbc04] border-l-[#ea4335] drive-modal-spin-reverse" />
+                {/* カラフルリング — 4色コニカルグラデーション */}
+                <svg className="absolute inset-0 w-full h-full drive-modal-spin" viewBox="0 0 56 56">
+                  <defs>
+                    <linearGradient id="driveGrad1" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#4285F4" />
+                      <stop offset="33%" stopColor="#34A853" />
+                      <stop offset="66%" stopColor="#FBBC04" />
+                      <stop offset="100%" stopColor="#EA4335" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="28" cy="28" r="25" fill="none" stroke="url(#driveGrad1)" strokeWidth="3" strokeLinecap="round" strokeDasharray="120 40" />
+                </svg>
                 {/* 中央アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <GoogleDriveIcon className="w-5 h-5 drive-modal-pulse" />

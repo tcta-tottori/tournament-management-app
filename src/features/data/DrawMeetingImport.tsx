@@ -1,74 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, FileJson, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, Download, RefreshCw, FolderOpen, X, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import type { ImportedScheduleItem } from '../../stores/appStore';
-import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
-import {
-  getSavedToken as gdriveGetSavedToken,
-  getSavedClientId,
-  isTokenValid as gdriveIsTokenValid,
-  listTournamentExcelFiles,
-  downloadTournamentExcel,
-  listScheduleExcelFiles,
-  downloadScheduleExcel,
-  type GoogleDriveFile,
-} from '../backup/googleDriveApi';
-
-/** Google Drive ブランドアイコン */
-function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5l5.4 9.35z" fill="#0066DA"/>
-      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L3.45 44.7c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
-      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.85L73.55 76.8z" fill="#EA4335"/>
-      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
-      <path d="M59.85 53H27.5l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L59.85 53z" fill="#2684FC"/>
-      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.2 28h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
-    </svg>
-  );
-}
-
-
-/** Google Drive からドロー会議システムの最新バックアップを取得 */
-async function fetchDrawBackupFromGDrive(token: string): Promise<{ data: any; fileName: string }> {
-  const DRIVE_API = 'https://www.googleapis.com/drive/v3';
-  const hdrs = { Authorization: `Bearer ${token}` };
-
-  // 「鳥取テニス協会バックアップ」フォルダを検索
-  const rootQ = `name='鳥取テニス協会バックアップ' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const rootRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: rootQ, fields: 'files(id)', pageSize: '1' })}`, { headers: hdrs });
-  if (!rootRes.ok) throw new Error(`Google Drive API エラー (${rootRes.status})`);
-  const rootData = await rootRes.json();
-  const rootId = rootData.files?.[0]?.id;
-  if (!rootId) throw new Error('Google Drive に「鳥取テニス協会バックアップ」フォルダが見つかりません');
-
-  // 「ドロー会議システム」サブフォルダを検索
-  const subQ = `name='ドロー会議システム' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`;
-  const subRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: subQ, fields: 'files(id)', pageSize: '1' })}`, { headers: hdrs });
-  if (!subRes.ok) throw new Error(`Google Drive API エラー (${subRes.status})`);
-  const subData = await subRes.json();
-  const subId = subData.files?.[0]?.id;
-  if (!subId) throw new Error('Google Drive に「ドロー会議システム」フォルダが見つかりません');
-
-  // フォルダ内のJSONバックアップを最新順で取得
-  const filesQ = `'${subId}' in parents and trashed=false and mimeType='application/json'`;
-  const filesRes = await fetch(`${DRIVE_API}/files?${new URLSearchParams({ q: filesQ, fields: 'files(id,name,modifiedTime)', orderBy: 'modifiedTime desc', pageSize: '1' })}`, { headers: hdrs });
-  if (!filesRes.ok) throw new Error(`Google Drive API エラー (${filesRes.status})`);
-  const filesData = await filesRes.json();
-  const latest = filesData.files?.[0];
-  if (!latest) throw new Error('Google Drive にドロー会議のバックアップファイルがありません');
-
-  // ダウンロード
-  const dlRes = await fetch(`${DRIVE_API}/files/${latest.id}?alt=media`, { headers: hdrs });
-  if (!dlRes.ok) throw new Error(`ダウンロード失敗 (${dlRes.status})`);
-  const data = await dlRes.json();
-  return { data, fileName: latest.name };
-}
 
 // ドロー会議システムのイベントコード → 大会運営システムの種目定義
 const EVENT_MAP: Record<string, { name: string; type: 'Singles' | 'Doubles' }> = {
@@ -486,11 +423,13 @@ function normalizeScheduleTime(raw: string): string {
 }
 
 interface DataImportProps {
-  gdriveConnected?: boolean;
-  onGDriveConnectionChange?: () => void;
+  /** GDriveからダウンロードされた大会Excel (DataSyncから渡される) */
+  externalTournamentExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
+  /** GDriveからダウンロードされた時間割Excel (DataSyncから渡される) */
+  externalScheduleExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
 }
 
-export default function DataImport({ gdriveConnected: gdriveConnectedProp }: DataImportProps) {
+export default function DataImport({ externalTournamentExcel, externalScheduleExcel }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -503,11 +442,6 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
-  const [isLoadingGDrive, setIsLoadingGDrive] = useState(false);
-  const [gdriveFileList, setGdriveFileList] = useState<GoogleDriveFile[]>([]);
-  const [isLoadingFileList, setIsLoadingFileList] = useState(false);
-  const [showFileList, setShowFileList] = useState(false);
-  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -516,199 +450,60 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const [scheduleItems, setScheduleItems] = useState<ImportedScheduleItem[]>([]);
   const [scheduleFileName, setScheduleFileName] = useState('');
   const [scheduleError, setScheduleError] = useState('');
-  const [isLoadingScheduleGDrive, setIsLoadingScheduleGDrive] = useState(false);
-  const [scheduleGDriveFiles, setScheduleGDriveFiles] = useState<GoogleDriveFile[]>([]);
-  const [showScheduleFileList, setShowScheduleFileList] = useState(false);
-  const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
 
-  // ローディングモーダル用state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
-  const [modalProgress, setModalProgress] = useState(0);
-  const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
-
-  // Google Drive 接続状態（propsから受け取り、フォールバックとして自前チェック）
-  const gdriveConnected = gdriveConnectedProp ?? (!!getSavedClientId() && gdriveIsTokenValid());
-
-  // --- Google Drive からドロー会議データを読み込む ---
-  const handleLoadFromGDrive = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) {
-      setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
-      return;
-    }
-    let steps: LoadingStep[] = [
-      { label: 'ドロー会議フォルダを検索中...', status: 'loading' },
-      { label: 'バックアップデータを読込', status: 'waiting' },
-    ];
-    setModalTitle('ドロー会議データ読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsLoadingGDrive(true);
-    setImportResult(null);
+  // --- 外部から渡されたExcelデータ（GDriveからDL済み）を処理 ---
+  const processExcelArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
     try {
-      setModalProgress(20);
-      const { data: json, fileName } = await fetchDrawBackupFromGDrive(token);
-      steps = [
-        { ...steps[0], status: 'done', label: 'ドロー会議フォルダを検出' },
-        { ...steps[1], status: 'loading', label: 'バックアップデータを解析中...' },
-      ];
-      setModalSteps([...steps]);
-      setModalProgress(60);
-      const data = parseImportFile(json);
-      if (!data) {
-        steps = [steps[0], { ...steps[1], status: 'error', label: 'データ形式を認識できません' }];
-        setModalSteps([...steps]);
-        const r = { success: false, message: 'Google Drive のバックアップはドロー会議システムのデータ形式ではありません。' };
-        setModalResult(r);
-        setImportResult(r);
-        return;
-      }
-      setModalProgress(100);
-      steps = [steps[0], { ...steps[1], status: 'done', label: 'データ解析完了' }];
-      setModalSteps([...steps]);
-      const r = { success: true, message: `「${fileName}」を読み込みました`, details: [`形式: ${data.format === 'complete-backup' ? '完全バックアップ' : 'ドロー共有'}`] };
-      setModalResult(r);
-      setParsedData(data);
-      setParsedExcel(null);
-      const sum = buildSummary(data);
-      setSummary(sum);
-      const rawName = data.tournamentName || data.tournaments[0]?.name || fileName.replace(/\.json$/i, '');
-      setEditTournamentName(cleanTournamentName(rawName));
-      setEditDate(sum.tournamentDate);
-      setEditVenue(sum.tournamentVenue);
-      if (data.tournaments.length > 0) {
-        setEditReserveDate(data.tournaments[0].reserveDate || '');
-      }
-      if (data.tournaments.length === 1) setSelectedTournament(data.tournaments[0].id);
-    } catch (err) {
-      const failStep = steps.findIndex(s => s.status === 'loading');
-      if (failStep >= 0) {
-        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
-        setModalSteps([...steps]);
-      }
-      const r = { success: false, message: `Google Drive 読込失敗: ${(err as Error).message}` };
-      setModalResult(r);
-      setImportResult(r);
-    } finally {
-      setIsLoadingGDrive(false);
-    }
-  }, []);
-
-  // --- Google Drive 大会一覧フォルダからファイル一覧を取得 ---
-  const handleListTournamentFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) {
-      setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
-      return;
-    }
-    const steps: LoadingStep[] = [
-      { label: '大会一覧フォルダを取得中...', status: 'loading' },
-    ];
-    setModalTitle('大会一覧');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsLoadingFileList(true);
-    setImportResult(null);
-    try {
-      setModalProgress(30);
-      const files = await listTournamentExcelFiles(token);
-      setModalProgress(100);
-      setGdriveFileList(files);
-      if (files.length === 0) {
-        steps[0] = { ...steps[0], status: 'error', label: '大会一覧フォルダにファイルがありません' };
-        setModalSteps([...steps]);
-        const r = { success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' };
-        setModalResult(r);
-        setImportResult(r);
-      } else {
-        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
-        setModalSteps([...steps]);
-        const r = { success: true, message: `${files.length}件のファイルが見つかりました` };
-        setModalResult(r);
-        // モーダルを閉じてファイル選択に遷移
-        setTimeout(() => {
-          setModalOpen(false);
-          setShowFileList(true);
-        }, 500);
-      }
-    } catch (err) {
-      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
-      setModalSteps([...steps]);
-      const r = { success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` };
-      setModalResult(r);
-      setImportResult(r);
-    } finally {
-      setIsLoadingFileList(false);
-    }
-  }, []);
-
-  // --- Google Drive 大会一覧から選択したファイルを読込（Excel） ---
-  const handleSelectTournamentFile = useCallback(async (file: GoogleDriveFile) => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    setShowFileList(false);
-    let steps: LoadingStep[] = [
-      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
-      { label: 'ドロー情報を解析', status: 'waiting' },
-    ];
-    setModalTitle('大会データ読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setLoadingFileId(file.id);
-    setImportResult(null);
-    try {
-      setModalProgress(20);
-      const arrayBuffer = await downloadTournamentExcel(token, file.id);
-      steps = [
-        { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` },
-        { ...steps[1], status: 'loading', label: 'ドロー情報を解析中...' },
-      ];
-      setModalSteps([...steps]);
-      setModalProgress(60);
-      const result = parseDrawExcel(arrayBuffer, file.name);
+      const result = parseDrawExcel(arrayBuffer, fileName);
       if (!result.events || result.events.length === 0) {
-        steps[1] = { ...steps[1], status: 'error', label: 'ドロー情報を検出できませんでした' };
-        setModalSteps([...steps]);
-        const r = { success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' };
-        setModalResult(r);
-        setImportResult(r);
+        setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' });
         return;
       }
-      setModalProgress(100);
-      steps[1] = { ...steps[1], status: 'done', label: `${result.events.length}種目を検出` };
-      setModalSteps([...steps]);
-      const r = { success: true, message: `${result.events.length}種目のドロー情報を読み込みました`, details: [`ファイル: ${file.name}`] };
-      setModalResult(r);
       setParsedExcel(result);
       setParsedData(null);
       setSummary(null);
       setImportResult(null);
-      const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
+      const rawName = result.tournamentName || fileName.replace(/\.(xlsx?|xls)$/i, '');
       setEditTournamentName(cleanTournamentName(rawName));
       if (result.date) setEditDate(result.date);
       if (result.venue) setEditVenue(result.venue);
       if (result.reserveDate) setEditReserveDate(result.reserveDate);
     } catch (err) {
-      const failStep = steps.findIndex(s => s.status === 'loading');
-      if (failStep >= 0) {
-        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
-        setModalSteps([...steps]);
-      }
-      const r = { success: false, message: `ファイル読込失敗: ${(err as Error).message}` };
-      setModalResult(r);
-      setImportResult(r);
-    } finally {
-      setLoadingFileId(null);
+      setImportResult({ success: false, message: `Excelの解析に失敗しました: ${(err as Error).message}` });
     }
   }, []);
+
+  // 外部から渡された時間割Excelを処理
+  const processScheduleArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
+    try {
+      const items = parseScheduleExcel(arrayBuffer);
+      if (items.length === 0) {
+        setScheduleError('時間割データを検出できませんでした。');
+        return;
+      }
+      setScheduleItems(items);
+      setScheduleFileName(fileName);
+      setScheduleError('');
+      useAppStore.getState().setImportedSchedule(items);
+      setScheduleOpen(true);
+    } catch (err) {
+      setScheduleError(`時間割の解析に失敗しました: ${(err as Error).message}`);
+    }
+  }, []);
+
+  // GDriveから大会Excelが渡されたら処理
+  useEffect(() => {
+    if (externalTournamentExcel) {
+      processExcelArrayBuffer(externalTournamentExcel.arrayBuffer, externalTournamentExcel.fileName);
+    }
+  }, [externalTournamentExcel, processExcelArrayBuffer]);
+
+  // GDriveから時間割Excelが渡されたら処理
+  useEffect(() => {
+    if (externalScheduleExcel) {
+      processScheduleArrayBuffer(externalScheduleExcel.arrayBuffer, externalScheduleExcel.fileName);
+    }
+  }, [externalScheduleExcel, processScheduleArrayBuffer]);
 
   // --- JSON file handler (existing) ---
   const handleJsonFile = useCallback((file: File) => {
@@ -718,7 +513,7 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
         const json = JSON.parse(e.target?.result as string);
         const data = parseImportFile(json);
         if (!data) {
-          setImportResult({ success: false, message: 'ドロー会議システムのデータ形式ではありません。完全バックアップJSON または ドロー共有JSONを選択してください。' });
+          setImportResult({ success: false, message: 'データ形式を認識できませんでした。' });
           return;
         }
         setParsedData(data);
@@ -726,16 +521,13 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
         const sum = buildSummary(data);
         setSummary(sum);
         setImportResult(null);
-        // 大会名をプリセット（自動クリーンアップ）
         const rawName = data.tournamentName || data.tournaments[0]?.name || '';
         setEditTournamentName(cleanTournamentName(rawName));
-        // 日程・会場をプリセット
         setEditDate(sum.tournamentDate);
         setEditVenue(sum.tournamentVenue);
         if (data.tournaments.length > 0) {
           setEditReserveDate(data.tournaments[0].reserveDate || '');
         }
-        // 大会が1つだけならプリセレクト
         if (data.tournaments.length === 1) setSelectedTournament(data.tournaments[0].id);
       } catch (err) {
         setImportResult({ success: false, message: `JSONの解析に失敗しました: ${(err as Error).message}` });
@@ -800,110 +592,6 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
     reader.readAsArrayBuffer(file);
   }, []);
 
-  // --- Google Drive: 時間割ファイル一覧取得 ---
-  const handleListScheduleFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) {
-      setScheduleError('Google Drive に接続されていません。');
-      return;
-    }
-    const steps: LoadingStep[] = [
-      { label: '時間割フォルダを取得中...', status: 'loading' },
-    ];
-    setModalTitle('時間割');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setIsLoadingScheduleGDrive(true);
-    setScheduleError('');
-    try {
-      setModalProgress(30);
-      const files = await listScheduleExcelFiles(token);
-      setModalProgress(100);
-      setScheduleGDriveFiles(files);
-      if (files.length === 0) {
-        steps[0] = { ...steps[0], status: 'error', label: '時間割フォルダにファイルがありません' };
-        setModalSteps([...steps]);
-        const r = { success: false, message: 'Google Drive の「時間割」フォルダにファイルがありません。' };
-        setModalResult(r);
-        setScheduleError(r.message);
-      } else {
-        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
-        setModalSteps([...steps]);
-        const r = { success: true, message: `${files.length}件のファイルが見つかりました` };
-        setModalResult(r);
-        setTimeout(() => {
-          setModalOpen(false);
-          setShowScheduleFileList(true);
-        }, 500);
-      }
-    } catch (err) {
-      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
-      setModalSteps([...steps]);
-      setModalResult({ success: false, message: `ファイル一覧の取得に失敗: ${(err as Error).message}` });
-      setScheduleError(`ファイル一覧の取得に失敗: ${(err as Error).message}`);
-    } finally {
-      setIsLoadingScheduleGDrive(false);
-    }
-  }, []);
-
-  // --- Google Drive: 時間割ファイル選択 ---
-  const handleSelectScheduleFile = useCallback(async (file: GoogleDriveFile) => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    setShowScheduleFileList(false);
-    let steps: LoadingStep[] = [
-      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
-      { label: '時間割データを解析', status: 'waiting' },
-    ];
-    setModalTitle('時間割読込');
-    setModalSteps(steps);
-    setModalResult(null);
-    setModalProgress(0);
-    setModalOpen(true);
-    setLoadingScheduleFileId(file.id);
-    setScheduleError('');
-    try {
-      setModalProgress(20);
-      const arrayBuffer = await downloadScheduleExcel(token, file.id);
-      steps = [
-        { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` },
-        { ...steps[1], status: 'loading', label: '時間割データを解析中...' },
-      ];
-      setModalSteps([...steps]);
-      setModalProgress(60);
-      const items = parseScheduleExcel(arrayBuffer);
-      if (items.length === 0) {
-        steps[1] = { ...steps[1], status: 'error', label: '時間割データを検出できませんでした' };
-        setModalSteps([...steps]);
-        const r = { success: false, message: '時間割データを検出できませんでした。Excelの形式を確認してください。' };
-        setModalResult(r);
-        setScheduleError(r.message);
-        return;
-      }
-      setModalProgress(100);
-      const courts = new Set(items.map(i => i.courtName)).size;
-      steps[1] = { ...steps[1], status: 'done', label: `${items.length}試合 / ${courts}コートを検出` };
-      setModalSteps([...steps]);
-      const r = { success: true, message: `${items.length}試合の時間割を読み込みました`, details: [`ファイル: ${file.name}`, `${courts}コート`] };
-      setModalResult(r);
-      setScheduleItems(items);
-      setScheduleFileName(file.name);
-      useAppStore.getState().setImportedSchedule(items);
-    } catch (err) {
-      const failStep = steps.findIndex(s => s.status === 'loading');
-      if (failStep >= 0) {
-        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
-        setModalSteps([...steps]);
-      }
-      const r = { success: false, message: `ファイル読込失敗: ${(err as Error).message}` };
-      setModalResult(r);
-      setScheduleError(r.message);
-    } finally {
-      setLoadingScheduleFileId(null);
-    }
-  }, []);
 
   // --- File dispatcher: detect type by extension ---
   const handleFile = useCallback((file: File) => {
@@ -917,11 +605,6 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
     }
   }, [handleJsonFile, handleExcelFile]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
 
   // --- JSON import (existing) ---
   const handleImport = async () => {
@@ -1473,87 +1156,54 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
 
   const hasPreview = parsedData && summary;
   const hasExcelPreview = parsedExcel;
-  const showDropZone = !hasPreview && !hasExcelPreview;
-
-  const handleModalClose = useCallback(() => {
-    setModalOpen(false);
-    setModalResult(null);
-  }, []);
+  const showButtons = !hasPreview && !hasExcelPreview;
 
   return (
     <div className="space-y-4">
-      {/* Google Drive ローディングモーダル */}
-      <DriveLoadingModal
-        open={modalOpen}
-        title={modalTitle}
-        steps={modalSteps}
-        progress={modalProgress}
-        result={modalResult}
-        onClose={handleModalClose}
-      />
-
-      {/* ファイルアップロード */}
-      {showDropZone && (
+      {/* Excel読込ボタン */}
+      {showButtons && (
         <div className="space-y-3">
-          {/* Google Drive 大会一覧から選択 */}
-          <button
-            onClick={handleListTournamentFiles}
-            disabled={!gdriveConnected || isLoadingFileList}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 text-sm font-medium text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
-          >
-            {isLoadingFileList ? (
-              <RefreshCw className="w-4.5 h-4.5 animate-spin" />
-            ) : (
-              <GoogleDriveIcon className="w-4.5 h-4.5" />
-            )}
-            {isLoadingFileList ? '大会一覧を取得中...' : 'Google Drive の大会一覧から選択'}
-          </button>
-          {!gdriveConnected && (
-            <p className="text-[10px] text-gray-400 text-center -mt-1">※ 上部の Google ドライブ連携から接続すると利用できます</p>
-          )}
-
-          {/* ドロー会議の最新データ読込 */}
-          <button
-            onClick={handleLoadFromGDrive}
-            disabled={!gdriveConnected || isLoadingGDrive}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoadingGDrive ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <GoogleDriveIcon className="w-4 h-4" />
-            )}
-            {isLoadingGDrive ? 'ドロー会議データ読込中...' : 'ドロー会議の最新データから読込'}
-          </button>
-
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            <div className="flex-1 border-t border-border-main" />
-            <span>またはファイルから</span>
-            <div className="flex-1 border-t border-border-main" />
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+            >
+              <FileSpreadsheet className="w-4.5 h-4.5" />
+              大会Excel読込
+            </button>
+            <button
+              onClick={() => scheduleFileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+            >
+              <CalendarClock className="w-4.5 h-4.5" />
+              時間割Excel読込
+            </button>
           </div>
-
-          {/* ファイルドロップゾーン */}
-          <div
-            onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-border-main rounded-lg p-5 text-center bg-primary-50/50 hover:bg-primary-50 hover:border-primary-500 transition-colors cursor-pointer"
-          >
-            <FileJson className="w-8 h-8 text-primary-500 mx-auto mb-1.5 opacity-50" />
-            <p className="text-sm font-medium text-gray-700">JSON / Excel ファイルを読込</p>
-            <p className="text-[10px] text-gray-400 mt-1">ドロー会議バックアップJSON / ドロー共有JSON / ドローExcel (.xlsx)</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,.xlsx,.xls"
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
-                e.target.value = '';
-              }}
-            />
-          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.xlsx,.xls"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={scheduleFileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) handleScheduleFile(file);
+              e.target.value = '';
+            }}
+          />
+          <p className="text-[10px] text-gray-400 text-center">
+            ドローExcel (.xlsx) / 時間割Excel (.xlsx) を読み込みます。Google ドライブからの読込は上部の連携セクションをご利用ください。
+          </p>
         </div>
       )}
 
@@ -2045,257 +1695,77 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
         );
       })()}
       {/* ── 時間割読込セクション ── */}
-      <div className="border border-border-main rounded-lg overflow-hidden">
-        <button
-          onClick={() => setScheduleOpen(!scheduleOpen)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
-        >
-          {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-          <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
-          時間割読込
-          {scheduleItems.length > 0 && (
+      {scheduleItems.length > 0 && (
+        <div className="border border-border-main rounded-lg overflow-hidden">
+          <button
+            onClick={() => setScheduleOpen(!scheduleOpen)}
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
+          >
+            {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+            <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
+            時間割
             <span className="ml-auto text-xs font-normal text-green-600 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" />
               {scheduleItems.length}試合読込済
             </span>
-          )}
-        </button>
-        {scheduleOpen && (
-          <div className="p-4 space-y-3 border-t border-border-main">
-            <p className="text-xs text-gray-500">
-              試合順・コート・時刻が記載された時間割Excelを読み込みます。エントリー確定前に読み込むことで、後のスケジュール作成に活用できます。
-            </p>
-
-            {/* Google Drive から取得 */}
-            <button
-              onClick={handleListScheduleFiles}
-              disabled={!gdriveConnected || isLoadingScheduleGDrive}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoadingScheduleGDrive ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <GoogleDriveIcon className="w-4 h-4" />
-              )}
-              {isLoadingScheduleGDrive ? '取得中...' : 'Google Drive から時間割を選択'}
-            </button>
-
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              <div className="flex-1 border-t border-border-main" />
-              <span>またはファイルから</span>
-              <div className="flex-1 border-t border-border-main" />
-            </div>
-
-            {/* ローカルファイル選択 */}
-            <button
-              onClick={() => scheduleFileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-border-main rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              時間割Excelを選択 (.xlsx)
-            </button>
-            <input
-              ref={scheduleFileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) handleScheduleFile(file);
-                e.target.value = '';
-              }}
-            />
-
-            {/* エラー表示 */}
-            {scheduleError && (
-              <div className="p-3 rounded-lg text-sm flex items-start gap-2 bg-red-50 text-red-800 border border-red-200">
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>{scheduleError}</span>
-              </div>
-            )}
-
-            {/* 読込成功サマリー */}
-            {scheduleItems.length > 0 && (
-              <div className="space-y-3">
-                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                  <div className="flex items-center gap-2 text-sm font-bold text-green-700">
-                    <CheckCircle2 className="w-4 h-4" />
-                    時間割読込成功
-                  </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
-                    {scheduleItems.length}試合 / {new Set(scheduleItems.map(i => i.courtName)).size}コート の時間割を読み込みました
-                  </p>
+          </button>
+          {scheduleOpen && (
+            <div className="p-4 space-y-3 border-t border-border-main">
+              <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                <div className="flex items-center gap-2 text-sm font-bold text-green-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  時間割読込成功
                 </div>
-
-                {/* プレビューテーブル */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">#</th>
-                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">コート</th>
-                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">時刻</th>
-                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">種目</th>
-                        <th className="px-2 py-1.5 text-left font-medium text-gray-500">回戦</th>
+                <p className="text-xs text-green-600 mt-1">
+                  {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
+                  {scheduleItems.length}試合 / {new Set(scheduleItems.map(i => i.courtName)).size}コート の時間割を読み込みました
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">#</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">コート</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">時刻</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">種目</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">回戦</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {scheduleItems.map((item, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-2 py-1 text-gray-500">{item.matchOrder}</td>
+                        <td className="px-2 py-1 text-gray-900">{item.courtName}</td>
+                        <td className="px-2 py-1 text-gray-900">{item.startTime}</td>
+                        <td className="px-2 py-1 text-gray-700">{item.eventName || '-'}</td>
+                        <td className="px-2 py-1 text-gray-500">{item.roundLabel}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {scheduleItems.map((item, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-2 py-1 text-gray-500">{item.matchOrder}</td>
-                          <td className="px-2 py-1 text-gray-900">{item.courtName}</td>
-                          <td className="px-2 py-1 text-gray-900">{item.startTime}</td>
-                          <td className="px-2 py-1 text-gray-700">{item.eventName || '-'}</td>
-                          <td className="px-2 py-1 text-gray-500">{item.roundLabel}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* クリアボタン */}
-                <button
-                  onClick={() => {
-                    setScheduleItems([]);
-                    setScheduleFileName('');
-                    useAppStore.getState().setImportedSchedule([]);
-                  }}
-                  className="text-xs text-gray-500 hover:text-red-500 transition-colors"
-                >
-                  時間割をクリア
-                </button>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Google Drive 時間割ファイル選択ポップアップ */}
-      {showScheduleFileList && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowScheduleFileList(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <CalendarClock className="w-5 h-5 text-primary-500" />
-                <h3 className="text-base font-bold text-gray-900">時間割ファイルを選択</h3>
-                <span className="text-xs text-gray-400">{scheduleGDriveFiles.length}件</span>
-              </div>
-              <button onClick={() => setShowScheduleFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
+              <button
+                onClick={() => {
+                  setScheduleItems([]);
+                  setScheduleFileName('');
+                  useAppStore.getState().setImportedSchedule([]);
+                }}
+                className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+              >
+                時間割をクリア
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {scheduleGDriveFiles.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <FolderOpen className="w-12 h-12 mb-3" />
-                  <p className="text-sm">ファイルがありません</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {scheduleGDriveFiles.map(f => {
-                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
-                    const modDate = new Date(f.modifiedTime);
-                    const isLoading = loadingScheduleFileId === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => handleSelectScheduleFile(f)}
-                        disabled={!!loadingScheduleFileId}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                          ) : (
-                            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
-                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <p className="text-xs text-gray-400 text-center">時間割Excelファイルを選択してください</p>
-            </div>
-          </div>
-        </div>,
-        document.body
+          )}
+        </div>
       )}
 
-      {/* Google Drive 大会一覧ポップアップ - createPortal で画面中央表示 */}
-      {showFileList && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <GoogleDriveIcon className="w-5 h-5" />
-                <h3 className="text-base font-bold text-gray-900">大会一覧</h3>
-                <span className="text-xs text-gray-400">{gdriveFileList.length}件</span>
-              </div>
-              <button onClick={() => setShowFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {gdriveFileList.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <FolderOpen className="w-12 h-12 mb-3" />
-                  <p className="text-sm">ファイルがありません</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {gdriveFileList.map(f => {
-                    const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
-                    const modDate = new Date(f.modifiedTime);
-                    const isLoading = loadingFileId === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => handleSelectTournamentFile(f)}
-                        disabled={!!loadingFileId}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                          ) : (
-                            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
-                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            {/* Footer */}
-            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <p className="text-xs text-gray-400 text-center">
-                鳥取テニス協会バックアップ &gt; 大会運営システム &gt; 大会一覧
-              </p>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {/* 時間割エラー */}
+      {scheduleError && (
+        <div className="p-3 rounded-lg text-sm flex items-start gap-2 bg-red-50 text-red-800 border border-red-200">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{scheduleError}</span>
+        </div>
       )}
     </div>
   );

@@ -1198,22 +1198,18 @@ export default function EntryRegistration() {
       if (isMobile && y > 20 && y > lastScrollY) setControlsOpen(false);
       lastScrollY = y;
 
-      // スクロール中の種目名検出
-      if (showAllEvents) {
-        const container = contentRef.current;
-        if (container) {
-          const sections = container.querySelectorAll('[data-event-name]');
-          let currentName = '';
-          for (const sec of sections) {
-            const rect = (sec as HTMLElement).getBoundingClientRect();
-            if (rect.top <= 100) {
-              currentName = (sec as HTMLElement).dataset.eventName || '';
-            }
+      // スクロール中の種目名検出（モバイル: 全モードで表示）
+      const container = contentRef.current;
+      if (container) {
+        const sections = container.querySelectorAll('[data-event-name]');
+        let currentName = '';
+        for (const sec of sections) {
+          const rect = (sec as HTMLElement).getBoundingClientRect();
+          if (rect.top <= 100) {
+            currentName = (sec as HTMLElement).dataset.eventName || '';
           }
-          setStickyEventName(y > 10 ? currentName : '');
         }
-      } else {
-        setStickyEventName('');
+        setStickyEventName(y > 10 ? currentName : '');
       }
     };
 
@@ -1228,7 +1224,7 @@ export default function EntryRegistration() {
         mobileEl.removeEventListener('scroll', onScroll);
       }
     };
-  }, [showAllEvents]);
+  }, []);
 
   if (!currentTournamentId) {
     return (
@@ -1311,17 +1307,17 @@ export default function EntryRegistration() {
             )}
           </div>
         </div>
+
+        {/* スティッキー種目名バー — モバイルのみ、コントロール直下に表示 */}
+        {stickyEventName && (
+          <div className="lg:hidden bg-primary-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-md mt-1">
+            {stickyEventName}
+          </div>
+        )}
       </div>
 
       {/* RIGHT: Main content area */}
       <div className="flex-1 min-w-0 order-2 lg:order-2 flex flex-col min-h-0">
-        {/* スティッキー種目名バー — モバイルでもスティッキー表示 */}
-        {stickyEventName && (
-          <div className="bg-primary-600 text-white px-4 py-1.5 rounded-t-lg text-sm font-bold shadow-md shrink-0 sticky top-0 z-10 lg:static">
-            {stickyEventName}
-          </div>
-        )}
-
         <div ref={contentRef} className="flex-1 lg:overflow-y-auto space-y-4 min-h-0">
           {showAllEvents ? (
             events.length === 0 ? (
