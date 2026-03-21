@@ -286,6 +286,15 @@ function findScheduleGrid(rows: any[]): {
   return null;
 }
 
+/** 全角英数字→半角に変換 + 全角スペース→半角 */
+function normalizeFullWidth(s: string): string {
+  return s
+    .replace(/[\u3000]+/g, ' ')
+    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF21 + 0x41))
+    .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF41 + 0x61))
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
+}
+
 /** 時間割Excelをパースする */
 function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
   const wb = XLSX.read(data, { type: 'array' });
@@ -317,7 +326,7 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
       const courtName = String(courtNum);
 
       for (const tc of grid.timeColumns) {
-        const cell = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
+        const cell = normalizeFullWidth(String(row[tc.colIdx] ?? '')).trim();
         if (!cell) continue;
         globalOrder++;
         // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）
@@ -394,7 +403,7 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
         if (!row || !row[0]) continue;
         const time = excelTimeToString(row[0]) || normalizeScheduleTime(String(row[0]).trim());
         for (let ci = 0; ci < courtNames.length; ci++) {
-          const cell = String(row[ci + 1] || '').trim();
+          const cell = normalizeFullWidth(String(row[ci + 1] || '')).trim();
           if (!cell) continue;
           globalOrder++;
           // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）

@@ -17,32 +17,33 @@ const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
   l55d: '女子55歳以上ダブルス', mbd: '男子B級ダブルス', lbd: '女子B級ダブルス',
 };
 
-// 日本語略称 ↔ 正式名の双方向マッピング（Excel時間割の略称とドロー会議システムの正式名）
+// 日本語略称 ↔ 正式名の双方向マッピング（Excel時間割の略称とDB種目名）
+// DB種目名は「男子シングルスA級」「男子B級シングルス」等、語順が異なる場合がある
 const JP_ABBREV_PAIRS: [string, string][] = [
-  // シングルス
-  ['男子A', '一般男子シングルス'],
-  ['男子B', '男子B級シングルス'],
-  ['男子C', '男子C級シングルス'],
+  // シングルス（両方の語順パターンを登録）
+  ['男子A', '一般男子シングルス'], ['男子A', '男子シングルスA級'],
+  ['男子B', '男子B級シングルス'], ['男子B', '男子シングルスB級'],
+  ['男子C', '男子C級シングルス'], ['男子C', '男子シングルスC級'],
   ['男子35', '男子35歳以上シングルス'],
   ['男子45', '男子45歳以上シングルス'],
   ['男子55', '男子55歳以上シングルス'],
   ['男子65', '男子65歳以上シングルス'],
-  ['女子A', '一般女子シングルス'],
-  ['女子B', '女子B級シングルス'],
-  ['女子C', '女子C級シングルス'],
+  ['女子A', '一般女子シングルス'], ['女子A', '女子シングルスA級'],
+  ['女子B', '女子B級シングルス'], ['女子B', '女子シングルスB級'],
+  ['女子C', '女子C級シングルス'], ['女子C', '女子シングルスC級'],
   ['女子45', '女子45歳以上シングルス'],
   ['女子55', '女子55歳以上シングルス'],
   ['女子65', '女子65歳以上シングルス'],
   // ダブルス
-  ['男子AD', '一般男子ダブルス'],
-  ['男子BD', '男子B級ダブルス'],
-  ['男子CD', '男子C級ダブルス'],
+  ['男子AD', '一般男子ダブルス'], ['男子AD', '男子ダブルスA級'],
+  ['男子BD', '男子B級ダブルス'], ['男子BD', '男子ダブルスB級'],
+  ['男子CD', '男子C級ダブルス'], ['男子CD', '男子ダブルスC級'],
   ['男子35D', '男子35歳以上ダブルス'],
   ['男子45D', '男子45歳以上ダブルス'],
   ['男子55D', '男子55歳以上ダブルス'],
   ['男子65D', '男子65歳以上ダブルス'],
-  ['女子AD', '一般女子ダブルス'],
-  ['女子BD', '女子B級ダブルス'],
+  ['女子AD', '一般女子ダブルス'], ['女子AD', '女子ダブルスA級'],
+  ['女子BD', '女子B級ダブルス'], ['女子BD', '女子ダブルスB級'],
   ['女子45D', '女子45歳以上ダブルス'],
   ['女子55D', '女子55歳以上ダブルス'],
   ['女子65D', '女子65歳以上ダブルス'],
@@ -499,6 +500,7 @@ export default function EntryRegistration() {
     // 時間割アイテムを種目+ラウンドでグループ化
     // key: eventId|roundLabel
     const scheduleGrouped = new Map<string, typeof importedSchedule>();
+    const unmatchedScheduleItems: string[] = [];
     for (const item of importedSchedule) {
       // 種目名マッチング（略称→正式名変換 + 柔軟マッチング）
       let matchedEventId: string | null = null;
@@ -509,7 +511,10 @@ export default function EntryRegistration() {
           break;
         }
       }
-      if (!matchedEventId) continue;
+      if (!matchedEventId) {
+        unmatchedScheduleItems.push(`${item.eventName}(${item.roundLabel}@${item.startTime})`);
+        continue;
+      }
 
       const key = `${matchedEventId}|${item.roundLabel}`;
       if (!scheduleGrouped.has(key)) scheduleGrouped.set(key, []);
@@ -524,6 +529,14 @@ export default function EntryRegistration() {
         return (parseInt(a.courtName) || 0) - (parseInt(b.courtName) || 0);
       });
     }
+
+    // デバッグ: マッチング状況をログ出力
+    if (unmatchedScheduleItems.length > 0) {
+      console.warn('[スケジュール紐付け] マッチしなかった時間割:', unmatchedScheduleItems.slice(0, 20));
+    }
+    console.log('[スケジュール紐付け] 時間割グループ数:', scheduleGrouped.size,
+      '/ DB種目:', allEvents.map(e => e.name),
+      '/ 時間割種目:', [...new Set(importedSchedule.map(i => i.eventName))]);
 
     // 試合を種目+ラウンドでグループ化して時間割とマッチング
     type MatchWithSchedule = { match: Match; startTime: string; courtName: string };
@@ -541,6 +554,15 @@ export default function EntryRegistration() {
       const key = `${m.eventId}|${rLabel}`;
       if (!matchGrouped.has(key)) matchGrouped.set(key, []);
       matchGrouped.get(key)!.push(m);
+    }
+
+    // デバッグ: matchGroupedの各キーの試合数と状態
+    for (const [key, matches] of matchGrouped) {
+      const walkoverCount = matches.filter(m => m.status === 'walkover').length;
+      const hasSchedule = scheduleGrouped.has(key);
+      if (!hasSchedule || walkoverCount > 0) {
+        console.log(`[紐付け] ${key}: 全${matches.length}試合(WO=${walkoverCount}), スケジュール=${hasSchedule ? scheduleGrouped.get(key)!.length + '枠' : 'なし'}`);
+      }
     }
 
     // 各グループで試合をposition順にソートし、時間割スロットとzip
@@ -563,28 +585,28 @@ export default function EntryRegistration() {
           continue;
         }
         // Use alternative key items
-        const sortedMatches = [...matches].sort((a, b) => a.position - b.position);
-        // walkover(BYE)も含めてスケジュール枠に紐付ける
-        let idx = 0;
+        const playable2 = matches.filter(m => m.status !== 'walkover').sort((a, b) => a.position - b.position);
+        let idx2 = 0;
         for (const si of altItems) {
-          if (idx >= sortedMatches.length) break;
-          scheduled.push({ match: sortedMatches[idx], startTime: si.startTime, courtName: si.courtName });
-          idx++;
+          if (idx2 >= playable2.length) break;
+          scheduled.push({ match: playable2[idx2], startTime: si.startTime, courtName: si.courtName });
+          idx2++;
         }
-        for (; idx < sortedMatches.length; idx++) unscheduled.push(sortedMatches[idx]);
+        for (; idx2 < playable2.length; idx2++) unscheduled.push(playable2[idx2]);
+        for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
         continue;
       }
 
-      // 通常フロー: 試合をposition順にソートし、時間割スロットとzip
-      // walkover(BYE)も含めてスケジュール枠に紐付ける
-      const sortedMatches = [...matches].sort((a, b) => a.position - b.position);
+      // 通常フロー: playable試合（walkover除外）をposition順にソートし、時間割スロットとzip
+      const playable = matches.filter(m => m.status !== 'walkover').sort((a, b) => a.position - b.position);
       let idx = 0;
       for (const si of schedItems) {
-        if (idx >= sortedMatches.length) break;
-        scheduled.push({ match: sortedMatches[idx], startTime: si.startTime, courtName: si.courtName });
+        if (idx >= playable.length) break;
+        scheduled.push({ match: playable[idx], startTime: si.startTime, courtName: si.courtName });
         idx++;
       }
-      for (; idx < sortedMatches.length; idx++) unscheduled.push(sortedMatches[idx]);
+      for (; idx < playable.length; idx++) unscheduled.push(playable[idx]);
+      for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
     }
 
     // グローバルソート: startTime → courtName(数値)
