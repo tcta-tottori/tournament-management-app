@@ -167,23 +167,6 @@ export default function AppLayout() {
     return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
   }, [events]);
 
-  // 試合形式（シングルス/ダブルス等）
-  const matchTypes = useMemo(() => {
-    const types = new Set<string>();
-    for (const e of (events ?? [])) {
-      const name = e.name || '';
-      if (/ダブルス|doubles/i.test(name) || /ダブルス|doubles/i.test(e.type || '')) {
-        types.add('ダブルス');
-      } else if (/ミックス|mixed/i.test(name) || /ミックス|mixed/i.test(e.type || '')) {
-        types.add('ミックスダブルス');
-      } else if (/団体|team/i.test(name) || /団体|team/i.test(e.type || '')) {
-        types.add('団体戦');
-      } else {
-        types.add('シングルス');
-      }
-    }
-    return Array.from(types).join(' / ');
-  }, [events]);
 
   // モバイル用: 全タブ表示
   const mobileMainTabs = useMemo(() => allTabs, [allTabs]);
@@ -350,13 +333,10 @@ export default function AppLayout() {
       {/* ===== 大会情報バー ===== */}
       {tournament && (
         <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-b border-primary-100 flex items-center shrink-0 h-7 overflow-hidden text-xs">
-          {/* 固定部分: 大会名 + 試合形式 */}
-          <div className="flex items-center gap-2 px-3 shrink-0 border-r border-primary-100 h-full bg-white/60">
+          {/* 固定部分: 大会名（コンパクト表示） */}
+          <div className="flex items-center gap-1.5 px-2 shrink-0 border-r border-primary-100 h-full bg-white/60 max-w-[50vw]">
             <Trophy className="w-3 h-3 text-primary-600 shrink-0" />
-            <span className="font-bold text-primary-700 whitespace-nowrap">{tournament.name}</span>
-            {matchTypes && (
-              <span className="text-[10px] text-gray-500 whitespace-nowrap">({matchTypes})</span>
-            )}
+            <span className="font-bold text-primary-700 text-[11px] truncate">{tournament.name.replace(/\(.*?\)|（.*?）/g, '')}</span>
           </div>
           {/* 流れるティッカー */}
           {tickerItems.length > 0 && (

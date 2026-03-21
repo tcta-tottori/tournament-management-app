@@ -439,7 +439,7 @@
 
 /* 情報バー ティッカーアニメーション */
 .info-ticker {
-  animation: ticker-scroll 20s linear infinite;
+  animation: ticker-scroll 7s linear infinite;
 }
 .info-ticker:hover {
   animation-play-state: paused;

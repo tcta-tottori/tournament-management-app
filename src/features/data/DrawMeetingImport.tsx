@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, RefreshCw, X } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, RefreshCw, X, Maximize2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
@@ -330,24 +330,43 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
         const cell = normalizeFullWidth(String(row[tc.colIdx] ?? '')).trim();
         if (!cell) continue;
         globalOrder++;
-        // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）
-        const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝|\bF\b)/);
-        const roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '') : '1R';
-        // ラウンドラベルを除去して種目名を抽出
-        const rawEventName = cell
-          .replace(/\d+\s*R/g, '')
-          .replace(/Q\s*F/g, '')
-          .replace(/S\s*F/g, '')
-          .replace(/準々決勝|準決勝|決勝/g, '')
-          .replace(/(?:^|\s)F(?:\s|$)/g, ' ')  // 独立した "F" のみ除去
-          .replace(/F$/g, '')                   // 末尾の "F" を除去
-          .trim();
-        // EVENT_MAPで略称→正式名に変換
-        const mapped = EVENT_MAP[rawEventName.toLowerCase()];
-        const eventName = mapped ? mapped.name : rawEventName;
+        // 解析: EVENT_MAPのキーで種目を先にマッチし、残りをラウンドとする
+        const cellLower = cell.toLowerCase().replace(/\s+/g, '');
+        let eventName = '';
+        let roundLabel = '';
+        // EVENT_MAPのキーを長い順に試す（"m45s" > "ms" のように長い方を優先）
+        const sortedKeys = Object.keys(EVENT_MAP).sort((a, b) => b.length - a.length);
+        for (const key of sortedKeys) {
+          if (cellLower.startsWith(key)) {
+            eventName = EVENT_MAP[key].name;
+            const remainder = cellLower.slice(key.length).trim();
+            if (/^\d+r$/.test(remainder)) roundLabel = remainder.toUpperCase();
+            else if (remainder === 'qf') roundLabel = 'QF';
+            else if (remainder === 'sf') roundLabel = 'SF';
+            else if (remainder === 'f') roundLabel = 'F';
+            else if (!remainder) roundLabel = '1R';
+            else roundLabel = remainder.toUpperCase() || '1R';
+            break;
+          }
+        }
+        // EVENT_MAPにマッチしなかった場合はフォールバック（従来ロジック）
+        if (!eventName) {
+          const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝)/i);
+          roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '').toUpperCase() : '1R';
+          // 末尾のF（決勝）を検出（種目名内のFと区別するためスペース区切りまたは末尾）
+          if (!roundMatch && /[\s　]F$/i.test(cell)) roundLabel = 'F';
+          const rawEventName = cell
+            .replace(/\d+\s*R/gi, '')
+            .replace(/Q\s*F/gi, '')
+            .replace(/S\s*F/gi, '')
+            .replace(/準々決勝|準決勝|決勝/g, '')
+            .replace(/[\s　]F$/i, '')
+            .trim();
+          eventName = rawEventName || cell;
+        }
         items.push({
           eventName,
-          roundLabel,
+          roundLabel: roundLabel || '1R',
           matchOrder: globalOrder,
           courtName,
           startTime: tc.time,
@@ -407,20 +426,33 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
           const cell = normalizeFullWidth(String(row[ci + 1] || '')).trim();
           if (!cell) continue;
           globalOrder++;
-          // ラウンドラベルを先に抽出（スペース入り "S F", "Q F" にも対応）
-          const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝|\bF\b)/);
-          const roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '') : '1R';
-          const rawEventName = cell
-            .replace(/\d+\s*R/g, '')
-            .replace(/Q\s*F/g, '')
-            .replace(/S\s*F/g, '')
-            .replace(/準々決勝|準決勝|決勝/g, '')
-            .replace(/(?:^|\s)F(?:\s|$)/g, ' ')
-            .replace(/F$/g, '')
-            .trim();
-          // EVENT_MAPで略称→正式名に変換
-          const mapped3 = EVENT_MAP[rawEventName.toLowerCase()];
-          const eventName = mapped3 ? mapped3.name : rawEventName;
+          // EVENT_MAPのキーで種目を先にマッチ
+          const cellLower3 = cell.toLowerCase().replace(/\s+/g, '');
+          let eventName = '';
+          let roundLabel = '';
+          const sortedKeys3 = Object.keys(EVENT_MAP).sort((a, b) => b.length - a.length);
+          for (const key of sortedKeys3) {
+            if (cellLower3.startsWith(key)) {
+              eventName = EVENT_MAP[key].name;
+              const remainder = cellLower3.slice(key.length).trim();
+              if (/^\d+r$/.test(remainder)) roundLabel = remainder.toUpperCase();
+              else if (remainder === 'qf') roundLabel = 'QF';
+              else if (remainder === 'sf') roundLabel = 'SF';
+              else if (remainder === 'f') roundLabel = 'F';
+              else if (!remainder) roundLabel = '1R';
+              else roundLabel = remainder.toUpperCase() || '1R';
+              break;
+            }
+          }
+          if (!eventName) {
+            const roundMatch = cell.match(/(\d+\s*R|Q\s*F|S\s*F|決勝|準決勝|準々決勝)/i);
+            roundLabel = roundMatch ? roundMatch[0].replace(/\s+/g, '').toUpperCase() : '1R';
+            if (!roundMatch && /[\s　]F$/i.test(cell)) roundLabel = 'F';
+            const rawEventName = cell
+              .replace(/\d+\s*R/gi, '').replace(/Q\s*F/gi, '').replace(/S\s*F/gi, '')
+              .replace(/準々決勝|準決勝|決勝/g, '').replace(/[\s　]F$/i, '').trim();
+            eventName = rawEventName || cell;
+          }
           items.push({
             eventName,
             roundLabel,
@@ -478,6 +510,16 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
+  // 会場・日程の選択モード: 'normal' | 'reserve' | 'custom'
+  const [venueMode, setVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
+  const [dateMode, setDateMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
+  // 元データの通常・予備日情報を保持
+  const [sourceVenue, setSourceVenue] = useState('');
+  const [sourceReserveVenue, setSourceReserveVenue] = useState('');
+  const [sourceDate, setSourceDate] = useState('');
+  const [sourceReserveDate, setSourceReserveDate] = useState('');
+  // 時間割全画面表示
+  const [scheduleFullscreen, setScheduleFullscreen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -526,9 +568,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       setImportResult(null);
       const rawName = result.tournamentName || fileName.replace(/\.(xlsx?|xls)$/i, '');
       setEditTournamentName(cleanTournamentName(rawName));
-      if (result.date) setEditDate(result.date);
-      if (result.venue) setEditVenue(result.venue);
-      if (result.reserveDate) setEditReserveDate(result.reserveDate);
+      if (result.date) { setEditDate(result.date); setSourceDate(result.date); }
+      if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
+      if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
+      if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
+      setVenueMode('normal'); setDateMode('normal');
     } catch (err) {
       setImportResult({ success: false, message: `Excelの解析に失敗しました: ${(err as Error).message}` });
     }
@@ -620,10 +664,12 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         // 大会名をプリセット（Excel内の大会名 > ファイル名）
         const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
         setEditTournamentName(cleanTournamentName(rawName));
-        // 日程・会場・予備日をプリセット
-        if (result.date) setEditDate(result.date);
-        if (result.venue) setEditVenue(result.venue);
-        if (result.reserveDate) setEditReserveDate(result.reserveDate);
+        // 日程・会場・予備日をプリセット（ソース情報も保持）
+        if (result.date) { setEditDate(result.date); setSourceDate(result.date); }
+        if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
+        if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
+        if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
+        setVenueMode('normal'); setDateMode('normal');
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
       }
@@ -1310,9 +1356,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                       onChange={() => {
                         setSelectedTournament(t.id);
                         setEditTournamentName(cleanTournamentName(t.name || ''));
-                        setEditDate(t.date || '');
-                        setEditVenue(t.venue || '');
-                        setEditReserveDate(t.reserveDate || '');
+                        setEditDate(t.date || ''); setSourceDate(t.date || '');
+                        setEditVenue(t.venue || ''); setSourceVenue(t.venue || '');
+                        setEditReserveDate(t.reserveDate || ''); setSourceReserveDate(t.reserveDate || '');
+                        setSourceReserveVenue(t.reserveVenue || '');
+                        setVenueMode('normal'); setDateMode('normal');
                       }}
                       className="accent-primary-500"
                     />
@@ -1354,35 +1402,45 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
-                <input
-                  type="text"
-                  value={editDate}
-                  onChange={e => setEditDate(e.target.value)}
-                  placeholder="例: 3/15"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
+                <select
+                  value={dateMode}
+                  onChange={e => {
+                    const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                    setDateMode(mode);
+                    if (mode === 'normal') setEditDate(sourceDate);
+                    else if (mode === 'reserve') setEditDate(sourceReserveDate);
+                  }}
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 outline-none mb-1"
+                >
+                  <option value="normal">通常日程{sourceDate ? ` (${sourceDate})` : ''}</option>
+                  <option value="reserve">予備日{sourceReserveDate ? ` (${sourceReserveDate})` : ''}</option>
+                  <option value="custom">その他</option>
+                </select>
+                {dateMode === 'custom' && (
+                  <input type="text" value={editDate} onChange={e => setEditDate(e.target.value)} placeholder="例: 3/15"
+                    className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 outline-none" />
+                )}
               </div>
               <div>
                 <label className="text-[10px] text-gray-500 block mb-0.5">会場</label>
-                <input
-                  type="text"
-                  value={editVenue}
-                  onChange={e => setEditVenue(e.target.value)}
-                  placeholder="例: コカ・コーラウエストパーク"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-0.5">予備日</label>
-                <input
-                  type="text"
-                  value={editReserveDate}
-                  onChange={e => setEditReserveDate(e.target.value)}
-                  placeholder="例: 3/22"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
+                <select
+                  value={venueMode}
+                  onChange={e => {
+                    const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                    setVenueMode(mode);
+                    if (mode === 'normal') setEditVenue(sourceVenue);
+                    else if (mode === 'reserve') setEditVenue(sourceReserveVenue);
+                  }}
+                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 outline-none mb-1"
+                >
+                  <option value="normal">通常会場{sourceVenue ? ` (${sourceVenue})` : ''}</option>
+                  <option value="reserve">予備日会場{sourceReserveVenue ? ` (${sourceReserveVenue})` : ''}</option>
+                  <option value="custom">その他</option>
+                </select>
+                {venueMode === 'custom' && (
+                  <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                    className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 outline-none" />
+                )}
               </div>
             </div>
           </div>
@@ -1552,39 +1610,47 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                   <label className="text-[11px] font-medium text-gray-500 block mb-1">
                     <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />日程
                   </label>
-                  <input
-                    type="text"
-                    value={editDate}
-                    onChange={e => setEditDate(e.target.value)}
-                    placeholder="例: 3/15"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
-                  />
+                  <select
+                    value={dateMode}
+                    onChange={e => {
+                      const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                      setDateMode(mode);
+                      if (mode === 'normal') setEditDate(sourceDate);
+                      else if (mode === 'reserve') setEditDate(sourceReserveDate);
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1"
+                  >
+                    <option value="normal">通常日程{sourceDate ? ` (${sourceDate})` : ''}</option>
+                    <option value="reserve">予備日{sourceReserveDate ? ` (${sourceReserveDate})` : ''}</option>
+                    <option value="custom">その他</option>
+                  </select>
+                  {dateMode === 'custom' && (
+                    <input type="text" value={editDate} onChange={e => setEditDate(e.target.value)} placeholder="例: 3/15"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-gray-500 block mb-1">
                     <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
                   </label>
-                  <input
-                    type="text"
-                    value={editVenue}
-                    onChange={e => setEditVenue(e.target.value)}
-                    placeholder="例: ヤマタスポーツパーク"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
-                    <CalendarClock className="w-3 h-3 inline mr-0.5 -mt-0.5" />予備日
-                  </label>
-                  <input
-                    type="text"
-                    value={editReserveDate}
-                    onChange={e => setEditReserveDate(e.target.value)}
-                    placeholder="例: 3/22"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
-                  />
+                  <select
+                    value={venueMode}
+                    onChange={e => {
+                      const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                      setVenueMode(mode);
+                      if (mode === 'normal') setEditVenue(sourceVenue);
+                      else if (mode === 'reserve') setEditVenue(sourceReserveVenue);
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1"
+                  >
+                    <option value="normal">通常会場{sourceVenue ? ` (${sourceVenue})` : ''}</option>
+                    <option value="reserve">予備日会場{sourceReserveVenue ? ` (${sourceReserveVenue})` : ''}</option>
+                    <option value="custom">その他</option>
+                  </select>
+                  {venueMode === 'custom' && (
+                    <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  )}
                 </div>
               </div>
             </div>
@@ -1774,74 +1840,155 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         );
       })()}
       {/* ── 時間割読込セクション ── */}
-      {scheduleItems.length > 0 && (
-        <div className="border border-border-main rounded-lg overflow-hidden">
-          <button
-            onClick={() => setScheduleOpen(!scheduleOpen)}
-            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
-          >
-            {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-            <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
-            時間割
-            <span className="ml-auto text-xs font-normal text-green-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              {scheduleItems.length}試合読込済
-            </span>
-          </button>
-          {scheduleOpen && (
-            <div className="p-4 space-y-3 border-t border-border-main">
-              <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                <div className="flex items-center gap-2 text-sm font-bold text-green-700">
-                  <CheckCircle2 className="w-4 h-4" />
-                  時間割読込成功
-                </div>
-                <p className="text-xs text-green-600 mt-1">
-                  {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
-                  {scheduleItems.length}試合 / {new Set(scheduleItems.map(i => i.courtName)).size}コート の時間割を読み込みました
-                </p>
-              </div>
-              <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">#</th>
-                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">コート</th>
-                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">時刻</th>
-                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">種目</th>
-                      <th className="px-2 py-1.5 text-left font-medium text-gray-500">回戦</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {[...scheduleItems].sort((a, b) => {
-                      const timeCmp = a.startTime.localeCompare(b.startTime);
-                      if (timeCmp !== 0) return timeCmp;
-                      return (parseInt(a.courtName) || 0) - (parseInt(b.courtName) || 0);
-                    }).map((item, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-2 py-1 text-gray-500">{i + 1}</td>
-                        <td className="px-2 py-1 text-gray-900">{item.courtName}</td>
-                        <td className="px-2 py-1 text-gray-900">{item.startTime}</td>
-                        <td className="px-2 py-1 text-gray-700">{item.eventName || '-'}</td>
-                        <td className="px-2 py-1 text-gray-500">{item.roundLabel}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {scheduleItems.length > 0 && (() => {
+        // 色分けロジック: 男子=青系, 女子=赤系, 種目ごとに色味を変え, ラウンドで濃淡
+        const getScheduleColor = (eventName: string, roundLabel: string) => {
+          const isFemale = /女子|レディース|LD|LS|LB/i.test(eventName);
+          // 種目ごとにhue微調整
+          const eventKey = eventName.replace(/\d+R|QF|SF|F|回戦|準々決勝|準決勝|決勝/g, '').trim();
+          let hueShift = 0;
+          if (/B級/i.test(eventKey)) hueShift = 20;
+          else if (/45|シニア/i.test(eventKey)) hueShift = -15;
+          else if (/55/i.test(eventKey)) hueShift = -30;
+          else if (/65/i.test(eventKey)) hueShift = -40;
+          else if (/35/i.test(eventKey)) hueShift = 10;
+          else if (/ダブルス|doubles/i.test(eventKey)) hueShift = 35;
+          // ラウンドで明るさ変更（後半ラウンドほど濃い）
+          let intensity = 100; // bg opacity
+          const rl = roundLabel.toUpperCase();
+          if (rl === 'F' || /決勝/.test(roundLabel)) intensity = 200;
+          else if (rl === 'SF' || /準決勝/.test(roundLabel)) intensity = 170;
+          else if (rl === 'QF' || /準々決勝/.test(roundLabel)) intensity = 140;
+          else if (/^[2-9]R|^[2-9]回戦/.test(roundLabel)) intensity = 120;
+          if (isFemale) {
+            // 赤系
+            return {
+              bg: intensity >= 170 ? 'bg-rose-200' : intensity >= 140 ? 'bg-rose-100' : intensity >= 120 ? 'bg-pink-100' : 'bg-pink-50',
+              text: intensity >= 170 ? 'text-rose-900 font-semibold' : 'text-rose-800',
+              border: intensity >= 170 ? 'border-rose-300' : 'border-rose-200',
+              hueShift,
+            };
+          } else {
+            // 青系
+            return {
+              bg: intensity >= 170 ? 'bg-blue-200' : intensity >= 140 ? 'bg-blue-100' : intensity >= 120 ? 'bg-sky-100' : 'bg-sky-50',
+              text: intensity >= 170 ? 'text-blue-900 font-semibold' : 'text-blue-800',
+              border: intensity >= 170 ? 'border-blue-300' : 'border-blue-200',
+              hueShift,
+            };
+          }
+        };
+        // グリッド形式で表示: 行=コート, 列=時間
+        const courtNames = [...new Set(scheduleItems.map(i => i.courtName))].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+        const timeSlots = [...new Set(scheduleItems.map(i => i.startTime))].sort();
+        const gridMap = new Map<string, typeof scheduleItems[0]>();
+        for (const item of scheduleItems) {
+          gridMap.set(`${item.courtName}|${item.startTime}`, item);
+        }
+        const renderScheduleGrid = (maxH: string) => (
+          <div className={`overflow-auto ${maxH}`}>
+            <table className="w-full text-xs border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-700 text-white">
+                  <th className="px-2 py-1.5 text-left font-medium border border-gray-600 whitespace-nowrap">コート</th>
+                  {timeSlots.map(t => (
+                    <th key={t} className="px-2 py-1.5 text-center font-medium border border-gray-600 whitespace-nowrap">{t}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {courtNames.map(cn => (
+                  <tr key={cn}>
+                    <td className="px-2 py-1.5 font-bold text-gray-700 bg-gray-100 border border-gray-200 whitespace-nowrap text-center">{cn}</td>
+                    {timeSlots.map(t => {
+                      const item = gridMap.get(`${cn}|${t}`);
+                      if (!item) return <td key={t} className="border border-gray-200 bg-gray-50/50" />;
+                      const color = getScheduleColor(item.eventName, item.roundLabel);
+                      return (
+                        <td key={t} className={`border ${color.border} ${color.bg} px-1.5 py-1 text-center whitespace-nowrap`}>
+                          <div className={`text-[11px] leading-tight ${color.text}`}>{item.eventName}</div>
+                          <div className="text-[10px] text-gray-500 leading-tight">{item.roundLabel}</div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        return (
+          <>
+            <div className="border border-border-main rounded-lg overflow-hidden">
               <button
-                onClick={() => {
-                  setScheduleItems([]);
-                  setScheduleFileName('');
-                  useAppStore.getState().setImportedSchedule([]);
-                }}
-                className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                onClick={() => setScheduleOpen(!scheduleOpen)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
               >
-                時間割をクリア
+                {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
+                時間割
+                <span className="ml-auto text-xs font-normal text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  {scheduleItems.length}試合読込済
+                </span>
               </button>
+              {scheduleOpen && (
+                <div className="p-4 space-y-3 border-t border-border-main">
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-bold text-green-700">
+                        <CheckCircle2 className="w-4 h-4" />
+                        時間割読込成功
+                      </div>
+                      <button
+                        onClick={() => setScheduleFullscreen(true)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-primary-600 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                        全画面
+                      </button>
+                    </div>
+                    <p className="text-xs text-green-600 mt-1">
+                      {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
+                      {scheduleItems.length}試合 / {courtNames.length}コート / {timeSlots.length}時間枠
+                    </p>
+                  </div>
+                  {renderScheduleGrid('max-h-64')}
+                  <button
+                    onClick={() => {
+                      setScheduleItems([]);
+                      setScheduleFileName('');
+                      useAppStore.getState().setImportedSchedule([]);
+                    }}
+                    className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                  >
+                    時間割をクリア
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+            {/* 全画面モーダル */}
+            {scheduleFullscreen && createPortal(
+              <div className="fixed inset-0 z-[9999] bg-white flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white shrink-0">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4" />
+                    <span className="text-sm font-bold">時間割</span>
+                    <span className="text-xs text-gray-300">{scheduleItems.length}試合 / {courtNames.length}コート</span>
+                  </div>
+                  <button onClick={() => setScheduleFullscreen(false)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto p-2">
+                  {renderScheduleGrid('')}
+                </div>
+              </div>,
+              document.body
+            )}
+          </>
+        );
+      })()}
 
       {/* 時間割エラー */}
       {scheduleError && (
@@ -1910,24 +2057,39 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                   <label className="text-[11px] font-medium text-gray-500 block mb-1">
                     <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />日程
                   </label>
-                  <input type="text" value={editDate} onChange={e => setEditDate(e.target.value)} placeholder="例: 3/15"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                  <select value={dateMode} onChange={e => {
+                    const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                    setDateMode(mode);
+                    if (mode === 'normal') setEditDate(sourceDate);
+                    else if (mode === 'reserve') setEditDate(sourceReserveDate);
+                  }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                    <option value="normal">通常日程{sourceDate ? ` (${sourceDate})` : ''}</option>
+                    <option value="reserve">予備日{sourceReserveDate ? ` (${sourceReserveDate})` : ''}</option>
+                    <option value="custom">その他</option>
+                  </select>
+                  {dateMode === 'custom' && (
+                    <input type="text" value={editDate} onChange={e => setEditDate(e.target.value)} placeholder="例: 3/15"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-gray-500 block mb-1">
                     <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
                   </label>
-                  <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
-                    <CalendarClock className="w-3 h-3 inline mr-0.5 -mt-0.5" />予備日
-                  </label>
-                  <input type="text" value={editReserveDate} onChange={e => setEditReserveDate(e.target.value)} placeholder="例: 3/22"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                  <select value={venueMode} onChange={e => {
+                    const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                    setVenueMode(mode);
+                    if (mode === 'normal') setEditVenue(sourceVenue);
+                    else if (mode === 'reserve') setEditVenue(sourceReserveVenue);
+                  }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                    <option value="normal">通常会場{sourceVenue ? ` (${sourceVenue})` : ''}</option>
+                    <option value="reserve">予備日会場{sourceReserveVenue ? ` (${sourceReserveVenue})` : ''}</option>
+                    <option value="custom">その他</option>
+                  </select>
+                  {venueMode === 'custom' && (
+                    <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  )}
                 </div>
               </div>
             </div>
