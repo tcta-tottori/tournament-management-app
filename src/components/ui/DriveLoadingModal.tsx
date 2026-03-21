@@ -96,26 +96,41 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
         {/* Content */}
         <div className="px-5 py-4">
           {!isFinished && (
-            /* ローディングアニメーション — カラフルな1段リング */
+            /* ローディングアニメーション — Gemini風スパークル + 回転アーク */
             <div className="flex justify-center py-4">
-              <div className="relative w-14 h-14">
-                {/* 背景リング */}
-                <div className="absolute inset-0 rounded-full border-[3px] border-gray-100" />
-                {/* カラフルリング — 4色コニカルグラデーション */}
-                <svg className="absolute inset-0 w-full h-full drive-modal-spin" viewBox="0 0 56 56">
-                  <defs>
-                    <linearGradient id="driveGrad1" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#4285F4" />
-                      <stop offset="33%" stopColor="#34A853" />
-                      <stop offset="66%" stopColor="#FBBC04" />
-                      <stop offset="100%" stopColor="#EA4335" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="28" cy="28" r="25" fill="none" stroke="url(#driveGrad1)" strokeWidth="3" strokeLinecap="round" strokeDasharray="120 40" />
+              <div className="relative w-16 h-16">
+                {/* 回転するカラフルアーク — 3色の弧が独立して回転 */}
+                <svg className="absolute inset-0 w-full h-full gemini-arc-spin" viewBox="0 0 64 64">
+                  {/* 青アーク */}
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#4285F4" strokeWidth="3" strokeLinecap="round"
+                    strokeDasharray="30 140" strokeDashoffset="0" />
+                  {/* 緑アーク */}
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#34A853" strokeWidth="3" strokeLinecap="round"
+                    strokeDasharray="25 140" strokeDashoffset="-60" />
+                  {/* 黄アーク */}
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#FBBC04" strokeWidth="3" strokeLinecap="round"
+                    strokeDasharray="20 140" strokeDashoffset="-115" />
                 </svg>
-                {/* 中央アイコン */}
+                {/* 逆回転の淡いアーク — 奥行き感 */}
+                <svg className="absolute inset-0 w-full h-full gemini-arc-spin-reverse" viewBox="0 0 64 64" style={{ opacity: 0.3 }}>
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#4285F4" strokeWidth="2" strokeLinecap="round"
+                    strokeDasharray="15 150" strokeDashoffset="-20" />
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#EA4335" strokeWidth="2" strokeLinecap="round"
+                    strokeDasharray="12 150" strokeDashoffset="-90" />
+                </svg>
+                {/* 中央スパークルアイコン（4角星） */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <GoogleDriveIcon className="w-5 h-5 drive-modal-pulse" />
+                  <svg className="w-6 h-6 gemini-sparkle-pulse" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L13.5 9.5L20 12L13.5 14.5L12 22L10.5 14.5L4 12L10.5 9.5L12 2Z"
+                      fill="url(#sparkleGrad)" />
+                    <defs>
+                      <linearGradient id="sparkleGrad" x1="4" y1="2" x2="20" y2="22">
+                        <stop offset="0%" stopColor="#4285F4" />
+                        <stop offset="50%" stopColor="#34A853" />
+                        <stop offset="100%" stopColor="#FBBC04" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
                 </div>
               </div>
             </div>
