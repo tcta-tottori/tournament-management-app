@@ -21,6 +21,7 @@ type DrawSlot = { position: number; entryId: string | null; seed: number; isBye:
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'event' | 'global'>('global'); // 種目別 or 対戦順
 
   const events = useLiveQuery(
     () => currentTournamentId ? db.events.where('tournamentId').equals(currentTournamentId).toArray() : [],
@@ -86,6 +87,20 @@ export default function MatchManager() {
   const eventsWithMatches = useMemo(() => {
     return events.filter(e => (allMatchesByEvent.get(e.eventId)?.length || 0) > 0);
   }, [events, allMatchesByEvent]);
+
+  // 全試合をmatchOrder順でグローバルソート（対戦順表示用）
+  const globalSortedMatches = useMemo(() => {
+    const arr: (Match & { eventName: string })[] = [];
+    for (const [eventId, matches] of allMatchesByEvent) {
+      const evt = events.find(e => e.eventId === eventId);
+      const name = evt?.name || '';
+      for (const m of matches) {
+        if (m.status === 'walkover') continue;
+        arr.push({ ...m, eventName: name });
+      }
+    }
+    return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
+  }, [allMatchesByEvent, events]);
 
   // --- 音声コール ---
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
@@ -905,6 +920,17 @@ ${printableMatches.map(m => {
 
         <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
+            {/* 表示切替 */}
+            <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
+              <button onClick={() => setViewMode('global')}
+                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${viewMode === 'global' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <ListOrdered className="w-3.5 h-3.5" />対戦順
+              </button>
+              <button onClick={() => setViewMode('event')}
+                className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${viewMode === 'event' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <ClipboardList className="w-3.5 h-3.5" />種目別
+              </button>
+            </div>
             {/* 全コート初戦一斉コール */}
             {hasWaitingMatchesWithCourts && (
               <button
@@ -991,9 +1017,90 @@ ${printableMatches.map(m => {
         </div>
       </div>
 
-      {/* Main content - 全種目表示 */}
+      {/* Main content */}
       <div ref={matchContentRef} className="flex-1 min-w-0 overflow-auto space-y-3">
-        {eventsWithMatches.length > 0 ? (
+        {/* === 対戦順（グローバル）表示 === */}
+        {viewMode === 'global' && (
+          globalSortedMatches.length > 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
+              <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="w-5 h-5 text-white" />
+                  <span className="font-bold text-white text-sm">対戦順（時間割・コート順）</span>
+                  <span className="text-white/70 text-xs">{globalSortedMatches.length}試合</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '600px' }}>
+                  <colgroup>
+                    <col style={{ width: '40px' }} />
+                    <col style={{ width: '56px' }} />
+                    <col />
+                    <col style={{ width: '28px' }} />
+                    <col />
+                    <col style={{ width: '110px' }} />
+                    <col style={{ width: '56px' }} />
+                    <col style={{ width: '56px' }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">#</th>
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">時間</th>
+                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手1</th>
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">vs</th>
+                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手2</th>
+                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">種目・回戦</th>
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">コート</th>
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">状態</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalSortedMatches.map((m) => {
+                      const st = statusLabels[m.status] || statusLabels.waiting;
+                      const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+                      const eventDraw = allDraws.get(m.eventId);
+                      const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
+                      const rName = getRoundName(m.round, evTotalRounds);
+                      const hasPlayers = !!m.player1Name && !!m.player2Name;
+                      return (
+                        <tr key={m.matchId} className={`border-b border-gray-100 ${!hasPlayers ? 'opacity-40' : ''} ${m.status === 'playing' ? 'bg-green-50' : m.status === 'finished' ? 'bg-gray-50' : ''}`}>
+                          <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{m.matchOrder}</td>
+                          <td className="py-2 px-2 text-center text-xs font-mono text-gray-600">{m.scheduledTime || '-'}</td>
+                          <td className="py-2 px-2">
+                            <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
+                          </td>
+                          <td className="py-2 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
+                          <td className="py-2 px-2">
+                            <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
+                          </td>
+                          <td className="py-2 px-2">
+                            <div className="text-[10px] text-gray-500 truncate">{m.eventName}</div>
+                            <div className="text-[10px] font-medium text-gray-700">{rName}</div>
+                          </td>
+                          <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{courtObj?.name || '-'}</td>
+                          <td className="py-2 px-2 text-center">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${st.color}`}>{st.text}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
+              <ClipboardList className="w-16 h-16 text-gray-300 mb-4" />
+              <h3 className="text-lg font-bold text-gray-900 mb-2">試合データがありません</h3>
+              <p className="text-gray-500 max-w-md">
+                エントリー画面で種目を確定すると、時間割順で対戦順が表示されます。
+              </p>
+            </div>
+          )
+        )}
+
+        {/* === 種目別表示 === */}
+        {viewMode === 'event' && (eventsWithMatches.length > 0 ? (
           eventsWithMatches.map(evt => {
             const eventMatches = (allMatchesByEvent.get(evt.eventId) || []).filter(m => m.status !== 'walkover');
             const eventDraw = allDraws.get(evt.eventId);
@@ -1404,7 +1511,7 @@ ${printableMatches.map(m => {
               ドロー画面で試合を生成すると、ここに全種目の対戦順が表示されます。
             </p>
           </div>
-        )}
+        ))}
       </div>
 
       {/* コール履歴 */}

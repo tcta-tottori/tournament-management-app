@@ -413,11 +413,13 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       modal.setModalProgress(100);
       steps[0] = { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` };
       modal.setModalSteps([...steps]);
-      modal.setModalResult({ success: true, message: `ダウンロード完了` });
       onTournamentExcelLoaded?.(arrayBuffer, file.name);
-      // 時間割ファイルリストがあれば続けて表示
+      // 時間割ファイルリストがあれば即座に表示
       if (scheduleGDriveFiles.length > 0) {
-        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 800);
+        modal.setModalOpen(false);
+        setShowScheduleFileList(true);
+      } else {
+        modal.setModalResult({ success: true, message: `ダウンロード完了` });
       }
     } catch (err) {
       steps[0] = { ...steps[0], status: 'error', label: `読込失敗: ${(err as Error).message}` };
@@ -528,8 +530,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     let steps: LoadingStep[] = [
       { label: 'ふりがな一覧を読込中...', status: 'loading' },
       { label: '所属一覧', status: 'waiting' },
-      { label: '大会一覧', status: 'waiting' },
-      { label: '時間割', status: 'waiting' },
+      { label: '大会・時間割ファイル一覧', status: 'waiting' },
     ];
     modal.setModalTitle('一括読込');
     modal.setModalSteps(steps);
@@ -571,30 +572,24 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       }
       modal.setModalSteps([...steps]);
       modal.setModalProgress(50);
-      // 3. 大会一覧
-      steps = modal.updateStep(steps, 2, { status: 'loading', label: '大会一覧フォルダを取得中...' });
+      // 3. 大会一覧 + 時間割を並列取得
+      steps = modal.updateStep(steps, 2, { status: 'loading', label: '大会・時間割ファイル一覧を取得中...' });
       modal.setModalSteps([...steps]);
       try {
-        tournamentFiles = await listTournamentExcelFiles(token);
-        steps = modal.updateStep(steps, 2, { status: 'done', label: `大会一覧: ${tournamentFiles.length}件のファイルを検出` });
-        allDetails.push(`【大会一覧】${tournamentFiles.length}件`);
+        const [tFiles, sFiles] = await Promise.all([
+          listTournamentExcelFiles(token).catch((err) => { allDetails.push(`【大会一覧】取得失敗: ${(err as Error).message}`); hasError = true; return [] as GoogleDriveFile[]; }),
+          listScheduleExcelFiles(token).catch((err) => { allDetails.push(`【時間割】取得失敗: ${(err as Error).message}`); hasError = true; return [] as GoogleDriveFile[]; }),
+        ]);
+        tournamentFiles = tFiles;
+        scheduleFiles = sFiles;
+        if (tournamentFiles.length > 0) allDetails.push(`【大会一覧】${tournamentFiles.length}件`);
+        if (scheduleFiles.length > 0) allDetails.push(`【時間割】${scheduleFiles.length}件`);
+        steps = modal.updateStep(steps, 2, {
+          status: hasError ? 'error' : 'done',
+          label: hasError ? '一部のファイル取得に失敗' : `大会${tournamentFiles.length}件・時間割${scheduleFiles.length}件を検出`,
+        });
       } catch (err) {
-        steps = modal.updateStep(steps, 2, { status: 'error', label: `大会一覧取得失敗: ${(err as Error).message}` });
-        allDetails.push(`【大会一覧】取得失敗: ${(err as Error).message}`);
-        hasError = true;
-      }
-      modal.setModalSteps([...steps]);
-      modal.setModalProgress(75);
-      // 4. 時間割
-      steps = modal.updateStep(steps, 3, { status: 'loading', label: '時間割フォルダを取得中...' });
-      modal.setModalSteps([...steps]);
-      try {
-        scheduleFiles = await listScheduleExcelFiles(token);
-        steps = modal.updateStep(steps, 3, { status: 'done', label: `時間割: ${scheduleFiles.length}件のファイルを検出` });
-        allDetails.push(`【時間割】${scheduleFiles.length}件`);
-      } catch (err) {
-        steps = modal.updateStep(steps, 3, { status: 'error', label: `時間割取得失敗: ${(err as Error).message}` });
-        allDetails.push(`【時間割】取得失敗: ${(err as Error).message}`);
+        steps = modal.updateStep(steps, 2, { status: 'error', label: `ファイル取得失敗: ${(err as Error).message}` });
         hasError = true;
       }
       modal.setModalSteps([...steps]);
@@ -603,18 +598,18 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setGdriveFileList(tournamentFiles);
       setScheduleGDriveFiles(scheduleFiles);
       if (!hasError) onDataLoaded?.();
-      const r = hasError
-        ? { success: false, message: '一部の読込に失敗しました', details: allDetails }
-        : { success: true, message: '全データの読込が完了しました', details: allDetails };
-      setResult(r);
-      modal.setModalResult(r);
-      // ファイル選択UIを表示
-      if (tournamentFiles.length > 0 || scheduleFiles.length > 0) {
-        setTimeout(() => {
-          modal.setModalOpen(false);
-          if (tournamentFiles.length > 0) setShowFileList(true);
-          else if (scheduleFiles.length > 0) setShowScheduleFileList(true);
-        }, 1500);
+      // エラー時のみ結果表示、成功時は即ファイル選択へ
+      if (hasError || (tournamentFiles.length === 0 && scheduleFiles.length === 0)) {
+        const r = hasError
+          ? { success: false, message: '一部の読込に失敗しました', details: allDetails }
+          : { success: true, message: 'ふりがな・所属の読込が完了しました（大会・時間割ファイルなし）', details: allDetails };
+        setResult(r);
+        modal.setModalResult(r);
+      } else {
+        // 成功→即座にモーダルを閉じてファイル選択UIへ
+        modal.setModalOpen(false);
+        if (tournamentFiles.length > 0) setShowFileList(true);
+        else if (scheduleFiles.length > 0) setShowScheduleFileList(true);
       }
     } catch (err) {
       const r = { success: false, message: `読込失敗: ${(err as Error).message}` };

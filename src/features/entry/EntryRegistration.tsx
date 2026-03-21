@@ -819,6 +819,17 @@ export default function EntryRegistration() {
     return { total, checkedIn, absent, remaining };
   }, [confirmedIds]);
 
+  // 確定済み種目を自動折りたたみ
+  useEffect(() => {
+    if (confirmedEventsSet.size > 0) {
+      setCollapsedEvents(prev => {
+        const next = new Set(prev);
+        for (const id of confirmedEventsSet) next.add(id);
+        return next;
+      });
+    }
+  }, [confirmedEventsSet]);
+
   const toggleCollapse = (eventId: string) => {
     setCollapsedEvents(prev => {
       const next = new Set(prev);
@@ -1350,14 +1361,18 @@ export default function EntryRegistration() {
     }
 
     return (
-      <div key={eventId} className={`rounded-xl shadow-sm border overflow-x-auto transition-all ${isConfirmedEvent ? 'bg-gray-50 border-gray-300 opacity-70' : 'bg-white border-border-main'}`}
+      <div key={eventId} className={`rounded-xl shadow-sm border overflow-x-auto transition-all ${isConfirmedEvent ? 'bg-gray-100 border-gray-300' : 'bg-white border-border-main'}`}
         data-event-id={eventId} data-event-name={eventName}>
         {/* Event header */}
-        <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between sticky top-0 z-10 ${isConfirmedEvent ? 'bg-gray-100 border-gray-300' : 'bg-primary-50 border-border-main'}`}>
+        <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between sticky top-0 z-10 ${isConfirmedEvent ? 'bg-gray-200 border-gray-300' : 'bg-primary-50 border-border-main'}`}>
           <button onClick={() => toggleCollapse(eventId)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-            <h3 className={`font-bold text-sm ${isConfirmedEvent ? 'text-gray-500' : 'text-primary-600'}`}>{eventName}</h3>
-            {isConfirmedEvent && <Lock className="w-3 h-3 text-green-600" />}
+            <h3 className={`font-bold text-sm ${isConfirmedEvent ? 'text-gray-400' : 'text-primary-600'}`}>{eventName}</h3>
+            {isConfirmedEvent && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-300 text-gray-600 rounded text-[10px] font-bold">
+                <Lock className="w-2.5 h-2.5" />確定済
+              </span>
+            )}
           </button>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {!isConfirmedEvent && (
