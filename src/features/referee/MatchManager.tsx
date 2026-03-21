@@ -1471,6 +1471,31 @@ ${printableMatches.map(m => {
                               <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-700 text-white text-[10px] font-bold">{round}</span>
                                 <span className="text-xs font-bold text-slate-700 tracking-wide">{roundLabel}</span>
+                                {evt.roundGameRules && evt.roundGameRules.length > 0 && (
+                                  <span className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded">
+                                    {(() => {
+                                      const rules = evt.roundGameRules;
+                                      if (rules.length === 1) return rules[0].ruleText;
+                                      for (const rule of rules) {
+                                        const label = rule.roundLabel;
+                                        if (label === '全回戦') continue;
+                                        const rm = label.match(/(\d+)～(\d+)回戦/);
+                                        if (rm && round >= parseInt(rm[1]) && round <= parseInt(rm[2])) return rule.ruleText;
+                                        if (label.includes('以降')) {
+                                          const cl = label.replace('以降', '');
+                                          if (cl.includes('準々決勝') && round >= evTotalRounds - 2) return rule.ruleText;
+                                          if (cl.includes('準決勝') && round >= evTotalRounds - 1) return rule.ruleText;
+                                          if (cl.includes('決勝') && !cl.includes('準') && round >= evTotalRounds) return rule.ruleText;
+                                          const rn = cl.match(/(\d+)回戦/);
+                                          if (rn && round >= parseInt(rn[1])) return rule.ruleText;
+                                          continue;
+                                        }
+                                        if (roundLabel === label || label.includes(roundLabel)) return rule.ruleText;
+                                      }
+                                      return rules[0].ruleText;
+                                    })()}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <div className="h-1.5 w-16 bg-slate-200 rounded-full overflow-hidden">
