@@ -2,8 +2,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight } from 'lucide-react';
-import type { Match } from '../../db/database';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone } from 'lucide-react';
+import type { Match, Court } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -256,6 +256,51 @@ export default function MatchManager() {
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
+  // --- 全コート初戦一斉コール ---
+  const allMatchesFlat = useMemo(() => {
+    const arr: Match[] = [];
+    for (const [, matches] of allMatchesByEvent) arr.push(...matches);
+    return arr;
+  }, [allMatchesByEvent]);
+
+  const hasWaitingMatchesWithCourts = useMemo(() => {
+    return allMatchesFlat.some(m =>
+      m.courtId && (m.status === 'waiting' || m.status === 'ready')
+    );
+  }, [allMatchesFlat]);
+
+  const handleBulkFirstCall = useCallback(async () => {
+    if (!currentTournamentId || courts.length === 0) return;
+
+    const firstMatches: { match: Match; court: Court }[] = [];
+    for (const court of courts) {
+      if (!court.isAvailable) continue;
+      const courtMatches = allMatchesFlat
+        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready'))
+        .sort((a, b) => {
+          if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
+          return (a.matchOrder || 0) - (b.matchOrder || 0);
+        });
+      if (courtMatches.length > 0) firstMatches.push({ match: courtMatches[0], court });
+    }
+
+    if (firstMatches.length === 0) { alert('コールする試合がありません。'); return; }
+
+    const confirmed = confirm(
+      `${firstMatches.length}コートの初戦を一斉にコールします。よろしいですか？\n\n` +
+      firstMatches.map(fm => `${fm.court.name}番: ${fm.match.player1Name} vs ${fm.match.player2Name}`).join('\n')
+    );
+    if (!confirmed) return;
+
+    for (const fm of firstMatches) {
+      if (fm.match.id) {
+        await db.matches.update(fm.match.id, { status: 'playing', updatedAt: Date.now() });
+        if (fm.court.id) await db.courts.update(fm.court.id, { currentMatchId: fm.match.matchId });
+      }
+    }
+    alert(`${firstMatches.length}コートの初戦をコールしました。`);
+  }, [currentTournamentId, courts, allMatchesFlat]);
+
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [editScore1, setEditScore1] = useState('');
@@ -403,13 +448,10 @@ export default function MatchManager() {
 
     const roundName = (round: number) => getRoundName(round, eventTotalRounds);
 
+    // B5 landscape: 250mm x 176mm, margin 5mm → usable 240mm x 166mm
     // Excel column structure: 38 columns (A-AL)
-    // Col A = 3.29 width, Cols B-AL = 8.43 width each (37 cols)
-    // Total = 3.29 + 37*8.43 = 315.20
-    // Percentage: A = 1.044%, each B-AL = 2.674%
-    // We define 38 <col> elements matching the Excel columns exactly.
-    const colA = (3.29 / 315.20 * 100).toFixed(3); // ~1.044%
-    const colN = (8.43 / 315.20 * 100).toFixed(3); // ~2.674%
+    const colA = (3.29 / 315.20 * 100).toFixed(3);
+    const colN = (8.43 / 315.20 * 100).toFixed(3);
 
     const colgroup = `<colgroup>
       <col style="width:${colA}%">` + /* col A (1) */
@@ -422,13 +464,13 @@ export default function MatchManager() {
     // Scale factor: 190mm / 418.5pt
     const rowHeights = [16.5, 21, 22.5, 18.75, 18.75, 18.75, 18.75, 37.5, 37.5, 7.5, 18.75, 18.75, 16.5, 16.5, 16.5, 16.5, 16.5, 16.5, 39.75, 39.75, 39.75, 25.5];
     const totalPt = rowHeights.reduce((a, b) => a + b, 0);
-    const rh = rowHeights.map(h => (h / totalPt * 190).toFixed(2) + 'mm');
+    const rh = rowHeights.map(h => (h / totalPt * 166).toFixed(2) + 'mm');
     // rh[0]=R1, rh[1]=R2, ... rh[21]=R22
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>審判用紙 - ${eventName}</title>
 <style>
-  @page { size: A4 landscape; margin: 5mm; }
+  @page { size: B5 landscape; margin: 5mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', 'Hiragino Sans', monospace;
@@ -438,8 +480,8 @@ export default function MatchManager() {
   }
 
   .sheet {
-    width: 287mm;
-    height: 190mm;
+    width: 240mm;
+    height: 166mm;
     page-break-after: always;
     overflow: hidden;
     position: relative;
@@ -789,10 +831,10 @@ ${printableMatches.map(m => {
     const colgroup = `<colgroup><col style="width:${colA}%">` + Array.from({length: 37}, () => `<col style="width:${colN}%">`).join('') + `</colgroup>`;
     const rowHeights = [16.5, 21, 22.5, 18.75, 18.75, 18.75, 18.75, 37.5, 37.5, 7.5, 18.75, 18.75, 16.5, 16.5, 16.5, 16.5, 16.5, 16.5, 39.75, 39.75, 39.75, 25.5];
     const totalPt = rowHeights.reduce((a, b) => a + b, 0);
-    const rh = rowHeights.map(h => (h / totalPt * 190).toFixed(2) + 'mm');
+    const rh = rowHeights.map(h => (h / totalPt * 166).toFixed(2) + 'mm');
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>審判用紙 - ${eventName} ${rName}</title>
-<style>@page{size:A4 landscape;margin:5mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'MS Gothic','MS ゴシック','Yu Gothic','Hiragino Sans',monospace;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.sheet{width:287mm;height:190mm;overflow:hidden;position:relative;}.ref-table{width:100%;height:100%;table-layout:fixed;border-collapse:collapse;}.ref-table td{padding:0;margin:0;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;}.fg{font-family:'MS Gothic','MS ゴシック','Yu Gothic',monospace;}.fp{font-family:'MS PGothic','MS Pゴシック','Yu Gothic',sans-serif;}.ft{font-family:'Times New Roman',serif;}.bt{border-top:1px solid #000;}.bb{border-bottom:1px solid #000;}.bl{border-left:1px solid #000;}.br{border-right:1px solid #000;}.bt2{border-top:2px solid #000;}.bb2{border-bottom:2px solid #000;}.bl2{border-left:2px solid #000;}.br2{border-right:2px solid #000;}.ba{border:1px solid #000;}</style></head><body>
+<style>@page{size:B5 landscape;margin:5mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'MS Gothic','MS ゴシック','Yu Gothic','Hiragino Sans',monospace;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.sheet{width:240mm;height:166mm;overflow:hidden;position:relative;}.ref-table{width:100%;height:100%;table-layout:fixed;border-collapse:collapse;}.ref-table td{padding:0;margin:0;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;}.fg{font-family:'MS Gothic','MS ゴシック','Yu Gothic',monospace;}.fp{font-family:'MS PGothic','MS Pゴシック','Yu Gothic',sans-serif;}.ft{font-family:'Times New Roman',serif;}.bt{border-top:1px solid #000;}.bb{border-bottom:1px solid #000;}.bl{border-left:1px solid #000;}.br{border-right:1px solid #000;}.bt2{border-top:2px solid #000;}.bb2{border-bottom:2px solid #000;}.bl2{border-left:2px solid #000;}.br2{border-right:2px solid #000;}.ba{border:1px solid #000;}</style></head><body>
 <div class="sheet"><table class="ref-table">${colgroup}
 <tr style="height:${rh[0]};"><td colspan="38" rowspan="2" class="fg" style="text-align:center;font-size:32px;font-weight:bold;letter-spacing:0.5em;height:calc(${rh[0]}+${rh[1]});">審　判　用　紙</td></tr><tr style="height:${rh[1]};"></tr>
 <tr style="height:${rh[2]};"><td colspan="7" style="height:${rh[2]};"></td><td colspan="23" class="fg bb2" style="text-align:center;font-size:14px;">(${tournamentName})</td><td colspan="8" class="fg bb2" style="text-align:right;font-size:14px;padding-right:4px;">${tournamentDate}</td></tr>
@@ -863,6 +905,16 @@ ${printableMatches.map(m => {
 
         <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
+            {/* 全コート初戦一斉コール */}
+            {hasWaitingMatchesWithCourts && (
+              <button
+                onClick={handleBulkFirstCall}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-700 hover:to-emerald-700 shadow-md transition-all"
+              >
+                <Megaphone className="w-4 h-4" />
+                全コート初戦一斉コール
+              </button>
+            )}
             {/* 音声コール設定 */}
             <div>
               <button
