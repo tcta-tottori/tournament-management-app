@@ -1445,165 +1445,175 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         </div>
       )}
 
-      {/* Excel プレビュー (新規) */}
+      {/* Excel プレビュー */}
       {parsedExcel && (
-        <div className="space-y-3">
-          <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
-            <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
-              <FileSpreadsheet className="w-4 h-4" />
-              Excel読込成功
-              <span className="text-xs font-normal text-gray-500 ml-2">
-                形式: ドローExcel
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              ファイル: {parsedExcel.fileName}
-            </p>
-          </div>
-
-          {/* 大会名・日程・会場入力 */}
-          <div className="bg-white rounded-lg border border-border-main p-3 space-y-2">
-            <h4 className="text-xs font-bold text-gray-700">大会情報</h4>
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-0.5">大会名</label>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={editTournamentName}
-                  onChange={e => setEditTournamentName(e.target.value)}
-                  placeholder="大会名を入力"
-                  className="flex-1 border border-border-main rounded px-2 py-1 text-sm font-medium focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
-                    setEditTournamentName(cleanTournamentName(raw));
-                  }}
-                  className="shrink-0 px-2 py-1 text-[10px] font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
-                  title="不要な文字を自動除去"
-                >
-                  <Sparkles className="w-3 h-3 inline mr-0.5" />
-                  整理
-                </button>
+        <div className="space-y-4">
+          {/* ヘッダーカード */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-5 text-white shadow-lg">
+            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/[0.06]" />
+            <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/[0.04]" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                  <FileSpreadsheet className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">Excel読込完了</h3>
+                  <p className="text-[10px] text-white/60">ドローExcel形式</p>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-0.5">日程</label>
-                <input
-                  type="text"
-                  value={editDate}
-                  onChange={e => setEditDate(e.target.value)}
-                  placeholder="例: 3/15"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-0.5">会場</label>
-                <input
-                  type="text"
-                  value={editVenue}
-                  onChange={e => setEditVenue(e.target.value)}
-                  placeholder="例: コカ・コーラウエストパーク"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-0.5">予備日</label>
-                <input
-                  type="text"
-                  value={editReserveDate}
-                  onChange={e => setEditReserveDate(e.target.value)}
-                  placeholder="例: 3/22"
-                  className="w-full border border-border-main rounded px-2 py-1 text-sm focus:border-primary-500 focus:ring-[2px] focus:ring-primary-500/15 outline-none"
-                />
+              <p className="text-xs text-white/70 truncate">{parsedExcel.fileName}</p>
+              {/* 統計バッジ */}
+              <div className="flex gap-2 mt-4">
+                {[
+                  { icon: Users, value: excelPlayerCount, label: '選手' },
+                  { icon: Trophy, value: parsedExcel.events.length, label: '種目' },
+                  { icon: Dices, value: excelDrawCount, label: 'ドロー' },
+                ].map(({ icon: Icon, value, label }) => (
+                  <div key={label} className="flex-1 bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center">
+                    <Icon className="w-4 h-4 mx-auto mb-1 text-white/80" />
+                    <p className="text-xl font-extrabold leading-none">{value}</p>
+                    <p className="text-[9px] text-white/60 mt-0.5 font-medium">{label}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* サマリー */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
-              <Users className="w-5 h-5 text-primary-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-900">{excelPlayerCount}</p>
-              <p className="text-[10px] text-gray-500">選手</p>
+          {/* 大会情報フォーム */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+              <h4 className="text-xs font-bold text-gray-600 tracking-wide">大会情報</h4>
             </div>
-            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
-              <Trophy className="w-5 h-5 text-primary-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-900">{parsedExcel.events.length}</p>
-              <p className="text-[10px] text-gray-500">種目</p>
-            </div>
-            <div className="bg-white rounded-lg border border-border-main p-3 text-center">
-              <Dices className="w-5 h-5 text-primary-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-900">{excelDrawCount}</p>
-              <p className="text-[10px] text-gray-500">ドロー</p>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 block mb-1">大会名</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editTournamentName}
+                    onChange={e => setEditTournamentName(e.target.value)}
+                    placeholder="大会名を入力"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
+                      setEditTournamentName(cleanTournamentName(raw));
+                    }}
+                    className="shrink-0 px-3 py-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                    title="不要な文字を自動除去"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 inline mr-0.5 -mt-0.5" />
+                    整理
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />日程
+                  </label>
+                  <input
+                    type="text"
+                    value={editDate}
+                    onChange={e => setEditDate(e.target.value)}
+                    placeholder="例: 3/15"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
+                  </label>
+                  <input
+                    type="text"
+                    value={editVenue}
+                    onChange={e => setEditVenue(e.target.value)}
+                    placeholder="例: ヤマタスポーツパーク"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <CalendarClock className="w-3 h-3 inline mr-0.5 -mt-0.5" />予備日
+                  </label>
+                  <input
+                    type="text"
+                    value={editReserveDate}
+                    onChange={e => setEditReserveDate(e.target.value)}
+                    placeholder="例: 3/22"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* 種目詳細 */}
-          <button
-            onClick={() => setShowDetail(!showDetail)}
-            className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900"
-          >
-            {showDetail ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            種目別詳細
-          </button>
-          {showDetail && (
-            <div className="bg-white rounded-lg border border-border-main overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-primary-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500">種目</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500">選手数</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500">ドローサイズ</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500">形式</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsedExcel.events.map((ev, idx) => {
-                    const realCount = ev.players.filter(p => !p.isBye).length;
-                    return (
-                      <tr key={idx} className="border-t border-border-main">
-                        <td className="px-3 py-1.5">
-                          <span className="font-medium text-gray-900">{ev.eventName}</span>
-                          <span className="text-gray-500 ml-1">({ev.type === 'Doubles' ? 'D' : 'S'})</span>
-                        </td>
-                        <td className="px-3 py-1.5 text-right text-gray-500">
-                          {realCount}名
-                        </td>
-                        <td className="px-3 py-1.5 text-right text-gray-500">
-                          {ev.isRoundRobin ? '-' : ev.drawSize}
-                        </td>
-                        <td className="px-3 py-1.5 text-center">
-                          {ev.isRoundRobin ? (
-                            <span className="text-blue-600 text-[10px] font-medium">リーグ</span>
-                          ) : (
-                            <span className="text-green-600 text-[10px] font-medium">トーナメント</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <button
+              onClick={() => setShowDetail(!showDetail)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-xs font-bold text-gray-600 tracking-wide">種目別詳細</span>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showDetail ? 'rotate-180' : ''}`} />
+            </button>
+            {showDetail && (
+              <div className="border-t border-gray-100">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50/80">
+                      <th className="px-4 py-2 text-left font-semibold text-gray-500">種目</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">選手</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">ドロー</th>
+                      <th className="px-4 py-2 text-center font-semibold text-gray-500">形式</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {parsedExcel.events.map((ev, idx) => {
+                      const realCount = ev.players.filter(p => !p.isBye).length;
+                      return (
+                        <tr key={idx} className="hover:bg-emerald-50/30 transition-colors">
+                          <td className="px-4 py-2">
+                            <span className="font-semibold text-gray-800">{ev.eventName}</span>
+                            <span className="text-[10px] text-gray-400 ml-1">{ev.type === 'Doubles' ? 'D' : 'S'}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right font-medium text-gray-600">{realCount}</td>
+                          <td className="px-4 py-2 text-right font-medium text-gray-600">
+                            {ev.isRoundRobin ? '-' : ev.drawSize}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            {ev.isRoundRobin ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">リーグ</span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">トーナメント</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           {/* アクションボタン */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={reset}
-              className="px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-border-main rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-5 py-2.5 text-sm font-semibold text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 active:scale-[0.98] shadow-sm transition-all"
             >
               キャンセル
             </button>
             <button
               onClick={handleExcelImport}
               disabled={isImporting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 transition-all"
             >
               <Upload className="w-4 h-4" />
               {isImporting ? 'インポート中...' : 'インポート実行'}
