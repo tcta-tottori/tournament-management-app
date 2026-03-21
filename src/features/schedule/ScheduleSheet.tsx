@@ -795,16 +795,50 @@ export default function ScheduleSheet() {
               100% { background-position: 200% 0; }
             }
             @keyframes glow-pulse {
-              0%, 100% { box-shadow: inset 0 0 0 2px rgba(34,197,94,0.4); }
-              50% { box-shadow: inset 0 0 8px 1px rgba(34,197,94,0.3); }
+              0%, 100% { box-shadow: inset 0 0 0 2px rgba(34,197,94,0.5); }
+              50% { box-shadow: inset 0 0 12px 2px rgba(34,197,94,0.35), inset 0 0 0 2px rgba(34,197,94,0.6); }
             }
             .cell-playing {
-              animation: glow-pulse 2s ease-in-out infinite, shimmer 3s linear infinite;
-              background-image: linear-gradient(90deg, transparent 25%, rgba(34,197,94,0.08) 50%, transparent 75%);
+              animation: glow-pulse 2s ease-in-out infinite, shimmer 2.5s linear infinite;
+              background-image: linear-gradient(90deg, transparent 20%, rgba(34,197,94,0.12) 50%, transparent 80%) !important;
               background-size: 200% 100%;
+              background-color: #dcfce7 !important;
+              position: relative;
+            }
+            .cell-playing::before {
+              content: '';
+              position: absolute;
+              top: 1px; left: 1px;
+              width: 6px; height: 6px;
+              background: #22c55e;
+              border-radius: 50%;
+              animation: playing-dot-ping 1.5s ease-in-out infinite;
+              z-index: 2;
+            }
+            @keyframes playing-dot-ping {
+              0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+              50% { opacity: 0.8; transform: scale(1.3); box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+            }
+            .cell-waiting {
+              position: relative;
             }
             .cell-finished {
-              opacity: 0.55;
+              position: relative;
+              opacity: 1;
+            }
+            .cell-finished::before {
+              content: '';
+              position: absolute;
+              inset: 0;
+              background: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 4px,
+                rgba(56,189,248,0.06) 4px,
+                rgba(56,189,248,0.06) 8px
+              );
+              pointer-events: none;
+              z-index: 1;
             }
             .time-now-line {
               position: relative;
@@ -924,10 +958,11 @@ export default function ScheduleSheet() {
                         statusBg = 'bg-green-100';
                         cellStatusClass = 'cell-playing';
                       } else if (isFinished) {
-                        statusBg = 'bg-sky-50';
+                        statusBg = 'bg-sky-50/60';
                         cellStatusClass = 'cell-finished';
                       } else {
                         statusBg = color?.bg || 'bg-gray-50';
+                        cellStatusClass = 'cell-waiting';
                       }
 
                       const tooltipParts = [evAbbr, roundLabelToJapanese(item.roundLabel)];
@@ -941,27 +976,23 @@ export default function ScheduleSheet() {
                           title={tooltipParts.join(' | ')}
                           className={`border border-gray-300 min-w-[80px] h-12 cursor-pointer text-center transition-all duration-300 px-0.5 ${statusBg} ${color?.text || 'text-gray-800'} hover:brightness-90 hover:scale-[1.02] ${cellStatusClass} ${isNowSlot && !isFinished && !isPlaying ? 'time-now-line' : ''}`}
                         >
-                          <div className="flex items-center justify-center gap-0.5">
-                            {isPlaying && (
-                              <span className="relative flex h-2 w-2 flex-shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                              </span>
-                            )}
-                            {isFinished && (
-                              <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0 text-sky-400" />
-                            )}
+                          <div className="flex items-center justify-center gap-0.5 relative z-[2]">
                             <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
-                            <span className="text-[9px] leading-tight opacity-70">{roundLabelToJapanese(item.roundLabel)}</span>
+                            <span className={`text-[9px] leading-tight ${isFinished ? 'text-sky-500' : isPlaying ? 'text-green-700' : 'opacity-70'}`}>{roundLabelToJapanese(item.roundLabel)}</span>
                           </div>
                           {playerLabel && (
-                            <div className={`text-[8px] leading-tight truncate ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'opacity-60' : 'opacity-80'}`}>
+                            <div className={`text-[8px] leading-tight truncate relative z-[2] ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'text-sky-600/70' : isPlaying ? 'text-green-800' : 'opacity-80'}`}>
                               {playerLabel}
                             </div>
                           )}
-                          {dbMatch?.score && (
-                            <div className={`text-[7px] leading-tight truncate font-mono ${isFinished ? 'text-sky-500 font-bold' : 'text-gray-500'}`}>
+                          {dbMatch?.score && isFinished && (
+                            <div className="text-[7px] leading-tight truncate font-mono text-sky-500 font-bold relative z-[2]">
                               {dbMatch.score}
+                            </div>
+                          )}
+                          {isPlaying && !dbMatch?.score && (
+                            <div className="text-[7px] leading-tight font-bold text-green-600 relative z-[2]">
+                              試合中
                             </div>
                           )}
                         </td>

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Lock, Unlock } from 'lucide-react';
+import { AlertTriangle, Lock } from 'lucide-react';
 
 export interface ConfirmDialogProps {
   open: boolean;
