@@ -1605,13 +1605,13 @@ export default function EntryRegistration() {
           <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
             <div className="flex flex-col gap-2">
               <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
-                <button onClick={() => setShowAllEvents(false)}
-                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                  <Eye className="w-3.5 h-3.5" />個別表示
-                </button>
                 <button onClick={() => setShowAllEvents(true)}
                   className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   <List className="w-3.5 h-3.5" />すべて表示
+                </button>
+                <button onClick={() => setShowAllEvents(false)}
+                  className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${!showAllEvents ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <Eye className="w-3.5 h-3.5" />個別表示
                 </button>
               </div>
 
