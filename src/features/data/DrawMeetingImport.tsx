@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import type { ImportedScheduleItem } from '../../stores/appStore';
+import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
   getSavedToken as gdriveGetSavedToken,
   getSavedClientId,
@@ -520,6 +521,13 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const [showScheduleFileList, setShowScheduleFileList] = useState(false);
   const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
 
+  // ローディングモーダル用state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
+  const [modalProgress, setModalProgress] = useState(0);
+  const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
+
   // Google Drive 接続状態（propsから受け取り、フォールバックとして自前チェック）
   const gdriveConnected = gdriveConnectedProp ?? (!!getSavedClientId() && gdriveIsTokenValid());
 
@@ -530,20 +538,44 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
       return;
     }
+    let steps: LoadingStep[] = [
+      { label: 'ドロー会議フォルダを検索中...', status: 'loading' },
+      { label: 'バックアップデータを読込', status: 'waiting' },
+    ];
+    setModalTitle('ドロー会議データ読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalProgress(0);
+    setModalOpen(true);
     setIsLoadingGDrive(true);
     setImportResult(null);
     try {
+      setModalProgress(20);
       const { data: json, fileName } = await fetchDrawBackupFromGDrive(token);
+      steps = [
+        { ...steps[0], status: 'done', label: 'ドロー会議フォルダを検出' },
+        { ...steps[1], status: 'loading', label: 'バックアップデータを解析中...' },
+      ];
+      setModalSteps([...steps]);
+      setModalProgress(60);
       const data = parseImportFile(json);
       if (!data) {
-        setImportResult({ success: false, message: 'Google Drive のバックアップはドロー会議システムのデータ形式ではありません。' });
+        steps = [steps[0], { ...steps[1], status: 'error', label: 'データ形式を認識できません' }];
+        setModalSteps([...steps]);
+        const r = { success: false, message: 'Google Drive のバックアップはドロー会議システムのデータ形式ではありません。' };
+        setModalResult(r);
+        setImportResult(r);
         return;
       }
+      setModalProgress(100);
+      steps = [steps[0], { ...steps[1], status: 'done', label: 'データ解析完了' }];
+      setModalSteps([...steps]);
+      const r = { success: true, message: `「${fileName}」を読み込みました`, details: [`形式: ${data.format === 'complete-backup' ? '完全バックアップ' : 'ドロー共有'}`] };
+      setModalResult(r);
       setParsedData(data);
       setParsedExcel(null);
       const sum = buildSummary(data);
       setSummary(sum);
-      // 大会名をプリセット
       const rawName = data.tournamentName || data.tournaments[0]?.name || fileName.replace(/\.json$/i, '');
       setEditTournamentName(cleanTournamentName(rawName));
       setEditDate(sum.tournamentDate);
@@ -553,7 +585,14 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       }
       if (data.tournaments.length === 1) setSelectedTournament(data.tournaments[0].id);
     } catch (err) {
-      setImportResult({ success: false, message: `Google Drive 読込失敗: ${(err as Error).message}` });
+      const failStep = steps.findIndex(s => s.status === 'loading');
+      if (failStep >= 0) {
+        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
+        setModalSteps([...steps]);
+      }
+      const r = { success: false, message: `Google Drive 読込失敗: ${(err as Error).message}` };
+      setModalResult(r);
+      setImportResult(r);
     } finally {
       setIsLoadingGDrive(false);
     }
@@ -566,17 +605,44 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       setImportResult({ success: false, message: 'Google Drive に接続されていません。上部の Google ドライブ連携から接続してください。' });
       return;
     }
+    const steps: LoadingStep[] = [
+      { label: '大会一覧フォルダを取得中...', status: 'loading' },
+    ];
+    setModalTitle('大会一覧');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalProgress(0);
+    setModalOpen(true);
     setIsLoadingFileList(true);
     setImportResult(null);
     try {
+      setModalProgress(30);
       const files = await listTournamentExcelFiles(token);
+      setModalProgress(100);
       setGdriveFileList(files);
-      setShowFileList(true);
       if (files.length === 0) {
-        setImportResult({ success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' });
+        steps[0] = { ...steps[0], status: 'error', label: '大会一覧フォルダにファイルがありません' };
+        setModalSteps([...steps]);
+        const r = { success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' };
+        setModalResult(r);
+        setImportResult(r);
+      } else {
+        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
+        setModalSteps([...steps]);
+        const r = { success: true, message: `${files.length}件のファイルが見つかりました` };
+        setModalResult(r);
+        // モーダルを閉じてファイル選択に遷移
+        setTimeout(() => {
+          setModalOpen(false);
+          setShowFileList(true);
+        }, 500);
       }
     } catch (err) {
-      setImportResult({ success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` });
+      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
+      setModalSteps([...steps]);
+      const r = { success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` };
+      setModalResult(r);
+      setImportResult(r);
     } finally {
       setIsLoadingFileList(false);
     }
@@ -586,15 +652,41 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const handleSelectTournamentFile = useCallback(async (file: GoogleDriveFile) => {
     const token = gdriveGetSavedToken();
     if (!token) return;
+    setShowFileList(false);
+    let steps: LoadingStep[] = [
+      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
+      { label: 'ドロー情報を解析', status: 'waiting' },
+    ];
+    setModalTitle('大会データ読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalProgress(0);
+    setModalOpen(true);
     setLoadingFileId(file.id);
     setImportResult(null);
     try {
+      setModalProgress(20);
       const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      steps = [
+        { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` },
+        { ...steps[1], status: 'loading', label: 'ドロー情報を解析中...' },
+      ];
+      setModalSteps([...steps]);
+      setModalProgress(60);
       const result = parseDrawExcel(arrayBuffer, file.name);
       if (!result.events || result.events.length === 0) {
-        setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' });
+        steps[1] = { ...steps[1], status: 'error', label: 'ドロー情報を検出できませんでした' };
+        setModalSteps([...steps]);
+        const r = { success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' };
+        setModalResult(r);
+        setImportResult(r);
         return;
       }
+      setModalProgress(100);
+      steps[1] = { ...steps[1], status: 'done', label: `${result.events.length}種目を検出` };
+      setModalSteps([...steps]);
+      const r = { success: true, message: `${result.events.length}種目のドロー情報を読み込みました`, details: [`ファイル: ${file.name}`] };
+      setModalResult(r);
       setParsedExcel(result);
       setParsedData(null);
       setSummary(null);
@@ -604,9 +696,15 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       if (result.date) setEditDate(result.date);
       if (result.venue) setEditVenue(result.venue);
       if (result.reserveDate) setEditReserveDate(result.reserveDate);
-      setShowFileList(false);
     } catch (err) {
-      setImportResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
+      const failStep = steps.findIndex(s => s.status === 'loading');
+      if (failStep >= 0) {
+        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
+        setModalSteps([...steps]);
+      }
+      const r = { success: false, message: `ファイル読込失敗: ${(err as Error).message}` };
+      setModalResult(r);
+      setImportResult(r);
     } finally {
       setLoadingFileId(null);
     }
@@ -709,16 +807,41 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
       setScheduleError('Google Drive に接続されていません。');
       return;
     }
+    const steps: LoadingStep[] = [
+      { label: '時間割フォルダを取得中...', status: 'loading' },
+    ];
+    setModalTitle('時間割');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalProgress(0);
+    setModalOpen(true);
     setIsLoadingScheduleGDrive(true);
     setScheduleError('');
     try {
+      setModalProgress(30);
       const files = await listScheduleExcelFiles(token);
+      setModalProgress(100);
       setScheduleGDriveFiles(files);
-      setShowScheduleFileList(true);
       if (files.length === 0) {
-        setScheduleError('Google Drive の「時間割」フォルダにファイルがありません。');
+        steps[0] = { ...steps[0], status: 'error', label: '時間割フォルダにファイルがありません' };
+        setModalSteps([...steps]);
+        const r = { success: false, message: 'Google Drive の「時間割」フォルダにファイルがありません。' };
+        setModalResult(r);
+        setScheduleError(r.message);
+      } else {
+        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
+        setModalSteps([...steps]);
+        const r = { success: true, message: `${files.length}件のファイルが見つかりました` };
+        setModalResult(r);
+        setTimeout(() => {
+          setModalOpen(false);
+          setShowScheduleFileList(true);
+        }, 500);
       }
     } catch (err) {
+      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
+      setModalSteps([...steps]);
+      setModalResult({ success: false, message: `ファイル一覧の取得に失敗: ${(err as Error).message}` });
       setScheduleError(`ファイル一覧の取得に失敗: ${(err as Error).message}`);
     } finally {
       setIsLoadingScheduleGDrive(false);
@@ -729,21 +852,54 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const handleSelectScheduleFile = useCallback(async (file: GoogleDriveFile) => {
     const token = gdriveGetSavedToken();
     if (!token) return;
+    setShowScheduleFileList(false);
+    let steps: LoadingStep[] = [
+      { label: `「${file.name}」をダウンロード中...`, status: 'loading' },
+      { label: '時間割データを解析', status: 'waiting' },
+    ];
+    setModalTitle('時間割読込');
+    setModalSteps(steps);
+    setModalResult(null);
+    setModalProgress(0);
+    setModalOpen(true);
     setLoadingScheduleFileId(file.id);
     setScheduleError('');
     try {
+      setModalProgress(20);
       const arrayBuffer = await downloadScheduleExcel(token, file.id);
+      steps = [
+        { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` },
+        { ...steps[1], status: 'loading', label: '時間割データを解析中...' },
+      ];
+      setModalSteps([...steps]);
+      setModalProgress(60);
       const items = parseScheduleExcel(arrayBuffer);
       if (items.length === 0) {
-        setScheduleError('時間割データを検出できませんでした。');
+        steps[1] = { ...steps[1], status: 'error', label: '時間割データを検出できませんでした' };
+        setModalSteps([...steps]);
+        const r = { success: false, message: '時間割データを検出できませんでした。Excelの形式を確認してください。' };
+        setModalResult(r);
+        setScheduleError(r.message);
         return;
       }
+      setModalProgress(100);
+      const courts = new Set(items.map(i => i.courtName)).size;
+      steps[1] = { ...steps[1], status: 'done', label: `${items.length}試合 / ${courts}コートを検出` };
+      setModalSteps([...steps]);
+      const r = { success: true, message: `${items.length}試合の時間割を読み込みました`, details: [`ファイル: ${file.name}`, `${courts}コート`] };
+      setModalResult(r);
       setScheduleItems(items);
       setScheduleFileName(file.name);
       useAppStore.getState().setImportedSchedule(items);
-      setShowScheduleFileList(false);
     } catch (err) {
-      setScheduleError(`ファイル読込失敗: ${(err as Error).message}`);
+      const failStep = steps.findIndex(s => s.status === 'loading');
+      if (failStep >= 0) {
+        steps[failStep] = { ...steps[failStep], status: 'error', label: `読込失敗: ${(err as Error).message}` };
+        setModalSteps([...steps]);
+      }
+      const r = { success: false, message: `ファイル読込失敗: ${(err as Error).message}` };
+      setModalResult(r);
+      setScheduleError(r.message);
     } finally {
       setLoadingScheduleFileId(null);
     }
@@ -1319,8 +1475,23 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
   const hasExcelPreview = parsedExcel;
   const showDropZone = !hasPreview && !hasExcelPreview;
 
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setModalResult(null);
+  }, []);
+
   return (
     <div className="space-y-4">
+      {/* Google Drive ローディングモーダル */}
+      <DriveLoadingModal
+        open={modalOpen}
+        title={modalTitle}
+        steps={modalSteps}
+        progress={modalProgress}
+        result={modalResult}
+        onClose={handleModalClose}
+      />
+
       {/* ファイルアップロード */}
       {showDropZone && (
         <div className="space-y-3">
