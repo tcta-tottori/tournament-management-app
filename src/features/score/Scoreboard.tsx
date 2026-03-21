@@ -7,6 +7,7 @@ import ScoreboardBracket from './ScoreboardBracket';
 import ScoreboardLeague from './ScoreboardLeague';
 import ScoreInputDialog from './ScoreInputDialog';
 import type { ScoreInputMatch } from './ScoreInputDialog';
+import type { Event, RoundGameRule } from '../../db/database';
 import {
   MonitorPlay,
   Check,
@@ -33,6 +34,46 @@ function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds - 1) return '準決勝';
   if (round === totalRounds - 2) return '準々決勝';
   return `${round}回戦`;
+}
+
+/** 回戦に応じたゲームルール文字列を取得 */
+function getGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
+  if (!evt) return '';
+  // 個別ルールがない場合はデフォルト表示
+  const rules: RoundGameRule[] = evt.roundGameRules || [];
+  if (rules.length === 0) {
+    const g = evt.gameRules?.games ?? 6;
+    return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
+  }
+  if (rules.length === 1) return rules[0].ruleText;
+  // 回戦名でマッチング
+  const roundName = getRoundName(round, totalRounds);
+  for (const rule of rules) {
+    const label = rule.roundLabel;
+    // "全回戦" は常にマッチ
+    if (label === '全回戦') continue;
+    // "１～２回戦" パターン
+    const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+    if (rangeMatch) {
+      const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
+      if (round >= from && round <= to) return rule.ruleText;
+      continue;
+    }
+    // "準々決勝以降", "準決勝以降", "３回戦以降" パターン
+    if (label.includes('以降')) {
+      const cleanLabel = label.replace('以降', '');
+      if (cleanLabel.includes('準々決勝') && round >= totalRounds - 2) return rule.ruleText;
+      if (cleanLabel.includes('準決勝') && round >= totalRounds - 1) return rule.ruleText;
+      if (cleanLabel.includes('決勝') && !cleanLabel.includes('準') && round >= totalRounds) return rule.ruleText;
+      const roundNumMatch = cleanLabel.match(/(\d+)回戦/);
+      if (roundNumMatch && round >= parseInt(roundNumMatch[1])) return rule.ruleText;
+      continue;
+    }
+    // 直接名称マッチ
+    if (roundName === label || label.includes(roundName)) return rule.ruleText;
+  }
+  // フォールバック: 最初のルール
+  return rules[0].ruleText;
 }
 
 /** フルネームから苗字を抽出（ダブルス "A / B" にも対応） */
@@ -848,6 +889,10 @@ export default function Scoreboard() {
                 return evtData ? getRoundName(round, evtData.totalRounds) : `${round}回戦`;
               }}
               isLeague={perEventData.find(d => d.event.eventId === selectedAllEventId)?.isRoundRobin}
+              gameRuleText={(() => {
+                const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
+                return evtData ? getGameRuleText(evtData.event, selectedAllMatch.round, evtData.totalRounds) : '';
+              })()}
             />
           )}
         </div>
@@ -904,6 +949,7 @@ export default function Scoreboard() {
               onMatchUpdate={() => {}}
               getRoundName={makeRoundName}
               isLeague={isRoundRobin}
+              gameRuleText={getGameRuleText(events[selectedEventIdx], selectedMatch.round, totalRounds)}
             />
           )}
         </div>

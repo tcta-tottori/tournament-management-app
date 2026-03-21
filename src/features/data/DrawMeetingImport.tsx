@@ -1074,12 +1074,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         eventIds.push(eventId);
 
         // --- 3. 種目作成 ---
+        const defaultGames = ev.roundGameRules.length > 0 ? ev.roundGameRules[0].games : 6;
         await db.events.add({
           tournamentId,
           eventId,
           name: ev.eventName,
           type: ev.type,
-          gameRules: { sets: 1, games: 6, deuce: true, tiebreakPoint: 7 },
+          gameRules: { sets: 1, games: defaultGames, deuce: true, tiebreakPoint: defaultGames },
+          roundGameRules: ev.roundGameRules.length > 0 ? ev.roundGameRules : undefined,
         });
 
         // --- 4. 選手 & エントリー作成 ---

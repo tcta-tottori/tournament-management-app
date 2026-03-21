@@ -2,8 +2,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge } from 'lucide-react';
-import type { Match, Court } from '../../db/database';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2 } from 'lucide-react';
+import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -390,6 +390,29 @@ export default function MatchManager() {
     bulkCallStart(bulkItems, voiceSettings.rate, 1);
   }, [currentTournamentId, courts, allMatchesFlat, bulkCallActive, bulkCallStart, buildMatchCall, affiliationFuriganaMap, voiceSettings, events, allDraws]);
 
+  // --- ゲームルール編集 ---
+  const [editingRuleEventId, setEditingRuleEventId] = useState<string | null>(null);
+  const [editingRules, setEditingRules] = useState<RoundGameRule[]>([]);
+
+  const openRuleEditor = useCallback((evt: Event) => {
+    setEditingRuleEventId(evt.eventId);
+    setEditingRules(evt.roundGameRules?.length ? [...evt.roundGameRules] : [
+      { roundLabel: '全回戦', ruleText: `${evt.gameRules?.games ?? 6}ゲームマッチ（${evt.gameRules?.games ?? 6}-${evt.gameRules?.games ?? 6}タイブレーク）`, games: evt.gameRules?.games ?? 6 },
+    ]);
+  }, []);
+
+  const saveRules = useCallback(async () => {
+    if (!editingRuleEventId) return;
+    const evt = events.find(e => e.eventId === editingRuleEventId);
+    if (!evt?.id) return;
+    const defaultGames = editingRules.length > 0 ? editingRules[0].games : 6;
+    await db.events.update(evt.id, {
+      roundGameRules: editingRules,
+      gameRules: { ...evt.gameRules, games: defaultGames, tiebreakPoint: defaultGames },
+    });
+    setEditingRuleEventId(null);
+  }, [editingRuleEventId, editingRules, events]);
+
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [editScore1, setEditScore1] = useState('');
@@ -559,10 +582,40 @@ export default function MatchManager() {
     const eventName = evt?.name || '';
     const tournamentName = tournament?.name || '';
     const tournamentDate = tournament?.date || '';
-    const games = evt?.gameRules?.games ?? 6;
-    const gameMethod = `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
     const eventDraw = allDraws.get(eventId);
     const eventTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
+
+    /** 回戦に応じたゲームルール文字列を取得 */
+    const getGameMethodForRound = (round: number): string => {
+      const rules = evt?.roundGameRules;
+      if (rules && rules.length > 0) {
+        if (rules.length === 1) return rules[0].ruleText.replace(/\n/g, '\n');
+        const roundN = getRoundName(round, eventTotalRounds);
+        for (const rule of rules) {
+          const label = rule.roundLabel;
+          if (label === '全回戦') continue;
+          const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+          if (rangeMatch) {
+            const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
+            if (round >= from && round <= to) return rule.ruleText;
+            continue;
+          }
+          if (label.includes('以降')) {
+            const cl = label.replace('以降', '');
+            if (cl.includes('準々決勝') && round >= eventTotalRounds - 2) return rule.ruleText;
+            if (cl.includes('準決勝') && round >= eventTotalRounds - 1) return rule.ruleText;
+            if (cl.includes('決勝') && !cl.includes('準') && round >= eventTotalRounds) return rule.ruleText;
+            const rn = cl.match(/(\d+)回戦/);
+            if (rn && round >= parseInt(rn[1])) return rule.ruleText;
+            continue;
+          }
+          if (roundN === label || label.includes(roundN)) return rule.ruleText;
+        }
+        return rules[0].ruleText;
+      }
+      const games = evt?.gameRules?.games ?? 6;
+      return `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
+    };
 
     const roundName = (round: number) => getRoundName(round, eventTotalRounds);
 
@@ -732,7 +785,7 @@ ${printableMatches.map(m => {
       <td colspan="9" rowspan="2"
           class="fg bt br bb2"
           style="text-align:center; font-size:18px; white-space:pre-line; line-height:1.3;">
-        ${gameMethod}
+        ${getGameMethodForRound(m.round)}
       </td>
       <td colspan="5" rowspan="2"
           class="fg bt br bb2"
@@ -927,8 +980,35 @@ ${printableMatches.map(m => {
     const eventName = evt.name;
     const tournamentName = tournament?.name || '';
     const tournamentDate = tournament?.date || '';
-    const gamesVal = evt.gameRules?.games ?? 6;
-    const gameMethod = `${gamesVal}ゲームマッチ\n（${gamesVal}-${gamesVal}タイブレーク）`;
+    // 回戦に応じたゲームルール
+    const rules2 = evt.roundGameRules;
+    let gameMethod: string;
+    if (rules2 && rules2.length > 0) {
+      if (rules2.length === 1) { gameMethod = rules2[0].ruleText; }
+      else {
+        const rn2 = getRoundName(m.round, eventTotalRounds);
+        gameMethod = rules2[0].ruleText; // default
+        for (const rule of rules2) {
+          const label = rule.roundLabel;
+          if (label === '全回戦') continue;
+          const rm = label.match(/(\d+)～(\d+)回戦/);
+          if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameMethod = rule.ruleText; break; } continue; }
+          if (label.includes('以降')) {
+            const cl = label.replace('以降', '');
+            if (cl.includes('準々決勝') && m.round >= eventTotalRounds - 2) { gameMethod = rule.ruleText; break; }
+            if (cl.includes('準決勝') && m.round >= eventTotalRounds - 1) { gameMethod = rule.ruleText; break; }
+            if (cl.includes('決勝') && !cl.includes('準') && m.round >= eventTotalRounds) { gameMethod = rule.ruleText; break; }
+            const rn3 = cl.match(/(\d+)回戦/);
+            if (rn3 && m.round >= parseInt(rn3[1])) { gameMethod = rule.ruleText; break; }
+            continue;
+          }
+          if (rn2 === label || label.includes(rn2)) { gameMethod = rule.ruleText; break; }
+        }
+      }
+    } else {
+      const gamesVal = evt.gameRules?.games ?? 6;
+      gameMethod = `${gamesVal}ゲームマッチ\n（${gamesVal}-${gamesVal}タイブレーク）`;
+    }
     const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
     const courtDisplay = courtObj?.name || '';
 
@@ -1293,12 +1373,16 @@ ${printableMatches.map(m => {
         {/* === 種目別表示 === */}
         {viewMode === 'event' && (eventsWithMatches.length > 0 ? (
           eventsWithMatches.map(evt => {
-            const eventMatches = (allMatchesByEvent.get(evt.eventId) || []).filter(m => m.status !== 'walkover');
+            const eventMatchesAll = (allMatchesByEvent.get(evt.eventId) || []).filter(m => m.status !== 'walkover');
+            // 実際に試合が行われるもののみカウント（BYE・対戦相手未定は除外）
+            const isPlayable = (m: Match) => !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+            const eventMatches = eventMatchesAll;
+            const playableMatches = eventMatchesAll.filter(isPlayable);
             const eventDraw = allDraws.get(evt.eventId);
             const ds = eventDraw?.drawSize || 0;
             const isLeagueEvent = eventDraw?.drawType === 'roundRobin' || (ds > 0 && (ds & (ds - 1)) !== 0) || /リーグ/i.test(evt.name || '');
             const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
-            const finishedCount = eventMatches.filter(m => m.status === 'finished').length;
+            const finishedCount = playableMatches.filter(m => m.status === 'finished').length;
             const isActive = selectedEventId === evt.eventId;
 
             // ラウンド別にグループ化
@@ -1328,11 +1412,22 @@ ${printableMatches.map(m => {
                         {evt.name}
                       </h3>
                       <p className={`text-[10px] ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
-                        {eventMatches.length}試合 / {finishedCount}完了
+                        {playableMatches.length}試合 / {finishedCount}完了
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openRuleEditor(evt); }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                        isActive
+                          ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
+                          : 'bg-amber-500 text-white hover:bg-amber-600'
+                      }`}
+                      title="ゲームルール"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handlePrintEvent(evt.eventId); }}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
@@ -1729,6 +1824,114 @@ ${printableMatches.map(m => {
           </div>
         </div>
       )}
+      {/* ゲームルール編集ダイアログ */}
+      {editingRuleEventId && (() => {
+        const ruleEvt = events.find(e => e.eventId === editingRuleEventId);
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setEditingRuleEventId(null)}>
+            <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5" />
+                  <div>
+                    <h3 className="text-sm font-bold">ゲームルール編集</h3>
+                    <p className="text-[10px] text-white/70">{ruleEvt?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditingRuleEventId(null)} className="p-1 rounded-lg hover:bg-white/20">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3 max-h-[60vh] overflow-auto">
+                {editingRules.map((rule, i) => (
+                  <div key={i} className="flex items-start gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex-1 space-y-2">
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-medium">適用範囲</label>
+                        <input
+                          type="text"
+                          value={rule.roundLabel}
+                          onChange={e => {
+                            const next = [...editingRules];
+                            next[i] = { ...next[i], roundLabel: e.target.value };
+                            setEditingRules(next);
+                          }}
+                          placeholder="例: 全回戦, 1～2回戦, 準決勝以降"
+                          className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 font-medium">ルール</label>
+                        <input
+                          type="text"
+                          value={rule.ruleText}
+                          onChange={e => {
+                            const next = [...editingRules];
+                            const text = e.target.value;
+                            const gMatch = text.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30)).match(/(\d+)\s*ゲーム/);
+                            next[i] = { ...next[i], ruleText: text, games: gMatch ? parseInt(gMatch[1]) : next[i].games };
+                            setEditingRules(next);
+                          }}
+                          placeholder="例: 8ゲームマッチ（8-8タイブレーク）"
+                          className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={rule.games}
+                          onChange={e => {
+                            const next = [...editingRules];
+                            next[i] = { ...next[i], games: parseInt(e.target.value) || 6 };
+                            setEditingRules(next);
+                          }}
+                          className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
+                        />
+                      </div>
+                    </div>
+                    {editingRules.length > 1 && (
+                      <button
+                        onClick={() => setEditingRules(editingRules.filter((_, idx) => idx !== i))}
+                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => setEditingRules([...editingRules, { roundLabel: '', ruleText: '', games: 6 }])}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-amber-600 border border-dashed border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  ルールを追加
+                </button>
+              </div>
+
+              <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                <button
+                  onClick={() => setEditingRuleEventId(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={saveRules}
+                  className="px-4 py-2 text-xs font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 shadow-sm"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

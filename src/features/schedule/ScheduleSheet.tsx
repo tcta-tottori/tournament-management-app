@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore, type ImportedScheduleItem } from '../../stores/appStore';
-import { CalendarClock, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
+import { CalendarClock, Download, FileSpreadsheet, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   getSavedToken as gdriveGetSavedToken,
@@ -129,10 +129,6 @@ export default function ScheduleSheet() {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
-
-  const currentTimeStr = useMemo(() => {
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  }, [now]);
 
   // --------------- Reactive queries ---------------
 
@@ -278,63 +274,14 @@ export default function ScheduleSheet() {
     return lookup;
   }, [importedSchedule, allMatches, events, draws]);
 
-  // --------------- Progress stats ---------------
-  const progressStats = useMemo(() => {
-    if (importedSchedule.length === 0) return null;
-    let total = 0, finished = 0, playing = 0, waiting = 0;
+  // --------------- LIVE判定（試合中があるか） ---------------
+  const hasPlayingMatch = useMemo(() => {
     for (let i = 0; i < importedSchedule.length; i++) {
-      total++;
       const dbMatch = matchLookup.get(i);
-      if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') finished++;
-      else if (dbMatch?.status === 'playing') playing++;
-      else waiting++;
+      if (dbMatch?.status === 'playing') return true;
     }
-    const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
-    return { total, finished, playing, waiting, pct };
+    return false;
   }, [importedSchedule, matchLookup]);
-
-  // --------------- Per-court real-time stats ---------------
-  const courtStats = useMemo(() => {
-    if (!gridData || importedSchedule.length === 0) return null;
-    const stats = new Map<string, { playing: number; finished: number; total: number; currentMatch?: Match }>();
-    for (const cn of courtNames) {
-      let playing = 0, finished = 0, total = 0;
-      let currentMatch: Match | undefined;
-      const courtMap = gridData.get(cn);
-      if (courtMap) {
-        for (const [, entry] of courtMap) {
-          total++;
-          const dbMatch = matchLookup.get(entry.index);
-          if (dbMatch?.status === 'playing') { playing++; currentMatch = dbMatch; }
-          else if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') finished++;
-        }
-      }
-      stats.set(cn, { playing, finished, total, currentMatch });
-    }
-    return stats;
-  }, [gridData, importedSchedule, courtNames, matchLookup]);
-
-  // --------------- Per-event progress ---------------
-  const eventProgress = useMemo(() => {
-    if (importedSchedule.length === 0) return [];
-    const map = new Map<string, { total: number; finished: number; playing: number }>();
-    for (let i = 0; i < importedSchedule.length; i++) {
-      const item = importedSchedule[i];
-      if (!map.has(item.eventName)) map.set(item.eventName, { total: 0, finished: 0, playing: 0 });
-      const s = map.get(item.eventName)!;
-      s.total++;
-      const dbMatch = matchLookup.get(i);
-      if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') s.finished++;
-      else if (dbMatch?.status === 'playing') s.playing++;
-    }
-    return [...map.entries()].map(([name, s]) => ({
-      name: abbreviateEventName(name),
-      fullName: name,
-      ...s,
-      pct: s.total > 0 ? Math.round((s.finished / s.total) * 100) : 0,
-      color: eventColorMap.get(name),
-    }));
-  }, [importedSchedule, matchLookup, eventColorMap]);
 
   // --------------- Handlers ---------------
 
@@ -661,7 +608,7 @@ export default function ScheduleSheet() {
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <CalendarClock className="w-6 h-6 text-primary-500" />
               タイムテーブル
-              {progressStats && progressStats.playing > 0 && (
+              {hasPlayingMatch && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-bold border border-red-200">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -698,117 +645,6 @@ export default function ScheduleSheet() {
           </div>
         )}
       </header>
-
-      {/* Progress Dashboard */}
-      {progressStats && hasData && (
-        <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 space-y-4">
-          {/* Overall progress */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Clock className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-bold text-gray-900">{currentTimeStr}</span>
-              <div className="h-4 w-px bg-gray-200" />
-              <span className="text-xs text-gray-500">全体進行</span>
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-700">
-                  <CheckCircle2 className="w-3 h-3" />
-                </span>
-                <span className="text-gray-600">完了 <strong className="text-gray-900">{progressStats.finished}</strong></span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="relative inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700">
-                  <PlayCircle className="w-3 h-3" />
-                  {progressStats.playing > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                  )}
-                </span>
-                <span className="text-gray-600">試合中 <strong className="text-gray-900">{progressStats.playing}</strong></span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500">
-                  <Activity className="w-3 h-3" />
-                </span>
-                <span className="text-gray-600">待機 <strong className="text-gray-900">{progressStats.waiting}</strong></span>
-              </span>
-            </div>
-          </div>
-          <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 ease-out"
-              style={{ width: `${progressStats.pct}%` }}
-            />
-            {progressStats.playing > 0 && (
-              <div
-                className="absolute inset-y-0 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-1000 ease-out"
-                style={{
-                  left: `${progressStats.pct}%`,
-                  width: `${Math.round((progressStats.playing / progressStats.total) * 100)}%`,
-                }}
-              >
-                <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
-              </div>
-            )}
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[10px] text-gray-400">{progressStats.finished}/{progressStats.total} 試合完了</span>
-            <span className="text-[10px] font-bold text-emerald-600">{progressStats.pct}%</span>
-          </div>
-
-          {/* Per-event progress */}
-          {eventProgress.length > 1 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 pt-2 border-t border-gray-100">
-              {eventProgress.map((ep) => (
-                <div key={ep.fullName} className={`rounded-lg px-2.5 py-1.5 ${ep.color?.bg || 'bg-gray-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[10px] font-bold truncate ${ep.color?.text || 'text-gray-700'}`}>{ep.name}</span>
-                    <span className="text-[9px] text-gray-500 ml-1">{ep.pct}%</span>
-                  </div>
-                  <div className="relative h-1.5 bg-white/60 rounded-full overflow-hidden mt-1">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-current opacity-40 transition-all duration-700"
-                      style={{ width: `${ep.pct}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-gray-500">
-                    <span>{ep.finished}/{ep.total}</span>
-                    {ep.playing > 0 && (
-                      <span className="flex items-center gap-0.5 text-green-600 font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        {ep.playing}試合中
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Currently playing courts */}
-          {courtStats && progressStats.playing > 0 && (
-            <div className="pt-2 border-t border-gray-100">
-              <p className="text-[10px] text-gray-400 font-medium mb-1.5">試合中のコート</p>
-              <div className="flex flex-wrap gap-1.5">
-                {courtNames.map((cn) => {
-                  const cs = courtStats.get(cn);
-                  if (!cs?.currentMatch) return null;
-                  const m = cs.currentMatch;
-                  const p1 = m.player1Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
-                  const p2 = m.player2Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
-                  return (
-                    <div key={cn} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-50 border border-green-200 text-[10px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
-                      <span className="font-bold text-green-800">#{cn}</span>
-                      <span className="text-green-700 truncate max-w-[120px]">{p1} vs {p2}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Timetable Grid */}
       {hasData ? (

@@ -14,6 +14,8 @@ import {
   VolumeX,
   Timer,
   ChevronRight,
+  BookOpen,
+  UserX,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -49,6 +51,8 @@ interface ScoreInputDialogProps {
   getRoundName: (round: number) => string;
   bestOf?: number; // 何セットマッチか（デフォルト1セットマッチ）
   isLeague?: boolean; // リーグ戦の場合は次ラウンド進出を行わない
+  /** 現在の試合に適用されるゲームルール文字列 */
+  gameRuleText?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +81,7 @@ export default function ScoreInputDialog({
   getRoundName,
   bestOf = 1,
   isLeague = false,
+  gameRuleText,
 }: ScoreInputDialogProps) {
   // セットスコア入力（最大3セット）
   const maxSets = bestOf >= 3 ? 3 : 1;
@@ -88,6 +93,8 @@ export default function ScoreInputDialog({
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState('');
+  /** Ret（棄権）モード: null=通常, 1=P1棄権, 2=P2棄権 */
+  const [retPlayer, setRetPlayer] = useState<1 | 2 | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -96,9 +103,15 @@ export default function ScoreInputDialog({
   // 試合が変わったらスコアを同期
   useEffect(() => {
     if (!match) return;
+    // Retスコアの復元
+    if (match.score && match.score.includes('Ret')) {
+      setRetPlayer(match.score.startsWith('Ret') ? 1 : 2);
+    } else {
+      setRetPlayer(null);
+    }
     if (match.score && match.status === 'finished') {
-      // 既存スコアをパース: "6-4" or "6-4 7-5" or "6-4 6-7(3) 6-2"
-      const setParts = match.score.split(/\s+/);
+      // 既存スコアをパース: "6-4" or "6-4 7-5" or "6-4 6-7(3) 6-2" or "Ret" or "4-6 Ret"
+      const setParts = match.score.replace(/\s*Ret\s*/g, '').split(/\s+/).filter(Boolean);
       const newSets = Array.from({ length: maxSets }, () => ({ p1: '', p2: '' }));
       const newTB = Array.from<string | null>({ length: maxSets }).fill(null);
       for (let i = 0; i < setParts.length && i < maxSets; i++) {
@@ -170,6 +183,9 @@ export default function ScoreInputDialog({
   // 勝者自動判定
   const autoWinner = useMemo(() => {
     if (!match) return null;
+    // Ret（棄権）の場合: 棄権した側の相手が勝者
+    if (retPlayer === 1) return 2 as const;
+    if (retPlayer === 2) return 1 as const;
     let p1Wins = 0, p2Wins = 0;
     for (const s of sets) {
       const a = parseInt(s.p1), b = parseInt(s.p2);
@@ -180,11 +196,11 @@ export default function ScoreInputDialog({
     if (p1Wins >= neededSets) return 1 as const;
     if (p2Wins >= neededSets) return 2 as const;
     return null;
-  }, [sets, match, maxSets]);
+  }, [sets, match, maxSets, retPlayer]);
 
   // スコア文字列を構築
   const buildScoreString = useCallback(() => {
-    return sets
+    const scoreParts = sets
       .map((s, i) => {
         const p1 = s.p1.trim(), p2 = s.p2.trim();
         if (!p1 && !p2) return null;
@@ -194,9 +210,14 @@ export default function ScoreInputDialog({
         }
         return score;
       })
-      .filter(Boolean)
-      .join(' ');
-  }, [sets, tiebreaks, tiebreakFlags]);
+      .filter(Boolean);
+    // Retの場合: スコア部分 + " Ret" を付加
+    if (retPlayer) {
+      const base = scoreParts.join(' ');
+      return base ? `${base} Ret` : 'Ret';
+    }
+    return scoreParts.join(' ');
+  }, [sets, tiebreaks, tiebreakFlags, retPlayer]);
 
   // セットスコア入力ハンドラ
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
@@ -392,6 +413,16 @@ export default function ScoreInputDialog({
           </div>
         </div>
 
+        {/* ゲームルール表示 */}
+        {gameRuleText && (
+          <div className="px-4 sm:px-6 pt-3 pb-0">
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
+              <BookOpen className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="text-xs font-bold text-amber-800">{gameRuleText}</span>
+            </div>
+          </div>
+        )}
+
         {/* Players */}
         <div className="px-4 sm:px-6 py-4 sm:py-5">
           {(() => {
@@ -532,17 +563,49 @@ export default function ScoreInputDialog({
               </div>
             )}
 
+            {/* 棄権（Ret）ボタン */}
+            {(match.status === 'playing' || isFinished) && !isFinished && (
+              <div className="space-y-1.5">
+                <span className="text-xs text-gray-500">棄権 (Ret)</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRetPlayer(retPlayer === 1 ? null : 1)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg border transition-colors ${
+                      retPlayer === 1
+                        ? 'bg-red-100 border-red-300 text-red-700'
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
+                    }`}
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    {match.player1Name || 'P1'} 棄権
+                  </button>
+                  <button
+                    onClick={() => setRetPlayer(retPlayer === 2 ? null : 2)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg border transition-colors ${
+                      retPlayer === 2
+                        ? 'bg-red-100 border-red-300 text-red-700'
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
+                    }`}
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    {match.player2Name || 'P2'} 棄権
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 自動勝者判定表示 */}
             {autoWinner && canFinish && (
               <div className="text-center">
                 <span className="text-xs text-primary-600 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
+                  {retPlayer && ' (Ret)'}
                 </span>
               </div>
             )}
             {/* スコア未入力時のヒント */}
             {canFinish && !autoWinner && (
-              <p className="text-center text-xs text-gray-400">スコアを入力すると勝者が自動判定されます</p>
+              <p className="text-center text-xs text-gray-400">スコアを入力するか棄権を選択すると勝者が判定されます</p>
             )}
           </div>
         </div>

@@ -14,6 +14,16 @@ export interface ParsedDrawPlayer {
   partnerAffiliation?: string;
 }
 
+/** 回戦ごとのゲームルール */
+export interface RoundGameRule {
+  /** 適用ラウンド範囲の説明（例: "１～２回戦", "準々決勝以降"） */
+  roundLabel: string;
+  /** ルールテキスト（例: "8ゲームマッチ（8-8タイブレーク）"） */
+  ruleText: string;
+  /** ゲーム数 */
+  games: number;
+}
+
 export interface ParsedDrawEvent {
   eventName: string;
   matchFormat: string;
@@ -21,6 +31,8 @@ export interface ParsedDrawEvent {
   drawSize: number;
   players: ParsedDrawPlayer[];
   isRoundRobin: boolean;
+  /** 回戦別ゲームルール（複数ルールがある場合） */
+  roundGameRules: RoundGameRule[];
 }
 
 export interface ParsedDrawFile {
@@ -99,6 +111,82 @@ function isEventHeader(text: string): boolean {
 
 function detectType(eventName: string): 'Singles' | 'Doubles' {
   return eventName.includes('ダブルス') ? 'Doubles' : 'Singles';
+}
+
+// ---------------------------------------------------------------------------
+// Game rule parsing
+// ---------------------------------------------------------------------------
+
+/** "8ゲームマッチ（8-8タイブレーク）" → 8 */
+function extractGamesFromRuleText(text: string): number {
+  const norm = normalizeDigits(text);
+  const m = norm.match(/(\d+)\s*ゲーム/);
+  return m ? parseInt(m[1], 10) : 6; // デフォルト6ゲーム
+}
+
+/**
+ * イベントヘッダー周辺からゲームルールをパースする。
+ * パターン:
+ *   1) 同行の後方カラムにルール ("8ゲームマッチ（8-8タイブレーク）")
+ *   2) 次行にルール ("8ゲームマッチ（8-8タイブレーク）")
+ *   3) 同行または次行に回戦別ルール ("１～２回戦　8ゲームマッチ...") + その次行にも別ルール
+ */
+function parseGameRules(
+  rows: unknown[][],
+  headerRow: number,
+  endRow: number,
+  headerMatchFormat: string,
+): RoundGameRule[] {
+  const rules: RoundGameRule[] = [];
+  const ruleRe = /(\d+)\s*ゲームマッチ/;
+  const roundPrefixRe = /^(.*(?:回戦|決勝|以降))\s+/;
+
+  // ヘッダー行の matchFormat に含まれるルール
+  if (headerMatchFormat && ruleRe.test(normalizeDigits(headerMatchFormat))) {
+    const roundMatch = roundPrefixRe.exec(headerMatchFormat);
+    rules.push({
+      roundLabel: roundMatch ? roundMatch[1] : '全回戦',
+      ruleText: headerMatchFormat,
+      games: extractGamesFromRuleText(headerMatchFormat),
+    });
+  }
+
+  // ヘッダー行の後続行をスキャン（最大5行）
+  for (let r = headerRow + 1; r < Math.min(headerRow + 6, endRow); r++) {
+    const row = rows[r];
+    if (!row) continue;
+
+    // 全カラムを結合してルールテキストを探す
+    for (let c = 0; c < Math.min(row.length, 30); c++) {
+      const val = cellStr(row, c);
+      if (!val) continue;
+      const norm = normalizeDigits(val);
+      if (ruleRe.test(norm)) {
+        const roundMatch = roundPrefixRe.exec(val);
+        const ruleText = roundMatch ? val.replace(roundMatch[1], '').trim() : val;
+        rules.push({
+          roundLabel: roundMatch ? roundMatch[1] : '全回戦',
+          ruleText: ruleText,
+          games: extractGamesFromRuleText(val),
+        });
+      }
+    }
+
+    // ドロー番号行に到達したら終了（選手データが始まった）
+    const drawNum = cellNum(row, 0) ?? cellNum(row, 1);
+    if (drawNum != null && drawNum >= 1 && Number.isInteger(drawNum)) break;
+    // シード行に到達したら終了
+    if (cellStr(row, 0).startsWith('シード')) break;
+  }
+
+  // 重複除去（同じruleTextは除く）
+  const seen = new Set<string>();
+  return rules.filter(r => {
+    const key = `${r.roundLabel}::${r.ruleText}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -390,6 +478,9 @@ export function parseDrawExcel(
       ? allPlayers.length
       : nextPowerOf2(maxPosition || allPlayers.length);
 
+    // ゲームルール解析
+    const roundGameRules = parseGameRules(rows, section.headerRow, endRow, section.matchFormat);
+
     events.push({
       eventName: section.eventName,
       matchFormat: section.matchFormat,
@@ -397,6 +488,7 @@ export function parseDrawExcel(
       drawSize,
       players: allPlayers,
       isRoundRobin,
+      roundGameRules,
     });
   }
 

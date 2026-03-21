@@ -43,6 +43,13 @@ export interface FuriganaDict {
 // 4. 種目 (Event)
 // 大会に紐づく各カテゴリー
 // ---------------------------
+/** 回戦ごとのゲームルール */
+export interface RoundGameRule {
+  roundLabel: string;   // "全回戦", "１～２回戦", "準々決勝以降" 等
+  ruleText: string;     // "8ゲームマッチ（8-8タイブレーク）"
+  games: number;        // ゲーム数
+}
+
 export interface Event {
   id?: number;
   tournamentId: string; // 外部キー
@@ -55,6 +62,8 @@ export interface Event {
     deuce: boolean;
     tiebreakPoint: number;
   };
+  /** 回戦別ゲームルール（Excelから読み込み） */
+  roundGameRules?: RoundGameRule[];
 }
 
 // ---------------------------
@@ -110,6 +119,7 @@ export interface Match {
   player2Affiliation: string;
   score: string;           // "6-4 6-3" 等のスコア文字列
   winnerEntryId: string | null;
+  gameRule?: string;       // 個別試合ルール（上書き用）
   courtId: string | null;  // 割り当てコートID
   scheduledTime: string | null; // "10:00" 等
   status: 'waiting' | 'ready' | 'playing' | 'finished' | 'walkover';
