@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  HelpCircle, ExternalLink, Medal, HardDrive, MapPin, Calendar
+  HelpCircle, ExternalLink, Medal, HardDrive,
+  AlertTriangle
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -79,7 +80,14 @@ export default function AppLayout() {
       : undefined,
     [currentTournamentId]
   );
-  const importedSchedule = useAppStore((s) => s.importedSchedule);
+  const matchDuration = useAppStore((s) => s.scheduleConfig.matchDuration);
+  const [now, setNow] = useState(Date.now());
+
+  // Tick every 15 seconds for ticker updates
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 現在の大会に紐づく種目を取得
   const events = useLiveQuery(
@@ -90,6 +98,64 @@ export default function AppLayout() {
     [currentTournamentId]
   );
 
+  // 全試合データ取得
+  const eventIds = useMemo(() => (events ?? []).map(e => e.eventId).sort().join(','), [events]);
+  const allMatches = useLiveQuery(async () => {
+    const ids = eventIds.split(',').filter(Boolean);
+    if (ids.length === 0) return [];
+    return db.matches.where('eventId').anyOf(ids).toArray();
+  }, [eventIds]) || [];
+
+  // コートデータ取得
+  const courts = useLiveQuery(
+    () => currentTournamentId ? db.courts.where('tournamentId').equals(currentTournamentId).toArray() : [],
+    [currentTournamentId]
+  ) || [];
+
+  // ティッカー用リアルタイムステータス
+  const tickerItems = useMemo(() => {
+    const items: string[] = [];
+    if (allMatches.length === 0 && courts.length === 0) return items;
+
+    const playing = allMatches.filter(m => m.status === 'playing');
+    const finished = allMatches.filter(m => m.status === 'finished' || m.status === 'walkover');
+    const total = allMatches.length;
+
+    // 進捗
+    if (total > 0) {
+      const pct = Math.round((finished.length / total) * 100);
+      items.push(`進捗: ${finished.length}/${total}試合完了 (${pct}%)`);
+    }
+
+    // コート状況
+    if (courts.length > 0) {
+      const availCourts = courts.filter(c => c.isAvailable);
+      const playingCourts = availCourts.filter(c =>
+        allMatches.some(m => m.courtId === c.courtId && m.status === 'playing')
+      );
+      const emptyCourts = availCourts.length - playingCourts.length;
+      items.push(`${playingCourts.length}/${availCourts.length}コート使用中 | ${emptyCourts}コート空き`);
+    }
+
+    // 試合中
+    if (playing.length > 0) {
+      items.push(`${playing.length}試合進行中`);
+    }
+
+    // 時間超過コート
+    const limitMs = matchDuration * 60 * 1000;
+    const overMatches = playing.filter(m => m.updatedAt && (now - m.updatedAt) > limitMs);
+    for (const m of overMatches) {
+      const court = courts.find(c => c.courtId === m.courtId);
+      const elapsed = Math.floor((now - (m.updatedAt || now)) / 60000);
+      const courtLabel = court?.name || m.courtId;
+      items.push(`⚠ ${courtLabel} 時間超過(${elapsed}分) ${m.player1Name} vs ${m.player2Name}`);
+    }
+
+    return items;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMatches, courts, matchDuration, now]);
+
   // ミックス or 団体戦の種目があるかどうかでタブを出し分け
   const allTabs = useMemo(() => {
     const hasDrawEvents = (events ?? []).some(
@@ -99,6 +165,24 @@ export default function AppLayout() {
     );
     if (hasDrawEvents) return ALL_MAIN_TABS;
     return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
+  }, [events]);
+
+  // 試合形式（シングルス/ダブルス等）
+  const matchTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const e of (events ?? [])) {
+      const name = e.name || '';
+      if (/ダブルス|doubles/i.test(name) || /ダブルス|doubles/i.test(e.type || '')) {
+        types.add('ダブルス');
+      } else if (/ミックス|mixed/i.test(name) || /ミックス|mixed/i.test(e.type || '')) {
+        types.add('ミックスダブルス');
+      } else if (/団体|team/i.test(name) || /団体|team/i.test(e.type || '')) {
+        types.add('団体戦');
+      } else {
+        types.add('シングルス');
+      }
+    }
+    return Array.from(types).join(' / ');
   }, [events]);
 
   // モバイル用: 全タブ表示
@@ -265,27 +349,34 @@ export default function AppLayout() {
 
       {/* ===== 大会情報バー ===== */}
       {tournament && (
-        <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-b border-primary-100 px-4 py-1.5 flex items-center gap-4 text-xs shrink-0 overflow-x-auto">
-          <span className="font-bold text-primary-700 truncate">{tournament.name}</span>
-          {tournament.date && (
-            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
-              <Calendar className="w-3 h-3" />{tournament.date}
-            </span>
-          )}
-          {tournament.venue && (
-            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
-              <MapPin className="w-3 h-3" />{tournament.venue}
-            </span>
-          )}
-          {(events ?? []).length > 0 && (
-            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
-              <Trophy className="w-3 h-3" />{(events ?? []).length}種目
-            </span>
-          )}
-          {importedSchedule.length > 0 && (
-            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
-              <CalendarClock className="w-3 h-3" />時間割{importedSchedule.length}試合
-            </span>
+        <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-b border-primary-100 flex items-center shrink-0 h-7 overflow-hidden text-xs">
+          {/* 固定部分: 大会名 + 試合形式 */}
+          <div className="flex items-center gap-2 px-3 shrink-0 border-r border-primary-100 h-full bg-white/60">
+            <Trophy className="w-3 h-3 text-primary-600 shrink-0" />
+            <span className="font-bold text-primary-700 whitespace-nowrap">{tournament.name}</span>
+            {matchTypes && (
+              <span className="text-[10px] text-gray-500 whitespace-nowrap">({matchTypes})</span>
+            )}
+          </div>
+          {/* 流れるティッカー */}
+          {tickerItems.length > 0 && (
+            <div className="flex-1 overflow-hidden relative h-full">
+              <div className="info-ticker flex items-center h-full gap-12 whitespace-nowrap">
+                {tickerItems.map((item, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1 ${item.startsWith('⚠') ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                    {item.startsWith('⚠') ? item.slice(2) : item}
+                  </span>
+                ))}
+                {/* Duplicate for seamless loop */}
+                {tickerItems.map((item, i) => (
+                  <span key={`dup-${i}`} className={`inline-flex items-center gap-1 ${item.startsWith('⚠') ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                    {item.startsWith('⚠') ? item.slice(2) : item}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
