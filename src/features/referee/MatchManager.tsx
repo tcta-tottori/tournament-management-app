@@ -356,6 +356,48 @@ export default function MatchManager() {
     );
   }, [allMatchesFlat]);
 
+  // 初回コートが未確定か（playing中の試合が0かつ、courtId付きの待機試合がある or まだコートを振っていない）
+  const hasPlayingMatches = useMemo(() => {
+    return allMatchesFlat.some(m => m.status === 'playing');
+  }, [allMatchesFlat]);
+
+  // 初回コート確定ハンドラ
+  const handleAssignInitialCourts = useCallback(async () => {
+    const availableCourts = courts.filter(c => c.isAvailable).sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
+    if (availableCourts.length === 0) { alert('使用可能なコートがありません。'); return; }
+
+    // 対戦順の上からコート数分の待機試合を取得
+    const waitingMatches = globalSortedMatches.filter(m =>
+      (m.status === 'waiting' || m.status === 'ready')
+      && !!m.player1Name && !!m.player2Name
+      && m.player1Name !== 'BYE' && m.player2Name !== 'BYE'
+    );
+
+    const assignCount = Math.min(waitingMatches.length, availableCourts.length);
+    if (assignCount === 0) { alert('割り当てる試合がありません。'); return; }
+
+    const assignments = waitingMatches.slice(0, assignCount).map((m, i) => ({
+      match: m,
+      court: availableCourts[i],
+    }));
+
+    const confirmed = confirm(
+      `${assignCount}試合にコートを割り当てて試合開始にします。\n\n` +
+      assignments.map(a => `${a.court.name}番コート: ${a.match.player1Name} vs ${a.match.player2Name}`).join('\n')
+    );
+    if (!confirmed) return;
+
+    for (const a of assignments) {
+      if (a.match.id) {
+        await db.matches.update(a.match.id, {
+          courtId: a.court.courtId,
+          status: 'playing',
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  }, [courts, globalSortedMatches]);
+
   const bulkCallStart = useBulkCallStore(s => s.start);
   const bulkCallActive = useBulkCallStore(s => s.isActive);
 
@@ -1156,6 +1198,16 @@ ${printableMatches.map(m => {
                 <ClipboardList className="w-3.5 h-3.5" />種目別
               </button>
             </div>
+            {/* 初回コート確定 */}
+            {!hasPlayingMatches && globalSortedMatches.some(m => (m.status === 'waiting' || m.status === 'ready') && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE') && (
+              <button
+                onClick={handleAssignInitialCourts}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-md transition-all"
+              >
+                <Play className="w-4 h-4" />
+                初回コート確定（{courts.filter(c => c.isAvailable).length}コートに割り当て）
+              </button>
+            )}
             {/* 全コート初戦一斉コール */}
             {hasWaitingMatchesWithCourts && (
               <button
