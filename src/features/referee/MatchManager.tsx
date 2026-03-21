@@ -18,7 +18,7 @@ function getRoundName(round: number, totalRounds: number): string {
 }
 
 function shortEventName(name: string): string {
-  return name.replace(/シングルス/g, '');
+  return name.replace(/シングルス/g, '').replace(/ダブルス/g, '');
 }
 
 function stripRoundPrefix(text: string): string {
@@ -301,7 +301,11 @@ export default function MatchManager() {
   // コール実行
   const handleVoiceCall = useCallback((m: Match, courtNum: string) => {
     if (!courtNum) return;
-    const matchCall = buildMatchCall(m, courtNum);
+    // グローバル表示でも正しくイベント・ラウンド数を解決
+    const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
+    const evDraw = allDraws.get(m.eventId);
+    const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+    const matchCall = buildMatchCall(m, courtNum, evt, evTotalRounds);
     if (!matchCall) return;
 
     const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap);
@@ -309,17 +313,17 @@ export default function MatchManager() {
 
     speak(text, voiceSettings, () => {
       setSpeakingMatchId(null);
-      const roundName = getRoundName(m.round, totalRounds);
+      const roundName = getRoundName(m.round, evTotalRounds);
       setCallLog(prev => [{
         timestamp: new Date(),
         courtNumber: courtNum,
-        eventName: currentEvent?.name || '',
+        eventName: evt?.name || '',
         round: `${roundName} #${m.position}`,
         text,
         matchId: m.id || 0,
       }, ...prev]);
     });
-  }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds]);
+  }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds, events, allDraws]);
 
   // コール停止
   const handleVoiceStop = useCallback(() => {
@@ -444,8 +448,20 @@ export default function MatchManager() {
   const [editScore2, setEditScore2] = useState('');
   const [editTiebreak, setEditTiebreak] = useState('');
 
-  // ゲーム数からタイブレークかどうか判定
-  const games = currentEvent?.gameRules?.games ?? 6;
+  // ゲーム数からタイブレークかどうか判定（グローバル表示では編集中の試合の種目から取得）
+  const games = useMemo(() => {
+    if (currentEvent?.gameRules?.games) return currentEvent.gameRules.games;
+    // グローバル表示: 編集中の試合のeventIdからゲーム数を取得
+    if (editingMatchId) {
+      const editingMatch = globalSortedMatches.find(m => m.matchId === editingMatchId)
+        || Array.from(allMatchesByEvent.values()).flat().find(m => m.matchId === editingMatchId);
+      if (editingMatch) {
+        const evt = events.find(e => e.eventId === editingMatch.eventId);
+        if (evt?.gameRules?.games) return evt.gameRules.games;
+      }
+    }
+    return 6;
+  }, [currentEvent, editingMatchId, globalSortedMatches, allMatchesByEvent, events]);
   const isTiebreakScore = useMemo(() => {
     const s1 = parseInt(editScore1);
     const s2 = parseInt(editScore2);
@@ -526,8 +542,9 @@ export default function MatchManager() {
     });
 
     // 次ラウンドへの自動進出（リーグ戦では不要）
-    if (selectedEventId) {
-      const eventDraw = await db.draws.where('eventId').equals(selectedEventId).first();
+    const matchEventId = m.eventId || selectedEventId;
+    if (matchEventId) {
+      const eventDraw = await db.draws.where('eventId').equals(matchEventId).first();
       const ds = eventDraw?.drawSize || 0;
       const isLeague = eventDraw?.drawType === 'roundRobin' || (ds > 0 && (ds & (ds - 1)) !== 0);
 
@@ -535,7 +552,7 @@ export default function MatchManager() {
         const nextRound = m.round + 1;
         const nextPosition = Math.ceil(m.position / 2);
         const nextMatch = await db.matches
-          .where('eventId').equals(selectedEventId)
+          .where('eventId').equals(matchEventId)
           .filter(nm => nm.round === nextRound && nm.position === nextPosition)
           .first();
 
@@ -1269,8 +1286,22 @@ ${printableMatches.map(m => {
                   <tbody>
                     {(() => {
                       let lastTime = '';
-                      const availableCourtCount = courts.filter(c => c.isAvailable).length;
-                      let courtAssignedCount = 0;
+                      const availableCourts = courts.filter(c => c.isAvailable).sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
+                      const availableCourtCount = availableCourts.length;
+                      // 初回コート割振り: 対戦順の上から順に若番コートを割り当て（使用コート数まで）
+                      // playing/finishedの試合は実際のcourtIdを使用、それ以外は順番に割り当て
+                      let courtAssignIdx = 0;
+                      // 事前に割り当てマップを作成
+                      const courtAssignMap = new Map<string, string>();
+                      for (const m of globalSortedMatches) {
+                        if (m.status === 'playing' || m.status === 'finished') continue;
+                        const hasP = !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+                        if (!hasP) continue;
+                        if (courtAssignIdx < availableCourtCount) {
+                          courtAssignMap.set(m.matchId, availableCourts[courtAssignIdx].name);
+                          courtAssignIdx++;
+                        }
+                      }
                       return globalSortedMatches.map((m) => {
                         const st = statusLabels[m.status] || statusLabels.waiting;
                         const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
@@ -1328,10 +1359,8 @@ ${printableMatches.map(m => {
                               </td>
                               <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{(() => {
                                 if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
-                                if (hasPlayers && courtObj && courtAssignedCount < availableCourtCount) {
-                                  courtAssignedCount++;
-                                  return courtObj.name;
-                                }
+                                const assignedCourt = courtAssignMap.get(m.matchId);
+                                if (assignedCourt) return assignedCourt;
                                 return '-';
                               })()}</td>
                               <td className="py-2 px-2 text-center">
