@@ -674,7 +674,7 @@ ${printableMatches.map(m => {
       <td colspan="7" rowspan="2"
           class="fg bt br2 bb2"
           style="text-align:center; font-size:22px; font-weight:bold;">
-        ${m.scheduledTime || ''}
+        ${m.round === 1 ? (m.scheduledTime || '') : ''}
       </td>
     </tr>
     <tr style="height:${rh[8]};"></tr>
@@ -1125,7 +1125,7 @@ ${printableMatches.map(m => {
                       return (
                         <tr key={m.matchId} className={`border-b border-gray-100 ${!hasPlayers ? 'opacity-40' : ''} ${m.status === 'playing' ? 'bg-green-50' : m.status === 'finished' ? 'bg-gray-50' : ''}`}>
                           <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{m.matchOrder}</td>
-                          <td className="py-2 px-2 text-center text-xs font-mono text-gray-600">{m.scheduledTime || '-'}</td>
+                          <td className="py-2 px-2 text-center text-xs font-mono text-gray-600">{m.round === 1 ? (m.scheduledTime || '-') : '-'}</td>
                           <td className="py-2 px-2">
                             <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
                           </td>

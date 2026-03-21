@@ -386,7 +386,7 @@ export default function ScoreInputDialog({
                 <span className="font-mono font-bold text-white">{elapsedTime}</span>
               </span>
             )}
-            {match.scheduledTime && (
+            {match.scheduledTime && match.round === 1 && (
               <span className="text-xs text-primary-200">予定 {match.scheduledTime}</span>
             )}
           </div>

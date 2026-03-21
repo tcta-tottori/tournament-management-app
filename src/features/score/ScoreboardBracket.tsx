@@ -299,7 +299,7 @@ export default function ScoreboardBracket({
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                    {matchResult.scheduledTime && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                    {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   </div>
                 </>
               ) : (
@@ -356,7 +356,7 @@ export default function ScoreboardBracket({
                   {renderStatusBadge(matchResult)}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
-                  {matchResult.scheduledTime && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                  {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
                 </div>
               </>
@@ -368,7 +368,7 @@ export default function ScoreboardBracket({
                     : getSurname(matchResult?.player1Name || matchResult?.player2Name || '')}
                 </span>
                 <div className="flex items-center gap-1">
-                  {matchResult?.scheduledTime && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                  {matchResult?.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   {matchResult?.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
                 </div>
               </div>

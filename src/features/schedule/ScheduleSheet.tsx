@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore, type ImportedScheduleItem } from '../../stores/appStore';
-import { CalendarClock, Printer, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
+import { CalendarClock, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   getSavedToken as gdriveGetSavedToken,
@@ -12,14 +12,14 @@ import {
 } from '../backup/googleDriveApi';
 
 const EVENT_COLORS = [
-  { bg: 'bg-blue-100', text: 'text-blue-800', print: '#DBEAFE' },
-  { bg: 'bg-orange-100', text: 'text-orange-800', print: '#FFEDD5' },
-  { bg: 'bg-green-100', text: 'text-green-800', print: '#DCFCE7' },
-  { bg: 'bg-pink-100', text: 'text-pink-800', print: '#FCE7F3' },
-  { bg: 'bg-purple-100', text: 'text-purple-800', print: '#F3E8FF' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-800', print: '#CFFAFE' },
-  { bg: 'bg-amber-100', text: 'text-amber-800', print: '#FEF3C7' },
-  { bg: 'bg-stone-100', text: 'text-stone-800', print: '#F5F5F4' },
+  { bg: 'bg-blue-100', text: 'text-blue-800' },
+  { bg: 'bg-orange-100', text: 'text-orange-800' },
+  { bg: 'bg-green-100', text: 'text-green-800' },
+  { bg: 'bg-pink-100', text: 'text-pink-800' },
+  { bg: 'bg-purple-100', text: 'text-purple-800' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+  { bg: 'bg-amber-100', text: 'text-amber-800' },
+  { bg: 'bg-stone-100', text: 'text-stone-800' },
 ];
 
 function abbreviateEventName(name: string): string {
@@ -142,11 +142,6 @@ export default function ScheduleSheet() {
     () => tid ? db.events.where('tournamentId').equals(tid).toArray() : [],
     [tid],
   ) || [];
-
-  const tournament = useLiveQuery(
-    () => tid ? db.tournaments.where('tournamentId').equals(tid).first() : undefined,
-    [tid],
-  );
 
   const allMatches = useLiveQuery(async () => {
     if (!tid) return [];
@@ -298,6 +293,49 @@ export default function ScheduleSheet() {
     return { total, finished, playing, waiting, pct };
   }, [importedSchedule, matchLookup]);
 
+  // --------------- Per-court real-time stats ---------------
+  const courtStats = useMemo(() => {
+    if (!gridData || importedSchedule.length === 0) return null;
+    const stats = new Map<string, { playing: number; finished: number; total: number; currentMatch?: Match }>();
+    for (const cn of courtNames) {
+      let playing = 0, finished = 0, total = 0;
+      let currentMatch: Match | undefined;
+      const courtMap = gridData.get(cn);
+      if (courtMap) {
+        for (const [, entry] of courtMap) {
+          total++;
+          const dbMatch = matchLookup.get(entry.index);
+          if (dbMatch?.status === 'playing') { playing++; currentMatch = dbMatch; }
+          else if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') finished++;
+        }
+      }
+      stats.set(cn, { playing, finished, total, currentMatch });
+    }
+    return stats;
+  }, [gridData, importedSchedule, courtNames, matchLookup]);
+
+  // --------------- Per-event progress ---------------
+  const eventProgress = useMemo(() => {
+    if (importedSchedule.length === 0) return [];
+    const map = new Map<string, { total: number; finished: number; playing: number }>();
+    for (let i = 0; i < importedSchedule.length; i++) {
+      const item = importedSchedule[i];
+      if (!map.has(item.eventName)) map.set(item.eventName, { total: 0, finished: 0, playing: 0 });
+      const s = map.get(item.eventName)!;
+      s.total++;
+      const dbMatch = matchLookup.get(i);
+      if (dbMatch?.status === 'finished' || dbMatch?.status === 'walkover') s.finished++;
+      else if (dbMatch?.status === 'playing') s.playing++;
+    }
+    return [...map.entries()].map(([name, s]) => ({
+      name: abbreviateEventName(name),
+      fullName: name,
+      ...s,
+      pct: s.total > 0 ? Math.round((s.finished / s.total) * 100) : 0,
+      color: eventColorMap.get(name),
+    }));
+  }, [importedSchedule, matchLookup, eventColorMap]);
+
   // --------------- Handlers ---------------
 
   const handleCellClick = useCallback(
@@ -340,64 +378,6 @@ export default function ScheduleSheet() {
 
     setEditingCell(null);
   }, [editingCell, importedSchedule, matchLookup, allCourts, tid, setImportedSchedule]);
-
-  // --------------- Print ---------------
-
-  const handlePrint = useCallback(() => {
-    if (!gridData || importedSchedule.length === 0) return;
-
-    const tournamentName = tournament?.name || '';
-    const tournamentDate = tournament?.date || '';
-
-    let headerCells = '<th style="padding:4px 8px;border:1px solid #ccc;background:#1a365d;color:white;font-size:11px;">コート</th>';
-    for (const time of timeSlots) {
-      headerCells += `<th style="padding:2px 4px;border:1px solid #ccc;background:#1a365d;color:white;font-size:10px;white-space:nowrap;">${time}</th>`;
-    }
-
-    let gridRows = '';
-    for (const cn of courtNames) {
-      let cells = `<td style="padding:4px 8px;font-weight:bold;border:1px solid #ccc;background:#f5f5f5;text-align:center;white-space:nowrap;">${cn}</td>`;
-      for (const time of timeSlots) {
-        const entry = gridData.get(cn)?.get(time);
-        if (entry) {
-          const { item } = entry;
-          const color = eventColorMap.get(item.eventName);
-          const bg = color?.print || '#fff';
-          const abbr = abbreviateEventName(item.eventName);
-          cells += `<td style="padding:2px 4px;border:1px solid #ccc;background:${bg};text-align:center;font-size:10px;white-space:nowrap;">${abbr}<br/>${item.roundLabel}</td>`;
-        } else {
-          cells += `<td style="border:1px solid #eee;"></td>`;
-        }
-      }
-      gridRows += `<tr>${cells}</tr>`;
-    }
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>時間割 - ${tournamentName}</title>
-<style>
-  @page { size: A4 landscape; margin: 5mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Yu Gothic', 'Hiragino Sans', sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-</style></head><body>
-<div style="padding:10px;">
-  <h1 style="font-size:18px;text-align:center;margin-bottom:2px;">時間割表</h1>
-  <p style="font-size:12px;text-align:center;margin-bottom:10px;">${tournamentName}　${tournamentDate}</p>
-  <div style="overflow-x:auto;">
-    <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
-      <thead><tr>${headerCells}</tr></thead>
-      <tbody>${gridRows}</tbody>
-    </table>
-  </div>
-</div>
-</body></html>`;
-
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-      printWin.document.write(html);
-      printWin.document.close();
-      printWin.focus();
-      setTimeout(() => printWin.print(), 500);
-    }
-  }, [gridData, importedSchedule, timeSlots, courtNames, tournament, eventColorMap]);
 
   // --------------- Excel Import ---------------
 
@@ -675,46 +655,34 @@ export default function ScheduleSheet() {
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-4">
       {/* Header */}
-      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main sticky top-0 z-10">
+      <header className="bg-white p-4 rounded-xl shadow-sm border border-border-main">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <CalendarClock className="w-6 h-6 text-primary-500" />
-              時間割シート
+              タイムテーブル
               {progressStats && progressStats.playing > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-bold border border-red-200">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                   </span>
                   LIVE
                 </span>
               )}
             </h1>
             <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-              インポートされた時間割データをリアルタイムで表示
+              リアルタイム試合進行状況
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handlePrint}
-              disabled={!hasData}
-              className="flex items-center gap-1.5 bg-primary-500 text-white px-4 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
-            >
-              <Printer className="w-4 h-4" />
-              印刷
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleExcelImport}
-              className="hidden"
-            />
-          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelImport}
+            className="hidden"
+          />
         </div>
 
         {/* Status Message */}
@@ -731,15 +699,16 @@ export default function ScheduleSheet() {
         )}
       </header>
 
-      {/* Progress Bar */}
+      {/* Progress Dashboard */}
       {progressStats && hasData && (
-        <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-4 space-y-4">
+          {/* Overall progress */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-bold text-gray-900">{currentTimeStr}</span>
               <div className="h-4 w-px bg-gray-200" />
-              <span className="text-xs text-gray-500">進行状況</span>
+              <span className="text-xs text-gray-500">全体進行</span>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5">
@@ -782,10 +751,62 @@ export default function ScheduleSheet() {
               </div>
             )}
           </div>
-          <div className="flex justify-between mt-1.5">
+          <div className="flex justify-between">
             <span className="text-[10px] text-gray-400">{progressStats.finished}/{progressStats.total} 試合完了</span>
             <span className="text-[10px] font-bold text-emerald-600">{progressStats.pct}%</span>
           </div>
+
+          {/* Per-event progress */}
+          {eventProgress.length > 1 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 pt-2 border-t border-gray-100">
+              {eventProgress.map((ep) => (
+                <div key={ep.fullName} className={`rounded-lg px-2.5 py-1.5 ${ep.color?.bg || 'bg-gray-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10px] font-bold truncate ${ep.color?.text || 'text-gray-700'}`}>{ep.name}</span>
+                    <span className="text-[9px] text-gray-500 ml-1">{ep.pct}%</span>
+                  </div>
+                  <div className="relative h-1.5 bg-white/60 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-current opacity-40 transition-all duration-700"
+                      style={{ width: `${ep.pct}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-gray-500">
+                    <span>{ep.finished}/{ep.total}</span>
+                    {ep.playing > 0 && (
+                      <span className="flex items-center gap-0.5 text-green-600 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        {ep.playing}試合中
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Currently playing courts */}
+          {courtStats && progressStats.playing > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 font-medium mb-1.5">試合中のコート</p>
+              <div className="flex flex-wrap gap-1.5">
+                {courtNames.map((cn) => {
+                  const cs = courtStats.get(cn);
+                  if (!cs?.currentMatch) return null;
+                  const m = cs.currentMatch;
+                  const p1 = m.player1Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
+                  const p2 = m.player2Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
+                  return (
+                    <div key={cn} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-50 border border-green-200 text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                      <span className="font-bold text-green-800">#{cn}</span>
+                      <span className="text-green-700 truncate max-w-[120px]">{p1} vs {p2}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -876,19 +897,11 @@ export default function ScheduleSheet() {
               z-index: 5;
             }
           `}</style>
-          <div className="bg-gradient-to-r from-primary-50 to-blue-50 px-4 py-2.5 border-b border-border-main flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              時間割シート
-            </h2>
-            <span className="text-xs text-gray-500">
-              セルをタップして編集
-            </span>
-          </div>
-          <div className="overflow-auto flex-1">
+          <div className="overflow-auto flex-1 relative">
             <table className="border-collapse min-w-full">
-              <thead>
+              <thead className="sticky top-0 z-20">
                 <tr>
-                  <th className="sticky left-0 z-10 bg-gray-800 text-white text-xs px-3 py-2 border border-gray-600 whitespace-nowrap">
+                  <th className="sticky left-0 z-30 bg-gray-800 text-white text-xs px-3 py-2 border border-gray-600 whitespace-nowrap">
                     コート
                   </th>
                   {timeSlots.map((time, idx) => {
@@ -1011,7 +1024,7 @@ export default function ScheduleSheet() {
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
           <CalendarClock className="w-16 h-16 text-gray-300 mb-4" />
           <h3 className="text-lg font-bold text-gray-900 mb-2">
-            時間割データがありません
+            タイムテーブルデータがありません
           </h3>
           <p className="text-gray-500 max-w-md">
             Excel読込ボタンまたはGoogle Drive時間割フォルダからスケジュールデータをインポートしてください。

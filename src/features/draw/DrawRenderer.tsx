@@ -208,7 +208,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                       <div className="text-sm font-medium text-gray-800 truncate whitespace-nowrap flex-1" title={displayName}>
                         {displayName}
                       </div>
-                      {matchResult?.scheduledTime && (
+                      {matchResult?.scheduledTime && matchResult.round === 1 && (
                         <div className="shrink-0 bg-ocean text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.scheduledTime}
                         </div>
@@ -231,7 +231,7 @@ export default function DrawRenderer({ slots, drawSize, onDragStart, onDrop, onD
                       {isPlaying ? '試合中...' : ''}
                     </div>
                     <div className="flex items-center gap-1">
-                      {matchResult?.scheduledTime && (
+                      {matchResult?.scheduledTime && matchResult.round === 1 && (
                         <div className="shrink-0 bg-ocean text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">
                           {matchResult.scheduledTime}
                         </div>

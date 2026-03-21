@@ -364,7 +364,7 @@ export default function Scoreboard() {
   // -- Match status groups for table view --
   const activeMatches = useMemo(() =>
     matches
-      .filter(m => m.status === 'playing' || m.status === 'ready')
+      .filter(m => m.status === 'playing')
       .sort((a, b) => a.matchOrder - b.matchOrder),
     [matches]
   );
@@ -428,29 +428,6 @@ export default function Scoreboard() {
   };
 
   // -- Table view: legacy match operations --
-  const handleStartMatch = async (matchId: string) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-    try {
-      const match = matches.find(m => m.matchId === matchId);
-      if (!match?.id) return;
-      await db.matches.update(match.id, { status: 'playing', updatedAt: Date.now() });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleReadyMatch = async (matchId: string) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-    try {
-      const match = matches.find(m => m.matchId === matchId);
-      if (!match?.id) return;
-      await db.matches.update(match.id, { status: 'ready', updatedAt: Date.now() });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleFinishMatch = async (matchId: string, winnerNum: 1 | 2) => {
     if (isProcessing) return;
@@ -959,8 +936,8 @@ export default function Scoreboard() {
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-xs font-mono text-gray-500">#{m.matchOrder} R{m.round}</span>
                         {m.courtId && <span className="text-xs bg-primary-50 text-primary-500 px-2 py-0.5 rounded font-medium">{getCourtName(m.courtId)}</span>}
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.status === 'playing' ? 'bg-green-100 text-green-600' : 'bg-primary-50 text-primary-500'}`}>
-                          {m.status === 'playing' ? '試合中' : '準備完了'}
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-600">
+                          試合中
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -997,12 +974,6 @@ export default function Scoreboard() {
                         </div>
                       ) : (
                         <div className="mt-3 pt-3 border-t border-border-main flex items-center gap-2">
-                          {m.status === 'ready' && (
-                            <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing}
-                              className="text-xs bg-green-600 text-white px-3 py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50">
-                              開始
-                            </button>
-                          )}
                           {m.status === 'playing' && (
                             <button onClick={() => { setEditingMatchId(m.matchId); setScoreInput(''); }}
                               className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600">
@@ -1036,7 +1007,6 @@ export default function Scoreboard() {
                       <th className="py-2 px-2 sm:px-3 w-8 sm:w-10 border-b-2 border-border-main">#</th>
                       <th className="py-2 px-2 sm:px-3 border-b-2 border-border-main">対戦</th>
                       <th className="py-2 px-2 sm:px-3 w-24 sm:w-32 border-b-2 border-border-main">コート</th>
-                      <th className="py-2 px-2 sm:px-3 w-20 sm:w-24 border-b-2 border-border-main"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1056,12 +1026,6 @@ export default function Scoreboard() {
                               <option key={c.courtId} value={c.courtId}>{c.name}</option>
                             ))}
                           </select>
-                        </td>
-                        <td className="py-2 px-3">
-                          <button onClick={() => handleReadyMatch(m.matchId)} disabled={isProcessing}
-                            className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50">
-                            準備完了
-                          </button>
                         </td>
                       </tr>
                     ))}
