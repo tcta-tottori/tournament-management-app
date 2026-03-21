@@ -306,6 +306,48 @@ function cleanTournamentName(name: string): string {
     .trim();
 }
 
+/** Excelシリアル値(0-1)または文字列からHH:MM形式に変換 */
+function excelTimeToString(val: unknown): string | null {
+  if (val == null) return null;
+  const num = Number(val);
+  // Excelシリアル値 (0.375 = 9:00, 0.416667 = 10:00, etc.)
+  if (!isNaN(num) && num > 0 && num < 1) {
+    const totalMinutes = Math.round(num * 24 * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+  const str = String(val).trim();
+  if (/^\d{1,2}:\d{2}$/.test(str)) return str.padStart(5, '0');
+  return null;
+}
+
+/** 「コートNO.」行を自動検出してスケジュールグリッドの開始行を見つける */
+function findScheduleGrid(rows: any[]): {
+  headerRowIdx: number;
+  dataStartIdx: number;
+  timeColumns: { colIdx: number; time: string }[];
+} | null {
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r] as any[];
+    if (!row || row.length < 2) continue;
+    const firstCell = String(row[0] ?? '').replace(/[\s\u3000]+/g, '').trim();
+    // 「コートNO.」「コートNo.」「コート」をヘッダー行と判定
+    if (!/^コート(NO\.?|No\.?)?$/i.test(firstCell)) continue;
+
+    // この行から時刻カラムを抽出
+    const timeColumns: { colIdx: number; time: string }[] = [];
+    for (let c = 1; c < row.length; c++) {
+      const time = excelTimeToString(row[c]);
+      if (time) timeColumns.push({ colIdx: c, time });
+    }
+    if (timeColumns.length > 0) {
+      return { headerRowIdx: r, dataStartIdx: r + 1, timeColumns };
+    }
+  }
+  return null;
+}
+
 /** 時間割Excelをパースする */
 function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
   const wb = XLSX.read(data, { type: 'array' });
@@ -317,17 +359,51 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
 
   if (!rows || rows.length === 0) return items;
 
-  // Detect format:
-  // Format 1: Grid format - row 0 has court names as columns, subsequent rows have time + matches
-  // Format 2: List format - each row is a match with columns (コート, 時刻, 種目, 回戦, etc.)
-  const firstRow = rows[0] as any[];
+  // === Format 1: 「コートNO.」行を自動検出するグリッド形式 ===
+  // 実際の時間割Excelで最もよく使われる形式
+  // ヘッダー行: コートNO. | 9:00 | 9:30 | 10:00 | ...
+  // データ行:   1         | MS1R | LD QF| ...
+  const grid = findScheduleGrid(rows);
+  if (grid) {
+    for (let ri = grid.dataStartIdx; ri < rows.length; ri++) {
+      const row = rows[ri] as any[];
+      if (!row || row.length === 0) continue;
+      const rawCourtName = String(row[0] ?? '').trim();
+      if (!rawCourtName) continue;
+      // コート番号（数値）の行のみ処理
+      const courtNum = parseInt(rawCourtName, 10);
+      if (isNaN(courtNum)) {
+        if (items.length > 0) break; // データ行が終わった
+        continue;
+      }
+      const courtName = String(courtNum);
 
-  // Check if first row looks like list headers
+      for (const tc of grid.timeColumns) {
+        const cell = String(row[tc.colIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
+        if (!cell) continue;
+        globalOrder++;
+        const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
+        const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
+        const roundLabel = roundMatch ? roundMatch[0] : '1R';
+        items.push({
+          eventName,
+          roundLabel,
+          matchOrder: globalOrder,
+          courtName,
+          startTime: tc.time,
+        });
+      }
+    }
+    if (items.length > 0) return items;
+  }
+
+  // === Format 2: リスト形式 ===
+  // 各行が1試合: コート | 時刻 | 種目 | 回戦
+  const firstRow = rows[0] as any[];
   const headerStr = (firstRow || []).map((c: any) => String(c || '').trim().toLowerCase()).join(',');
   const isListFormat = /コート|court/.test(headerStr) && (/時刻|時間|time/.test(headerStr) || /種目|event/.test(headerStr));
 
   if (isListFormat) {
-    // List format: try to find columns by header names
     const headers = firstRow.map((c: any) => String(c || '').trim());
     let courtIdx = -1, timeIdx = -1, eventIdx = -1, roundIdx = -1;
     for (let i = 0; i < headers.length; i++) {
@@ -355,31 +431,33 @@ function parseScheduleExcel(data: ArrayBuffer): ImportedScheduleItem[] {
         startTime: normalizeScheduleTime(timeVal),
       });
     }
-  } else {
-    // Grid format: columns are courts, rows are time slots
-    // First row should have court identifiers
-    const courtNames = firstRow.slice(1).map((c: any) => String(c || '').trim()).filter(c => c);
-    if (courtNames.length === 0) return items;
+    if (items.length > 0) return items;
+  }
 
-    for (let ri = 1; ri < rows.length; ri++) {
-      const row = rows[ri] as any[];
-      if (!row || !row[0]) continue;
-      const time = normalizeScheduleTime(String(row[0]).trim());
-      for (let ci = 0; ci < courtNames.length; ci++) {
-        const cell = String(row[ci + 1] || '').trim();
-        if (!cell) continue;
-        globalOrder++;
-        // Parse cell: "男子S A級 1R" or similar
-        const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
-        const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
-        const roundLabel = roundMatch ? roundMatch[0] : '1R';
-        items.push({
-          eventName,
-          roundLabel,
-          matchOrder: globalOrder,
-          courtName: courtNames[ci],
-          startTime: time,
-        });
+  // === Format 3: シンプルグリッド形式（フォールバック） ===
+  // 1行目がコート名、1列目が時刻
+  if (firstRow) {
+    const courtNames = firstRow.slice(1).map((c: any) => String(c || '').trim()).filter(c => c);
+    if (courtNames.length > 0) {
+      for (let ri = 1; ri < rows.length; ri++) {
+        const row = rows[ri] as any[];
+        if (!row || !row[0]) continue;
+        const time = excelTimeToString(row[0]) || normalizeScheduleTime(String(row[0]).trim());
+        for (let ci = 0; ci < courtNames.length; ci++) {
+          const cell = String(row[ci + 1] || '').trim();
+          if (!cell) continue;
+          globalOrder++;
+          const eventName = cell.replace(/\d+R|QF|SF|F|決勝|準決勝|準々決勝/g, '').trim();
+          const roundMatch = cell.match(/(\d+R|QF|SF|F|決勝|準決勝|準々決勝)/);
+          const roundLabel = roundMatch ? roundMatch[0] : '1R';
+          items.push({
+            eventName,
+            roundLabel,
+            matchOrder: globalOrder,
+            courtName: courtNames[ci],
+            startTime: time,
+          });
+        }
       }
     }
   }
