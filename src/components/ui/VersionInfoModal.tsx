@@ -21,6 +21,26 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 1.5',
+    date: '2026-03-22',
+    highlights: '2セット+STBスコア入力・ゲームルール編集・棄権(Ret)対応',
+    timeGroups: [
+      {
+        time: '—',
+        summary: 'スコア入力・ゲームルール対応強化',
+        changes: [
+          { type: 'feat', text: '2セットマッチ＋スーパータイブレーク形式のスコア入力に対応（[10-5]表記）' },
+          { type: 'feat', text: 'Excelドローからタイブレークセット＋ファイナルセット10ポイントSTB形式を自動検出' },
+          { type: 'feat', text: 'ゲームルール編集ダイアログで試合方式（ゲームマッチ / 2セット+STB）を選択可能に' },
+          { type: 'feat', text: 'ラウンドヘッダーにゲームルールバッジを表示' },
+          { type: 'feat', text: 'スコア入力で棄権(Ret)・不戦勝(DEF)に対応' },
+          { type: 'fix', text: 'コートマップPC横向きレイアウト対応' },
+          { type: 'design', text: 'スピナー改善・一括読込ウィザード化' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 1.4',
     date: '2026-03-21',
     highlights: '情報バーティッカー・時間超過ハイライト・LIVE一斉コール整理',
@@ -357,7 +377,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 1.4</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 1.5</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">
