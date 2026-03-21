@@ -772,22 +772,30 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
 
       {/* ── 大会ファイル選択ポップアップ ── */}
       {showFileList && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <GoogleDriveIcon className="w-5 h-5" />
-                <h3 className="text-base font-bold text-gray-900">大会一覧</h3>
-                <span className="text-xs text-gray-400">{gdriveFileList.length}件</span>
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[9999] flex items-center justify-center p-4" onClick={() => setShowFileList(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* ヘッダー */}
+            <div className="bg-gradient-to-r from-[#e8f0fe] to-[#d2e3fc] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white/80 shadow-sm flex items-center justify-center">
+                    <GoogleDriveIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-800">大会ファイルを選択</h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{gdriveFileList.length}件のファイル</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowFileList(false)} className="w-8 h-8 rounded-full bg-white/60 hover:bg-white flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
-              <button onClick={() => setShowFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            {/* ファイルリスト */}
+            <div className="flex-1 overflow-y-auto px-3 py-2">
               {gdriveFileList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <FolderOpen className="w-10 h-10 mb-2 opacity-50" />
                   <p className="text-sm">ファイルがありません</p>
                 </div>
               ) : (
@@ -801,26 +809,29 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         key={f.id}
                         onClick={() => handleSelectTournamentFile(f)}
                         disabled={!!loadingFileId}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-600" />}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
-                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               )}
             </div>
-            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <p className="text-xs text-gray-400 text-center">鳥取テニス協会バックアップ &gt; 大会運営システム &gt; 大会一覧</p>
+            {/* フッター */}
+            <div className="px-5 py-2.5 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 text-center">大会一覧フォルダから読込</p>
             </div>
           </div>
         </div>,
@@ -829,22 +840,30 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
 
       {/* ── 時間割ファイル選択ポップアップ ── */}
       {showScheduleFileList && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowScheduleFileList(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2.5">
-                <CalendarClock className="w-5 h-5 text-primary-500" />
-                <h3 className="text-base font-bold text-gray-900">時間割ファイルを選択</h3>
-                <span className="text-xs text-gray-400">{scheduleGDriveFiles.length}件</span>
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[9999] flex items-center justify-center p-4" onClick={() => setShowScheduleFileList(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* ヘッダー */}
+            <div className="bg-gradient-to-r from-[#e8f0fe] to-[#d2e3fc] px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white/80 shadow-sm flex items-center justify-center">
+                    <CalendarClock className="w-5 h-5 text-[#1a73e8]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-800">時間割ファイルを選択</h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{scheduleGDriveFiles.length}件のファイル</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowScheduleFileList(false)} className="w-8 h-8 rounded-full bg-white/60 hover:bg-white flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
-              <button onClick={() => setShowScheduleFileList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            {/* ファイルリスト */}
+            <div className="flex-1 overflow-y-auto px-3 py-2">
               {scheduleGDriveFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <FolderOpen className="w-12 h-12 mb-3" />
+                  <FolderOpen className="w-10 h-10 mb-2 opacity-50" />
                   <p className="text-sm">ファイルがありません</p>
                 </div>
               ) : (
@@ -858,26 +877,29 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         key={f.id}
                         onClick={() => handleSelectScheduleFile(f)}
                         disabled={!!loadingScheduleFileId}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-600" />}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{displayName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            更新: {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
-                        <Download className="w-4 h-4 text-gray-400 group-hover:text-primary-500 flex-shrink-0 transition-colors" />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               )}
             </div>
-            <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-              <p className="text-xs text-gray-400 text-center">時間割Excelファイルを選択してください</p>
+            {/* フッター */}
+            <div className="px-5 py-2.5 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 text-center">時間割フォルダから読込</p>
             </div>
           </div>
         </div>,

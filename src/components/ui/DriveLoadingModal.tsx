@@ -96,14 +96,21 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
         {/* Content */}
         <div className="px-5 py-4">
           {!isFinished && (
-            /* ローディングアニメーション — Driveアイコン中央 + 色が流れる一段リング */
+            /* ローディングアニメーション — Driveアイコン中央 + C字型カラーアーク回転 */
             <div className="flex justify-center py-4">
               <div className="relative w-20 h-20">
-                {/* 一段リング: conic-gradientで色が流れる */}
-                <div className="absolute inset-0 drive-ring-flow rounded-full" style={{
-                  background: 'conic-gradient(from 0deg, #4285F4, #34A853, #FBBC04, #EA4335, #4285F4)',
+                {/* C字型アーク: conic-gradient + 切れ目マスク */}
+                <div className="absolute inset-0 drive-ring-flow" style={{
+                  background: 'conic-gradient(from 0deg, #4285F4, #34A853, #FBBC04, #EA4335, transparent)',
+                  borderRadius: '50%',
                   mask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
                   WebkitMask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
+                }} />
+                {/* 先端の丸み（始点） */}
+                <div className="absolute drive-ring-flow" style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: '#4285F4',
+                  top: '4.5%', left: '50%', marginLeft: -4,
                 }} />
                 {/* 中央 Google Drive アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
