@@ -31,10 +31,11 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: /\.(?:js|css)$/,
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'static-resources',
               expiration: { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 },
+              networkTimeoutSeconds: 5,
             },
           },
         ],
