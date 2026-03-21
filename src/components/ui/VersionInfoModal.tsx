@@ -21,6 +21,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 1.3',
+    date: '2026-03-21',
+    highlights: 'タイムテーブル刷新・種目名マッチング修正・ライブステータス表示',
+    timeGroups: [
+      {
+        time: '15:00',
+        summary: 'タイムテーブルページ全面改修',
+        changes: [
+          { type: 'feat', text: '時間割ページをタイムテーブルに改名・スケジュール設定を削除' },
+          { type: 'feat', text: 'インポート済み時間割データをコート×時刻のグリッドで表示' },
+          { type: 'feat', text: '試合ステータス（待機/試合中/終了/不戦勝）をリアルタイム反映' },
+          { type: 'feat', text: 'タイムテーブルのセル編集機能（コート・時刻変更）を追加' },
+          { type: 'fix', text: '種目名マッチングを大幅改善（略称・正式名の双方向対応）' },
+          { type: 'fix', text: 'スケジュールExcelパースのラウンドラベル正規表現修正（スペース入り対応）' },
+          { type: 'fix', text: 'データページの時間割表示を時間→コート順でソート' },
+        ],
+      },
+      {
+        time: '14:00',
+        summary: 'エントリー確定・対戦順改善',
+        changes: [
+          { type: 'feat', text: 'エントリー確定時の処理中モーダル・グレーアウト・確定解除機能' },
+          { type: 'feat', text: '対戦順シートに時間割・コート順のグローバル表示を追加' },
+          { type: 'fix', text: 'トーナメントブラケット線の接続不良を修正' },
+          { type: 'fix', text: 'GDrive読込ボタンを3つに整理（一括/ふりがな・所属/大会・時間割）' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 1.2',
     date: '2026-03-21',
     highlights: 'GDrive連携UI刷新・PWA高速化・音声エンジン追加',
@@ -310,7 +340,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 1.2</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 1.3</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">

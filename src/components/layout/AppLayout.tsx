@@ -183,7 +183,7 @@ export default function AppLayout() {
             className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
             title="バージョン情報・更新履歴"
           >
-            <span className="header-version">Ver 1.2</span>
+            <span className="header-version">Ver 1.3</span>
             <span className="text-[8px] text-white/40 leading-tight mt-0.5 whitespace-nowrap">{__BUILD_TIMESTAMP__}</span>
           </button>
         </div>
