@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
-  X, Loader2, CalendarClock, FileJson,
+  X, Loader2, CalendarClock,
 } from 'lucide-react';
 import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
@@ -626,18 +626,18 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               <button
                 onClick={handleListTournamentFiles}
                 disabled={isProcessing}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 transition-colors border border-[#1a73e8]/15"
+                className="group relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#1a73e8] rounded-xl hover:from-[#3b78e7] hover:to-[#1557b0] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
-                <FileJson className="w-4 h-4" />
-                大会データ読込
+                <GoogleDriveIcon className="w-4.5 h-4.5" />
+                <span>大会データ読込</span>
               </button>
               <button
                 onClick={handleListScheduleFiles}
                 disabled={isProcessing}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] disabled:opacity-40 transition-colors border border-[#1a73e8]/15"
+                className="group relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#34A853] to-[#0d904f] rounded-xl hover:from-[#2d9249] hover:to-[#0b7a43] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
-                <CalendarClock className="w-4 h-4" />
-                時間割読込
+                <GoogleDriveIcon className="w-4.5 h-4.5" />
+                <span>時間割読込</span>
               </button>
             </div>
           </>
