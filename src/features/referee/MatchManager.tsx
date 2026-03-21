@@ -1286,20 +1286,17 @@ ${printableMatches.map(m => {
                   <tbody>
                     {(() => {
                       let lastTime = '';
-                      const availableCourts = courts.filter(c => c.isAvailable).sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
-                      const availableCourtCount = availableCourts.length;
-                      // 初回コート割振り: 対戦順の上から順に若番コートを割り当て（使用コート数まで）
-                      // playing/finishedの試合は実際のcourtIdを使用、それ以外は順番に割り当て
-                      let courtAssignIdx = 0;
-                      // 事前に割り当てマップを作成
+                      const availableCourtCount = courts.filter(c => c.isAvailable).length;
+                      // 初回コート割振り: 対戦順の上から順に1番、2番...と連番でコートを振る
+                      let courtNum = 1;
                       const courtAssignMap = new Map<string, string>();
                       for (const m of globalSortedMatches) {
                         if (m.status === 'playing' || m.status === 'finished') continue;
                         const hasP = !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
                         if (!hasP) continue;
-                        if (courtAssignIdx < availableCourtCount) {
-                          courtAssignMap.set(m.matchId, availableCourts[courtAssignIdx].name);
-                          courtAssignIdx++;
+                        if (courtNum <= availableCourtCount) {
+                          courtAssignMap.set(m.matchId, String(courtNum));
+                          courtNum++;
                         }
                       }
                       return globalSortedMatches.map((m) => {
