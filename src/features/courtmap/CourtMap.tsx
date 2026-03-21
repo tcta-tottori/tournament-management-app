@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import type { Match, Court } from '../../db/database';
-import { MapPin, Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Play, Clock, CheckCircle, AlertCircle, X, Trophy, Timer } from 'lucide-react';
 
 /** テニスコート型のSVGオーバーレイ（縦向き・モバイル用） */
 function CourtLines({ status }: { status: string }) {
@@ -80,7 +81,7 @@ const VENUE_PRESETS: VenuePreset[] = [
       { courts: ['9', '10', '11', '12'] },
       { courts: ['13', '14', '15', '16'] },
     ],
-    hqPosition: 1, // 5-8ブロックの後（9-12ブロックの前）に本部
+    hqPosition: 1, // 5番コートと9番コートの間に本部
     totalCourts: 16,
   },
   {
@@ -112,11 +113,12 @@ export default function CourtMap() {
   const [selectedCourt, setSelectedCourt] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
-  // Tick every 10 seconds for time-over detection
+  // Tick: 1秒（コート詳細表示中）/ 10秒（通常）で更新
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10000);
+    const interval = selectedCourt ? 1000 : 10000;
+    const timer = setInterval(() => setNow(Date.now()), interval);
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedCourt]);
 
   const courts = useLiveQuery(
     () => currentTournamentId ? db.courts.where('tournamentId').equals(currentTournamentId).toArray() : [],
@@ -135,6 +137,24 @@ export default function CourtMap() {
     if (ids.length === 0) return [];
     return db.matches.where('eventId').anyOf(ids).toArray();
   }, [eventIds]) || [];
+
+  // ドローデータ（回戦名取得用）
+  const allDraws = useLiveQuery(async () => {
+    const ids = eventIds.split(',').filter(Boolean);
+    if (ids.length === 0) return [];
+    return db.draws.where('eventId').anyOf(ids).toArray();
+  }, [eventIds]) || [];
+
+  /** 回戦名を取得 */
+  const getRoundName = useCallback((eventId: string, round: number) => {
+    const draw = allDraws.find(d => d.eventId === eventId);
+    if (!draw) return `${round}回戦`;
+    const totalRounds = Math.log2(draw.drawSize);
+    if (round === totalRounds) return '決勝';
+    if (round === totalRounds - 1) return '準決勝';
+    if (round === totalRounds - 2) return '準々決勝';
+    return `${round}回戦`;
+  }, [allDraws]);
 
   const venue = VENUE_PRESETS.find(v => v.id === selectedVenue) || VENUE_PRESETS[0];
 
@@ -209,12 +229,18 @@ export default function CourtMap() {
 
   const selectedCourtDetail = selectedCourt ? courtStatusMap[selectedCourt] : null;
 
-  // 選択コートの全試合
+  // 選択コートの全試合（履歴順: 完了試合を updatedAt 昇順で並べ、未完了は末尾）
   const selectedCourtMatches = useMemo(() => {
     if (!selectedCourtDetail?.court) return [];
     return allMatches
       .filter(m => m.courtId === selectedCourtDetail.court!.courtId)
-      .sort((a, b) => a.matchOrder - b.matchOrder);
+      .sort((a, b) => {
+        // finished/walkover → playing → others
+        const statusOrder = (s: string) => s === 'finished' || s === 'walkover' ? 0 : s === 'playing' ? 1 : 2;
+        const sa = statusOrder(a.status), sb = statusOrder(b.status);
+        if (sa !== sb) return sa - sb;
+        return (a.updatedAt || 0) - (b.updatedAt || 0);
+      });
   }, [selectedCourtDetail, allMatches]);
 
   // 種目名取得
@@ -575,107 +601,8 @@ export default function CourtMap() {
           </div>
         </div>
 
-        {/* 右パネル: コート詳細 */}
-        <div className="lg:w-80 shrink-0 overflow-auto space-y-3">
-          {selectedCourtDetail ? (
-            <>
-              <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
-                <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary-500" />
-                  {selectedCourt}番コート
-                </h3>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    selectedCourtDetail.status === 'playing' ? 'bg-green-100 text-green-800' :
-                    selectedCourtDetail.status === 'ready' ? 'bg-blue-100 text-primary-500' :
-                    selectedCourtDetail.status === 'unavailable' ? 'bg-gray-100 text-gray-500' :
-                    'bg-gray-50 text-gray-500'
-                  }`}>
-                    {selectedCourtDetail.status === 'playing' && <Play className="w-3 h-3" />}
-                    {selectedCourtDetail.status === 'ready' && <Clock className="w-3 h-3" />}
-                    {selectedCourtDetail.status === 'unavailable' && <AlertCircle className="w-3 h-3" />}
-                    {statusLabel[selectedCourtDetail.status]}
-                  </span>
-                  <span className="text-xs text-gray-500">{selectedCourtDetail.matchCount}試合割当</span>
-                </div>
-
-                {/* 現在の試合 */}
-                {selectedCourtDetail.currentMatch && (
-                  <div className="mt-3 bg-green-50 rounded-lg p-3 border border-green-200">
-                    <div className="text-xs font-medium text-green-700 mb-1 flex items-center gap-1">
-                      <Play className="w-3 h-3" /> 現在の試合
-                    </div>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {getEventName(selectedCourtDetail.currentMatch.eventId)}
-                    </div>
-                    <p className="text-sm font-medium whitespace-nowrap">{selectedCourtDetail.currentMatch.player1Name}</p>
-                    <p className="text-[10px] text-gray-500 text-center">vs</p>
-                    <p className="text-sm font-medium whitespace-nowrap">{selectedCourtDetail.currentMatch.player2Name}</p>
-                    {selectedCourtDetail.currentMatch.score && (
-                      <p className="text-sm font-mono text-primary-500 mt-1">{selectedCourtDetail.currentMatch.score}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* コート試合一覧 */}
-              {selectedCourtMatches.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
-                  <h4 className="text-sm font-bold text-gray-900 mb-2">試合一覧</h4>
-                  <div className="space-y-2 max-h-96 overflow-auto">
-                    {selectedCourtMatches.map(m => (
-                      <div
-                        key={m.matchId}
-                        className={`rounded-lg p-2.5 text-xs border ${
-                          m.status === 'playing' ? 'bg-green-50 border-green-200' :
-                          m.status === 'finished' ? 'bg-primary-50 border-border-main' :
-                          m.status === 'walkover' ? 'bg-amber-50 border-amber-200' :
-                          'bg-white border-border-main'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-gray-500 truncate flex-1">
-                            {getEventName(m.eventId)}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            m.status === 'playing' ? 'bg-green-100 text-green-700' :
-                            m.status === 'finished' ? 'bg-blue-100 text-primary-500' :
-                            m.status === 'walkover' ? 'bg-amber-100 text-amber-700' :
-                            m.status === 'ready' ? 'bg-blue-50 text-blue-600' :
-                            'bg-gray-100 text-gray-500'
-                          }`}>
-                            {m.status === 'playing' ? '試合中' :
-                             m.status === 'finished' ? '終了' :
-                             m.status === 'walkover' ? '不戦勝' :
-                             m.status === 'ready' ? '準備完了' : '待機'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium truncate whitespace-nowrap">{m.player1Name}</span>
-                          <span className="text-gray-500 shrink-0">vs</span>
-                          <span className="font-medium truncate whitespace-nowrap">{m.player2Name}</span>
-                        </div>
-                        {m.score && (
-                          <p className="font-mono text-primary-500 mt-0.5">{m.score}</p>
-                        )}
-                        {m.scheduledTime && (
-                          <p className="text-gray-500 mt-0.5">{m.scheduledTime}〜</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-dashed border-border-main p-8 text-center">
-              <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">コートをクリックすると</p>
-              <p className="text-sm text-gray-500">詳細が表示されます</p>
-            </div>
-          )}
-
-          {/* 全体進捗 */}
+        {/* 全体進捗 */}
+        <div className="lg:w-64 shrink-0 overflow-auto">
           <div className="bg-white rounded-xl shadow-sm border border-border-main p-4">
             <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4 text-primary-500" />
@@ -712,6 +639,257 @@ export default function CourtMap() {
           </div>
         </div>
       </div>
+
+      {/* ===== フルスクリーン コート詳細オーバーレイ ===== */}
+      {selectedCourt && selectedCourtDetail && createPortal(
+        <div
+          className="fixed inset-0 z-[100] court-detail-backdrop"
+          onClick={() => setSelectedCourt(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm court-detail-fade-in" />
+
+          {/* Content */}
+          <div
+            className="absolute inset-0 flex flex-col court-detail-slide-up overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* ヘッダー: コート番号 + ステータス */}
+            <div className={`shrink-0 px-5 pt-5 pb-4 ${
+              selectedCourtDetail.status === 'playing'
+                ? 'bg-gradient-to-br from-green-600 via-green-700 to-emerald-800'
+                : selectedCourtDetail.status === 'ready'
+                  ? 'bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800'
+                  : 'bg-gradient-to-br from-gray-600 via-gray-700 to-slate-800'
+            } text-white`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  {/* コート番号 大表示 */}
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shadow-lg">
+                      <span className="text-3xl font-black">{selectedCourt}</span>
+                    </div>
+                    {selectedCourtDetail.status === 'playing' && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping opacity-75" />
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      {selectedCourt}番コート
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        selectedCourtDetail.status === 'playing'
+                          ? 'bg-green-400/30 text-green-100 border border-green-400/40'
+                          : selectedCourtDetail.status === 'ready'
+                            ? 'bg-blue-400/30 text-blue-100 border border-blue-400/40'
+                            : 'bg-white/20 text-white/80 border border-white/20'
+                      }`}>
+                        {selectedCourtDetail.status === 'playing' && <Play className="w-3 h-3" />}
+                        {selectedCourtDetail.status === 'ready' && <Clock className="w-3 h-3" />}
+                        {statusLabel[selectedCourtDetail.status]}
+                      </span>
+                      <span className="text-xs text-white/60">
+                        {selectedCourtDetail.matchCount}試合割当
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCourt(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors border border-white/20"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 現在の試合 — 大きく表示 */}
+              {selectedCourtDetail.currentMatch && (() => {
+                const cm = selectedCourtDetail.currentMatch;
+                const elapsed = cm.updatedAt ? Math.floor((now - cm.updatedAt) / 1000) : 0;
+                const h = Math.floor(elapsed / 3600);
+                const m = Math.floor((elapsed % 3600) / 60);
+                const s = elapsed % 60;
+                const elapsedStr = h > 0
+                  ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+                  : `${m}:${String(s).padStart(2, '0')}`;
+                const isOver = timeOverCourts.has(selectedCourt!);
+                return (
+                  <div className="mt-4 bg-white/10 rounded-2xl p-4 border border-white/20 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-bold text-white/80 bg-white/15 px-2 py-0.5 rounded">
+                        {getEventName(cm.eventId)}
+                      </span>
+                      <span className="text-xs text-white/60">
+                        {getRoundName(cm.eventId, cm.round)}
+                      </span>
+                      {cm.scheduledTime && (
+                        <span className="text-xs text-white/50 ml-auto">
+                          予定 {cm.scheduledTime}
+                        </span>
+                      )}
+                    </div>
+                    {/* 選手名 大表示 */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 text-right">
+                        <p className="text-lg font-bold leading-tight">{cm.player1Name}</p>
+                        <p className="text-xs text-white/50 mt-0.5">{cm.player1Affiliation}</p>
+                      </div>
+                      <div className="shrink-0 flex flex-col items-center">
+                        <span className="text-xs font-bold text-white/40">VS</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-lg font-bold leading-tight">{cm.player2Name}</p>
+                        <p className="text-xs text-white/50 mt-0.5">{cm.player2Affiliation}</p>
+                      </div>
+                    </div>
+                    {/* 経過時間 */}
+                    <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-white/15">
+                      <Timer className={`w-4 h-4 ${isOver ? 'text-red-300 animate-pulse' : 'text-white/60'}`} />
+                      <span className={`text-2xl font-mono font-bold ${isOver ? 'text-red-300' : 'text-white'}`}>
+                        {elapsedStr}
+                      </span>
+                      {isOver && (
+                        <span className="text-xs font-bold text-red-300 bg-red-400/20 px-2 py-0.5 rounded-full border border-red-400/30 animate-pulse">
+                          時間超過
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 空きコート/準備中 */}
+              {!selectedCourtDetail.currentMatch && selectedCourtDetail.nextMatch && (
+                <div className="mt-4 bg-white/10 rounded-2xl p-4 border border-white/20 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-white/60" />
+                    <span className="text-sm font-bold text-white/80">次の試合</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 text-right">
+                      <p className="text-base font-bold">{selectedCourtDetail.nextMatch.player1Name}</p>
+                    </div>
+                    <span className="text-xs text-white/40">VS</span>
+                    <div className="flex-1">
+                      <p className="text-base font-bold">{selectedCourtDetail.nextMatch.player2Name}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 試合履歴 */}
+            <div className="flex-1 bg-white overflow-auto">
+              <div className="px-5 py-4">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-primary-500" />
+                  このコートの試合履歴
+                  <span className="text-xs font-normal text-gray-400">({selectedCourtMatches.length}試合)</span>
+                </h3>
+
+                {selectedCourtMatches.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">このコートにはまだ試合がありません</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedCourtMatches.map((m, idx) => {
+                      const isPlaying = m.status === 'playing';
+                      const isFinished = m.status === 'finished' || m.status === 'walkover';
+                      const eventName = getEventName(m.eventId);
+                      const roundName = getRoundName(m.eventId, m.round);
+                      const endTime = isFinished && m.updatedAt
+                        ? new Date(m.updatedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+                        : null;
+                      const winnerName = isFinished && m.winnerEntryId
+                        ? (m.winnerEntryId === m.player1EntryId ? m.player1Name : m.player2Name)
+                        : null;
+                      const loserName = isFinished && m.winnerEntryId
+                        ? (m.winnerEntryId === m.player1EntryId ? m.player2Name : m.player1Name)
+                        : null;
+
+                      return (
+                        <div
+                          key={m.matchId}
+                          className={`rounded-xl p-3 border transition-all court-detail-item ${
+                            isPlaying
+                              ? 'bg-green-50 border-green-300 shadow-sm shadow-green-100'
+                              : isFinished
+                                ? 'bg-gray-50 border-gray-200'
+                                : 'bg-blue-50 border-blue-200'
+                          }`}
+                          style={{ animationDelay: `${idx * 50}ms` }}
+                        >
+                          {/* 上段: 種目 + 回戦 + ステータス */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              isPlaying ? 'bg-green-200 text-green-800'
+                              : isFinished ? 'bg-gray-200 text-gray-600'
+                              : 'bg-blue-200 text-blue-700'
+                            }`}>
+                              {isPlaying ? '試合中' : isFinished ? '終了' : m.status === 'walkover' ? 'W/O' : '待機'}
+                            </span>
+                            <span className="text-xs text-gray-600 font-medium">{eventName}</span>
+                            <span className="text-xs text-gray-400">{roundName}</span>
+                            {endTime && (
+                              <span className="text-[10px] text-gray-400 ml-auto font-mono">{endTime}</span>
+                            )}
+                          </div>
+
+                          {/* 中段: 選手名 + スコア */}
+                          {isFinished && winnerName ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <Trophy className="w-3 h-3 text-yellow-500 shrink-0" />
+                                  <span className="text-sm font-bold text-gray-900 truncate">{winnerName}</span>
+                                </div>
+                                <span className="text-xs text-gray-400 truncate block">vs {loserName}</span>
+                              </div>
+                              {m.score && (
+                                <span className="text-xs font-mono font-bold text-gray-700 shrink-0 bg-white px-2 py-1 rounded border border-gray-200">
+                                  {m.score}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800 truncate">{m.player1Name}</span>
+                              <span className="text-xs text-gray-400 shrink-0">vs</span>
+                              <span className="text-sm font-medium text-gray-800 truncate">{m.player2Name}</span>
+                            </div>
+                          )}
+
+                          {/* 下段: 時間情報 */}
+                          {m.scheduledTime && (
+                            <div className="flex items-center gap-1 mt-1.5 text-[10px] text-gray-400">
+                              <Clock className="w-3 h-3" />
+                              予定 {m.scheduledTime}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* フッター: 閉じるボタン */}
+            <div className="shrink-0 bg-white border-t border-gray-200 px-5 py-3">
+              <button
+                onClick={() => setSelectedCourt(null)}
+                className="w-full py-3 text-sm font-bold text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
+              >
+                コートマップに戻る
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

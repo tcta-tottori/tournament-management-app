@@ -119,6 +119,24 @@ export default function Scoreboard() {
   const [scoreInput, setScoreInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const initializedRef = useRef(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // スクロールでヘッダーを非表示にする
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      const y = container.scrollTop;
+      if (y > lastScrollY.current && y > 50) {
+        setHeaderVisible(false);
+      }
+      lastScrollY.current = y;
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, []);
 
   // -- Data queries --
   const events = useLiveQuery(
@@ -604,9 +622,19 @@ export default function Scoreboard() {
   // =========================================================================
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-4 print:p-0 print:space-y-2">
+    <div ref={scrollContainerRef} className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-4 print:p-0 print:space-y-2 overflow-auto">
+      {/* ヘッダー再表示ボタン（非表示時のみ） */}
+      {!headerVisible && (
+        <button
+          onClick={() => setHeaderVisible(true)}
+          className="fixed top-2 right-2 z-50 bg-primary-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-bold hover:bg-primary-600 transition-colors print:hidden flex items-center gap-1"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          メニュー
+        </button>
+      )}
       {/* ===== HEADER ===== */}
-      <header className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0 sticky top-0 z-10">
+      <header className={`flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-border-main print:shadow-none print:border-none print:p-2 shrink-0 sticky top-0 z-10 transition-all duration-300 ${!headerVisible ? 'hidden' : ''}`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -766,7 +794,7 @@ export default function Scoreboard() {
       </header>
 
       {/* ===== COURT STATUS BAR ===== */}
-      {courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
+      {headerVisible && courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
         <div className="flex gap-2 overflow-x-auto pb-1 print:hidden shrink-0">
           {courtStatus.map(c => {
             const isOver = c.matchInfo && c.startedAt > 0 && (clockTick - c.startedAt) > matchDuration * 60 * 1000;
@@ -813,8 +841,8 @@ export default function Scoreboard() {
             perEventData.map(evtData => {
               return (
                 <section key={evtData.event.eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-                  {/* Event header */}
-                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-border-main">
+                  {/* Event header — sticky */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-border-main sticky top-0 z-[5]">
                     <div className="flex items-center justify-between">
                       <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                         {evtData.isRoundRobin

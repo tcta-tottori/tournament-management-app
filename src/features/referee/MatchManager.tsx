@@ -17,6 +17,14 @@ function getRoundName(round: number, totalRounds: number): string {
   return `${round}回戦`;
 }
 
+function shortEventName(name: string): string {
+  return name.replace(/シングルス/g, '');
+}
+
+function stripRoundPrefix(text: string): string {
+  return text.replace(/^[\d～\-]+回戦は|^準々?決勝(以降)?は|^決勝は|^全回戦は/g, '').trim();
+}
+
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
 
 
@@ -50,6 +58,20 @@ export default function MatchManager() {
   const entries = useLiveQuery(
     () => selectedEventId ? db.entries.where('eventId').equals(selectedEventId).toArray() : [],
     [selectedEventId]
+  ) || [];
+
+  const allEntries = useLiveQuery(
+    async () => {
+      if (!currentTournamentId) return [];
+      const allEvts = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+      const entryArr: any[] = [];
+      for (const evt of allEvts) {
+        const evtEntries = await db.entries.where('eventId').equals(evt.eventId).toArray();
+        entryArr.push(...evtEntries);
+      }
+      return entryArr;
+    },
+    [currentTournamentId]
   ) || [];
 
   const players = useLiveQuery(() => db.players.toArray()) || [];
@@ -176,8 +198,11 @@ export default function MatchManager() {
   ) || {};
 
   // Match → MatchCall 変換
-  const buildMatchCall = useCallback((m: Match, courtNum: string): MatchCall | null => {
+  const buildMatchCall = useCallback((m: Match, courtNum: string, overrideEvent?: Event, overrideTotalRounds?: number): MatchCall | null => {
     if (!m.player1Name || !m.player2Name) return null;
+
+    const useEvent = overrideEvent || currentEvent;
+    const useTotalRounds = overrideTotalRounds ?? totalRounds;
 
     const getPos = (entryId: string | null, eventId?: string) => {
       if (!entryId) return 0;
@@ -190,7 +215,7 @@ export default function MatchManager() {
 
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
       if (!entryId) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
-      const entry = entries.find(e => e.entryId === entryId);
+      const entry = entries.find(e => e.entryId === entryId) || allEntries.find(e => e.entryId === entryId);
       if (!entry) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
       const player = players.find(p => p.playerId === entry.playerId);
       if (!player) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
@@ -198,8 +223,8 @@ export default function MatchManager() {
       return { name: player.furigana || player.name, aff: affReading };
     };
 
-    const isDoubles = currentEvent?.type === 'Doubles';
-    const roundName = getRoundName(m.round, totalRounds);
+    const isDoubles = useEvent?.type === 'Doubles';
+    const roundName = getRoundName(m.round, useTotalRounds);
 
     if (isDoubles) {
       const [fallbackNameA, fallbackPairNameA] = m.player1Name.includes(' / ')
@@ -218,14 +243,14 @@ export default function MatchManager() {
       let partnerB = { name: fallbackPairNameB.trim(), aff: fallbackPairAffB.trim() };
 
       if (m.player1EntryId) {
-        const entry1 = entries.find(e => e.entryId === m.player1EntryId);
+        const entry1 = entries.find(e => e.entryId === m.player1EntryId) || allEntries.find(e => e.entryId === m.player1EntryId);
         if (entry1?.partnerId) {
           const partner = players.find(p => p.playerId === entry1.partnerId);
           if (partner) partnerA = { name: partner.furigana || partner.name, aff: partner.affiliation };
         }
       }
       if (m.player2EntryId) {
-        const entry2 = entries.find(e => e.entryId === m.player2EntryId);
+        const entry2 = entries.find(e => e.entryId === m.player2EntryId) || allEntries.find(e => e.entryId === m.player2EntryId);
         if (entry2?.partnerId) {
           const partner = players.find(p => p.playerId === entry2.partnerId);
           if (partner) partnerB = { name: partner.furigana || partner.name, aff: partner.affiliation };
@@ -234,7 +259,7 @@ export default function MatchManager() {
 
       return {
         id: m.id || 0,
-        eventName: currentEvent?.name || '',
+        eventName: useEvent?.name || '',
         round: `${roundName} #${m.position}`,
         numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
@@ -257,7 +282,7 @@ export default function MatchManager() {
 
       return {
         id: m.id || 0,
-        eventName: currentEvent?.name || '',
+        eventName: useEvent?.name || '',
         round: `${roundName} #${m.position}`,
         numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
@@ -271,7 +296,7 @@ export default function MatchManager() {
         startTime: m.scheduledTime || '',
       };
     }
-  }, [drawData, allDraws, entries, players, currentEvent, totalRounds, affiliationFuriganaMap]);
+  }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap]);
 
   // コール実行
   const handleVoiceCall = useCallback((m: Match, courtNum: string) => {
@@ -364,12 +389,12 @@ export default function MatchManager() {
     for (const fm of firstMatches) {
       const m = fm.match;
       const courtNum = fm.court.name;
-      const matchCall = buildMatchCall(m, courtNum);
-      if (!matchCall) continue;
-      const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap);
       const evt = events.find(e => e.eventId === m.eventId);
       const evDraw = allDraws.get(m.eventId);
       const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+      const matchCall = buildMatchCall(m, courtNum, evt, evTotalRounds);
+      if (!matchCall) continue;
+      const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap, true);
 
       bulkItems.push({
         matchId: m.matchId,
@@ -589,7 +614,7 @@ export default function MatchManager() {
     const getGameMethodForRound = (round: number): string => {
       const rules = evt?.roundGameRules;
       if (rules && rules.length > 0) {
-        if (rules.length === 1) return rules[0].ruleText.replace(/\n/g, '\n');
+        if (rules.length === 1) return stripRoundPrefix(rules[0].ruleText).replace(/\n/g, '\n');
         const roundN = getRoundName(round, eventTotalRounds);
         for (const rule of rules) {
           const label = rule.roundLabel;
@@ -597,21 +622,21 @@ export default function MatchManager() {
           const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
           if (rangeMatch) {
             const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
-            if (round >= from && round <= to) return rule.ruleText;
+            if (round >= from && round <= to) return stripRoundPrefix(rule.ruleText);
             continue;
           }
           if (label.includes('以降')) {
             const cl = label.replace('以降', '');
-            if (cl.includes('準々決勝') && round >= eventTotalRounds - 2) return rule.ruleText;
-            if (cl.includes('準決勝') && round >= eventTotalRounds - 1) return rule.ruleText;
-            if (cl.includes('決勝') && !cl.includes('準') && round >= eventTotalRounds) return rule.ruleText;
+            if (cl.includes('準々決勝') && round >= eventTotalRounds - 2) return stripRoundPrefix(rule.ruleText);
+            if (cl.includes('準決勝') && round >= eventTotalRounds - 1) return stripRoundPrefix(rule.ruleText);
+            if (cl.includes('決勝') && !cl.includes('準') && round >= eventTotalRounds) return stripRoundPrefix(rule.ruleText);
             const rn = cl.match(/(\d+)回戦/);
-            if (rn && round >= parseInt(rn[1])) return rule.ruleText;
+            if (rn && round >= parseInt(rn[1])) return stripRoundPrefix(rule.ruleText);
             continue;
           }
-          if (roundN === label || label.includes(roundN)) return rule.ruleText;
+          if (roundN === label || label.includes(roundN)) return stripRoundPrefix(rule.ruleText);
         }
-        return rules[0].ruleText;
+        return stripRoundPrefix(rules[0].ruleText);
       }
       const games = evt?.gameRules?.games ?? 6;
       return `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
@@ -984,25 +1009,25 @@ ${printableMatches.map(m => {
     const rules2 = evt.roundGameRules;
     let gameMethod: string;
     if (rules2 && rules2.length > 0) {
-      if (rules2.length === 1) { gameMethod = rules2[0].ruleText; }
+      if (rules2.length === 1) { gameMethod = stripRoundPrefix(rules2[0].ruleText); }
       else {
         const rn2 = getRoundName(m.round, eventTotalRounds);
-        gameMethod = rules2[0].ruleText; // default
+        gameMethod = stripRoundPrefix(rules2[0].ruleText); // default
         for (const rule of rules2) {
           const label = rule.roundLabel;
           if (label === '全回戦') continue;
           const rm = label.match(/(\d+)～(\d+)回戦/);
-          if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameMethod = rule.ruleText; break; } continue; }
+          if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameMethod = stripRoundPrefix(rule.ruleText); break; } continue; }
           if (label.includes('以降')) {
             const cl = label.replace('以降', '');
-            if (cl.includes('準々決勝') && m.round >= eventTotalRounds - 2) { gameMethod = rule.ruleText; break; }
-            if (cl.includes('準決勝') && m.round >= eventTotalRounds - 1) { gameMethod = rule.ruleText; break; }
-            if (cl.includes('決勝') && !cl.includes('準') && m.round >= eventTotalRounds) { gameMethod = rule.ruleText; break; }
+            if (cl.includes('準々決勝') && m.round >= eventTotalRounds - 2) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
+            if (cl.includes('準決勝') && m.round >= eventTotalRounds - 1) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
+            if (cl.includes('決勝') && !cl.includes('準') && m.round >= eventTotalRounds) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
             const rn3 = cl.match(/(\d+)回戦/);
-            if (rn3 && m.round >= parseInt(rn3[1])) { gameMethod = rule.ruleText; break; }
+            if (rn3 && m.round >= parseInt(rn3[1])) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
             continue;
           }
-          if (rn2 === label || label.includes(rn2)) { gameMethod = rule.ruleText; break; }
+          if (rn2 === label || label.includes(rn2)) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
         }
       }
     } else {
@@ -1244,6 +1269,8 @@ ${printableMatches.map(m => {
                   <tbody>
                     {(() => {
                       let lastTime = '';
+                      const availableCourtCount = courts.filter(c => c.isAvailable).length;
+                      let courtAssignedCount = 0;
                       return globalSortedMatches.map((m) => {
                         const st = statusLabels[m.status] || statusLabels.waiting;
                         const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
@@ -1296,10 +1323,17 @@ ${printableMatches.map(m => {
                                 <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
                               </td>
                               <td className="py-2 px-2">
-                                <div className="text-[10px] text-gray-500 truncate">{m.eventName}</div>
+                                <div className="text-[10px] text-gray-500 truncate">{shortEventName(m.eventName)}</div>
                                 <div className="text-[10px] font-medium text-gray-700">{rName}</div>
                               </td>
-                              <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{courtObj?.name || '-'}</td>
+                              <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{(() => {
+                                if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
+                                if (hasPlayers && courtObj && courtAssignedCount < availableCourtCount) {
+                                  courtAssignedCount++;
+                                  return courtObj.name;
+                                }
+                                return '-';
+                              })()}</td>
                               <td className="py-2 px-2 text-center">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
                               </td>
@@ -1351,6 +1385,55 @@ ${printableMatches.map(m => {
                                 </div>
                               </td>
                             </tr>
+                            {editingMatchId === m.matchId && (
+                              <tr className="bg-blue-50 border-b border-blue-200">
+                                <td colSpan={9} className="px-4 py-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    <span className="text-xs font-bold text-gray-600">スコア入力:</span>
+                                    <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="P1" autoFocus
+                                      onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                                    <span className="text-gray-400 font-bold">-</span>
+                                    <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="P2"
+                                      onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                                    {isTiebreakScore && (
+                                      <>
+                                        <span className="text-xs text-gray-500">TB:</span>
+                                        <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="TB"
+                                          onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                                      </>
+                                    )}
+                                    <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-3 py-1 bg-primary-500 text-white rounded text-xs font-bold disabled:opacity-30">
+                                      <Check className="w-3 h-3 inline mr-1" />確定
+                                    </button>
+                                    <button onClick={cancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-bold">
+                                      <X className="w-3 h-3 inline mr-1" />キャンセル
+                                    </button>
+                                    {autoWinner && <span className="text-xs text-primary-600 font-bold">勝者: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {callTargetMatchId === m.matchId && (
+                              <tr className="bg-emerald-50 border-b border-emerald-200">
+                                <td colSpan={9} className="px-4 py-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    <span className="text-xs font-bold text-emerald-700">コート:</span>
+                                    <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)} className="px-2 py-1 border rounded text-sm">
+                                      <option value="">選択</option>
+                                      {courts.filter(c => c.isAvailable).map(c => (
+                                        <option key={c.courtId} value={c.name}>{c.name}番</option>
+                                      ))}
+                                    </select>
+                                    <button onClick={() => { if (callCourtNumber) { handleVoiceCall(m, callCourtNumber); setCallTargetMatchId(null); } }} disabled={!callCourtNumber} className="px-3 py-1 bg-emerald-500 text-white rounded text-xs font-bold disabled:opacity-30">
+                                      <Volume2 className="w-3 h-3 inline mr-1" />コール
+                                    </button>
+                                    <button onClick={() => setCallTargetMatchId(null)} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-bold">
+                                      閉じる
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
                           </React.Fragment>
                         );
                       });

@@ -562,3 +562,26 @@
   from { opacity: 0; transform: translateY(12px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* コート詳細 フルスクリーンオーバーレイ */
+@keyframes courtDetailFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes courtDetailSlideUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes courtDetailItemIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.court-detail-fade-in {
+  animation: courtDetailFadeIn 0.3s ease-out;
+}
+.court-detail-slide-up {
+  animation: courtDetailSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.court-detail-item {
+  animation: courtDetailItemIn 0.35s ease-out both;
+}

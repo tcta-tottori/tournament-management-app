@@ -16,6 +16,7 @@ import {
   ChevronRight,
   BookOpen,
   UserX,
+  AlertCircle,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
   walkover: { label: 'W/O',     bg: 'bg-orange-100',  text: 'text-orange-700',  dot: 'bg-orange-400' },
 };
 
-const DEFAULT_VOICE: VoiceSettings = { rate: 0.85, pitch: 1.1, volume: 1.0, repeatCount: 2 };
+const DEFAULT_VOICE: VoiceSettings = { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 };
 
 // ---------------------------------------------------------------------------
 // Component
@@ -251,6 +252,52 @@ export default function ScoreInputDialog({
     if (p2Wins >= neededSets) return 2 as const;
     return null;
   }, [sets, match, maxSets, retPlayer, isTwoSetFormat, superTB]);
+
+  // スコアバリデーション: ルールに基づいてスコアの妥当性を検証
+  const scoreValidationError = useMemo(() => {
+    if (!match || retPlayer) return null; // 棄権時はバリデーション不要
+    if (match.status !== 'playing') return null;
+
+    // gameRuleText からゲーム数を抽出（例: "6ゲームマッチ（6-6タイブレーク）"）
+    const gamesMatch = gameRuleText?.match(/(\d+)ゲームマッチ/);
+    const requiredGames = gamesMatch ? parseInt(gamesMatch[1]) : null;
+
+    if (!requiredGames) return null; // ルール不明の場合はスキップ
+
+    const errors: string[] = [];
+
+    for (let i = 0; i < (isTwoSetFormat ? 2 : maxSets); i++) {
+      const p1 = parseInt(sets[i]?.p1);
+      const p2 = parseInt(sets[i]?.p2);
+      if (isNaN(p1) && isNaN(p2)) continue; // 未入力セットはスキップ
+      if (isNaN(p1) || isNaN(p2)) {
+        errors.push(`Set${i + 1}: 両方のスコアを入力してください`);
+        continue;
+      }
+
+      const winner = Math.max(p1, p2);
+      const loser = Math.min(p1, p2);
+
+      // タイブレーク: winner = requiredGames+1, loser = requiredGames (e.g. 7-6)
+      // ノーアドの場合なども考慮して、loser < requiredGames の時 winner == requiredGames
+      if (winner === requiredGames + 1 && loser === requiredGames) {
+        // タイブレークスコア — OK, タイブレーク内ポイントが必要
+        if (!tiebreaks[i]) {
+          errors.push(`Set${i + 1}: タイブレークポイントを入力してください`);
+        }
+      } else if (winner === requiredGames && loser < requiredGames) {
+        // 通常勝利 — OK
+      } else if (winner === 9 && loser === 8) {
+        // 8-8 TB — OK (ノーアドバンテージ特殊ルール)
+      } else if (winner > requiredGames + 1 || (winner === requiredGames + 1 && loser !== requiredGames)) {
+        errors.push(`Set${i + 1}: ${requiredGames}ゲームマッチのスコアとして不正です (${p1}-${p2})`);
+      } else if (winner < requiredGames && (p1 + p2 > 0)) {
+        // 途中スコアとして可能なので警告しない
+      }
+    }
+
+    return errors.length > 0 ? errors : null;
+  }, [sets, tiebreaks, gameRuleText, match, retPlayer, isTwoSetFormat, maxSets]);
 
   // スコア文字列を構築
   const buildScoreString = useCallback(() => {
@@ -700,8 +747,19 @@ export default function ScoreInputDialog({
               </div>
             )}
 
+            {/* スコアバリデーションエラー */}
+            {scoreValidationError && canFinish && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2 space-y-0.5">
+                {scoreValidationError.map((err, idx) => (
+                  <p key={idx} className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />{err}
+                  </p>
+                ))}
+              </div>
+            )}
+
             {/* 自動勝者判定表示 */}
-            {autoWinner && canFinish && (
+            {autoWinner && canFinish && !scoreValidationError && (
               <div className="text-center">
                 <span className="text-xs text-primary-600 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
@@ -710,7 +768,7 @@ export default function ScoreInputDialog({
               </div>
             )}
             {/* スコア未入力時のヒント */}
-            {canFinish && !autoWinner && (
+            {canFinish && !autoWinner && !scoreValidationError && (
               <p className="text-center text-xs text-gray-400">スコアを入力するか棄権を選択すると勝者が判定されます</p>
             )}
           </div>
@@ -731,7 +789,7 @@ export default function ScoreInputDialog({
                 <Play className="w-4 h-4" /> 試合開始
               </button>
             )}
-            {canFinish && autoWinner && (
+            {canFinish && autoWinner && !scoreValidationError && (
               <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25">
                 <Trophy className="w-4 h-4" /> 結果確定

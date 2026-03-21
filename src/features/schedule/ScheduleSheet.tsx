@@ -224,55 +224,86 @@ export default function ScheduleSheet() {
   // --------------- Match lookup: match imported schedule items to DB matches ---------------
 
   const matchLookup = useMemo(() => {
-    // Build a lookup: for each importedSchedule item, find the matching DB match
-    // Matching logic: eventName -> find DB event, roundLabel -> round number, then position-based matching
     const lookup = new Map<number, Match>(); // index in importedSchedule -> Match
 
     if (allMatches.length === 0 || events.length === 0) return lookup;
 
-    // Group schedule items by eventName + roundLabel
-    const groups = new Map<string, number[]>();
-    importedSchedule.forEach((item, idx) => {
-      const key = `${item.eventName}|${item.roundLabel}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(idx);
-    });
-
-    const drawSizeMap = new Map<string, number>();
-    for (const d of draws) {
-      drawSizeMap.set(d.eventId, d.drawSize);
+    // Build courtName -> courtId mapping
+    const courtNameToId = new Map<string, string>();
+    for (const c of allCourts) {
+      courtNameToId.set(c.name, c.courtId);
     }
 
-    for (const [key, indices] of groups) {
-      const [eventName, roundLabel] = key.split('|');
-      const matchedEvent = findMatchingEvent(eventName, events);
-      if (!matchedEvent) continue;
+    // Strategy 1: Match by courtId + scheduledTime (most reliable when schedule import has been done)
+    const matchByCourtTime = new Map<string, Match>();
+    for (const m of allMatches) {
+      if (m.courtId && m.scheduledTime) {
+        matchByCourtTime.set(`${m.courtId}|${m.scheduledTime}`, m);
+      }
+    }
 
-      const totalRounds = drawSizeMap.has(matchedEvent.eventId)
-        ? Math.log2(drawSizeMap.get(matchedEvent.eventId)!)
-        : null;
-      const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
-      if (roundNum === null) continue;
+    const unmatchedIndices: number[] = [];
+    importedSchedule.forEach((item, idx) => {
+      const courtId = courtNameToId.get(item.courtName);
+      if (courtId) {
+        const key = `${courtId}|${item.startTime}`;
+        const match = matchByCourtTime.get(key);
+        if (match) {
+          lookup.set(idx, match);
+          return;
+        }
+      }
+      unmatchedIndices.push(idx);
+    });
 
-      // Get DB matches for this event+round, sorted by matchOrder (対戦順ページと同じ順序)
-      const dbMatchesForRound = allMatches
-        .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum)
-        .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
+    // Strategy 2: For unmatched items, fall back to event+round position pairing
+    if (unmatchedIndices.length > 0) {
+      const drawSizeMap = new Map<string, number>();
+      for (const d of draws) {
+        drawSizeMap.set(d.eventId, d.drawSize);
+      }
 
-      // Sort schedule indices by time then court
-      const sortedIndices = [...indices].sort((a, b) => {
-        const sa = importedSchedule[a], sb = importedSchedule[b];
-        if (sa.startTime !== sb.startTime) return sa.startTime.localeCompare(sb.startTime);
-        return (parseInt(sa.courtName, 10) || 0) - (parseInt(sb.courtName, 10) || 0);
-      });
+      const alreadyLinkedMatchIds = new Set<string>();
+      for (const m of lookup.values()) alreadyLinkedMatchIds.add(m.matchId);
 
-      for (let j = 0; j < sortedIndices.length && j < dbMatchesForRound.length; j++) {
-        lookup.set(sortedIndices[j], dbMatchesForRound[j]);
+      const groups = new Map<string, number[]>();
+      for (const idx of unmatchedIndices) {
+        const item = importedSchedule[idx];
+        const key = `${item.eventName}|${item.roundLabel}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(idx);
+      }
+
+      for (const [key, indices] of groups) {
+        const [eventName, roundLabel] = key.split('|');
+        const matchedEvent = findMatchingEvent(eventName, events);
+        if (!matchedEvent) continue;
+
+        const totalRounds = drawSizeMap.has(matchedEvent.eventId)
+          ? Math.log2(drawSizeMap.get(matchedEvent.eventId)!)
+          : null;
+        const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
+        if (roundNum === null) continue;
+
+        const dbMatchesForRound = allMatches
+          .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum && !alreadyLinkedMatchIds.has(m.matchId))
+          .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
+
+        const sortedIndices = [...indices].sort((a, b) => {
+          const sa = importedSchedule[a], sb = importedSchedule[b];
+          if (sa.startTime !== sb.startTime) return sa.startTime.localeCompare(sb.startTime);
+          return (parseInt(sa.courtName, 10) || 0) - (parseInt(sb.courtName, 10) || 0);
+        });
+
+        for (let j = 0; j < sortedIndices.length && j < dbMatchesForRound.length; j++) {
+          lookup.set(sortedIndices[j], dbMatchesForRound[j]);
+          alreadyLinkedMatchIds.add(dbMatchesForRound[j].matchId);
+        }
       }
     }
 
     return lookup;
-  }, [importedSchedule, allMatches, events, draws]);
+  }, [importedSchedule, allMatches, events, draws, allCourts]);
 
   // --------------- LIVE判定（試合中があるか） ---------------
   const hasPlayingMatch = useMemo(() => {
@@ -791,11 +822,17 @@ export default function ScheduleSheet() {
                       const color = eventColorMap.get(item.eventName);
                       const evAbbr = abbreviateEventName(item.eventName);
 
-                      // Player names
+                      // Player names (苗字のみ表示)
                       let playerLabel = '';
                       if (dbMatch) {
-                        const p1 = dbMatch.player1Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
-                        const p2 = dbMatch.player2Name?.split(/[/／]/)[0]?.slice(0, 4) || '';
+                        const getSurname = (name: string | undefined) => {
+                          if (!name) return '';
+                          const base = name.split(/[/／]/)[0] || '';
+                          const surname = base.split(/[\s　]+/)[0] || '';
+                          return surname.slice(0, 4);
+                        };
+                        const p1 = getSurname(dbMatch.player1Name);
+                        const p2 = getSurname(dbMatch.player2Name);
                         if (p1 && p2 && p1 !== 'BYE' && p2 !== 'BYE') {
                           playerLabel = `${p1}v${p2}`;
                         } else if (p1 && p1 !== 'BYE') {

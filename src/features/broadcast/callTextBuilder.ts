@@ -29,6 +29,7 @@ export function buildCallText(
   courtNumber: string,
   startTime: string,
   affiliationFuriganaMap: Record<string, string> = {},
+  skipTime?: boolean,
 ): string {
   const younger = match.numberA < match.numberB
     ? { num: match.numberA, name: match.nameA }
@@ -59,7 +60,7 @@ export function buildCallText(
 
   // コート指定（「行ってください」→「おこなってください」）
   let courtText = `この試合を、${courtNumber}番コートで`;
-  if (startTime) {
+  if (startTime && !skipTime) {
     const [h, m] = startTime.split(':');
     const minutes = parseInt(m);
     courtText += minutes === 0
