@@ -1,61 +1,251 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Sparkles, Bug, Wrench, Paintbrush, ChevronRight } from 'lucide-react';
+import { X, Sparkles, Bug, Wrench, Paintbrush, ChevronRight, ChevronDown, Clock } from 'lucide-react';
 
-/** 更新履歴のエントリ */
+type ChangeType = 'feat' | 'fix' | 'design' | 'chore';
+
+/** 時間帯ごとの更新グループ */
+interface TimeGroup {
+  time: string;          // "13:06" など
+  summary: string;       // 時間帯の概要
+  changes: { type: ChangeType; text: string }[];
+}
+
+/** バージョンごとの更新履歴 */
 interface ChangelogEntry {
   version: string;
   date: string;
   highlights?: string;
-  changes: { type: 'feat' | 'fix' | 'design' | 'chore'; text: string }[];
+  timeGroups: TimeGroup[];
 }
 
 const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'v1.2',
     date: '2026-03-21',
-    highlights: 'PWA高速化・Google Drive連携強化・音声エンジン追加',
-    changes: [
-      { type: 'feat', text: 'VOICEVOX音声エンジンを放送コールシステムに追加' },
-      { type: 'feat', text: '時間割読込・自動コート配置・全コート初戦一斉コール機能' },
-      { type: 'feat', text: 'PC版ブラケット表をレスポンシブ化・選手名拡大' },
-      { type: 'fix', text: 'PWAキャッシュ戦略をNetworkFirstに変更' },
-      { type: 'fix', text: 'GDriveモーダルに進捗バー追加' },
-      { type: 'fix', text: 'ふりがな・所属データ読込後に一覧パネルを自動展開' },
-      { type: 'fix', text: 'DEF選手がいるときに対戦順が変わるバグを修正' },
-      { type: 'fix', text: 'Google Driveフォルダ重複作成を修正' },
-      { type: 'design', text: 'インポート完了UIをリデザイン' },
-      { type: 'design', text: 'データ管理ページの全セクションを統一的な開閉式パネルに変更' },
+    highlights: 'GDrive連携UI刷新・PWA高速化・音声エンジン追加',
+    timeGroups: [
+      {
+        time: '13:06',
+        summary: 'GDrive連携セクション整理・ローディングUI改善',
+        changes: [
+          { type: 'design', text: 'GDrive読込スピナーを1段カラフルリングに変更' },
+          { type: 'feat', text: 'ふりがな・所属操作を所属一覧パネル側に移動' },
+          { type: 'feat', text: '大会データ・時間割読込をGDrive連携セクションに統合' },
+          { type: 'fix', text: 'ドロー会議読込機能を削除・Excel読込をボタン方式に変更' },
+          { type: 'fix', text: '読込が8秒以上停止した場合のタイムアウト処理を追加' },
+        ],
+      },
+      {
+        time: '12:24',
+        summary: 'エントリーページ モバイル改善',
+        changes: [
+          { type: 'fix', text: 'モバイルでスクロール時に入力欄を非表示にし、ボタンでのみ再表示' },
+        ],
+      },
+      {
+        time: '11:05',
+        summary: 'GDriveモーダルに進捗バー追加',
+        changes: [
+          { type: 'feat', text: '大会データ読込・時間割読込にDriveLoadingModal(進捗バー付き)を追加' },
+        ],
+      },
+      {
+        time: '10:54',
+        summary: 'バージョン情報モーダル・時間割パーサー改善',
+        changes: [
+          { type: 'feat', text: 'バージョン情報モーダル追加・ヘッダーバージョンクリックで更新履歴表示' },
+          { type: 'fix', text: '時間割Excelパーサーを改善し「コートNO.」形式のグリッドを正しく検出' },
+        ],
+      },
+      {
+        time: '09:48',
+        summary: 'PWA高速化・キャッシュ戦略変更',
+        changes: [
+          { type: 'fix', text: 'PWAキャッシュ戦略をNetworkFirstに変更' },
+          { type: 'fix', text: '未使用変数affFuriganaMapを削除してビルドエラーを解消' },
+        ],
+      },
+      {
+        time: '09:09',
+        summary: 'GDriveモーダル進捗バー・時間割フォルダ取得',
+        changes: [
+          { type: 'fix', text: 'GDriveモーダルに進捗バー追加・時間割読込を専用フォルダから取得' },
+        ],
+      },
+      {
+        time: '08:20',
+        summary: 'インポート完了UIリデザイン',
+        changes: [
+          { type: 'design', text: 'インポート完了UIをリデザイン（メッシュグラデーション・パーティクル装飾）' },
+          { type: 'fix', text: 'ふりがな・所属データ読込後に一覧パネルを自動展開' },
+        ],
+      },
+      {
+        time: '07:11',
+        summary: 'データ管理ページ レイアウト統一',
+        changes: [
+          { type: 'fix', text: '所属・ふりがな一覧をDB辞書テーブルベースに変更しGDrive読込数と一致させる' },
+          { type: 'design', text: 'データ管理ページの全セクションを統一的な開閉式パネルに変更' },
+        ],
+      },
+      {
+        time: '06:04',
+        summary: 'VOICEVOX音声・時間割機能・ブラケット改善',
+        changes: [
+          { type: 'feat', text: 'VOICEVOX音声エンジンを放送コールシステムに追加' },
+          { type: 'feat', text: '時間割読込・自動コート配置・全コート初戦一斉コール機能' },
+          { type: 'fix', text: 'DEF選手がいるときに対戦順が変わるバグを修正' },
+          { type: 'feat', text: 'PC版ブラケット表をレスポンシブ化・選手名拡大' },
+        ],
+      },
+      {
+        time: '05:14',
+        summary: 'GDrive大会一覧・所属データ修正',
+        changes: [
+          { type: 'fix', text: '所属・ふりがな一覧の重複を自動クリーンアップ' },
+          { type: 'fix', text: 'Google Drive大会一覧をcreatePortalポップアップ式に変更' },
+          { type: 'fix', text: 'PC版ブラケット統一表示・対戦順ボタン常時表示・時間割モーダル中央化' },
+        ],
+      },
     ],
   },
   {
     version: 'v1.1',
     date: '2026-03-20',
     highlights: 'ライブダッシュボード・スコア入力・Google Drive連携',
-    changes: [
-      { type: 'feat', text: 'スコア入力ダイアログ追加・ブラケット改善' },
-      { type: 'feat', text: 'ライブダッシュボード大幅改善' },
-      { type: 'feat', text: 'スコアボードに全種目表示モード追加' },
-      { type: 'feat', text: 'Google ドライブ連携でふりがな・所属データの読込/書込' },
-      { type: 'feat', text: '各ページのヘッダーをスクロール時にスティッキー固定' },
-      { type: 'feat', text: 'ふりがな・所属の一括読込ボタン追加' },
-      { type: 'fix', text: 'スコア入力ダイアログを画面中央に表示' },
-      { type: 'fix', text: 'モバイル表示の全面最適化' },
-      { type: 'fix', text: 'リーグ戦でのスコア入力時に次ラウンド進出処理をスキップ' },
-      { type: 'fix', text: 'エントリーページのモバイル対応改善' },
-      { type: 'fix', text: 'タイムテーブル自動配置を対戦順に統一' },
-      { type: 'design', text: 'ヘッダーのゴールド波型ラインを動的アニメーションにリデザイン' },
-      { type: 'design', text: 'Google DriveブランドUI化' },
+    timeGroups: [
+      {
+        time: '20:43',
+        summary: 'スコア入力・モバイル最適化',
+        changes: [
+          { type: 'fix', text: 'スコア入力ダイアログをcreatePortalで画面中央に表示' },
+          { type: 'fix', text: 'モバイル表示の全面最適化' },
+          { type: 'fix', text: 'レガシーテーブル表示のリーグ戦対応＋音声コール品質改善' },
+        ],
+      },
+      {
+        time: '19:37',
+        summary: 'スコアボード全種目モード・エントリー改善',
+        changes: [
+          { type: 'fix', text: 'リーグ戦でのスコア入力時に次ラウンド進出処理をスキップ' },
+          { type: 'feat', text: 'スコアボードに全種目表示モード追加（デフォルト）' },
+          { type: 'fix', text: 'エントリーページのモバイル対応 — スクロールで入力欄を隠し種目名をスティッキーに' },
+        ],
+      },
+      {
+        time: '18:30',
+        summary: 'ふりがな一括読込・GDriveローディング',
+        changes: [
+          { type: 'feat', text: 'ふりがな・所属の一括読込ボタン追加' },
+          { type: 'feat', text: 'Google Drive操作時のローディングポップアップ追加' },
+        ],
+      },
+      {
+        time: '16:05',
+        summary: 'ページヘッダー改善・GDrive接続修正',
+        changes: [
+          { type: 'feat', text: '各ページのヘッダーをスクロール時にスティッキー固定' },
+          { type: 'fix', text: 'DataSync onConnectionChange props追加・LiveDashboard更新' },
+          { type: 'fix', text: 'スコア入力ダイアログを画面中央に表示＋背景ぼかしを控えめに' },
+        ],
+      },
+      {
+        time: '15:22',
+        summary: 'ヘッダーデザイン刷新・GDrive修正',
+        changes: [
+          { type: 'feat', text: 'ふりがな・所属データ読込後に自動重複削除を実行' },
+          { type: 'fix', text: 'Google Driveトークンのスコープ検証を追加・エラー詳細化' },
+          { type: 'design', text: 'ヘッダーのゴールド波型ラインを動的アニメーションにリデザイン' },
+          { type: 'design', text: '金の粒子を極細かくして空中に漂うイメージに変更' },
+          { type: 'fix', text: 'OAuthスコープ変更時に古いトークンを自動無効化' },
+        ],
+      },
+      {
+        time: '14:19',
+        summary: 'GDriveフォルダ修正・PWAキャッシュ改善',
+        changes: [
+          { type: 'fix', text: 'Google Driveフォルダ重複作成を修正・読取時にフォルダ作成しない' },
+          { type: 'fix', text: 'データページの大会データ読込セクションを最上部に移動' },
+          { type: 'fix', text: 'PWAキャッシュ更新問題を修正・バージョン表示にビルド日時を追加' },
+        ],
+      },
+      {
+        time: '13:28',
+        summary: 'ヘッダー金砂エフェクト・時間割Drive読込',
+        changes: [
+          { type: 'feat', text: 'ヘッダー金砂エフェクト追加' },
+          { type: 'fix', text: 'トーナメント線接続修正・モバイルメニュー改善' },
+          { type: 'feat', text: '時間割Driveインポート対応' },
+        ],
+      },
+      {
+        time: '09:13',
+        summary: 'GDrive連携・データ管理レイアウト',
+        changes: [
+          { type: 'feat', text: 'Google ドライブ連携でふりがな・所属データの読込/書込機能' },
+          { type: 'fix', text: 'データ管理ページのレイアウト整理・Google ドライブ連携を最上部に配置' },
+        ],
+      },
+      {
+        time: '07:14',
+        summary: 'スコア入力・ダッシュボード・ふりがな',
+        changes: [
+          { type: 'feat', text: 'スコア入力ダイアログ追加・ブラケット改善・ふりがな管理改善' },
+          { type: 'feat', text: 'ライブダッシュボード大幅改善' },
+          { type: 'fix', text: 'ふりがなインポートの列名「氏名」対応・シードデータの確実な初期投入' },
+          { type: 'feat', text: '時間割の進行状況表示・データページ改善・ふりがな初期データ' },
+          { type: 'fix', text: 'タイムテーブル自動配置を対戦順（左山上→下、右山上→下）に統一' },
+          { type: 'fix', text: 'エントリーページのリーグ戦枠をトーナメント表と同じ幅・高さに統一' },
+        ],
+      },
     ],
   },
   {
     version: 'v1.0',
     date: '2026-03-19',
     highlights: '初回リリース',
-    changes: [
-      { type: 'feat', text: 'データ同期GitHub化・放送コール・時間割Excel対応' },
-      { type: 'feat', text: 'スコアボード — ブラケット/リーグ表示・アクションパネル' },
-      { type: 'feat', text: 'バックアップ・リストア機能' },
-      { type: 'feat', text: 'エントリー管理・抽選・ドロー表生成' },
+    timeGroups: [
+      {
+        time: '23:09',
+        summary: 'スコアボード強化',
+        changes: [
+          { type: 'feat', text: 'スコアボード大幅強化 — ブラケット/リーグ表示・アクションパネル・前種目表示' },
+        ],
+      },
+      {
+        time: '22:27',
+        summary: 'GDriveブランドUI・ふりがな同期',
+        changes: [
+          { type: 'design', text: 'Google DriveブランドUI化・フォルダ開くボタン' },
+          { type: 'feat', text: 'ふりがなGDrive同期機能' },
+        ],
+      },
+      {
+        time: '21:39',
+        summary: 'データ同期・放送コール・エントリー',
+        changes: [
+          { type: 'feat', text: 'データ同期GitHub化・放送コールDB参照・時間割Excel対応・Google Drive連携' },
+          { type: 'feat', text: 'エントリーページ大幅改善 — 全ラウンド表示・確定機能・左右山表示' },
+        ],
+      },
+      {
+        time: '19:22',
+        summary: '時間割Excel・ブラケット修正',
+        changes: [
+          { type: 'fix', text: 'エントリーブラケットのBYE空白詰め・斜め線修正・番号修正' },
+          { type: 'feat', text: '時間割の種目略称をM/W形式に変更、Excelインポート/エクスポート追加' },
+        ],
+      },
+      {
+        time: '18:23',
+        summary: 'バックアップ・初期構築',
+        changes: [
+          { type: 'feat', text: 'GitHubバックアップをワンクリックエクスポート/インポートに改善' },
+          { type: 'fix', text: 'データページのレイアウト崩れを修正' },
+          { type: 'feat', text: 'エントリー管理・抽選・ドロー表生成' },
+        ],
+      },
     ],
   },
 ];
@@ -73,7 +263,29 @@ interface Props {
 }
 
 export default function VersionInfoModal({ open, onClose }: Props) {
+  // 展開中のバージョン (null = 全閉)
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+  // 展開中の時間グループ (key: "v1.2-13:06")
+  const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
+
   if (!open) return null;
+
+  const toggleVersion = (version: string) => {
+    setExpandedVersion(prev => prev === version ? null : version);
+  };
+
+  const toggleTime = (key: string) => {
+    setExpandedTimes(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  /** バージョン内の変更件数 */
+  const countChanges = (entry: ChangelogEntry) =>
+    entry.timeGroups.reduce((sum, g) => sum + g.changes.length, 0);
 
   return createPortal(
     <div
@@ -87,7 +299,6 @@ export default function VersionInfoModal({ open, onClose }: Props) {
           <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-[#0a2618]" />
           <div className="absolute inset-0 opacity-20"
             style={{ background: 'radial-gradient(circle at 30% 40%, rgba(212,225,87,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(61,126,166,0.3) 0%, transparent 50%)' }} />
-          {/* 装飾リング */}
           <div className="absolute -top-6 -right-6 w-28 h-28 border border-white/[0.08] rounded-full" />
           <div className="absolute -bottom-4 -left-4 w-20 h-20 border border-white/[0.06] rounded-full" />
 
@@ -117,45 +328,93 @@ export default function VersionInfoModal({ open, onClose }: Props) {
         </div>
 
         {/* 更新履歴 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">更新履歴</h3>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1">更新履歴</h3>
 
-          {CHANGELOG.map((entry) => (
-            <div key={entry.version} className="relative">
-              {/* バージョンヘッダー */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-bold text-primary-700">{entry.version}</span>
-                <span className="text-[11px] text-gray-400">{entry.date}</span>
-                {entry === CHANGELOG[0] && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold text-white bg-primary-500 rounded-full uppercase tracking-wider">New</span>
+          {CHANGELOG.map((entry) => {
+            const isExpanded = expandedVersion === entry.version;
+            const total = countChanges(entry);
+
+            return (
+              <div key={entry.version} className="rounded-xl border border-gray-100 overflow-hidden">
+                {/* バージョンヘッダー — タップで展開 */}
+                <button
+                  onClick={() => toggleVersion(entry.version)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    isExpanded ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-primary-700">{entry.version}</span>
+                      <span className="text-[11px] text-gray-400">{entry.date}</span>
+                      {entry === CHANGELOG[0] && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold text-white bg-primary-500 rounded-full uppercase tracking-wider">New</span>
+                      )}
+                    </div>
+                    {entry.highlights && (
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">{entry.highlights}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-gray-400 tabular-nums">{total}件</span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+
+                {/* 時間帯グループ一覧 */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-gray-50/50">
+                    {entry.timeGroups.map((group, gi) => {
+                      const timeKey = `${entry.version}-${group.time}`;
+                      const isTimeExpanded = expandedTimes.has(timeKey);
+
+                      return (
+                        <div key={gi} className={gi > 0 ? 'border-t border-gray-100' : ''}>
+                          {/* 時間帯ヘッダー — タップで詳細展開 */}
+                          <button
+                            onClick={() => toggleTime(timeKey)}
+                            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
+                              isTimeExpanded ? 'bg-white' : 'hover:bg-white/80'
+                            }`}
+                          >
+                            <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="text-[11px] font-mono text-gray-500 shrink-0 tabular-nums">{group.time}</span>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-primary-700 font-medium' : 'text-gray-600'}`}>
+                              {group.summary}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[10px] text-gray-400">{group.changes.length}件</span>
+                              <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isTimeExpanded ? 'rotate-90' : ''}`} />
+                            </div>
+                          </button>
+
+                          {/* 変更詳細 */}
+                          {isTimeExpanded && (
+                            <div className="px-4 pb-3 pt-1 space-y-1.5 bg-white animate-[fadeIn_0.15s_ease-out]">
+                              {group.changes.map((change, ci) => {
+                                const cfg = TYPE_CONFIG[change.type];
+                                const Icon = cfg.icon;
+                                return (
+                                  <div key={ci} className="flex items-start gap-2 pl-6">
+                                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 mt-0.5 border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                                      <Icon className="w-2.5 h-2.5" />
+                                      {cfg.label}
+                                    </span>
+                                    <span className="text-xs text-gray-700 leading-relaxed">{change.text}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-
-              {/* ハイライト */}
-              {entry.highlights && (
-                <p className="text-xs text-gray-500 mb-2 pl-1 border-l-2 border-primary-200 ml-0.5">
-                  {entry.highlights}
-                </p>
-              )}
-
-              {/* 変更リスト */}
-              <div className="space-y-1">
-                {entry.changes.map((change, i) => {
-                  const cfg = TYPE_CONFIG[change.type];
-                  const Icon = cfg.icon;
-                  return (
-                    <div key={i} className="flex items-start gap-2 group">
-                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 mt-0.5 border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-                        <Icon className="w-2.5 h-2.5" />
-                        {cfg.label}
-                      </span>
-                      <span className="text-xs text-gray-700 leading-relaxed">{change.text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* フッター */}
