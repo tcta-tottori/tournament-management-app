@@ -954,6 +954,12 @@ export default function EntryRegistration() {
         return !s || (s.isBye && !s.entry);
       };
 
+      // ラウンドr、位置iのサブツリーが全てBYEかを再帰的にチェック
+      const isEmptySubtree = (r: number, i: number): boolean => {
+        if (r === 0) return isBye(i);
+        return isEmptySubtree(r - 1, i * 2) && isEmptySubtree(r - 1, i * 2 + 1);
+      };
+
       // Y位置計算（セクション内で独立）
       const r0Y: number[] = new Array(sectionDrawSize).fill(0);
       let nextY = OFFSET_Y;
@@ -979,20 +985,24 @@ export default function EntryRegistration() {
       for (let r = 0; r < sectionRoundsCount; r++) {
         const nm = sectionDrawSize / Math.pow(2, r + 1);
         for (let m = 0; m < nm; m++) {
+          const topEmpty = isEmptySubtree(r, m * 2);
+          const botEmpty = isEmptySubtree(r, m * 2 + 1);
+          if (topEmpty && botEmpty) continue;
+
           const xS = r === 0 ? getX(r) + getSlotW(r) : getX(r);
           const xN = getX(r + 1);
           const xM = (xS + xN) / 2;
           const yT = getY(r, m * 2) + SLOT_HEIGHT / 2;
           const yB = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
           const yM = getY(r + 1, m) + SLOT_HEIGHT / 2;
-          if (r === 0) {
-            if (isBye(m * 2) && isBye(m * 2 + 1)) continue;
-            if (isBye(m * 2) || isBye(m * 2 + 1)) {
-              const pY = isBye(m * 2) ? yB : yT;
-              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-              continue;
-            }
+
+          if (topEmpty || botEmpty) {
+            // 片方が全BYEサブツリー → ストレートライン
+            const pY = topEmpty ? yB : yT;
+            paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            continue;
           }
+
           paths.push(<path key={`${keyPrefix}-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`${keyPrefix}-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`${keyPrefix}-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
@@ -1123,7 +1133,11 @@ export default function EntryRegistration() {
           if (r === 0) return r0Y[i];
           return (getYFn(r - 1, i * 2) + getYFn(r - 1, i * 2 + 1)) / 2;
         };
-        return { r0Y, getY: getYFn, height: nextY + PC_SLOT_H, isBye: isByeFn };
+        const isEmptySubtreeFn = (r: number, i: number): boolean => {
+          if (r === 0) return isByeFn(i);
+          return isEmptySubtreeFn(r - 1, i * 2) && isEmptySubtreeFn(r - 1, i * 2 + 1);
+        };
+        return { r0Y, getY: getYFn, height: nextY + PC_SLOT_H, isBye: isByeFn, isEmptySubtree: isEmptySubtreeFn };
       };
 
       const leftCalc = calcHalfY(leftSlotsU, halfSize);
@@ -1138,20 +1152,23 @@ export default function EntryRegistration() {
       for (let r = 0; r < halfRounds; r++) {
         const nm = halfSize / Math.pow(2, r + 1);
         for (let m = 0; m < nm; m++) {
+          const topEmpty = leftCalc.isEmptySubtree(r, m * 2);
+          const botEmpty = leftCalc.isEmptySubtree(r, m * 2 + 1);
+          if (topEmpty && botEmpty) continue;
+
           const xS = r === 0 ? gxL(0) + PC_SLOT_W : gxL(r);
           const xN = gxL(r + 1);
           const xM = (xS + xN) / 2;
           const yT = leftCalc.getY(r, m * 2) + PC_SLOT_H / 2 + leftYOff;
           const yB = leftCalc.getY(r, m * 2 + 1) + PC_SLOT_H / 2 + leftYOff;
           const yM = leftCalc.getY(r + 1, m) + PC_SLOT_H / 2 + leftYOff;
-          if (r === 0) {
-            if (leftCalc.isBye(m * 2) && leftCalc.isBye(m * 2 + 1)) continue;
-            if (leftCalc.isBye(m * 2) || leftCalc.isBye(m * 2 + 1)) {
-              const pY = leftCalc.isBye(m * 2) ? yB : yT;
-              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-              continue;
-            }
+
+          if (topEmpty || botEmpty) {
+            const pY = topEmpty ? yB : yT;
+            paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            continue;
           }
+
           paths.push(<path key={`L-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`L-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`L-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
@@ -1162,20 +1179,23 @@ export default function EntryRegistration() {
       for (let r = 0; r < halfRounds; r++) {
         const nm = halfSize / Math.pow(2, r + 1);
         for (let m = 0; m < nm; m++) {
+          const topEmpty = rightCalc.isEmptySubtree(r, m * 2);
+          const botEmpty = rightCalc.isEmptySubtree(r, m * 2 + 1);
+          if (topEmpty && botEmpty) continue;
+
           const xS = r === 0 ? mx(gxL(0) + PC_SLOT_W) : mx(gxL(r));
           const xN = mx(gxL(r + 1));
           const xM = (xS + xN) / 2;
           const yT = rightCalc.getY(r, m * 2) + PC_SLOT_H / 2 + rightYOff;
           const yB = rightCalc.getY(r, m * 2 + 1) + PC_SLOT_H / 2 + rightYOff;
           const yM = rightCalc.getY(r + 1, m) + PC_SLOT_H / 2 + rightYOff;
-          if (r === 0) {
-            if (rightCalc.isBye(m * 2) && rightCalc.isBye(m * 2 + 1)) continue;
-            if (rightCalc.isBye(m * 2) || rightCalc.isBye(m * 2 + 1)) {
-              const pY = rightCalc.isBye(m * 2) ? yB : yT;
-              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-              continue;
-            }
+
+          if (topEmpty || botEmpty) {
+            const pY = topEmpty ? yB : yT;
+            paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            continue;
           }
+
           paths.push(<path key={`R-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`R-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
           paths.push(<path key={`R-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
