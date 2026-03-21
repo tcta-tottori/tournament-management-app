@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -148,11 +148,13 @@ function TennisCourtBlock({
   isSelected,
   onSelect,
   eventName,
+  isTimeOver,
 }: {
   cs: CourtStatus;
   isSelected: boolean;
   onSelect: () => void;
   eventName?: string;
+  isTimeOver?: boolean;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
     playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]' },
@@ -160,7 +162,10 @@ function TennisCourtBlock({
     empty: { bg: 'bg-white/80', border: 'border-emerald-200', text: 'text-gray-600', glow: '' },
     unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
   };
-  const style = statusStyles[cs.status];
+  // Time-over override
+  const style = isTimeOver
+    ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+    : statusStyles[cs.status];
   const courtNum = cs.court.name.replace(/[^\d]/g, '') || cs.court.name;
   const elapsed = cs.currentMatch?.status === 'playing' ? formatElapsed(cs.currentMatch.updatedAt) : '';
 
@@ -181,9 +186,15 @@ function TennisCourtBlock({
             {courtNum}
           </div>
           {cs.status === 'playing' && (
-            <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0">
-              <Play className="w-2 h-2 fill-white" /> LIVE
-            </span>
+            isTimeOver ? (
+              <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0 animate-pulse">
+                <AlertCircle className="w-2 h-2" /> 超過
+              </span>
+            ) : (
+              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0">
+                <Play className="w-2 h-2 fill-white" /> LIVE
+              </span>
+            )
           )}
         </div>
 
@@ -217,8 +228,8 @@ function TennisCourtBlock({
         {/* Bottom: elapsed time */}
         {elapsed ? (
           <div className="w-full flex items-center justify-center gap-1">
-            <Timer className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600" />
-            <span className="text-[10px] sm:text-xs font-mono font-bold text-green-700 tabular-nums">{elapsed}</span>
+            <Timer className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${isTimeOver ? 'text-red-600' : 'text-green-600'}`} />
+            <span className={`text-[10px] sm:text-xs font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-green-700'}`}>{elapsed}</span>
           </div>
         ) : (
           <div className="h-3 sm:h-4" />
@@ -234,6 +245,7 @@ function TennisCourtBlock({
 
 export default function LiveDashboard() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -351,6 +363,22 @@ export default function LiveDashboard() {
       });
   }, [courts, allMatches]);
 
+  // Time-over courts (elapsed > matchDuration)
+  const timeOverCourtIds = useMemo(() => {
+    const now = Date.now();
+    const limitMs = matchDuration * 60 * 1000;
+    const ids = new Set<string>();
+    for (const cs of courtStatusList) {
+      if (cs.currentMatch?.status === 'playing' && cs.currentMatch.updatedAt) {
+        if (now - cs.currentMatch.updatedAt > limitMs) {
+          ids.add(cs.court.courtId);
+        }
+      }
+    }
+    return ids;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courtStatusList, matchDuration, currentTime]);
+
   const courtStats = useMemo(() => ({
     playing: courtStatusList.filter(c => c.status === 'playing').length,
     ready: courtStatusList.filter(c => c.status === 'ready').length,
@@ -403,73 +431,6 @@ export default function LiveDashboard() {
 
   const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
-  // -- Bulk first match call --
-  const hasWaitingMatchesWithCourts = useMemo(() => {
-    return courts.some(court => {
-      if (!court.isAvailable) return false;
-      return allMatches.some(
-        m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready')
-      );
-    });
-  }, [courts, allMatches]);
-
-  const handleBulkFirstCall = useCallback(async () => {
-    if (!currentTournamentId) return;
-
-    if (courts.length === 0) return;
-
-    // For each available court, find the first (earliest) match that is 'waiting' or 'ready'
-    const firstMatches: { match: Match; court: Court }[] = [];
-
-    for (const court of courts) {
-      if (!court.isAvailable) continue;
-      const courtMatches = allMatches
-        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready'))
-        .sort((a, b) => {
-          // Sort by scheduledTime, then by matchOrder
-          if (a.scheduledTime && b.scheduledTime) {
-            return a.scheduledTime.localeCompare(b.scheduledTime);
-          }
-          return (a.matchOrder || 0) - (b.matchOrder || 0);
-        });
-
-      if (courtMatches.length > 0) {
-        firstMatches.push({ match: courtMatches[0], court });
-      }
-    }
-
-    if (firstMatches.length === 0) {
-      alert('コールする試合がありません。');
-      return;
-    }
-
-    const confirmed = confirm(
-      `${firstMatches.length}コートの初戦を一斉にコールします。よろしいですか？\n\n` +
-      firstMatches.map(fm =>
-        `${fm.court.name}: ${fm.match.player1Name} vs ${fm.match.player2Name}`
-      ).join('\n')
-    );
-
-    if (!confirmed) return;
-
-    // Update all matches to 'playing' status
-    for (const fm of firstMatches) {
-      if (fm.match.id) {
-        await db.matches.update(fm.match.id, {
-          status: 'playing',
-          updatedAt: Date.now(),
-        });
-        // Also set court's currentMatchId
-        if (fm.court.id) {
-          await db.courts.update(fm.court.id, {
-            currentMatchId: fm.match.matchId,
-          });
-        }
-      }
-    }
-
-    alert(`${firstMatches.length}コートの初戦をコールしました。`);
-  }, [currentTournamentId, courts, allMatches]);
 
   // =========================================================================
   // RENDER
@@ -489,16 +450,6 @@ export default function LiveDashboard() {
               {currentTournament ? currentTournament.name : '大会を選択してください'}
             </p>
           </div>
-          {/* Bulk first match call */}
-          {hasWaitingMatchesWithCourts && (
-            <button
-              onClick={handleBulkFirstCall}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-700 hover:to-emerald-700 shadow-md transition-all"
-            >
-              <Play className="w-4 h-4" />
-              全コート初戦一斉コール
-            </button>
-          )}
           {/* Current time */}
           <div className="text-right">
             <div className="text-3xl font-black text-gray-900 font-mono tracking-tight">{timeStr}</div>
@@ -631,6 +582,7 @@ export default function LiveDashboard() {
                             selectedCourtId === cs.court.courtId ? null : cs.court.courtId
                           )}
                           eventName={evtName}
+                          isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
                         />
                       );
                     })}

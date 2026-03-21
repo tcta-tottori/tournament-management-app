@@ -21,6 +21,23 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 1.4',
+    date: '2026-03-21',
+    highlights: '情報バーティッカー・時間超過ハイライト・LIVE一斉コール整理',
+    timeGroups: [
+      {
+        time: '18:00',
+        summary: '情報バー・時間超過表示・LIVEページ改善',
+        changes: [
+          { type: 'feat', text: '大会情報バーを刷新：固定部分（大会名＋試合形式）＋流れるティッカー（進捗・コート状況・時間超過警告）' },
+          { type: 'feat', text: 'コートマップ・LIVEダッシュボード・スコアボードに時間超過ハイライト表示を追加' },
+          { type: 'fix', text: 'LIVEページの全コート一斉コールボタンを削除（対戦順ページに統合済み）' },
+          { type: 'design', text: '時間超過コートを赤色ボーダー＋グロー＋パルスアイコンで視覚的に強調' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 1.3',
     date: '2026-03-21',
     highlights: 'タイムテーブル刷新・種目名マッチング修正・ライブステータス表示',
@@ -340,7 +357,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 1.3</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 1.4</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">

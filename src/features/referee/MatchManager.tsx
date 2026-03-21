@@ -1903,20 +1903,37 @@ ${printableMatches.map(m => {
                           className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
                         />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={12}
-                          value={rule.games}
-                          onChange={e => {
-                            const next = [...editingRules];
-                            next[i] = { ...next[i], games: parseInt(e.target.value) || 6 };
-                            setEditingRules(next);
-                          }}
-                          className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
-                        />
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={rule.games}
+                            onChange={e => {
+                              const next = [...editingRules];
+                              next[i] = { ...next[i], games: parseInt(e.target.value) || 6 };
+                              setEditingRules(next);
+                            }}
+                            className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-gray-500 font-medium">方式</label>
+                          <select
+                            value={rule.matchFormat || 'game'}
+                            onChange={e => {
+                              const next = [...editingRules];
+                              next[i] = { ...next[i], matchFormat: e.target.value as 'game' | 'twoSetsSuper10' };
+                              setEditingRules(next);
+                            }}
+                            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
+                          >
+                            <option value="game">ゲームマッチ</option>
+                            <option value="twoSetsSuper10">2セット+STB</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                     {editingRules.length > 1 && (

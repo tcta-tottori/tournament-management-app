@@ -43,6 +43,8 @@ export interface ScoreInputMatch {
   updatedAt?: number;
 }
 
+import type { MatchFormatType } from '../../db/database';
+
 interface ScoreInputDialogProps {
   match: ScoreInputMatch | null;
   courts: Array<{ courtId: string; name: string; isAvailable: boolean }>;
@@ -53,6 +55,8 @@ interface ScoreInputDialogProps {
   isLeague?: boolean; // リーグ戦の場合は次ラウンド進出を行わない
   /** 現在の試合に適用されるゲームルール文字列 */
   gameRuleText?: string;
+  /** 試合方式（省略時='game'） */
+  matchFormat?: MatchFormatType;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,15 +86,20 @@ export default function ScoreInputDialog({
   bestOf = 1,
   isLeague = false,
   gameRuleText,
+  matchFormat = 'game',
 }: ScoreInputDialogProps) {
+  // twoSetsSuper10 の場合: 2セット + ファイナルSTB（計3入力欄）
+  const isTwoSetFormat = matchFormat === 'twoSetsSuper10';
   // セットスコア入力（最大3セット）
-  const maxSets = bestOf >= 3 ? 3 : 1;
+  const maxSets = isTwoSetFormat ? 3 : (bestOf >= 3 ? 3 : 1);
   const [sets, setSets] = useState<{ p1: string; p2: string }[]>(
     Array.from({ length: maxSets }, () => ({ p1: '', p2: '' }))
   );
   const [tiebreaks, setTiebreaks] = useState<(string | null)[]>(
     Array.from({ length: maxSets }, () => null)
   );
+  /** スーパータイブレーク（ファイナルセット10ポイント）スコア */
+  const [superTB, setSuperTB] = useState<{ p1: string; p2: string }>({ p1: '', p2: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState('');
   /** Ret（棄権）モード: null=通常, 1=P1棄権, 2=P2棄権 */
@@ -110,11 +119,21 @@ export default function ScoreInputDialog({
       setRetPlayer(null);
     }
     if (match.score && match.status === 'finished') {
-      // 既存スコアをパース: "6-4" or "6-4 7-5" or "6-4 6-7(3) 6-2" or "Ret" or "4-6 Ret"
-      const setParts = match.score.replace(/\s*Ret\s*/g, '').split(/\s+/).filter(Boolean);
+      // 既存スコアをパース: "6-4" or "6-4 7-5" or "6-4 6-7(3) 6-2"
+      // or "6-4 4-6 [10-5]" (super TB) or "Ret" or "4-6 Ret"
+      const cleanScore = match.score.replace(/\s*Ret\s*/g, '');
+      const setParts = cleanScore.split(/\s+/).filter(Boolean);
       const newSets = Array.from({ length: maxSets }, () => ({ p1: '', p2: '' }));
       const newTB = Array.from<string | null>({ length: maxSets }).fill(null);
-      for (let i = 0; i < setParts.length && i < maxSets; i++) {
+      let newSuperTB = { p1: '', p2: '' };
+      for (let i = 0; i < setParts.length; i++) {
+        // スーパータイブレーク: [10-5] 形式
+        const stbMatch = setParts[i].match(/^\[(\d+)-(\d+)\]$/);
+        if (stbMatch) {
+          newSuperTB = { p1: stbMatch[1], p2: stbMatch[2] };
+          continue;
+        }
+        if (i >= maxSets) continue;
         const tbMatch = setParts[i].match(/^(\d+)-(\d+)\((\d+)\)$/);
         if (tbMatch) {
           newSets[i] = { p1: tbMatch[1], p2: tbMatch[2] };
@@ -128,9 +147,11 @@ export default function ScoreInputDialog({
       }
       setSets(newSets);
       setTiebreaks(newTB);
+      setSuperTB(newSuperTB);
     } else {
       setSets(Array.from({ length: maxSets }, () => ({ p1: '', p2: '' })));
       setTiebreaks(Array.from({ length: maxSets }, () => null));
+      setSuperTB({ p1: '', p2: '' });
     }
   }, [match?.matchId, match?.score, match?.status, maxSets]);
 
@@ -180,12 +201,45 @@ export default function ScoreInputDialog({
     });
   }, [sets]);
 
+  // twoSetsSuper10: セットカウントが1-1のとき3rd setはスーパーTB
+  const needsSuperTB = useMemo(() => {
+    if (!isTwoSetFormat) return false;
+    let p1w = 0, p2w = 0;
+    for (let i = 0; i < 2; i++) {
+      const a = parseInt(sets[i]?.p1), b = parseInt(sets[i]?.p2);
+      if (isNaN(a) || isNaN(b)) continue;
+      if (a > b) p1w++; else if (b > a) p2w++;
+    }
+    return p1w === 1 && p2w === 1;
+  }, [sets, isTwoSetFormat]);
+
   // 勝者自動判定
   const autoWinner = useMemo(() => {
     if (!match) return null;
     // Ret（棄権）の場合: 棄権した側の相手が勝者
     if (retPlayer === 1) return 2 as const;
     if (retPlayer === 2) return 1 as const;
+
+    if (isTwoSetFormat) {
+      // 2セットマッチ: 2-0で勝ちか、1-1でスーパーTBの勝者
+      let p1w = 0, p2w = 0;
+      for (let i = 0; i < 2; i++) {
+        const a = parseInt(sets[i]?.p1), b = parseInt(sets[i]?.p2);
+        if (isNaN(a) || isNaN(b) || a === b) continue;
+        if (a > b) p1w++; else p2w++;
+      }
+      if (p1w === 2) return 1 as const;
+      if (p2w === 2) return 2 as const;
+      // 1-1: スーパーTBで判定
+      if (p1w === 1 && p2w === 1) {
+        const stb1 = parseInt(superTB.p1), stb2 = parseInt(superTB.p2);
+        if (!isNaN(stb1) && !isNaN(stb2) && stb1 !== stb2) {
+          return stb1 > stb2 ? 1 as const : 2 as const;
+        }
+      }
+      return null;
+    }
+
     let p1Wins = 0, p2Wins = 0;
     for (const s of sets) {
       const a = parseInt(s.p1), b = parseInt(s.p2);
@@ -196,11 +250,13 @@ export default function ScoreInputDialog({
     if (p1Wins >= neededSets) return 1 as const;
     if (p2Wins >= neededSets) return 2 as const;
     return null;
-  }, [sets, match, maxSets, retPlayer]);
+  }, [sets, match, maxSets, retPlayer, isTwoSetFormat, superTB]);
 
   // スコア文字列を構築
   const buildScoreString = useCallback(() => {
-    const scoreParts = sets
+    // twoSetsSuper10: 最初の2セットのみ通常表示、3rdはスーパーTB
+    const setLimit = isTwoSetFormat ? 2 : sets.length;
+    const scoreParts = sets.slice(0, setLimit)
       .map((s, i) => {
         const p1 = s.p1.trim(), p2 = s.p2.trim();
         if (!p1 && !p2) return null;
@@ -211,13 +267,17 @@ export default function ScoreInputDialog({
         return score;
       })
       .filter(Boolean);
+    // スーパータイブレーク結果を追加 [10-5]
+    if (isTwoSetFormat && superTB.p1 && superTB.p2) {
+      scoreParts.push(`[${superTB.p1}-${superTB.p2}]`);
+    }
     // Retの場合: スコア部分 + " Ret" を付加
     if (retPlayer) {
       const base = scoreParts.join(' ');
       return base ? `${base} Ret` : 'Ret';
     }
     return scoreParts.join(' ');
-  }, [sets, tiebreaks, tiebreakFlags, retPlayer]);
+  }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB]);
 
   // セットスコア入力ハンドラ
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
@@ -489,12 +549,12 @@ export default function ScoreInputDialog({
             {(match.status === 'playing' || isFinished) && (
               <div className="space-y-2">
                 <span className="text-xs text-gray-500">スコア</span>
-                {sets.map((set, i) => {
+                {sets.slice(0, isTwoSetFormat ? 2 : maxSets).map((set, i) => {
                   const loserSide = tiebreakLoserSide[i];
                   return (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">
-                        {maxSets > 1 ? `Set${i + 1}` : ''}
+                        {(isTwoSetFormat || maxSets > 1) ? `Set${i + 1}` : ''}
                       </span>
                       <div className="flex items-center gap-1 flex-1 justify-center">
                         <input
@@ -560,6 +620,52 @@ export default function ScoreInputDialog({
                     </div>
                   );
                 })}
+
+                {/* スーパータイブレーク入力（twoSetsSuper10: 1-1の場合） */}
+                {isTwoSetFormat && needsSuperTB && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-purple-500 w-8 text-right shrink-0 font-bold">STB</span>
+                    <div className="flex items-center gap-1 flex-1 justify-center">
+                      <span className="text-[10px] text-purple-400 font-bold">[</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        placeholder="10"
+                        value={superTB.p1}
+                        onChange={e => {
+                          if (!/^\d{0,2}$/.test(e.target.value)) return;
+                          setSuperTB(prev => ({ ...prev, p1: e.target.value }));
+                          if (e.target.value.length >= 2) {
+                            // フォーカスをp2へ
+                            const next = e.target.nextElementSibling?.nextElementSibling as HTMLInputElement | null;
+                            setTimeout(() => next?.focus(), 50);
+                          }
+                        }}
+                        disabled={isFinished}
+                        className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                      />
+                      <span className="text-purple-400 font-bold">-</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        placeholder="0"
+                        value={superTB.p2}
+                        onChange={e => {
+                          if (!/^\d{0,2}$/.test(e.target.value)) return;
+                          setSuperTB(prev => ({ ...prev, p2: e.target.value }));
+                        }}
+                        disabled={isFinished}
+                        className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                      />
+                      <span className="text-[10px] text-purple-400 font-bold">]</span>
+                    </div>
+                  </div>
+                )}
+                {isTwoSetFormat && needsSuperTB && (
+                  <p className="text-center text-[10px] text-purple-500 font-medium">10ポイント スーパータイブレーク</p>
+                )}
               </div>
             )}
 

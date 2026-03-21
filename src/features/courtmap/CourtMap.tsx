@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -107,8 +107,16 @@ type CourtStatus = {
 
 export default function CourtMap() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
   const [selectedVenue, setSelectedVenue] = useState<string>('yamata');
   const [selectedCourt, setSelectedCourt] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  // Tick every 10 seconds for time-over detection
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const courts = useLiveQuery(
     () => currentTournamentId ? db.courts.where('tournamentId').equals(currentTournamentId).toArray() : [],
@@ -171,6 +179,20 @@ export default function CourtMap() {
     }
     return map;
   }, [venue, courts, allMatches]);
+
+  // Time-over courts
+  const timeOverCourts = useMemo(() => {
+    const limitMs = matchDuration * 60 * 1000;
+    const set = new Set<string>();
+    for (const [courtName, cs] of Object.entries(courtStatusMap)) {
+      if (cs.currentMatch?.status === 'playing' && cs.currentMatch.updatedAt) {
+        if (now - cs.currentMatch.updatedAt > limitMs) {
+          set.add(courtName);
+        }
+      }
+    }
+    return set;
+  }, [courtStatusMap, matchDuration, now]);
 
   // 統計
   const stats = useMemo(() => {
@@ -238,7 +260,10 @@ export default function CourtMap() {
   const renderCourtButton = useCallback((courtName: string) => {
     const cs = courtStatusMap[courtName];
     if (!cs) return null;
-    const style = statusStyles[cs.status];
+    const isOver = timeOverCourts.has(courtName);
+    const style = isOver
+      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+      : statusStyles[cs.status];
     const isSelected = selectedCourt === courtName;
 
     return (
@@ -249,7 +274,7 @@ export default function CourtMap() {
           relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
           ${style.bg} ${style.border} ${style.glow}
           ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.03]' : 'hover:scale-[1.02] hover:shadow-md'}
-          ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
+          ${cs.status === 'playing' && !isOver ? 'animate-pulse-slow' : ''}
         `}
         style={{ aspectRatio: '1 / 1.7' }}
       >
@@ -257,11 +282,15 @@ export default function CourtMap() {
         <div className="relative z-10 flex flex-col items-center justify-center h-full p-1.5">
           {cs.status === 'playing' && (
             <div className="absolute top-1 right-1">
-              <Play className="w-3 h-3 text-green-500 fill-green-500" />
+              {isOver ? (
+                <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />
+              ) : (
+                <Play className="w-3 h-3 text-green-500 fill-green-500" />
+              )}
             </div>
           )}
           <div className={`text-xl font-bold ${style.text} leading-none`}>{courtName}</div>
-          <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{statusLabel[cs.status]}</div>
+          <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
           {cs.currentMatch && (
             <div className="mt-1 pt-1 border-t border-green-200/60 w-full space-y-0">
               <p className="text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
@@ -279,13 +308,16 @@ export default function CourtMap() {
         </div>
       </button>
     );
-  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel]);
+  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel, timeOverCourts]);
 
   /** コートボタン描画（PC用・横向き） */
   const renderCourtButtonH = useCallback((courtName: string) => {
     const cs = courtStatusMap[courtName];
     if (!cs) return null;
-    const style = statusStyles[cs.status];
+    const isOver = timeOverCourts.has(courtName);
+    const style = isOver
+      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+      : statusStyles[cs.status];
     const isSelected = selectedCourt === courtName;
 
     return (
@@ -296,7 +328,7 @@ export default function CourtMap() {
           relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
           ${style.bg} ${style.border} ${style.glow}
           ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.02]' : 'hover:scale-[1.01] hover:shadow-md'}
-          ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
+          ${cs.status === 'playing' && !isOver ? 'animate-pulse-slow' : ''}
         `}
         style={{ aspectRatio: '1.8 / 1' }}
       >
@@ -305,10 +337,14 @@ export default function CourtMap() {
           {/* 左側: コート番号 + ステータス */}
           <div className="flex flex-col items-center shrink-0 min-w-[40px]">
             {cs.status === 'playing' && (
-              <Play className="w-3 h-3 text-green-500 fill-green-500 mb-0.5" />
+              isOver ? (
+                <AlertCircle className="w-3 h-3 text-red-500 animate-pulse mb-0.5" />
+              ) : (
+                <Play className="w-3 h-3 text-green-500 fill-green-500 mb-0.5" />
+              )
             )}
             <div className={`text-2xl font-bold ${style.text} leading-none`}>{courtName}</div>
-            <div className={`text-[10px] font-medium ${style.text} mt-0.5`}>{statusLabel[cs.status]}</div>
+            <div className={`text-[10px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
           </div>
           {/* 右側: 対戦情報 */}
           {cs.currentMatch && (
@@ -328,7 +364,7 @@ export default function CourtMap() {
         </div>
       </button>
     );
-  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel]);
+  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel, timeOverCourts]);
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto space-y-4">

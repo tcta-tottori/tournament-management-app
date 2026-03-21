@@ -14,6 +14,8 @@ export interface ParsedDrawPlayer {
   partnerAffiliation?: string;
 }
 
+import type { MatchFormatType } from '../../db/database';
+
 /** 回戦ごとのゲームルール */
 export interface RoundGameRule {
   /** 適用ラウンド範囲の説明（例: "１～２回戦", "準々決勝以降"） */
@@ -22,6 +24,8 @@ export interface RoundGameRule {
   ruleText: string;
   /** ゲーム数 */
   games: number;
+  /** 試合方式 */
+  matchFormat?: MatchFormatType;
 }
 
 export interface ParsedDrawEvent {
@@ -139,19 +143,33 @@ function parseGameRules(
 ): RoundGameRule[] {
   const rules: RoundGameRule[] = [];
   const ruleRe = /(\d+)\s*ゲームマッチ/;
+  const setRe = /タイブレークセット|セットマッチ/;
+  const superTbRe = /ファイナル.*タイブレーク|10\s*ポイント/;
   const roundPrefixRe = /^(.*(?:回戦|決勝|以降))\s+/;
 
   // ヘッダー行の matchFormat に含まれるルール
-  if (headerMatchFormat && ruleRe.test(normalizeDigits(headerMatchFormat))) {
-    const roundMatch = roundPrefixRe.exec(headerMatchFormat);
-    rules.push({
-      roundLabel: roundMatch ? roundMatch[1] : '全回戦',
-      ruleText: headerMatchFormat,
-      games: extractGamesFromRuleText(headerMatchFormat),
-    });
+  if (headerMatchFormat) {
+    const normHdr = normalizeDigits(headerMatchFormat);
+    if (ruleRe.test(normHdr)) {
+      const roundMatch = roundPrefixRe.exec(headerMatchFormat);
+      rules.push({
+        roundLabel: roundMatch ? roundMatch[1] : '全回戦',
+        ruleText: headerMatchFormat,
+        games: extractGamesFromRuleText(headerMatchFormat),
+      });
+    } else if (setRe.test(normHdr)) {
+      // セットマッチ形式（ヘッダー行に含まれるケース）
+      rules.push({
+        roundLabel: '全回戦',
+        ruleText: headerMatchFormat,
+        games: extractGamesFromRuleText(headerMatchFormat) || 6,
+        matchFormat: 'twoSetsSuper10',
+      });
+    }
   }
 
   // ヘッダー行の後続行をスキャン（最大5行）
+  let pendingSetRule: RoundGameRule | null = null;
   for (let r = headerRow + 1; r < Math.min(headerRow + 6, endRow); r++) {
     const row = rows[r];
     if (!row) continue;
@@ -161,6 +179,32 @@ function parseGameRules(
       const val = cellStr(row, c);
       if (!val) continue;
       const norm = normalizeDigits(val);
+
+      // "ファイナルセット10ポイントマッチタイブレーク" — 直前のセットルールに付加
+      if (superTbRe.test(norm)) {
+        if (pendingSetRule) {
+          pendingSetRule.ruleText += ' / ' + val;
+          pendingSetRule.matchFormat = 'twoSetsSuper10';
+        }
+        continue;
+      }
+
+      // "２タイブレークセット（6-6タイブレークデュース有）" — セットマッチ
+      if (setRe.test(norm)) {
+        const roundMatch = roundPrefixRe.exec(val);
+        const ruleText = roundMatch ? val.replace(roundMatch[1], '').trim() : val;
+        const rule: RoundGameRule = {
+          roundLabel: roundMatch ? roundMatch[1] : '全回戦',
+          ruleText: ruleText,
+          games: extractGamesFromRuleText(val) || 6,
+          matchFormat: 'twoSetsSuper10', // デフォルト、ファイナル行で確定
+        };
+        rules.push(rule);
+        pendingSetRule = rule;
+        continue;
+      }
+
+      // 通常のゲームマッチ
       if (ruleRe.test(norm)) {
         const roundMatch = roundPrefixRe.exec(val);
         const ruleText = roundMatch ? val.replace(roundMatch[1], '').trim() : val;
@@ -169,6 +213,7 @@ function parseGameRules(
           ruleText: ruleText,
           games: extractGamesFromRuleText(val),
         });
+        pendingSetRule = null;
       }
     }
 

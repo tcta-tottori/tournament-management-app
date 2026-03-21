@@ -7,7 +7,7 @@ import ScoreboardBracket from './ScoreboardBracket';
 import ScoreboardLeague from './ScoreboardLeague';
 import ScoreInputDialog from './ScoreInputDialog';
 import type { ScoreInputMatch } from './ScoreInputDialog';
-import type { Event, RoundGameRule } from '../../db/database';
+import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
 import {
   MonitorPlay,
   Check,
@@ -23,6 +23,7 @@ import {
   Layers,
   Eye,
   Trophy,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -36,44 +37,46 @@ function getRoundName(round: number, totalRounds: number): string {
   return `${round}回戦`;
 }
 
-/** 回戦に応じたゲームルール文字列を取得 */
-function getGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
-  if (!evt) return '';
-  // 個別ルールがない場合はデフォルト表示
+/** 回戦に応じたゲームルール情報を取得 */
+function getGameRuleForRound(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
+  if (!evt) return null;
   const rules: RoundGameRule[] = evt.roundGameRules || [];
-  if (rules.length === 0) {
-    const g = evt.gameRules?.games ?? 6;
-    return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
-  }
-  if (rules.length === 1) return rules[0].ruleText;
-  // 回戦名でマッチング
+  if (rules.length === 0) return null;
+  if (rules.length === 1) return rules[0];
   const roundName = getRoundName(round, totalRounds);
   for (const rule of rules) {
     const label = rule.roundLabel;
-    // "全回戦" は常にマッチ
     if (label === '全回戦') continue;
-    // "１～２回戦" パターン
     const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
     if (rangeMatch) {
       const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
-      if (round >= from && round <= to) return rule.ruleText;
+      if (round >= from && round <= to) return rule;
       continue;
     }
-    // "準々決勝以降", "準決勝以降", "３回戦以降" パターン
     if (label.includes('以降')) {
       const cleanLabel = label.replace('以降', '');
-      if (cleanLabel.includes('準々決勝') && round >= totalRounds - 2) return rule.ruleText;
-      if (cleanLabel.includes('準決勝') && round >= totalRounds - 1) return rule.ruleText;
-      if (cleanLabel.includes('決勝') && !cleanLabel.includes('準') && round >= totalRounds) return rule.ruleText;
+      if (cleanLabel.includes('準々決勝') && round >= totalRounds - 2) return rule;
+      if (cleanLabel.includes('準決勝') && round >= totalRounds - 1) return rule;
+      if (cleanLabel.includes('決勝') && !cleanLabel.includes('準') && round >= totalRounds) return rule;
       const roundNumMatch = cleanLabel.match(/(\d+)回戦/);
-      if (roundNumMatch && round >= parseInt(roundNumMatch[1])) return rule.ruleText;
+      if (roundNumMatch && round >= parseInt(roundNumMatch[1])) return rule;
       continue;
     }
-    // 直接名称マッチ
-    if (roundName === label || label.includes(roundName)) return rule.ruleText;
+    if (roundName === label || label.includes(roundName)) return rule;
   }
-  // フォールバック: 最初のルール
-  return rules[0].ruleText;
+  return rules[0];
+}
+
+function getGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  if (rule) return rule.ruleText;
+  const g = evt?.gameRules?.games ?? 6;
+  return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
+}
+
+function getMatchFormat(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  return rule?.matchFormat || 'game';
 }
 
 /** フルネームから苗字を抽出（ダブルス "A / B" にも対応） */
@@ -104,6 +107,7 @@ type ViewMode = 'bracket' | 'table';
 // ---------------------------------------------------------------------------
 export default function Scoreboard() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
 
   // -- Event navigation (前種目/次種目) --
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(-1);
@@ -764,30 +768,36 @@ export default function Scoreboard() {
       {/* ===== COURT STATUS BAR ===== */}
       {courtStatus.length > 0 && (showAllEvents || selectedEventId) && (
         <div className="flex gap-2 overflow-x-auto pb-1 print:hidden shrink-0">
-          {courtStatus.map(c => (
-            <div
-              key={c.courtId}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                c.matchInfo
-                  ? 'bg-green-50 border-green-300 text-green-700'
-                  : c.isAvailable
-                    ? 'bg-white border-border-main text-gray-500'
-                    : 'bg-gray-100 border-gray-300 text-gray-400'
-              }`}
-            >
-              <MapPin className="w-3 h-3" />
-              <span className="font-bold">{c.name}</span>
-              {c.matchInfo && (
-                <>
-                  {c.eventName && <span className="text-[10px] text-green-500 truncate max-w-[80px]">{c.eventName}</span>}
-                  <span className="text-green-600 truncate max-w-[120px]">{c.matchInfo}</span>
-                  {c.startedAt > 0 && (
-                    <span className="text-[10px] text-green-500 font-mono whitespace-nowrap">{formatElapsedMinutes(c.startedAt, clockTick)}</span>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
+          {courtStatus.map(c => {
+            const isOver = c.matchInfo && c.startedAt > 0 && (clockTick - c.startedAt) > matchDuration * 60 * 1000;
+            return (
+              <div
+                key={c.courtId}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  isOver
+                    ? 'bg-red-50 border-red-400 text-red-700 shadow-[0_0_8px_rgba(239,68,68,0.3)]'
+                    : c.matchInfo
+                      ? 'bg-green-50 border-green-300 text-green-700'
+                      : c.isAvailable
+                        ? 'bg-white border-border-main text-gray-500'
+                        : 'bg-gray-100 border-gray-300 text-gray-400'
+                }`}
+              >
+                <MapPin className={`w-3 h-3 ${isOver ? 'text-red-500' : ''}`} />
+                <span className="font-bold">{c.name}</span>
+                {isOver && <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse" />}
+                {c.matchInfo && (
+                  <>
+                    {c.eventName && <span className={`text-[10px] truncate max-w-[80px] ${isOver ? 'text-red-400' : 'text-green-500'}`}>{c.eventName}</span>}
+                    <span className={`truncate max-w-[120px] ${isOver ? 'text-red-600' : 'text-green-600'}`}>{c.matchInfo}</span>
+                    {c.startedAt > 0 && (
+                      <span className={`text-[10px] font-mono whitespace-nowrap ${isOver ? 'text-red-500 font-bold' : 'text-green-500'}`}>{formatElapsedMinutes(c.startedAt, clockTick)}</span>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -893,6 +903,10 @@ export default function Scoreboard() {
                 const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
                 return evtData ? getGameRuleText(evtData.event, selectedAllMatch.round, evtData.totalRounds) : '';
               })()}
+              matchFormat={(() => {
+                const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
+                return evtData ? getMatchFormat(evtData.event, selectedAllMatch.round, evtData.totalRounds) : 'game';
+              })()}
             />
           )}
         </div>
@@ -950,6 +964,7 @@ export default function Scoreboard() {
               getRoundName={makeRoundName}
               isLeague={isRoundRobin}
               gameRuleText={getGameRuleText(events[selectedEventIdx], selectedMatch.round, totalRounds)}
+              matchFormat={getMatchFormat(events[selectedEventIdx], selectedMatch.round, totalRounds)}
             />
           )}
         </div>

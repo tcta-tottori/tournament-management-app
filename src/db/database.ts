@@ -43,11 +43,17 @@ export interface FuriganaDict {
 // 4. 種目 (Event)
 // 大会に紐づく各カテゴリー
 // ---------------------------
+/** 試合方式 */
+export type MatchFormatType =
+  | 'game'             // Nゲームマッチ（1セット）: "8ゲームマッチ（8-8タイブレーク）"
+  | 'twoSetsSuper10';  // 2セットマッチ＋ファイナルセット10ポイントSTB
+
 /** 回戦ごとのゲームルール */
 export interface RoundGameRule {
-  roundLabel: string;   // "全回戦", "１～２回戦", "準々決勝以降" 等
-  ruleText: string;     // "8ゲームマッチ（8-8タイブレーク）"
-  games: number;        // ゲーム数
+  roundLabel: string;         // "全回戦", "１～２回戦", "準々決勝以降" 等
+  ruleText: string;           // "8ゲームマッチ（8-8タイブレーク）"
+  games: number;              // ゲーム数
+  matchFormat?: MatchFormatType; // 試合方式（省略時='game'）
 }
 
 export interface Event {
