@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban } from 'lucide-react';
+import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
+import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 
 type CheckInSlot = {
   drawPosition: number;
@@ -97,6 +98,13 @@ export default function EntryRegistration() {
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [stickyEventName, setStickyEventName] = useState('');
+
+  // 処理中モーダル
+  const [procModalOpen, setProcModalOpen] = useState(false);
+  const [procModalTitle, setProcModalTitle] = useState('');
+  const [procModalSteps, setProcModalSteps] = useState<ProcessingStep[]>([]);
+  const [procModalProgress, setProcModalProgress] = useState(0);
+  const [procModalResult, setProcModalResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Queries
   const events = useLiveQuery(
@@ -559,6 +567,21 @@ export default function EntryRegistration() {
     if (!draw) return;
     if (!skipConfirm && !confirm('エントリーを確定し対戦表を生成しますか？')) return;
 
+    // 処理中モーダル表示（skipConfirm=true の場合は呼び出し元が管理）
+    const showModal = !skipConfirm;
+    const evtName = events.find(e => e.eventId === eventId)?.name || eventId;
+    if (showModal) {
+      setProcModalTitle(`${evtName} 確定処理`);
+      setProcModalSteps([
+        { label: '対戦表を生成中...', status: 'loading' },
+        { label: '時間割と紐付け', status: 'waiting' },
+      ]);
+      setProcModalProgress(0);
+      setProcModalResult(null);
+      setProcModalOpen(true);
+    }
+
+    try {
     // DBから最新のエントリーと選手データを取得
     const eventEntries = await db.entries.where('eventId').equals(eventId).toArray();
     const allPlayers = await db.players.toArray();
@@ -707,14 +730,37 @@ export default function EntryRegistration() {
       }
     }
 
+    if (showModal) {
+      setProcModalProgress(60);
+      setProcModalSteps([
+        { label: '対戦表を生成完了', status: 'done' },
+        { label: '時間割と紐付け中...', status: 'loading' },
+      ]);
+    }
+
     // === 時間割に基づくグローバル対戦順再計算 ===
     if (!skipReorder) {
       await recalculateGlobalMatchOrder();
     }
-  }, [isLeagueEvent, recalculateGlobalMatchOrder]);
+
+    if (showModal) {
+      setProcModalProgress(100);
+      setProcModalSteps([
+        { label: '対戦表を生成完了', status: 'done' },
+        { label: '時間割と紐付け完了', status: 'done' },
+      ]);
+      setProcModalResult({ success: true, message: `${evtName} の対戦表を確定しました` });
+    }
+    } catch (err) {
+      if (showModal) {
+        setProcModalProgress(100);
+        setProcModalSteps(prev => prev.map(s => s.status === 'loading' ? { ...s, status: 'error' as const, label: `エラー: ${(err as Error).message}` } : s));
+        setProcModalResult({ success: false, message: `確定処理に失敗: ${(err as Error).message}` });
+      }
+    }
+  }, [events, isLeagueEvent, recalculateGlobalMatchOrder]);
 
   const handleConfirmAll = useCallback(async () => {
-    // DBから最新のドロー一覧を取得して確定対象を判定
     const currentDraws = eventIds.length > 0
       ? await db.draws.where('eventId').anyOf(eventIds).toArray()
       : [];
@@ -722,13 +768,46 @@ export default function EntryRegistration() {
     const targets = events.filter(evt => drawEventIds.has(evt.eventId));
     if (targets.length === 0) return;
     if (!confirm(`全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`)) return;
-    for (const evt of targets) {
-      await handleConfirmEvent(evt.eventId, true, true); // skipReorder=true
+
+    setProcModalTitle('全種目 一括確定');
+    const initialSteps: ProcessingStep[] = targets.map(t => ({ label: t.name, status: 'waiting' as const }));
+    initialSteps.push({ label: '時間割と紐付け', status: 'waiting' });
+    setProcModalSteps(initialSteps);
+    setProcModalProgress(0);
+    setProcModalResult(null);
+    setProcModalOpen(true);
+
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        setProcModalSteps(prev => prev.map((s, j) => j === i ? { ...s, status: 'loading', label: `${targets[i].name} を処理中...` } : s));
+        setProcModalProgress(Math.round(((i) / (targets.length + 1)) * 100));
+        await handleConfirmEvent(targets[i].eventId, true, true);
+        setProcModalSteps(prev => prev.map((s, j) => j === i ? { ...s, status: 'done', label: targets[i].name } : s));
+      }
+      // 時間割紐付け
+      setProcModalSteps(prev => prev.map((s, j) => j === targets.length ? { ...s, status: 'loading', label: '時間割と紐付け中...' } : s));
+      setProcModalProgress(Math.round((targets.length / (targets.length + 1)) * 100));
+      await recalculateGlobalMatchOrder();
+      setProcModalSteps(prev => prev.map((s, j) => j === targets.length ? { ...s, status: 'done', label: '時間割と紐付け完了' } : s));
+      setProcModalProgress(100);
+      setProcModalResult({ success: true, message: `全${targets.length}種目の対戦表を確定しました` });
+    } catch (err) {
+      setProcModalResult({ success: false, message: `確定処理に失敗: ${(err as Error).message}` });
     }
-    // 全種目確定後に一括でグローバル対戦順を再計算
-    await recalculateGlobalMatchOrder();
-    alert(`全${targets.length}種目の対戦表を確定しました。`);
   }, [events, eventIds, handleConfirmEvent, recalculateGlobalMatchOrder]);
+
+  // === 確定リセット（対戦表削除）===
+  const handleRevertConfirm = useCallback(async (eventId: string) => {
+    const evtName = events.find(e => e.eventId === eventId)?.name || eventId;
+    if (!confirm(`「${evtName}」の確定を解除し、対戦表を削除しますか？\nこの操作は取り消せません。`)) return;
+    const matches = await db.matches.where('eventId').equals(eventId).toArray();
+    const ids = matches.map(m => m.id).filter((id): id is number => id !== undefined);
+    if (ids.length > 0) {
+      await db.matches.bulkDelete(ids);
+    }
+    // 時間割紐付けを再計算
+    await recalculateGlobalMatchOrder();
+  }, [events, recalculateGlobalMatchOrder]);
 
   // Summary stats
   const computeStats = useCallback((slots: CheckInSlot[]) => {
@@ -1251,28 +1330,38 @@ export default function EntryRegistration() {
     }
 
     return (
-      <div key={eventId} className="bg-white rounded-xl shadow-sm border border-border-main overflow-x-auto"
+      <div key={eventId} className={`rounded-xl shadow-sm border overflow-x-auto transition-all ${isConfirmedEvent ? 'bg-gray-50 border-gray-300 opacity-70' : 'bg-white border-border-main'}`}
         data-event-id={eventId} data-event-name={eventName}>
-        {/* Event header - sticky（モバイル: コントロール折りたたみ時にtop固定） */}
-        <div className="bg-primary-50 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border-main flex items-center justify-between sticky top-0 z-10">
+        {/* Event header */}
+        <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between sticky top-0 z-10 ${isConfirmedEvent ? 'bg-gray-100 border-gray-300' : 'bg-primary-50 border-border-main'}`}>
           <button onClick={() => toggleCollapse(eventId)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-            <h3 className="font-bold text-primary-600 text-sm">{eventName}</h3>
+            <h3 className={`font-bold text-sm ${isConfirmedEvent ? 'text-gray-500' : 'text-primary-600'}`}>{eventName}</h3>
             {isConfirmedEvent && <Lock className="w-3 h-3 text-green-600" />}
           </button>
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
-            <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors min-h-[32px]">
-              <UserCheck className="w-3.5 h-3.5" />全員受付
-            </button>
+            {!isConfirmedEvent && (
+              <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors min-h-[32px]">
+                <UserCheck className="w-3.5 h-3.5" />全員受付
+              </button>
+            )}
             <button onClick={(e) => { e.stopPropagation(); handleConfirmEvent(eventId); }}
               className={`flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-orange-500 hover:bg-orange-600'}`}>
               <Lock className="w-3.5 h-3.5" />{isConfirmedEvent ? '再確定' : '確定'}
             </button>
-            <button onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
-              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors min-h-[32px]">
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
+            {isConfirmedEvent && (
+              <button onClick={(e) => { e.stopPropagation(); handleRevertConfirm(eventId); }}
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors min-h-[32px]">
+                <Unlock className="w-3.5 h-3.5" />解除
+              </button>
+            )}
+            {!isConfirmedEvent && (
+              <button onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors min-h-[32px]">
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
             <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
             <span className="text-gray-500">/</span>
             <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
@@ -1466,6 +1555,16 @@ export default function EntryRegistration() {
           )}
         </div>
       </div>
+
+      {/* 処理中モーダル */}
+      <ProcessingModal
+        open={procModalOpen}
+        title={procModalTitle}
+        steps={procModalSteps}
+        progress={procModalProgress}
+        result={procModalResult}
+        onClose={() => setProcModalOpen(false)}
+      />
     </div>
   );
 }
