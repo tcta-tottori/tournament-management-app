@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
-  X, Loader2, CalendarClock, ChevronRight, MapPin, Calendar, Trophy,
+  X, Loader2, CalendarClock, ChevronRight, Trophy,
 } from 'lucide-react';
 import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
@@ -259,7 +259,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
 
   // 一括読込ウィザード
-  type WizardPhase = 'loading' | 'select-tournament' | 'confirm-tournament' | 'select-schedule' | 'done';
+  type WizardPhase = 'loading' | 'select-tournament' | 'select-schedule' | 'done';
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardPhase, setWizardPhase] = useState<WizardPhase>('loading');
   const [wizardSteps, setWizardSteps] = useState<LoadingStep[]>([]);
@@ -267,9 +267,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardTournamentFiles, setWizardTournamentFiles] = useState<GoogleDriveFile[]>([]);
   const [wizardScheduleFiles, setWizardScheduleFiles] = useState<GoogleDriveFile[]>([]);
   const [wizardLoadingFileId, setWizardLoadingFileId] = useState<string | null>(null);
-  const [wizardTournamentName, setWizardTournamentName] = useState('');
-  const [wizardTournamentDate, setWizardTournamentDate] = useState('');
-  const [wizardTournamentVenue, setWizardTournamentVenue] = useState('');
   const [wizardResult, setWizardResult] = useState<{ success: boolean; message: string } | null>(null);
   const [wizardDetails, setWizardDetails] = useState<string[]>([]);
 
@@ -551,9 +548,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setWizardDetails([]);
     setWizardTournamentFiles([]);
     setWizardScheduleFiles([]);
-    setWizardTournamentName('');
-    setWizardTournamentDate('');
-    setWizardTournamentVenue('');
     setIsProcessing(true);
     setProcessingLabel('一括読込中...');
     setResult(null);
@@ -659,27 +653,20 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     try {
       const arrayBuffer = await downloadTournamentExcel(token, file.id);
       onTournamentExcelLoaded?.(arrayBuffer, file.name);
-      // ファイル名から大会名を推測
-      const rawName = file.name.replace(/\.(xlsx?|xls)$/i, '');
-      setWizardTournamentName(rawName);
-      setWizardPhase('confirm-tournament');
+      // 大会情報確認ステップをスキップ（事前に大会設定済みのため）→ 直接時間割選択へ
+      if (wizardScheduleFiles.length > 0) {
+        setWizardPhase('select-schedule');
+      } else {
+        setWizardResult({ success: true, message: '一括読込が完了しました' });
+        setWizardPhase('done');
+      }
     } catch (err) {
       setWizardResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
       setWizardPhase('done');
     } finally {
       setWizardLoadingFileId(null);
     }
-  }, [onTournamentExcelLoaded]);
-
-  // ウィザード内: 大会情報確定→時間割選択へ
-  const handleWizardConfirmTournament = useCallback(() => {
-    if (wizardScheduleFiles.length > 0) {
-      setWizardPhase('select-schedule');
-    } else {
-      setWizardResult({ success: true, message: '一括読込が完了しました' });
-      setWizardPhase('done');
-    }
-  }, [wizardScheduleFiles]);
+  }, [onTournamentExcelLoaded, wizardScheduleFiles]);
 
   // ウィザード内: 時間割ファイル選択→ダウンロード→完了
   const handleWizardSelectSchedule = useCallback(async (file: GoogleDriveFile) => {
@@ -1005,8 +992,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                 <h3 className="font-bold text-gray-800 text-sm">一括読込</h3>
                 {/* ステップインジケーター */}
                 <div className="flex items-center gap-1 mt-1">
-                  {['読込', '大会', '確認', '時間割'].map((label, i) => {
-                    const phaseMap: WizardPhase[] = ['loading', 'select-tournament', 'confirm-tournament', 'select-schedule'];
+                  {['読込', '大会', '時間割'].map((label, i) => {
+                    const phaseMap: WizardPhase[] = ['loading', 'select-tournament', 'select-schedule'];
                     const currentIdx = phaseMap.indexOf(wizardPhase);
                     const isDone = wizardPhase === 'done' || i < currentIdx;
                     const isCurrent = i === currentIdx;
@@ -1133,63 +1120,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       スキップ →
                     </button>
                   </div>
-                </div>
-              )}
-
-              {/* Phase: confirm-tournament */}
-              {wizardPhase === 'confirm-tournament' && (
-                <div className="px-5 py-4 space-y-4">
-                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    大会情報を確認
-                  </h4>
-                  <p className="text-[11px] text-gray-500">必要に応じて修正してください</p>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-500 flex items-center gap-1 mb-1">
-                        <Trophy className="w-3 h-3" /> 大会名
-                      </label>
-                      <input
-                        type="text"
-                        value={wizardTournamentName}
-                        onChange={e => setWizardTournamentName(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
-                        placeholder="大会名を入力"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-medium text-gray-500 flex items-center gap-1 mb-1">
-                          <Calendar className="w-3 h-3" /> 日程
-                        </label>
-                        <input
-                          type="text"
-                          value={wizardTournamentDate}
-                          onChange={e => setWizardTournamentDate(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
-                          placeholder="例: 3/15"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-medium text-gray-500 flex items-center gap-1 mb-1">
-                          <MapPin className="w-3 h-3" /> 会場
-                        </label>
-                        <input
-                          type="text"
-                          value={wizardTournamentVenue}
-                          onChange={e => setWizardTournamentVenue(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
-                          placeholder="例: ヤマタスポーツパーク"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleWizardConfirmTournament}
-                    className="w-full py-2.5 text-sm font-bold text-white bg-[#1a73e8] rounded-lg hover:bg-[#1557b0] transition-colors"
-                  >
-                    {wizardScheduleFiles.length > 0 ? '確定して時間割へ' : '確定して完了'}
-                  </button>
                 </div>
               )}
 
