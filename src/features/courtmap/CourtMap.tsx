@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/appStore';
 import type { Match, Court } from '../../db/database';
 import { MapPin, Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 
-/** テニスコート型のSVGオーバーレイ（縦向き） */
+/** テニスコート型のSVGオーバーレイ（縦向き・モバイル用） */
 function CourtLines({ status }: { status: string }) {
   const color = status === 'playing' ? 'rgba(22,163,74,0.25)'
     : status === 'ready' ? 'rgba(59,130,246,0.2)'
@@ -13,24 +13,44 @@ function CourtLines({ status }: { status: string }) {
     : 'rgba(148,163,184,0.15)';
   return (
     <svg viewBox="0 0 60 110" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
-      {/* 外枠 */}
       <rect x="4" y="4" width="52" height="102" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
-      {/* ネット（中央横線） */}
       <line x1="2" y1="55" x2="58" y2="55" stroke={color} strokeWidth="2" />
-      {/* サービスライン上 */}
       <line x1="10" y1="30" x2="50" y2="30" stroke={color} strokeWidth="0.8" />
-      {/* サービスライン下 */}
       <line x1="10" y1="80" x2="50" y2="80" stroke={color} strokeWidth="0.8" />
-      {/* シングルスサイドライン左 */}
       <line x1="10" y1="4" x2="10" y2="106" stroke={color} strokeWidth="0.8" />
-      {/* シングルスサイドライン右 */}
       <line x1="50" y1="4" x2="50" y2="106" stroke={color} strokeWidth="0.8" />
-      {/* センターサービスライン */}
       <line x1="30" y1="30" x2="30" y2="80" stroke={color} strokeWidth="0.8" />
-      {/* センターマーク上 */}
       <line x1="30" y1="4" x2="30" y2="8" stroke={color} strokeWidth="0.8" />
-      {/* センターマーク下 */}
       <line x1="30" y1="102" x2="30" y2="106" stroke={color} strokeWidth="0.8" />
+    </svg>
+  );
+}
+
+/** テニスコート型のSVGオーバーレイ（横向き・PC用） */
+function CourtLinesH({ status }: { status: string }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.25)'
+    : status === 'ready' ? 'rgba(59,130,246,0.2)'
+    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
+    : 'rgba(148,163,184,0.15)';
+  return (
+    <svg viewBox="0 0 110 60" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+      <rect x="4" y="4" width="102" height="52" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
+      {/* ネット（中央縦線） */}
+      <line x1="55" y1="2" x2="55" y2="58" stroke={color} strokeWidth="2" />
+      {/* サービスライン左 */}
+      <line x1="30" y1="10" x2="30" y2="50" stroke={color} strokeWidth="0.8" />
+      {/* サービスライン右 */}
+      <line x1="80" y1="10" x2="80" y2="50" stroke={color} strokeWidth="0.8" />
+      {/* シングルスベースライン上 */}
+      <line x1="4" y1="10" x2="106" y2="10" stroke={color} strokeWidth="0.8" />
+      {/* シングルスベースライン下 */}
+      <line x1="4" y1="50" x2="106" y2="50" stroke={color} strokeWidth="0.8" />
+      {/* センターサービスライン */}
+      <line x1="30" y1="30" x2="80" y2="30" stroke={color} strokeWidth="0.8" />
+      {/* センターマーク左 */}
+      <line x1="4" y1="30" x2="8" y2="30" stroke={color} strokeWidth="0.8" />
+      {/* センターマーク右 */}
+      <line x1="102" y1="30" x2="106" y2="30" stroke={color} strokeWidth="0.8" />
     </svg>
   );
 }
@@ -214,7 +234,7 @@ export default function CourtMap() {
     unavailable: '使用不可',
   };
 
-  /** コートボタン描画 */
+  /** コートボタン描画（モバイル用・縦向き） */
   const renderCourtButton = useCallback((courtName: string) => {
     const cs = courtStatusMap[courtName];
     if (!cs) return null;
@@ -233,42 +253,76 @@ export default function CourtMap() {
         `}
         style={{ aspectRatio: '1 / 1.7' }}
       >
-        {/* テニスコートライン */}
         <CourtLines status={cs.status} />
-
-        {/* コンテンツ */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full p-1.5 md:p-2">
+        <div className="relative z-10 flex flex-col items-center justify-center h-full p-1.5">
           {cs.status === 'playing' && (
             <div className="absolute top-1 right-1">
               <Play className="w-3 h-3 text-green-500 fill-green-500" />
             </div>
           )}
-          <div className={`text-xl md:text-2xl font-bold ${style.text} leading-none`}>
-            {courtName}
-          </div>
-          <div className={`text-[9px] md:text-[10px] font-medium ${style.text} mt-0.5`}>
-            {statusLabel[cs.status]}
-          </div>
+          <div className={`text-xl font-bold ${style.text} leading-none`}>{courtName}</div>
+          <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{statusLabel[cs.status]}</div>
           {cs.currentMatch && (
             <div className="mt-1 pt-1 border-t border-green-200/60 w-full space-y-0">
-              <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate text-center leading-tight">
-                {cs.currentMatch.player1Name}
-              </p>
-              <p className="text-[7px] md:text-[8px] text-green-600 text-center">vs</p>
-              <p className="text-[9px] md:text-[10px] font-medium text-green-800 truncate text-center leading-tight">
-                {cs.currentMatch.player2Name}
-              </p>
+              <p className="text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[7px] text-green-600 text-center">vs</p>
+              <p className="text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
             <div className="mt-1 pt-1 border-t border-blue-100/60 w-full space-y-0">
-              <p className="text-[9px] md:text-[10px] text-primary-500 truncate text-center leading-tight">
-                {cs.nextMatch.player1Name}
-              </p>
-              <p className="text-[7px] md:text-[8px] text-blue-400 text-center">vs</p>
-              <p className="text-[9px] md:text-[10px] text-primary-500 truncate text-center leading-tight">
-                {cs.nextMatch.player2Name}
-              </p>
+              <p className="text-[9px] text-primary-500 truncate text-center leading-tight">{cs.nextMatch.player1Name}</p>
+              <p className="text-[7px] text-blue-400 text-center">vs</p>
+              <p className="text-[9px] text-primary-500 truncate text-center leading-tight">{cs.nextMatch.player2Name}</p>
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  }, [courtStatusMap, selectedCourt, statusStyles, statusLabel]);
+
+  /** コートボタン描画（PC用・横向き） */
+  const renderCourtButtonH = useCallback((courtName: string) => {
+    const cs = courtStatusMap[courtName];
+    if (!cs) return null;
+    const style = statusStyles[cs.status];
+    const isSelected = selectedCourt === courtName;
+
+    return (
+      <button
+        key={courtName}
+        onClick={() => setSelectedCourt(isSelected ? null : courtName)}
+        className={`
+          relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
+          ${style.bg} ${style.border} ${style.glow}
+          ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.02]' : 'hover:scale-[1.01] hover:shadow-md'}
+          ${cs.status === 'playing' ? 'animate-pulse-slow' : ''}
+        `}
+        style={{ aspectRatio: '1.8 / 1' }}
+      >
+        <CourtLinesH status={cs.status} />
+        <div className="relative z-10 flex items-center h-full px-3 py-1.5 gap-2">
+          {/* 左側: コート番号 + ステータス */}
+          <div className="flex flex-col items-center shrink-0 min-w-[40px]">
+            {cs.status === 'playing' && (
+              <Play className="w-3 h-3 text-green-500 fill-green-500 mb-0.5" />
+            )}
+            <div className={`text-2xl font-bold ${style.text} leading-none`}>{courtName}</div>
+            <div className={`text-[10px] font-medium ${style.text} mt-0.5`}>{statusLabel[cs.status]}</div>
+          </div>
+          {/* 右側: 対戦情報 */}
+          {cs.currentMatch && (
+            <div className="flex-1 min-w-0 border-l border-green-200/60 pl-2 space-y-0">
+              <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[8px] text-green-600">vs</p>
+              <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player2Name}</p>
+            </div>
+          )}
+          {!cs.currentMatch && cs.nextMatch && (
+            <div className="flex-1 min-w-0 border-l border-blue-100/60 pl-2 space-y-0">
+              <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player1Name}</p>
+              <p className="text-[8px] text-blue-400">vs</p>
+              <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player2Name}</p>
             </div>
           )}
         </div>
@@ -336,15 +390,89 @@ export default function CourtMap() {
             {venue.name} - コート配置図
           </h2>
 
-          <div className="flex flex-col items-center gap-3 max-w-3xl mx-auto">
-            {/* hqSide === 'right' の場合: 全ブロックをflex-colでまとめ、右に本部を配置 */}
+          {/* === PC横向きレイアウト (md以上) === */}
+          <div className="hidden md:block w-full">
+            {venue.hqSide === 'right' ? (
+              /* 千代テニス場: 横向きレイアウト - ブロックを列として並べ、右に本部 */
+              <div className="flex items-stretch gap-3">
+                {venue.blocks.map((block, blockIdx) => (
+                  <div key={blockIdx} className="flex items-stretch gap-3">
+                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                      <div className="flex flex-col gap-2">
+                        {[...block.courts].reverse().map(renderCourtButtonH)}
+                      </div>
+                    </div>
+                    {blockIdx < venue.blocks.length - 1 && (
+                      <div className="flex flex-col items-center justify-center gap-1 py-2">
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                        <span className="text-[10px] text-gray-500 [writing-mode:vertical-rl]">通路</span>
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="flex items-center">
+                  <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
+                    <span className="text-lg">🏠</span>
+                    <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ヤマタスポーツパーク: 横向きレイアウト - ブロックを列、コート番号大→小（上→下） */
+              <div className="flex items-start gap-0 justify-center">
+                {venue.blocks.map((block, blockIdx) => (
+                  <div key={blockIdx} className="flex items-start">
+                    {/* ブロック */}
+                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
+                      <div className="flex flex-col gap-2">
+                        {[...block.courts].reverse().map(renderCourtButtonH)}
+                      </div>
+                    </div>
+
+                    {/* 本部表示（指定ブロックの後） */}
+                    {blockIdx === venue.hqPosition && (
+                      <div className="flex flex-col items-center justify-center mx-2 self-stretch">
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                        <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-3 shadow-sm my-1">
+                          <span className="text-base">🏠</span>
+                          <span className="text-xs font-bold text-amber-800">本部</span>
+                        </div>
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                      </div>
+                    )}
+
+                    {/* 通路表示（本部がないブロック間） */}
+                    {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
+                      <div className="flex flex-col items-center justify-center mx-1 self-stretch py-4">
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                        <span className="text-[10px] text-gray-500 [writing-mode:vertical-rl] my-1">通路</span>
+                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 駐車場（ヤマタのみ・PC横向き時は右端に表示） */}
+            {venue.id === 'yamata' && (
+              <div className="mt-3 flex justify-end">
+                <div className="bg-primary-50 rounded-lg px-4 py-1.5 text-xs text-gray-500 font-medium border border-border-main">
+                  駐車場側 →
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* === モバイル縦向きレイアウト (md未満) === */}
+          <div className="md:hidden flex flex-col items-center gap-3 w-full">
             {venue.hqSide === 'right' ? (
               <div className="w-full flex items-stretch gap-3">
                 <div className="flex-1 flex flex-col gap-3">
                   {venue.blocks.map((block, blockIdx) => {
                     const cols = block.courts.length;
                     const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
-
                     return (
                       <div key={blockIdx} className="w-full">
                         <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
@@ -352,8 +480,6 @@ export default function CourtMap() {
                             {block.courts.map(renderCourtButton)}
                           </div>
                         </div>
-
-                        {/* ブロック間の通路表示 */}
                         {blockIdx < venue.blocks.length - 1 && (
                           <div className="flex items-center gap-2 my-2">
                             <div className="flex-1 border-t border-dashed border-gray-300" />
@@ -365,56 +491,46 @@ export default function CourtMap() {
                     );
                   })}
                 </div>
-                {/* 本部 - 全ブロック右横に表示（千代テニス場レイアウト） */}
                 <div className="flex items-center">
                   <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
-                    <span className="text-sm font-bold text-amber-800 writing-vertical">本部</span>
+                    <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
                   </div>
                 </div>
               </div>
             ) : (
-            /* 通常レイアウト（ヤマタスポーツパーク等） */
-            venue.blocks.map((block, blockIdx) => {
-              const cols = block.courts.length;
-              const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
-
-              return (
-                <div key={blockIdx} className="w-full">
-                  {/* コートブロック - 緑のフィールド風 */}
-                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
-                    <div className={`grid ${gridCols} gap-2`}>
-                      {block.courts.map(renderCourtButton)}
-                    </div>
-                  </div>
-
-                  {/* 本部表示 - 指定ブロック間に表示（ヤマタスポーツパーク用） */}
-                  {blockIdx === venue.hqPosition && (
-                    <div className="flex items-center gap-3 my-3">
-                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
-                        <span className="text-base">🏠</span>
-                        <span className="text-sm font-bold text-amber-800">本部</span>
+              venue.blocks.map((block, blockIdx) => {
+                const cols = block.courts.length;
+                const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
+                return (
+                  <div key={blockIdx} className="w-full">
+                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                      <div className={`grid ${gridCols} gap-2`}>
+                        {block.courts.map(renderCourtButton)}
                       </div>
-                      <div className="flex-1 border-t border-dashed border-border-main" />
-                      <span className="text-[10px] text-gray-500">通路</span>
-                      <div className="flex-1 border-t border-dashed border-border-main" />
                     </div>
-                  )}
-
-                  {/* ブロック間の道路表示（本部表示がないブロック間） */}
-                  {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
-                    <div className="flex items-center gap-2 my-2">
-                      <div className="flex-1 border-t border-dashed border-gray-300" />
-                      <span className="text-[10px] text-gray-500">通路</span>
-                      <div className="flex-1 border-t border-dashed border-gray-300" />
-                    </div>
-                  )}
-                </div>
-              );
-            })
+                    {blockIdx === venue.hqPosition && (
+                      <div className="flex items-center gap-3 my-3">
+                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
+                          <span className="text-base">🏠</span>
+                          <span className="text-sm font-bold text-amber-800">本部</span>
+                        </div>
+                        <div className="flex-1 border-t border-dashed border-border-main" />
+                        <span className="text-[10px] text-gray-500">通路</span>
+                        <div className="flex-1 border-t border-dashed border-border-main" />
+                      </div>
+                    )}
+                    {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 border-t border-dashed border-gray-300" />
+                        <span className="text-[10px] text-gray-500">通路</span>
+                        <div className="flex-1 border-t border-dashed border-gray-300" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
-
-            {/* 駐車場（ヤマタのみ） */}
             {venue.id === 'yamata' && (
               <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main w-full text-center mt-1">
                 駐車場側
