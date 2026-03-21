@@ -147,24 +147,29 @@ export default function DataManagement() {
       </section>
 
       {/* 全データリセット */}
-      <section className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <span className="text-sm font-medium text-gray-600">全データリセット</span>
-            <span className="text-[11px] text-gray-400">（大会・エントリー・対戦表・時間割をすべて削除）</span>
+      <section className="rounded-xl overflow-hidden border border-red-200/60 bg-gradient-to-r from-red-50/80 to-orange-50/50">
+        <div className="px-5 py-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-white border border-red-200 shadow-sm flex items-center justify-center shrink-0">
+            <Trash2 className="w-5 h-5 text-red-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-gray-800">全データリセット</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">大会・エントリー・対戦表・試合結果・コート設定・時間割をすべて削除します</p>
           </div>
           <button
             onClick={() => setShowResetConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all shadow-sm shrink-0"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <AlertTriangle className="w-3.5 h-3.5" />
             リセット
           </button>
         </div>
         {resetDone && (
-          <div className="px-4 pb-3">
-            <p className="text-xs text-green-600 font-medium">全データをリセットしました。</p>
+          <div className="px-5 pb-3 -mt-1">
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+              <p className="text-xs text-green-700 font-medium">全データをリセットしました</p>
+            </div>
           </div>
         )}
       </section>
@@ -173,7 +178,7 @@ export default function DataManagement() {
       <ConfirmDialog
         open={showResetConfirm}
         title="全データリセット"
-        message={"以下のデータをすべて削除します：\n・大会情報\n・選手データ\n・エントリー\n・ドロー・対戦表\n・試合結果\n・コート設定\n・時間割\n\n※ふりがな・所属辞書は保持されます\n※この操作は取り消せません"}
+        message={"以下のデータをすべて削除します：\n\n・大会情報\n・選手データ\n・エントリー\n・ドロー・対戦表\n・試合結果\n・コート設定\n・時間割\n\nふりがな・所属辞書は保持されます。\nこの操作は取り消せません。"}
         danger
         confirmLabel="リセット実行"
         onConfirm={handleResetAll}

@@ -18,58 +18,42 @@ function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
 const CHUNK_PAUSE_MS = 600;
 
 /** テキストを音声再生する Promise */
-function speakText(text: string, rate: number, repeatCount: number, abortRef: React.RefObject<boolean>): Promise<void> {
+function speakText(text: string, rate: number, _repeatCount: number, abortRef: React.RefObject<boolean>): Promise<void> {
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     const voice = getJapaneseFemaleVoice();
-    const baseChunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
-    const repeatChunks = ['繰り返します。', ...baseChunks];
-    const effectiveRepeatCount = Math.min(repeatCount, 3);
-    let repeatIdx = 0;
+    const chunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
+    let index = 0;
 
-    function speakChunks() {
-      const chunks = repeatIdx === 0 ? baseChunks : repeatChunks;
-      let index = 0;
-
-      function speakNext() {
-        if (abortRef.current) { resolve(); return; }
-        if (index >= chunks.length) {
-          repeatIdx++;
-          if (repeatIdx < effectiveRepeatCount) {
-            setTimeout(() => {
-              if (!abortRef.current) speakChunks();
-              else resolve();
-            }, 2500);
-          } else {
-            resolve();
-          }
-          return;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(chunks[index]);
-        utterance.lang = 'ja-JP';
-        utterance.rate = rate;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        if (voice) utterance.voice = voice;
-
-        utterance.onend = () => {
-          index++;
-          if (index < chunks.length) {
-            setTimeout(() => speakNext(), CHUNK_PAUSE_MS);
-          } else {
-            speakNext();
-          }
-        };
-        utterance.onerror = () => {
-          index++;
-          speakNext();
-        };
-        synth.speak(utterance);
+    function speakNext() {
+      if (abortRef.current) { resolve(); return; }
+      if (index >= chunks.length) {
+        resolve();
+        return;
       }
-      speakNext();
+
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = 'ja-JP';
+      utterance.rate = rate;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      if (voice) utterance.voice = voice;
+
+      utterance.onend = () => {
+        index++;
+        if (index < chunks.length) {
+          setTimeout(() => speakNext(), CHUNK_PAUSE_MS);
+        } else {
+          speakNext();
+        }
+      };
+      utterance.onerror = () => {
+        index++;
+        speakNext();
+      };
+      synth.speak(utterance);
     }
-    speakChunks();
+    speakNext();
   });
 }
 
@@ -143,24 +127,23 @@ export default function BulkCallOverlay() {
     if (!finalState.aborted && finalState.currentIndex >= finalState.items.length) {
       setTimeout(() => reset(), 3000);
     }
-  }, []);
+  }, [reset]);
 
   // コール開始時に自動で実行
   useEffect(() => {
     if (isActive && !aborted && !runningRef.current) {
       runSequence();
     }
-  }, [isActive, runSequence]);
+  }, [isActive, aborted, runSequence]);
 
   const handleAbort = useCallback(() => {
     window.speechSynthesis.cancel();
     abort();
   }, [abort]);
 
-  if (!isActive && items.length === 0) return null;
-
+  // 完了/中断の判定（hooks の前に計算）
   const isComplete = !isActive && !aborted && currentIndex >= items.length && items.length > 0;
-  const wasAborted = aborted;
+  const wasAborted = aborted && items.length > 0;
 
   // 完了/中断後は3秒で消える
   useEffect(() => {
@@ -170,6 +153,8 @@ export default function BulkCallOverlay() {
     }
   }, [isComplete, wasAborted, reset]);
 
+  // 全ての hooks の後に条件付き return
+  if (!isActive && items.length === 0) return null;
   if (!isActive && !isComplete && !wasAborted) return null;
 
   const current = items[Math.min(currentIndex, items.length - 1)];

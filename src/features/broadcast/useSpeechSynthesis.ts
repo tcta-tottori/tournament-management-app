@@ -57,7 +57,7 @@ export function useSpeechSynthesis() {
     const repeatChunks = ['繰り返します。', ...baseChunks];
 
     // 繰り返し回数は最大2回（初回含め計3回）に制限
-    const effectiveRepeatCount = Math.min(settings.repeatCount, MAX_REPEATS + 1);
+    const effectiveRepeatCount = Math.min(settings.repeatCount || 1, MAX_REPEATS + 1);
 
     let repeatCount = 0;
 
@@ -86,7 +86,7 @@ export function useSpeechSynthesis() {
 
         const utterance = new SpeechSynthesisUtterance(chunks[index]);
         utterance.lang = 'ja-JP';
-            utterance.rate = settings.rate;
+        utterance.rate = settings.rate;
         utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch));
         utterance.volume = settings.volume;
         if (voice) utterance.voice = voice;

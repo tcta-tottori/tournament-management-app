@@ -632,11 +632,16 @@ export default function EntryRegistration() {
       for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
     }
 
-    // グローバルソート: startTime → courtName(数値)
+    // グローバルソート: 時間割の並び順（importedSchedule の matchOrder 順）に従う
+    // importedSchedule の順番 = Excel の種目順（例: 男子B→男子A→男子C→...）
+    const scheduleOrderMap = new Map<string, number>(); // "startTime|courtName" → schedule order
+    importedSchedule.forEach((item, idx) => {
+      scheduleOrderMap.set(`${item.startTime}|${item.courtName}`, idx);
+    });
     scheduled.sort((a, b) => {
-      const timeCmp = a.startTime.localeCompare(b.startTime);
-      if (timeCmp !== 0) return timeCmp;
-      return (parseInt(a.courtName) || 0) - (parseInt(b.courtName) || 0);
+      const orderA = scheduleOrderMap.get(`${a.startTime}|${a.courtName}`) ?? 99999;
+      const orderB = scheduleOrderMap.get(`${b.startTime}|${b.courtName}`) ?? 99999;
+      return orderA - orderB;
     });
 
     // matchOrder を割り当てて DB 更新

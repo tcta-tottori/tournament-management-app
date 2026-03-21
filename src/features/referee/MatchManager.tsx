@@ -348,7 +348,7 @@ export default function MatchManager() {
     if (bulkItems.length === 0) { alert('コール対象がありません。'); return; }
 
     // Zustand storeでコール開始（BulkCallOverlayが自動実行）
-    bulkCallStart(bulkItems, voiceSettings.rate, voiceSettings.repeatCount);
+    bulkCallStart(bulkItems, voiceSettings.rate, 1);
   }, [currentTournamentId, courts, allMatchesFlat, bulkCallActive, bulkCallStart, buildMatchCall, affiliationFuriganaMap, voiceSettings, events, allDraws]);
 
   // --- 結果入力 ---
@@ -1028,29 +1028,6 @@ ${printableMatches.map(m => {
                     </div>
                   </div>
 
-                  {/* 繰り返し回数 */}
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-2">
-                      <Megaphone className="w-3.5 h-3.5 text-emerald-500" />
-                      繰り返し回数
-                    </label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3].map(n => (
-                        <button
-                          key={n}
-                          onClick={() => setVoiceSettings(s => ({ ...s, repeatCount: n }))}
-                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                            voiceSettings.repeatCount === n
-                              ? 'bg-emerald-600 text-white shadow-sm'
-                              : 'bg-white text-gray-500 border border-gray-200 hover:border-emerald-300 hover:text-emerald-600'
-                          }`}
-                        >
-                          {n}回
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* テスト・停止ボタン */}
                   <div className="flex items-center gap-2 pt-1">
                     <button
@@ -1091,16 +1068,17 @@ ${printableMatches.map(m => {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '600px' }}>
+                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '720px' }}>
                   <colgroup>
-                    <col style={{ width: '40px' }} />
-                    <col style={{ width: '56px' }} />
+                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '50px' }} />
                     <col />
-                    <col style={{ width: '28px' }} />
+                    <col style={{ width: '24px' }} />
                     <col />
+                    <col style={{ width: '100px' }} />
+                    <col style={{ width: '48px' }} />
+                    <col style={{ width: '52px' }} />
                     <col style={{ width: '110px' }} />
-                    <col style={{ width: '56px' }} />
-                    <col style={{ width: '56px' }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
@@ -1112,6 +1090,7 @@ ${printableMatches.map(m => {
                       <th className="px-2 py-2 text-[10px] font-bold text-gray-500">種目・回戦</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">コート</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">状態</th>
+                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1140,6 +1119,53 @@ ${printableMatches.map(m => {
                           <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{courtObj?.name || '-'}</td>
                           <td className="py-2 px-2 text-center">
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${st.color}`}>{st.text}</span>
+                          </td>
+                          <td className="py-1.5 px-2 text-center">
+                            <div className="flex items-center gap-1 justify-center">
+                              <button
+                                onClick={() => handlePrintMatch(m)}
+                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
+                                title="対戦票印刷"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              {hasPlayers && m.status !== 'walkover' && (
+                                <button
+                                  onClick={() => startEdit(m)}
+                                  className={`p-1 rounded border transition-all ${
+                                    m.status === 'finished'
+                                      ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
+                                      : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
+                                  }`}
+                                  title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {hasPlayers && m.status !== 'walkover' && (
+                                speakingMatchId === m.matchId ? (
+                                  <button
+                                    onClick={handleVoiceStop}
+                                    className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
+                                    title="停止"
+                                  >
+                                    <Square className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => toggleCallTarget(m)}
+                                    className={`p-1 rounded border transition-all ${
+                                      callTargetMatchId === m.matchId
+                                        ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
+                                        : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
+                                    }`}
+                                    title="音声コール"
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
