@@ -74,15 +74,6 @@ export default function PlayerDataList() {
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editFuriganaValue, setEditFuriganaValue] = useState('');
 
-  // === 所属ふりがなマップ ===
-  const affFuriganaMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const entry of affFuriganaEntries) {
-      map.set(entry.name, entry.furigana);
-    }
-    return map;
-  }, [affFuriganaEntries]);
-
   // === 所属一覧データ（affiliationFuriganaテーブル + 選手データの所属を統合） ===
   const affiliationList = useMemo(() => {
     // affiliationFuriganaテーブルの全エントリをベースに
