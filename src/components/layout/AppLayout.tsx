@@ -18,7 +18,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-04', path: '/draw-lot', label: '抽選', icon: Dices },
   { id: 'S-05', path: '/draw-table', label: 'ドロー表', icon: Trophy },
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
-  { id: 'S-06b', path: '/schedule-sheet', label: 'タイムテーブル', icon: CalendarClock },
+  { id: 'S-06b', path: '/schedule-sheet', label: '時間割シート', icon: CalendarClock },
   { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-10', path: '/results', label: '結果', icon: Medal },

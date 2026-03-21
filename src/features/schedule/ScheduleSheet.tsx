@@ -3,12 +3,10 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore, type ImportedScheduleItem } from '../../stores/appStore';
-import { CalendarClock, Printer, Upload, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
+import { CalendarClock, Printer, Download, FileSpreadsheet, Clock, Activity, CheckCircle2, PlayCircle, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   getSavedToken as gdriveGetSavedToken,
-  isTokenValid as gdriveIsTokenValid,
-  listScheduleExcelFiles,
   downloadScheduleExcel,
   type GoogleDriveFile,
 } from '../backup/googleDriveApi';
@@ -27,13 +25,18 @@ const EVENT_COLORS = [
 function abbreviateEventName(name: string): string {
   return name
     .replace(/一般/g, '')
-    .replace(/男子/g, 'M')
-    .replace(/女子/g, 'W')
-    .replace(/シングルス/g, 'S')
-    .replace(/ダブルス/g, 'D')
-    .replace(/ミックス/g, 'MX')
-    .trim()
-    .slice(0, 6);
+    .replace(/シングルス/g, '')
+    .replace(/ダブルス/g, '')
+    .trim();
+}
+
+function roundLabelToJapanese(label: string): string {
+  if (label === 'F') return '決勝';
+  if (label === 'SF') return '準決勝';
+  if (label === 'QF') return '準々決勝';
+  const m = label.match(/^(\d+)R$/i);
+  if (m) return `${m[1]}回戦`;
+  return label;
 }
 
 /** 種目名を DB event に照合（あいまいマッチング） */
@@ -106,7 +109,7 @@ export default function ScheduleSheet() {
 
   // Google Drive file picker
   const [showDrivePicker, setShowDrivePicker] = useState(false);
-  const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [driveFiles] = useState<GoogleDriveFile[]>([]);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState('');
 
@@ -393,35 +396,6 @@ export default function ScheduleSheet() {
     }
   }, [gridData, importedSchedule, timeSlots, courtNames, tournament, eventColorMap]);
 
-  // --------------- Excel Export ---------------
-
-  const handleExcelExport = useCallback(() => {
-    if (!gridData || importedSchedule.length === 0) return;
-
-    const headerRow = ['コート', ...timeSlots];
-    const rows: (string | null)[][] = [headerRow];
-
-    for (const cn of courtNames) {
-      const row: (string | null)[] = [cn];
-      for (const time of timeSlots) {
-        const entry = gridData.get(cn)?.get(time);
-        if (entry) {
-          const abbr = abbreviateEventName(entry.item.eventName);
-          row.push(`${abbr} ${entry.item.roundLabel}`);
-        } else {
-          row.push(null);
-        }
-      }
-      rows.push(row);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '時間割');
-    const fileName = tournament?.name ? `時間割_${tournament.name}.xlsx` : '時間割.xlsx';
-    XLSX.writeFile(wb, fileName);
-  }, [gridData, importedSchedule, timeSlots, courtNames, tournament]);
-
   // --------------- Excel Import ---------------
 
   /** Excelシリアル値(0-1)または文字列からHH:MM形式に変換 */
@@ -588,29 +562,6 @@ export default function ScheduleSheet() {
 
   // --------------- Google Drive Import ---------------
 
-  const handleOpenDrivePicker = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token || !gdriveIsTokenValid()) {
-      setStatusMessage('Google Driveに接続されていません。データページからGoogle Driveに接続してください。');
-      return;
-    }
-    setShowDrivePicker(true);
-    setDriveLoading(true);
-    setDriveError('');
-    setDriveFiles([]);
-    try {
-      const files = await listScheduleExcelFiles(token);
-      setDriveFiles(files);
-      if (files.length === 0) {
-        setDriveError('時間割フォルダにExcelファイルがありません。');
-      }
-    } catch (err) {
-      setDriveError(`ファイル一覧の取得に失敗しました: ${(err as Error).message}`);
-    } finally {
-      setDriveLoading(false);
-    }
-  }, []);
-
   const handleDriveFileSelect = useCallback(async (file: GoogleDriveFile) => {
     if (!tid) return;
     const token = gdriveGetSavedToken();
@@ -726,7 +677,7 @@ export default function ScheduleSheet() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <CalendarClock className="w-6 h-6 text-primary-500" />
-              タイムテーブル
+              時間割シート
               {progressStats && progressStats.playing > 0 && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
                   <span className="relative flex h-2 w-2">
@@ -753,7 +704,6 @@ export default function ScheduleSheet() {
               印刷
             </button>
 
-            <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block" />
             <input
               ref={fileInputRef}
               type="file"
@@ -761,33 +711,6 @@ export default function ScheduleSheet() {
               onChange={handleExcelImport}
               className="hidden"
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 shadow-sm transition-colors text-sm"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <Upload className="w-3.5 h-3.5" />
-              Excel読込
-            </button>
-            <button
-              onClick={handleExcelExport}
-              disabled={!hasData}
-              className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-sm"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <Download className="w-3.5 h-3.5" />
-              Excel出力
-            </button>
-
-            <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block" />
-            <button
-              onClick={handleOpenDrivePicker}
-              className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-md font-medium hover:bg-gray-50 shadow-sm transition-colors text-sm"
-            >
-              <GoogleDriveIcon className="w-4 h-4" />
-              <FolderOpen className="w-3.5 h-3.5" />
-              時間割フォルダ
-            </button>
           </div>
         </div>
 
@@ -918,7 +841,7 @@ export default function ScheduleSheet() {
           `}</style>
           <div className="bg-gradient-to-r from-primary-50 to-blue-50 px-4 py-2.5 border-b border-border-main flex items-center justify-between">
             <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              タイムテーブル
+              時間割シート
             </h2>
             <span className="text-xs text-gray-500">
               セルをタップして編集
@@ -1007,7 +930,7 @@ export default function ScheduleSheet() {
                         statusBg = color?.bg || 'bg-gray-50';
                       }
 
-                      const tooltipParts = [evAbbr, item.roundLabel];
+                      const tooltipParts = [evAbbr, roundLabelToJapanese(item.roundLabel)];
                       if (dbMatch?.player1Name) tooltipParts.push(`${dbMatch.player1Name} vs ${dbMatch.player2Name}`);
                       if (dbMatch?.score) tooltipParts.push(dbMatch.score);
 
@@ -1029,7 +952,7 @@ export default function ScheduleSheet() {
                               <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0 text-sky-400" />
                             )}
                             <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
-                            <span className="text-[9px] leading-tight opacity-70">{item.roundLabel}</span>
+                            <span className="text-[9px] leading-tight opacity-70">{roundLabelToJapanese(item.roundLabel)}</span>
                           </div>
                           {playerLabel && (
                             <div className={`text-[8px] leading-tight truncate ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'opacity-60' : 'opacity-80'}`}>
