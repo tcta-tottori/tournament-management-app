@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -7,6 +7,9 @@ import {
 import PlayerDataList from './PlayerDataList';
 import DataImport from './DrawMeetingImport';
 import DataSync, { FuriganaAffiliationOps } from './DataSync';
+import { db } from '../../db/database';
+import { useAppStore } from '../../stores/appStore';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 export default function DataManagement() {
   // 共有 Google Drive 接続状態（再レンダリングトリガー用）
@@ -20,6 +23,10 @@ export default function DataManagement() {
   // GDriveからダウンロードされたデータを DrawMeetingImport に渡すための state
   const [externalTournamentExcel, setExternalTournamentExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
   const [externalScheduleExcel, setExternalScheduleExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
+
+  // 全データリセット用
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
 
   // DataSync の接続/切断時に再評価をトリガー
   const handleConnectionChange = useCallback(() => {
@@ -41,6 +48,31 @@ export default function DataManagement() {
   const handleScheduleExcelLoaded = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
     setExternalScheduleExcel({ arrayBuffer, fileName });
     setDataImportOpen(true);
+  }, []);
+
+  // 全データリセット
+  const handleResetAll = useCallback(async () => {
+    setShowResetConfirm(false);
+    try {
+      await db.transaction('rw', [db.tournaments, db.players, db.events, db.entries, db.draws, db.matches, db.courts], async () => {
+        await db.tournaments.clear();
+        await db.players.clear();
+        await db.events.clear();
+        await db.entries.clear();
+        await db.draws.clear();
+        await db.matches.clear();
+        await db.courts.clear();
+      });
+      // Zustand store リセット
+      useAppStore.getState().setCurrentTournamentId(null);
+      useAppStore.getState().setImportedSchedule([]);
+      useAppStore.getState().setScheduleSlots([]);
+      useAppStore.getState().setAllScheduleMatches([]);
+      setResetDone(true);
+      setTimeout(() => setResetDone(false), 3000);
+    } catch (err) {
+      console.error('Reset failed:', err);
+    }
   }, []);
 
   // 初回マウント時にも接続状態を評価
@@ -113,6 +145,40 @@ export default function DataManagement() {
           </div>
         )}
       </section>
+
+      {/* 全データリセット */}
+      <section className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
+            <span className="text-sm font-medium text-gray-600">全データリセット</span>
+            <span className="text-[11px] text-gray-400">（大会・エントリー・対戦表・時間割をすべて削除）</span>
+          </div>
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            リセット
+          </button>
+        </div>
+        {resetDone && (
+          <div className="px-4 pb-3">
+            <p className="text-xs text-green-600 font-medium">全データをリセットしました。</p>
+          </div>
+        )}
+      </section>
+
+      {/* リセット確認ダイアログ */}
+      <ConfirmDialog
+        open={showResetConfirm}
+        title="全データリセット"
+        message={"以下のデータをすべて削除します：\n・大会情報\n・選手データ\n・エントリー\n・ドロー・対戦表\n・試合結果\n・コート設定\n・時間割\n\n※ふりがな・所属辞書は保持されます\n※この操作は取り消せません"}
+        danger
+        confirmLabel="リセット実行"
+        onConfirm={handleResetAll}
+        onCancel={() => setShowResetConfirm(false)}
+      />
     </div>
   );
 }

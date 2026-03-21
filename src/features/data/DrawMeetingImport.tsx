@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, RefreshCw } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, ChevronRight, FileSpreadsheet, Sparkles, Calendar, MapPin, CalendarClock, RefreshCw, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
@@ -523,10 +524,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     }
   }, []);
 
-  // GDriveから大会Excelが渡されたら処理
+  // GDrive用モーダル表示フラグ
+  const [showGDriveModal, setShowGDriveModal] = useState(false);
+
+  // GDriveから大会Excelが渡されたら処理してモーダル表示
   useEffect(() => {
     if (externalTournamentExcel) {
       processExcelArrayBuffer(externalTournamentExcel.arrayBuffer, externalTournamentExcel.fileName);
+      setShowGDriveModal(true);
     }
   }, [externalTournamentExcel, processExcelArrayBuffer]);
 
@@ -1169,22 +1174,22 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   };
 
   // --- Excel preview helpers ---
-  const excelPlayerCount = parsedExcel
-    ? (() => {
-        const names = new Set<string>();
-        for (const ev of parsedExcel.events) {
-          for (const p of ev.players) {
-            if (!p.isBye && p.name) names.add(p.name.replace(/\s+/g, ''));
-            if (p.partnerName) names.add(p.partnerName.replace(/\s+/g, ''));
-          }
-        }
-        return names.size;
-      })()
-    : 0;
+  const excelPlayerCount = useMemo(() => {
+    if (!parsedExcel) return 0;
+    const names = new Set<string>();
+    for (const ev of parsedExcel.events) {
+      for (const p of ev.players) {
+        if (!p.isBye && p.name) names.add(p.name.replace(/\s+/g, ''));
+        if (p.partnerName) names.add(p.partnerName.replace(/\s+/g, ''));
+      }
+    }
+    return names.size;
+  }, [parsedExcel]);
 
-  const excelDrawCount = parsedExcel
-    ? parsedExcel.events.filter(ev => ev.drawSize > 0).length
-    : 0;
+  const excelDrawCount = useMemo(() => {
+    if (!parsedExcel) return 0;
+    return parsedExcel.events.filter(ev => ev.drawSize > 0).length;
+  }, [parsedExcel]);
 
   const hasPreview = parsedData && summary;
   const hasExcelPreview = parsedExcel;
@@ -1812,6 +1817,105 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{scheduleError}</span>
         </div>
+      )}
+
+      {/* GDriveインポートモーダル */}
+      {showGDriveModal && parsedExcel && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px]" onClick={() => setShowGDriveModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden m-auto animate-[confirmSlideUp_0.2s_ease-out]">
+            {/* ヘッダー */}
+            <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-700 px-5 py-4">
+              <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/[0.06]" />
+              <div className="flex items-center justify-between relative">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                    <FileSpreadsheet className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">大会データ読込</h3>
+                    <p className="text-[11px] text-white/60 mt-0.5 truncate max-w-[200px]">{parsedExcel.fileName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowGDriveModal(false)} className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+              {/* 統計バッジ */}
+              <div className="flex gap-2 mt-3 relative">
+                {[
+                  { icon: Users, value: excelPlayerCount, label: '選手' },
+                  { icon: Trophy, value: parsedExcel.events.length, label: '種目' },
+                  { icon: Dices, value: excelDrawCount, label: 'ドロー' },
+                ].map(({ icon: Icon, value, label }) => (
+                  <div key={label} className="flex-1 bg-white/10 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center text-white">
+                    <Icon className="w-3.5 h-3.5 mx-auto mb-0.5 text-white/70" />
+                    <p className="text-base font-bold leading-none">{value}</p>
+                    <p className="text-[9px] text-white/50 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* フォーム */}
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 block mb-1">大会名</label>
+                <div className="flex gap-2">
+                  <input type="text" value={editTournamentName} onChange={e => setEditTournamentName(e.target.value)}
+                    placeholder="大会名を入力"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                  <button type="button" onClick={() => {
+                    const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
+                    setEditTournamentName(cleanTournamentName(raw));
+                  }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all" title="不要な文字を自動除去">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />日程
+                  </label>
+                  <input type="text" value={editDate} onChange={e => setEditDate(e.target.value)} placeholder="例: 3/15"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
+                  </label>
+                  <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                    <CalendarClock className="w-3 h-3 inline mr-0.5 -mt-0.5" />予備日
+                  </label>
+                  <input type="text" value={editReserveDate} onChange={e => setEditReserveDate(e.target.value)} placeholder="例: 3/22"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                </div>
+              </div>
+            </div>
+
+            {/* アクション */}
+            <div className="px-5 pb-4 flex items-center gap-2.5">
+              <button onClick={() => { setShowGDriveModal(false); reset(); }}
+                className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-all">
+                キャンセル
+              </button>
+              <button onClick={async () => { setShowGDriveModal(false); await handleExcelImport(); }}
+                disabled={isImporting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all">
+                <Upload className="w-4 h-4" />
+                {isImporting ? 'インポート中...' : 'インポート'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  HelpCircle, ExternalLink, Medal, HardDrive
+  HelpCircle, ExternalLink, Medal, HardDrive, MapPin, Calendar
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -70,6 +70,15 @@ export default function AppLayout() {
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+
+  // 現在の大会情報を取得
+  const tournament = useLiveQuery(
+    () => currentTournamentId
+      ? db.tournaments.where('tournamentId').equals(currentTournamentId).first()
+      : undefined,
+    [currentTournamentId]
+  );
+  const importedSchedule = useAppStore((s) => s.importedSchedule);
 
   // 現在の大会に紐づく種目を取得
   const events = useLiveQuery(
@@ -252,6 +261,33 @@ export default function AppLayout() {
 
         </div>
       </nav>
+
+      {/* ===== 大会情報バー ===== */}
+      {tournament && (
+        <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-b border-primary-100 px-4 py-1.5 flex items-center gap-4 text-xs shrink-0 overflow-x-auto">
+          <span className="font-bold text-primary-700 truncate">{tournament.name}</span>
+          {tournament.date && (
+            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
+              <Calendar className="w-3 h-3" />{tournament.date}
+            </span>
+          )}
+          {tournament.venue && (
+            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
+              <MapPin className="w-3 h-3" />{tournament.venue}
+            </span>
+          )}
+          {(events ?? []).length > 0 && (
+            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
+              <Trophy className="w-3 h-3" />{(events ?? []).length}種目
+            </span>
+          )}
+          {importedSchedule.length > 0 && (
+            <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
+              <CalendarClock className="w-3 h-3" />時間割{importedSchedule.length}試合
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
       <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
