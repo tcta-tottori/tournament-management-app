@@ -104,6 +104,49 @@ export default function MatchManager() {
     return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
   }, [allMatchesByEvent, events]);
 
+  const courts = useLiveQuery(() => db.courts.toArray()) || [];
+
+  // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
+  const standbyInfo = useMemo(() => {
+    const availableCourts = courts.filter(c => c.isAvailable);
+    const totalCourts = availableCourts.length;
+
+    // 現在コートに入っている試合のコートIDセット
+    const playingCourtIds = new Set<string>();
+    for (const m of globalSortedMatches) {
+      if (m.status === 'playing' && m.courtId) playingCourtIds.add(m.courtId);
+    }
+    const onCourtCount = playingCourtIds.size;
+    const emptyCourtCount = Math.max(0, totalCourts - onCourtCount);
+
+    // 待機中（対戦相手が決まっている）試合を対戦順で取得
+    const waitingMatches: (Match & { eventName: string })[] = [];
+    for (const m of globalSortedMatches) {
+      if (m.status !== 'waiting' && m.status !== 'ready') continue;
+      if (!m.player1Name || !m.player2Name) continue;
+      if (m.player1Name === 'BYE' || m.player2Name === 'BYE') continue;
+      waitingMatches.push(m);
+    }
+
+    const standbyMap = new Map<string, { label: string; type: 'court' | 'standby' }>();
+    let standbyNum = 1;
+    let courtAssigned = 0;
+
+    for (const m of waitingMatches) {
+      if (courtAssigned < emptyCourtCount) {
+        standbyMap.set(m.matchId, { label: '次コート', type: 'court' });
+        courtAssigned++;
+      } else if (standbyNum <= 5) {
+        standbyMap.set(m.matchId, { label: `控え${standbyNum}`, type: 'standby' });
+        standbyNum++;
+      } else {
+        standbyMap.set(m.matchId, { label: '控え', type: 'standby' });
+      }
+    }
+
+    return standbyMap;
+  }, [globalSortedMatches, courts]);
+
   // --- 音声コール ---
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     rate: 0.95,
@@ -270,8 +313,6 @@ export default function MatchManager() {
   }, [callTargetMatchId]);
 
   // (生成機能は削除済み - ドロー画面から試合生成を行う)
-
-  const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
   // --- 全コート初戦一斉コール ---
   const allMatchesFlat = useMemo(() => {
@@ -470,6 +511,35 @@ export default function MatchManager() {
               updatedAt: Date.now(),
             });
           }
+        }
+      }
+    }
+
+    // 試合終了時のコートプロモーション: 空いたコートに次の待機試合を自動割当
+    if (winnerEntryId && m.courtId) {
+      const freedCourtId = m.courtId;
+      // 現在の全試合を取得して待機順で次の試合を見つける
+      const tid = useAppStore.getState().currentTournamentId;
+      if (tid) {
+        const allEvts = await db.events.where('tournamentId').equals(tid).toArray();
+        const allEvtIds = allEvts.map(e => e.eventId);
+        const allMs = await db.matches.where('eventId').anyOf(allEvtIds).toArray();
+        const sortedMs = allMs
+          .filter(mm => mm.status !== 'walkover')
+          .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
+
+        // 次の待機試合（対戦相手確定済み、waiting/ready）を見つける
+        const nextWaiting = sortedMs.find(mm =>
+          (mm.status === 'waiting' || mm.status === 'ready')
+          && mm.player1Name && mm.player2Name
+          && mm.player1Name !== 'BYE' && mm.player2Name !== 'BYE'
+        );
+        if (nextWaiting?.id) {
+          await db.matches.update(nextWaiting.id, {
+            courtId: freedCourtId,
+            status: 'playing',
+            updatedAt: Date.now(),
+          });
         }
       }
     }
@@ -1061,7 +1131,7 @@ ${printableMatches.map(m => {
               <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ListOrdered className="w-5 h-5 text-white" />
-                  <span className="font-bold text-white text-sm">対戦順</span>
+                  <span className="font-bold text-white text-sm">対戦順（種目・回戦順）</span>
                   <span className="text-white/70 text-xs">{globalSortedMatches.length}試合</span>
                 </div>
               </div>

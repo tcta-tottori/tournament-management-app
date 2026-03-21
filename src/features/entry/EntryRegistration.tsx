@@ -632,16 +632,42 @@ export default function EntryRegistration() {
       for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
     }
 
-    // グローバルソート: 時間割の並び順（importedSchedule の matchOrder 順）に従う
-    // importedSchedule の順番 = Excel の種目順（例: 男子B→男子A→男子C→...）
-    const scheduleOrderMap = new Map<string, number>(); // "startTime|courtName" → schedule order
-    importedSchedule.forEach((item, idx) => {
-      scheduleOrderMap.set(`${item.startTime}|${item.courtName}`, idx);
-    });
+    // グローバルソート: 時間割の種目+回戦の出現順に従う
+    // 同じ種目+回戦内では position（若番＝ドロー左上）順
+    // importedSchedule の種目+回戦の初出順でグループ順を決定
+    const groupOrderMap = new Map<string, number>(); // "eventId|roundLabel" → 出現順
+    let groupIdx = 0;
+    for (const item of importedSchedule) {
+      let matchedEventId: string | null = null;
+      const resolvedName = SCHEDULE_CODE_TO_NAME[item.eventName.toLowerCase()] || item.eventName;
+      for (const evt of allEvents) {
+        if (matchEventName(resolvedName, evt.name)) {
+          matchedEventId = evt.eventId;
+          break;
+        }
+      }
+      if (!matchedEventId) continue;
+      const gKey = `${matchedEventId}|${item.roundLabel}`;
+      if (!groupOrderMap.has(gKey)) {
+        groupOrderMap.set(gKey, groupIdx++);
+      }
+    }
+
     scheduled.sort((a, b) => {
-      const orderA = scheduleOrderMap.get(`${a.startTime}|${a.courtName}`) ?? 99999;
-      const orderB = scheduleOrderMap.get(`${b.startTime}|${b.courtName}`) ?? 99999;
-      return orderA - orderB;
+      // 種目+ラウンドのグループ順を取得
+      const drawA = drawMap.get(a.match.eventId);
+      const drawB = drawMap.get(b.match.eventId);
+      const totalRoundsA = drawA ? Math.log2(drawA.drawSize) : 1;
+      const totalRoundsB = drawB ? Math.log2(drawB.drawSize) : 1;
+      const rlA = roundNumberToLabel(a.match.round, totalRoundsA);
+      const rlB = roundNumberToLabel(b.match.round, totalRoundsB);
+      const gKeyA = `${a.match.eventId}|${rlA}`;
+      const gKeyB = `${b.match.eventId}|${rlB}`;
+      const orderA = groupOrderMap.get(gKeyA) ?? 99999;
+      const orderB = groupOrderMap.get(gKeyB) ?? 99999;
+      if (orderA !== orderB) return orderA - orderB;
+      // 同じ種目+回戦内では position 順（若番＝ドロー左上から）
+      return a.match.position - b.match.position;
     });
 
     // matchOrder を割り当てて DB 更新

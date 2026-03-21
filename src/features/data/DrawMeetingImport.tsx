@@ -464,6 +464,9 @@ interface DataImportProps {
 
 export default function DataImport({ externalTournamentExcel, externalScheduleExcel }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
+  const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const persistedImportedSchedule = useAppStore(state => state.importedSchedule);
+  const persistedScheduleFileName = useAppStore(state => state.scheduleFileName);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [parsedExcel, setParsedExcel] = useState<ParsedDrawFile | null>(null);
@@ -483,6 +486,31 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [scheduleItems, setScheduleItems] = useState<ImportedScheduleItem[]>([]);
   const [scheduleFileName, setScheduleFileName] = useState('');
   const [scheduleError, setScheduleError] = useState('');
+
+  // マウント時：永続化された時間割データを復元
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    // 時間割データを復元
+    if (persistedImportedSchedule.length > 0) {
+      setScheduleItems(persistedImportedSchedule);
+      setScheduleFileName(persistedScheduleFileName);
+    }
+
+    // 大会情報をDBから復元
+    if (currentTournamentId) {
+      db.tournaments.where('tournamentId').equals(currentTournamentId).first().then(tournament => {
+        if (tournament) {
+          setEditTournamentName(prev => prev || tournament.name || '');
+          setEditDate(prev => prev || tournament.date || '');
+          setEditVenue(prev => prev || tournament.venue || '');
+          setEditReserveDate(prev => prev || tournament.reserveDate || '');
+        }
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- 外部から渡されたExcelデータ（GDriveからDL済み）を処理 ---
   const processExcelArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
@@ -518,6 +546,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       setScheduleFileName(fileName);
       setScheduleError('');
       useAppStore.getState().setImportedSchedule(items);
+      useAppStore.getState().setScheduleFileName(fileName);
       setScheduleOpen(true);
     } catch (err) {
       setScheduleError(`時間割の解析に失敗しました: ${(err as Error).message}`);
@@ -622,6 +651,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         }
         setScheduleItems(items);
         useAppStore.getState().setImportedSchedule(items);
+        useAppStore.getState().setScheduleFileName(file.name);
       } catch (err) {
         setScheduleError(`Excelファイルの解析に失敗しました: ${(err as Error).message}`);
       }

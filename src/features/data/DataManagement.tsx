@@ -66,6 +66,7 @@ export default function DataManagement() {
       // Zustand store リセット
       useAppStore.getState().setCurrentTournamentId(null);
       useAppStore.getState().setImportedSchedule([]);
+      useAppStore.getState().setScheduleFileName('');
       useAppStore.getState().setScheduleSlots([]);
       useAppStore.getState().setAllScheduleMatches([]);
       setResetDone(true);

@@ -38,6 +38,10 @@ interface AppState {
   // インポート済み時間割
   importedSchedule: ImportedScheduleItem[];
   setImportedSchedule: (items: ImportedScheduleItem[]) => void;
+
+  // 時間割ファイル名（表示用）
+  scheduleFileName: string;
+  setScheduleFileName: (name: string) => void;
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -62,6 +66,8 @@ export const useAppStore = create<AppState>()(
       setAllScheduleMatches: (matches) => set({ allScheduleMatches: matches }),
       importedSchedule: [],
       setImportedSchedule: (items) => set({ importedSchedule: items }),
+      scheduleFileName: '',
+      setScheduleFileName: (name) => set({ scheduleFileName: name }),
     }),
     {
       name: 'tennis-tournament-storage', // localStorage に保存
