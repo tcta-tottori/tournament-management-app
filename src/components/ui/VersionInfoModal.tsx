@@ -21,7 +21,7 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.2',
+    version: 'Ver 1.2',
     date: '2026-03-21',
     highlights: 'GDrive連携UI刷新・PWA高速化・音声エンジン追加',
     timeGroups: [
@@ -111,7 +111,7 @@ const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: 'v1.1',
+    version: 'Ver 1.1',
     date: '2026-03-20',
     highlights: 'ライブダッシュボード・スコア入力・Google Drive連携',
     timeGroups: [
@@ -202,7 +202,7 @@ const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: 'v1.0',
+    version: 'Ver 1.0',
     date: '2026-03-19',
     highlights: '初回リリース',
     timeGroups: [
@@ -265,7 +265,7 @@ interface Props {
 export default function VersionInfoModal({ open, onClose }: Props) {
   // 展開中のバージョン (null = 全閉)
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
-  // 展開中の時間グループ (key: "v1.2-13:06")
+  // 展開中の時間グループ (key: "Ver 1.2-13:06")
   const [expandedTimes, setExpandedTimes] = useState<Set<string>>(new Set());
 
   if (!open) return null;
@@ -310,7 +310,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">v1.2</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 1.2</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">

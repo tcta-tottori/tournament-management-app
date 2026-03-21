@@ -629,7 +629,7 @@ export default function Manual() {
 
       {/* Footer */}
       <footer className="bg-gradient-to-r from-primary-500/10 to-primary-500/5 rounded-xl p-4 text-center text-xs text-gray-500 border border-primary-100">
-        大会運営システム v1.0 — 鳥取市テニス協会
+        大会運営システム Ver 1.2 — 鳥取市テニス協会
       </footer>
     </div>
   );
