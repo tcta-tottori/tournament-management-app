@@ -393,38 +393,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     }
   }, [updateLastSync, modal, onDataLoaded]);
 
-  // --- GDrive 大会一覧ファイルリスト取得 ---
-  const handleListTournamentFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    const steps: LoadingStep[] = [{ label: '大会一覧フォルダを取得中...', status: 'loading' }];
-    modal.setModalTitle('大会一覧');
-    modal.setModalSteps(steps);
-    modal.setModalResult(null);
-    modal.setModalProgress(0);
-    modal.setModalOpen(true);
-    try {
-      modal.setModalProgress(30);
-      const files = await listTournamentExcelFiles(token);
-      modal.setModalProgress(100);
-      setGdriveFileList(files);
-      if (files.length === 0) {
-        steps[0] = { ...steps[0], status: 'error', label: '大会一覧フォルダにファイルがありません' };
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: false, message: 'Google Drive の「大会一覧」フォルダにファイルがありません。' });
-      } else {
-        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: true, message: `${files.length}件のファイルが見つかりました` });
-        setTimeout(() => { modal.setModalOpen(false); setShowFileList(true); }, 500);
-      }
-    } catch (err) {
-      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
-      modal.setModalSteps([...steps]);
-      modal.setModalResult({ success: false, message: `大会一覧の取得に失敗: ${(err as Error).message}` });
-    }
-  }, [modal]);
-
   // --- GDrive 大会ファイル選択→ダウンロード ---
   const handleSelectTournamentFile = useCallback(async (file: GoogleDriveFile) => {
     const token = gdriveGetSavedToken();
@@ -447,6 +415,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       modal.setModalSteps([...steps]);
       modal.setModalResult({ success: true, message: `ダウンロード完了` });
       onTournamentExcelLoaded?.(arrayBuffer, file.name);
+      // 時間割ファイルリストがあれば続けて表示
+      if (scheduleGDriveFiles.length > 0) {
+        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 800);
+      }
     } catch (err) {
       steps[0] = { ...steps[0], status: 'error', label: `読込失敗: ${(err as Error).message}` };
       modal.setModalSteps([...steps]);
@@ -454,39 +426,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     } finally {
       setLoadingFileId(null);
     }
-  }, [modal, onTournamentExcelLoaded]);
-
-  // --- GDrive 時間割ファイルリスト取得 ---
-  const handleListScheduleFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    const steps: LoadingStep[] = [{ label: '時間割フォルダを取得中...', status: 'loading' }];
-    modal.setModalTitle('時間割');
-    modal.setModalSteps(steps);
-    modal.setModalResult(null);
-    modal.setModalProgress(0);
-    modal.setModalOpen(true);
-    try {
-      modal.setModalProgress(30);
-      const files = await listScheduleExcelFiles(token);
-      modal.setModalProgress(100);
-      setScheduleGDriveFiles(files);
-      if (files.length === 0) {
-        steps[0] = { ...steps[0], status: 'error', label: '時間割フォルダにファイルがありません' };
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: false, message: 'Google Drive の「時間割」フォルダにファイルがありません。' });
-      } else {
-        steps[0] = { ...steps[0], status: 'done', label: `${files.length}件のファイルを検出` };
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: true, message: `${files.length}件のファイルが見つかりました` });
-        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 500);
-      }
-    } catch (err) {
-      steps[0] = { ...steps[0], status: 'error', label: `取得失敗: ${(err as Error).message}` };
-      modal.setModalSteps([...steps]);
-      modal.setModalResult({ success: false, message: `ファイル一覧の取得に失敗: ${(err as Error).message}` });
-    }
-  }, [modal]);
+  }, [modal, onTournamentExcelLoaded, scheduleGDriveFiles]);
 
   // --- GDrive 時間割ファイル選択→ダウンロード ---
   const handleSelectScheduleFile = useCallback(async (file: GoogleDriveFile) => {
@@ -518,6 +458,241 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setLoadingScheduleFileId(null);
     }
   }, [modal, onScheduleExcelLoaded]);
+
+  // --- GDrive 大会・時間割 一括読込（ファイル一覧取得→選択UI表示） ---
+  const handleLoadTournamentAndSchedule = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    let steps: LoadingStep[] = [
+      { label: '大会一覧フォルダを取得中...', status: 'loading' },
+      { label: '時間割フォルダ', status: 'waiting' },
+    ];
+    modal.setModalTitle('大会・時間割 読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    const allDetails: string[] = [];
+    let hasError = false;
+    let tournamentFiles: GoogleDriveFile[] = [];
+    let scheduleFiles: GoogleDriveFile[] = [];
+    try {
+      // 大会一覧
+      modal.setModalProgress(10);
+      try {
+        tournamentFiles = await listTournamentExcelFiles(token);
+        steps = modal.updateStep(steps, 0, { status: 'done', label: `大会一覧: ${tournamentFiles.length}件のファイルを検出` });
+        allDetails.push(`大会一覧: ${tournamentFiles.length}件`);
+      } catch (err) {
+        steps = modal.updateStep(steps, 0, { status: 'error', label: `大会一覧取得失敗: ${(err as Error).message}` });
+        allDetails.push(`大会一覧取得失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(50);
+      // 時間割
+      steps = modal.updateStep(steps, 1, { status: 'loading', label: '時間割フォルダを取得中...' });
+      modal.setModalSteps([...steps]);
+      try {
+        scheduleFiles = await listScheduleExcelFiles(token);
+        steps = modal.updateStep(steps, 1, { status: 'done', label: `時間割: ${scheduleFiles.length}件のファイルを検出` });
+        allDetails.push(`時間割: ${scheduleFiles.length}件`);
+      } catch (err) {
+        steps = modal.updateStep(steps, 1, { status: 'error', label: `時間割取得失敗: ${(err as Error).message}` });
+        allDetails.push(`時間割取得失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(100);
+      setGdriveFileList(tournamentFiles);
+      setScheduleGDriveFiles(scheduleFiles);
+      if (hasError || (tournamentFiles.length === 0 && scheduleFiles.length === 0)) {
+        modal.setModalResult({ success: false, message: 'ファイルの取得に失敗、またはファイルがありません', details: allDetails });
+      } else {
+        modal.setModalResult({ success: true, message: `ファイル一覧を取得しました`, details: allDetails });
+        setTimeout(() => {
+          modal.setModalOpen(false);
+          if (tournamentFiles.length > 0) setShowFileList(true);
+          else if (scheduleFiles.length > 0) setShowScheduleFileList(true);
+        }, 500);
+      }
+    } catch (err) {
+      modal.setModalResult({ success: false, message: `読込失敗: ${(err as Error).message}` });
+    }
+  }, [modal]);
+
+  // --- GDrive 大会ファイル一覧取得→選択UI表示 ---
+  const handleListTournamentFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    let steps: LoadingStep[] = [
+      { label: '大会一覧フォルダを取得中...', status: 'loading' },
+    ];
+    modal.setModalTitle('大会データ読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    try {
+      modal.setModalProgress(30);
+      const files = await listTournamentExcelFiles(token);
+      modal.setModalProgress(100);
+      setGdriveFileList(files);
+      if (files.length === 0) {
+        steps = modal.updateStep(steps, 0, { status: 'error', label: '大会ファイルが見つかりません' });
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: false, message: '大会ファイルが見つかりません' });
+      } else {
+        steps = modal.updateStep(steps, 0, { status: 'done', label: `${files.length}件のファイルを検出` });
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: true, message: `${files.length}件のファイルを検出` });
+        setTimeout(() => { modal.setModalOpen(false); setShowFileList(true); }, 500);
+      }
+    } catch (err) {
+      steps = modal.updateStep(steps, 0, { status: 'error', label: `取得失敗: ${(err as Error).message}` });
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `大会一覧取得失敗: ${(err as Error).message}` });
+    }
+  }, [modal]);
+
+  // --- GDrive 時間割ファイル一覧取得→選択UI表示 ---
+  const handleListScheduleFiles = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    let steps: LoadingStep[] = [
+      { label: '時間割フォルダを取得中...', status: 'loading' },
+    ];
+    modal.setModalTitle('時間割読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    try {
+      modal.setModalProgress(30);
+      const files = await listScheduleExcelFiles(token);
+      modal.setModalProgress(100);
+      setScheduleGDriveFiles(files);
+      if (files.length === 0) {
+        steps = modal.updateStep(steps, 0, { status: 'error', label: '時間割ファイルが見つかりません' });
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: false, message: '時間割ファイルが見つかりません' });
+      } else {
+        steps = modal.updateStep(steps, 0, { status: 'done', label: `${files.length}件のファイルを検出` });
+        modal.setModalSteps([...steps]);
+        modal.setModalResult({ success: true, message: `${files.length}件のファイルを検出` });
+        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 500);
+      }
+    } catch (err) {
+      steps = modal.updateStep(steps, 0, { status: 'error', label: `取得失敗: ${(err as Error).message}` });
+      modal.setModalSteps([...steps]);
+      modal.setModalResult({ success: false, message: `時間割一覧取得失敗: ${(err as Error).message}` });
+    }
+  }, [modal]);
+
+  // --- GDrive 全データ一括読込（ふりがな・所属 + 大会・時間割） ---
+  const handleLoadAll = useCallback(async () => {
+    const token = gdriveGetSavedToken();
+    if (!token) return;
+    let steps: LoadingStep[] = [
+      { label: 'ふりがな一覧を読込中...', status: 'loading' },
+      { label: '所属一覧', status: 'waiting' },
+      { label: '大会一覧', status: 'waiting' },
+      { label: '時間割', status: 'waiting' },
+    ];
+    modal.setModalTitle('一括読込');
+    modal.setModalSteps(steps);
+    modal.setModalResult(null);
+    modal.setModalProgress(0);
+    modal.setModalOpen(true);
+    setIsProcessing(true);
+    setProcessingLabel('一括読込中...');
+    setResult(null);
+    const allDetails: string[] = [];
+    let hasError = false;
+    let tournamentFiles: GoogleDriveFile[] = [];
+    let scheduleFiles: GoogleDriveFile[] = [];
+    try {
+      // 1. ふりがな
+      modal.setModalProgress(5);
+      try {
+        const res = await doDownloadFurigana(token);
+        steps = modal.updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了', detail: res.details[1] });
+        allDetails.push('【ふりがな】', ...res.details);
+      } catch (err) {
+        steps = modal.updateStep(steps, 0, { status: 'error', label: `ふりがな読込失敗: ${(err as Error).message}` });
+        allDetails.push(`【ふりがな】読込失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(25);
+      // 2. 所属
+      steps = modal.updateStep(steps, 1, { status: 'loading', label: '所属一覧を読込中...' });
+      modal.setModalSteps([...steps]);
+      try {
+        const res = await doDownloadAffiliation(token);
+        steps = modal.updateStep(steps, 1, { status: 'done', label: '所属一覧を読込完了', detail: res.details[1] });
+        allDetails.push('【所属】', ...res.details);
+      } catch (err) {
+        steps = modal.updateStep(steps, 1, { status: 'error', label: `所属読込失敗: ${(err as Error).message}` });
+        allDetails.push(`【所属】読込失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(50);
+      // 3. 大会一覧
+      steps = modal.updateStep(steps, 2, { status: 'loading', label: '大会一覧フォルダを取得中...' });
+      modal.setModalSteps([...steps]);
+      try {
+        tournamentFiles = await listTournamentExcelFiles(token);
+        steps = modal.updateStep(steps, 2, { status: 'done', label: `大会一覧: ${tournamentFiles.length}件のファイルを検出` });
+        allDetails.push(`【大会一覧】${tournamentFiles.length}件`);
+      } catch (err) {
+        steps = modal.updateStep(steps, 2, { status: 'error', label: `大会一覧取得失敗: ${(err as Error).message}` });
+        allDetails.push(`【大会一覧】取得失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(75);
+      // 4. 時間割
+      steps = modal.updateStep(steps, 3, { status: 'loading', label: '時間割フォルダを取得中...' });
+      modal.setModalSteps([...steps]);
+      try {
+        scheduleFiles = await listScheduleExcelFiles(token);
+        steps = modal.updateStep(steps, 3, { status: 'done', label: `時間割: ${scheduleFiles.length}件のファイルを検出` });
+        allDetails.push(`【時間割】${scheduleFiles.length}件`);
+      } catch (err) {
+        steps = modal.updateStep(steps, 3, { status: 'error', label: `時間割取得失敗: ${(err as Error).message}` });
+        allDetails.push(`【時間割】取得失敗: ${(err as Error).message}`);
+        hasError = true;
+      }
+      modal.setModalSteps([...steps]);
+      modal.setModalProgress(100);
+      updateLastSync();
+      setGdriveFileList(tournamentFiles);
+      setScheduleGDriveFiles(scheduleFiles);
+      if (!hasError) onDataLoaded?.();
+      const r = hasError
+        ? { success: false, message: '一部の読込に失敗しました', details: allDetails }
+        : { success: true, message: '全データの読込が完了しました', details: allDetails };
+      setResult(r);
+      modal.setModalResult(r);
+      // ファイル選択UIを表示
+      if (tournamentFiles.length > 0 || scheduleFiles.length > 0) {
+        setTimeout(() => {
+          modal.setModalOpen(false);
+          if (tournamentFiles.length > 0) setShowFileList(true);
+          else if (scheduleFiles.length > 0) setShowScheduleFileList(true);
+        }, 1500);
+      }
+    } catch (err) {
+      const r = { success: false, message: `読込失敗: ${(err as Error).message}` };
+      setResult(r);
+      modal.setModalResult(r);
+    } finally {
+      setIsProcessing(false);
+      setProcessingLabel('');
+    }
+  }, [updateLastSync, modal, onDataLoaded]);
 
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {
@@ -609,35 +784,54 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               </div>
             </div>
 
-            {/* 一括読込ボタン */}
+            {/* ★ 一括読込ボタン（全Google Drive読込） — 最も目立つデザイン */}
             <button
-              onClick={handleBulkDownload}
+              onClick={handleLoadAll}
               disabled={isProcessing}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#1a73e8] to-[#8e24aa] rounded-xl hover:from-[#1557b0] hover:to-[#6a1b9a] disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
+              className="w-full relative flex items-center justify-center gap-2.5 px-5 py-4 text-base font-black text-white bg-gradient-to-r from-[#EA4335] via-[#FBBC04] via-[#34A853] to-[#4285F4] rounded-2xl hover:opacity-90 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl ring-2 ring-white/30"
             >
-              <Layers className="w-4 h-4" />
-              <GoogleDriveIcon className="w-4 h-4" />
-              ふりがな・所属を一括読込
-              {isProcessing && processingLabel.includes('一括') && <RefreshCw className="w-4 h-4 animate-spin" />}
+              <GoogleDriveIcon className="w-5 h-5" />
+              <Layers className="w-5 h-5" />
+              一括読込
+              {isProcessing && processingLabel.includes('一括') && <RefreshCw className="w-5 h-5 animate-spin" />}
             </button>
 
-            {/* 大会データ読込 + 時間割読込 */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* 一括読込ボタン（大会・時間割） */}
+            <button
+              onClick={handleLoadTournamentAndSchedule}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+            >
+              <GoogleDriveIcon className="w-4.5 h-4.5" />
+              大会・時間割 一括読込
+              {isProcessing && processingLabel.includes('大会') && <RefreshCw className="w-4 h-4 animate-spin" />}
+            </button>
+
+            {/* 個別読込ボタン */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={handleBulkDownload}
+                disabled={isProcessing}
+                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#1a73e8] to-[#8e24aa] rounded-xl hover:from-[#1557b0] hover:to-[#6a1b9a] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+              >
+                <GoogleDriveIcon className="w-4 h-4 shrink-0" />
+                <span>ふりがな・所属</span>
+              </button>
               <button
                 onClick={handleListTournamentFiles}
                 disabled={isProcessing}
-                className="group relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#1a73e8] rounded-xl hover:from-[#3b78e7] hover:to-[#1557b0] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#1a73e8] rounded-xl hover:from-[#3b78e7] hover:to-[#1557b0] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
-                <GoogleDriveIcon className="w-4.5 h-4.5" />
-                <span>大会データ読込</span>
+                <GoogleDriveIcon className="w-4 h-4 shrink-0" />
+                <span>大会データ</span>
               </button>
               <button
                 onClick={handleListScheduleFiles}
                 disabled={isProcessing}
-                className="group relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#34A853] to-[#0d904f] rounded-xl hover:from-[#2d9249] hover:to-[#0b7a43] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#34A853] to-[#0d904f] rounded-xl hover:from-[#2d9249] hover:to-[#0b7a43] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
-                <GoogleDriveIcon className="w-4.5 h-4.5" />
-                <span>時間割読込</span>
+                <GoogleDriveIcon className="w-4 h-4 shrink-0" />
+                <span>時間割</span>
               </button>
             </div>
           </>

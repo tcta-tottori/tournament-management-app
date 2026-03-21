@@ -1225,7 +1225,7 @@ export default function EntryRegistration() {
         {statsHeader}
         {/* PC: 左山→中央←右山の統一ブラケット（レスポンシブ幅） */}
         <div className="hidden lg:block overflow-x-auto" ref={bracketRef}>
-          {bracketWidth > 0 && renderUnifiedBracket()}
+          {renderUnifiedBracket()}
         </div>
         {/* スマホ: 左山・右山を分割表示 */}
         <div className="lg:hidden">
