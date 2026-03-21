@@ -519,32 +519,21 @@
   animation: drive-pulse 2s ease-in-out infinite;
 }
 
-/* Gemini風アニメーション */
-@keyframes gemini-arc-rotate {
+/* Drive読込アニメーション — 色が流れる一段リング */
+@keyframes drive-ring-flow {
   0%   { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-@keyframes gemini-arc-rotate-reverse {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(-360deg); }
+@keyframes drive-icon-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.75; transform: scale(0.92); }
 }
 
-@keyframes gemini-sparkle {
-  0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
-  25%  { opacity: 0.8; transform: scale(0.85) rotate(15deg); }
-  50%  { opacity: 1; transform: scale(1.1) rotate(0deg); }
-  75%  { opacity: 0.8; transform: scale(0.85) rotate(-15deg); }
+.drive-ring-flow {
+  animation: drive-ring-flow 1.8s linear infinite;
 }
 
-.gemini-arc-spin {
-  animation: gemini-arc-rotate 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.gemini-arc-spin-reverse {
-  animation: gemini-arc-rotate-reverse 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.gemini-sparkle-pulse {
-  animation: gemini-sparkle 2s ease-in-out infinite;
+.drive-icon-pulse {
+  animation: drive-icon-breathe 2s ease-in-out infinite;
 }
