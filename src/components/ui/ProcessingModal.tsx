@@ -81,12 +81,6 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
                   mask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
                   WebkitMask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
                 }} />
-                {/* 先端の丸み */}
-                <div className="absolute drive-ring-flow" style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: '#f59e0b',
-                  top: '6%', left: '50%', marginLeft: -3,
-                }} />
                 {/* 中央アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Lock className="w-5 h-5 text-orange-400 drive-icon-pulse" />

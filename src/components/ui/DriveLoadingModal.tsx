@@ -106,12 +106,6 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
                   mask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
                   WebkitMask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
                 }} />
-                {/* 先端の丸み（始点） */}
-                <div className="absolute drive-ring-flow" style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: '#4285F4',
-                  top: '4.5%', left: '50%', marginLeft: -4,
-                }} />
                 {/* 中央 Google Drive アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="drive-icon-pulse">
