@@ -13,6 +13,8 @@ import {
   isTokenValid as gdriveIsTokenValid,
   listTournamentExcelFiles,
   downloadTournamentExcel,
+  listScheduleExcelFiles,
+  downloadScheduleExcel,
   type GoogleDriveFile,
 } from '../backup/googleDriveApi';
 
@@ -632,11 +634,11 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
     setIsLoadingScheduleGDrive(true);
     setScheduleError('');
     try {
-      const files = await listTournamentExcelFiles(token);
+      const files = await listScheduleExcelFiles(token);
       setScheduleGDriveFiles(files);
       setShowScheduleFileList(true);
       if (files.length === 0) {
-        setScheduleError('Google Drive にファイルがありません。');
+        setScheduleError('Google Drive の「時間割」フォルダにファイルがありません。');
       }
     } catch (err) {
       setScheduleError(`ファイル一覧の取得に失敗: ${(err as Error).message}`);
@@ -652,7 +654,7 @@ export default function DataImport({ gdriveConnected: gdriveConnectedProp }: Dat
     setLoadingScheduleFileId(file.id);
     setScheduleError('');
     try {
-      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      const arrayBuffer = await downloadScheduleExcel(token, file.id);
       const items = parseScheduleExcel(arrayBuffer);
       if (items.length === 0) {
         setScheduleError('時間割データを検出できませんでした。');

@@ -167,6 +167,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
   const [modalTitle, setModalTitle] = useState('');
   const [modalSteps, setModalSteps] = useState<LoadingStep[]>([]);
   const [modalResult, setModalResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
+  const [modalProgress, setModalProgress] = useState(0);
 
   // DB counts for display
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
@@ -331,6 +332,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     setModalTitle('ふりがな読込');
     setModalSteps(steps);
     setModalResult(null);
+    setModalProgress(0);
     setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('ふりがな読込中...');
@@ -338,7 +340,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
+      setModalProgress(30);
       const res = await doDownloadFurigana(token);
+      setModalProgress(100);
       const s = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了' });
       setModalSteps(s);
       updateLastSync();
@@ -366,6 +370,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     setModalTitle('ふりがな書込');
     setModalSteps(steps);
     setModalResult(null);
+    setModalProgress(0);
     setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('ふりがな書込中...');
@@ -373,6 +378,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
+      setModalProgress(20);
       const allDict = await db.furiganaDict.toArray();
       const sorted = allDict.sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
       const data = sorted.map(d => ({
@@ -385,8 +391,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'ふりがな');
       const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      setModalProgress(60);
       const fileName = `ふりがなデータ.xlsx`;
       await uploadFuriganaExcel(token, fileName, buf);
+      setModalProgress(100);
       const s = updateStep(steps, 0, { status: 'done', label: 'ふりがなデータを書込完了' });
       setModalSteps(s);
       const r = { success: true, message: `ふりがなデータ（${data.length}件）を Google ドライブに保存しました` };
@@ -412,6 +420,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     setModalTitle('所属読込');
     setModalSteps(steps);
     setModalResult(null);
+    setModalProgress(0);
     setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('所属読込中...');
@@ -419,7 +428,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
+      setModalProgress(30);
       const res = await doDownloadAffiliation(token);
+      setModalProgress(100);
       const s = updateStep(steps, 0, { status: 'done', label: '所属一覧を読込完了' });
       setModalSteps(s);
       updateLastSync();
@@ -447,6 +458,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     setModalTitle('所属書込');
     setModalSteps(steps);
     setModalResult(null);
+    setModalProgress(0);
     setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('所属書込中...');
@@ -454,6 +466,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     try {
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
+      setModalProgress(20);
       const allAff = await db.affiliationFurigana.toArray();
       const sorted = allAff.filter(a => a.furigana).sort((a, b) => a.furigana.localeCompare(b.furigana, 'ja'));
       const data = sorted.map(a => ({
@@ -465,8 +478,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '所属一覧');
       const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+      setModalProgress(60);
       const fileName = `所属ふりがな.xlsx`;
       await uploadAffiliationExcel(token, fileName, buf);
+      setModalProgress(100);
       const s = updateStep(steps, 0, { status: 'done', label: '所属データを書込完了' });
       setModalSteps(s);
       const r = { success: true, message: `所属ふりがな（${data.length}件）を Google ドライブに保存しました` };
@@ -493,6 +508,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
     setModalTitle('一括読込');
     setModalSteps(steps);
     setModalResult(null);
+    setModalProgress(0);
     setModalOpen(true);
     setIsProcessing(true);
     setProcessingLabel('一括読込中...');
@@ -505,12 +521,16 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
       const token = gdriveGetSavedToken();
       if (!token) throw new Error('Google ドライブに接続してください');
 
+      setModalProgress(10);
+
       // Step 1: ふりがな読込
       try {
         const res = await doDownloadFurigana(token);
+        setModalProgress(50);
         steps = updateStep(steps, 0, { status: 'done', label: 'ふりがな一覧を読込完了', detail: res.details[1] });
         allDetails.push('【ふりがな】', ...res.details);
       } catch (err) {
+        setModalProgress(50);
         steps = updateStep(steps, 0, { status: 'error', label: `ふりがな読込失敗: ${(err as Error).message}` });
         allDetails.push(`【ふりがな】読込失敗: ${(err as Error).message}`);
         hasError = true;
@@ -522,9 +542,11 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
 
       try {
         const res = await doDownloadAffiliation(token);
+        setModalProgress(100);
         steps = updateStep(steps, 1, { status: 'done', label: '所属一覧を読込完了', detail: res.details[1] });
         allDetails.push('【所属】', ...res.details);
       } catch (err) {
+        setModalProgress(100);
         steps = updateStep(steps, 1, { status: 'error', label: `所属読込失敗: ${(err as Error).message}` });
         allDetails.push(`【所属】読込失敗: ${(err as Error).message}`);
         hasError = true;
@@ -664,6 +686,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded }: DataSyncP
         open={modalOpen}
         title={modalTitle}
         steps={modalSteps}
+        progress={modalProgress}
         result={modalResult}
         onClose={handleModalClose}
       />

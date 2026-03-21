@@ -25,11 +25,12 @@ interface DriveLoadingModalProps {
   open: boolean;
   title: string;
   steps: LoadingStep[];
+  progress?: number; // 0-100 の進捗率
   result?: { success: boolean; message: string; details?: string[] } | null;
   onClose?: () => void;
 }
 
-export default function DriveLoadingModal({ open, title, steps, result, onClose }: DriveLoadingModalProps) {
+export default function DriveLoadingModal({ open, title, steps, progress, result, onClose }: DriveLoadingModalProps) {
   if (!open) return null;
 
   const isFinished = !!result;
@@ -70,6 +71,27 @@ export default function DriveLoadingModal({ open, title, steps, result, onClose 
                 <div className="absolute inset-0 flex items-center justify-center">
                   <GoogleDriveIcon className="w-5 h-5 drive-modal-pulse" />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 進捗バー */}
+          {typeof progress === 'number' && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-500">進捗</span>
+                <span className="text-sm font-bold text-[#1a73e8]">{Math.round(progress)}%</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, progress))}%`,
+                    background: progress >= 100
+                      ? 'linear-gradient(90deg, #34a853, #34a853)'
+                      : 'linear-gradient(90deg, #1a73e8, #8e24aa)',
+                  }}
+                />
               </div>
             </div>
           )}
