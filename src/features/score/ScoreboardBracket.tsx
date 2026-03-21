@@ -284,7 +284,7 @@ export default function ScoreboardBracket({
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                    {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
+                    {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
                   </div>
                 </>
               ) : matchResult && matchResult.status === 'ready' ? (
@@ -342,7 +342,7 @@ export default function ScoreboardBracket({
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                  {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
+                  {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
                 </div>
               </>
             ) : matchResult && matchResult.status === 'ready' ? (

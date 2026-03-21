@@ -10,6 +10,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
+import BulkCallOverlay from '../ui/BulkCallOverlay';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -298,6 +299,9 @@ export default function AppLayout() {
 
       {/* バージョン情報モーダル */}
       <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />
+
+      {/* 一斉コール フローティングオーバーレイ */}
+      <BulkCallOverlay />
     </div>
   );
 }

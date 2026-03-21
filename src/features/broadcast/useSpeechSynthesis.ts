@@ -123,7 +123,7 @@ export function useSpeechSynthesis() {
     const synth = window.speechSynthesis;
     synth.cancel();
     const voice = getJapaneseFemaleVoice();
-    const utterance = new SpeechSynthesisUtterance('音声テストです。放送コールシステムをご利用いただきありがとうございます。');
+    const utterance = new SpeechSynthesisUtterance('音声テストです。大会運営システムの音声コールをご利用いただきありがとうございます。');
     utterance.lang = 'ja-JP';
     utterance.rate = settings.rate;
     utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch));

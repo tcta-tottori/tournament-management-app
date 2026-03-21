@@ -2,11 +2,13 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge } from 'lucide-react';
 import type { Match, Court } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useBulkCallStore } from '../../stores/bulkCallStore';
+import type { BulkCallItem } from '../../stores/bulkCallStore';
 
 function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds) return '決勝';
@@ -284,8 +286,12 @@ export default function MatchManager() {
     );
   }, [allMatchesFlat]);
 
+  const bulkCallStart = useBulkCallStore(s => s.start);
+  const bulkCallActive = useBulkCallStore(s => s.isActive);
+
   const handleBulkFirstCall = useCallback(async () => {
     if (!currentTournamentId || courts.length === 0) return;
+    if (bulkCallActive) { alert('現在コール中です。'); return; }
 
     const firstMatches: { match: Match; court: Court }[] = [];
     for (const court of courts) {
@@ -301,20 +307,49 @@ export default function MatchManager() {
 
     if (firstMatches.length === 0) { alert('コールする試合がありません。'); return; }
 
+    // コート番号順にソート
+    firstMatches.sort((a, b) => {
+      const numA = parseInt(a.court.name) || 0;
+      const numB = parseInt(b.court.name) || 0;
+      return numA - numB;
+    });
+
     const confirmed = confirm(
-      `${firstMatches.length}コートの初戦を一斉にコールします。よろしいですか？\n\n` +
-      firstMatches.map(fm => `${fm.court.name}番: ${fm.match.player1Name} vs ${fm.match.player2Name}`).join('\n')
+      `${firstMatches.length}コートの初戦を順番にコールします。よろしいですか？\n\n` +
+      firstMatches.map(fm => `${fm.court.name}番コート: ${fm.match.player1Name} vs ${fm.match.player2Name}`).join('\n')
     );
     if (!confirmed) return;
 
+    // コールテキストを生成
+    const bulkItems: BulkCallItem[] = [];
     for (const fm of firstMatches) {
-      if (fm.match.id) {
-        await db.matches.update(fm.match.id, { status: 'playing', updatedAt: Date.now() });
-        if (fm.court.id) await db.courts.update(fm.court.id, { currentMatchId: fm.match.matchId });
-      }
+      const m = fm.match;
+      const courtNum = fm.court.name;
+      const matchCall = buildMatchCall(m, courtNum);
+      if (!matchCall) continue;
+      const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap);
+      const evt = events.find(e => e.eventId === m.eventId);
+      const evDraw = allDraws.get(m.eventId);
+      const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+
+      bulkItems.push({
+        matchId: m.matchId,
+        dbId: m.id || 0,
+        courtName: courtNum,
+        courtId: fm.court.courtId,
+        player1Name: m.player1Name,
+        player2Name: m.player2Name,
+        eventName: evt?.name || '',
+        roundLabel: getRoundName(m.round, evTotalRounds),
+        callText: text,
+      });
     }
-    alert(`${firstMatches.length}コートの初戦をコールしました。`);
-  }, [currentTournamentId, courts, allMatchesFlat]);
+
+    if (bulkItems.length === 0) { alert('コール対象がありません。'); return; }
+
+    // Zustand storeでコール開始（BulkCallOverlayが自動実行）
+    bulkCallStart(bulkItems, voiceSettings.rate, voiceSettings.repeatCount);
+  }, [currentTournamentId, courts, allMatchesFlat, bulkCallActive, bulkCallStart, buildMatchCall, affiliationFuriganaMap, voiceSettings, events, allDraws]);
 
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -945,24 +980,38 @@ ${printableMatches.map(m => {
             <div>
               <button
                 onClick={() => setShowVoiceSettings(!showVoiceSettings)}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-primary-500 transition-colors"
+                className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors"
               >
                 {showVoiceSettings ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-                <Volume2 className="w-4 h-4 text-primary-500" />
+                <Settings2 className="w-4 h-4 text-emerald-500" />
                 音声コール設定
               </button>
               {showVoiceSettings && (
-                <div className="mt-2 space-y-3">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 rounded-lg border border-pink-200 text-xs">
-                    <span>👩</span>
-                    <span className="font-medium text-pink-700">女性音声</span>
-                    <span className="text-pink-500">{voiceName}</span>
+                <div className="mt-3 bg-gradient-to-br from-slate-50 to-emerald-50/50 rounded-xl border border-emerald-100 p-4 space-y-4">
+                  {/* 音声エンジン情報 */}
+                  <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-emerald-100 shadow-sm">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm">
+                      <Volume2 className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800">大会運営システム 音声エンジン</p>
+                      <p className="text-[10px] text-gray-500">Web Speech API — {voiceName || '日本語音声'}</p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">Active</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        速度: {voiceSettings.rate.toFixed(2)}
+
+                  {/* 速度スライダー */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                        <Gauge className="w-3.5 h-3.5 text-emerald-500" />
+                        読み上げ速度
                       </label>
+                      <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                        {voiceSettings.rate.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="relative">
                       <input
                         type="range"
                         min="0.5"
@@ -970,45 +1019,56 @@ ${printableMatches.map(m => {
                         step="0.05"
                         value={voiceSettings.rate}
                         onChange={e => setVoiceSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
-                        className="w-full accent-primary-500"
+                        className="w-full h-2 accent-emerald-500 cursor-pointer"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し</label>
-                      <div className="flex gap-1">
-                        {[1, 2, 3].map(n => (
-                          <button
-                            key={n}
-                            onClick={() => setVoiceSettings(s => ({ ...s, repeatCount: n }))}
-                            className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
-                              voiceSettings.repeatCount === n
-                                ? 'bg-primary-500 text-white'
-                                : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
-                            }`}
-                          >
-                            {n}回
-                          </button>
-                        ))}
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[9px] text-gray-400">ゆっくり</span>
+                        <span className="text-[9px] text-gray-400">はやい</span>
                       </div>
                     </div>
-                    <div className="flex items-end gap-2">
-                      <button
-                        onClick={() => testVoice(voiceSettings)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-500 rounded-lg text-xs font-medium hover:bg-primary-100 transition-colors"
-                      >
-                        <Mic className="w-3.5 h-3.5" />
-                        テスト
-                      </button>
-                      {isSpeaking && (
+                  </div>
+
+                  {/* 繰り返し回数 */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-2">
+                      <Megaphone className="w-3.5 h-3.5 text-emerald-500" />
+                      繰り返し回数
+                    </label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3].map(n => (
                         <button
-                          onClick={handleVoiceStop}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                          key={n}
+                          onClick={() => setVoiceSettings(s => ({ ...s, repeatCount: n }))}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                            voiceSettings.repeatCount === n
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'bg-white text-gray-500 border border-gray-200 hover:border-emerald-300 hover:text-emerald-600'
+                          }`}
                         >
-                          <Square className="w-3.5 h-3.5" />
-                          停止
+                          {n}回
                         </button>
-                      )}
+                      ))}
                     </div>
+                  </div>
+
+                  {/* テスト・停止ボタン */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => testVoice(voiceSettings)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-white text-emerald-600 rounded-lg text-xs font-bold border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm"
+                    >
+                      <Mic className="w-3.5 h-3.5" />
+                      テスト再生
+                    </button>
+                    {isSpeaking && (
+                      <button
+                        onClick={handleVoiceStop}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200 hover:bg-red-100 transition-all"
+                      >
+                        <Square className="w-3.5 h-3.5" />
+                        停止
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

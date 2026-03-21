@@ -76,10 +76,13 @@ function parseRoundFromLabel(label: string, totalRounds: number | null): number 
   const upper = label.toUpperCase().trim();
   const rMatch = upper.match(/^(\d+)R$/);
   if (rMatch) return parseInt(rMatch[1]);
+  // 日本語ラウンドラベル "1回戦" 等にも対応
+  const jpRound = label.match(/^(\d+)回戦$/);
+  if (jpRound) return parseInt(jpRound[1]);
   if (totalRounds === null) return null;
-  if (upper === 'F') return totalRounds;
-  if (upper === 'SF') return totalRounds - 1;
-  if (upper === 'QF') return totalRounds - 2;
+  if (upper === 'F' || label === '決勝') return totalRounds;
+  if (upper === 'SF' || label === '準決勝') return totalRounds - 1;
+  if (upper === 'QF' || label === '準々決勝') return totalRounds - 2;
   return null;
 }
 

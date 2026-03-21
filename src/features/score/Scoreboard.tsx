@@ -996,7 +996,7 @@ export default function Scoreboard() {
                           )}
                         </div>
                       ) : (
-                        <div className="mt-3 pt-3 border-t border-border-main flex gap-2">
+                        <div className="mt-3 pt-3 border-t border-border-main flex items-center gap-2">
                           {m.status === 'ready' && (
                             <button onClick={() => handleStartMatch(m.matchId)} disabled={isProcessing}
                               className="text-xs bg-green-600 text-white px-3 py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50">
@@ -1008,6 +1008,11 @@ export default function Scoreboard() {
                               className="text-xs bg-primary-500 text-white px-3 py-2 rounded-md font-medium hover:bg-primary-600">
                               <Check className="w-3 h-3 inline mr-1" />結果入力
                             </button>
+                          )}
+                          {m.status === 'playing' && m.updatedAt > 0 && (
+                            <span className="ml-auto text-xs text-green-500 font-mono whitespace-nowrap">
+                              {formatElapsedMinutes(m.updatedAt, clockTick)}
+                            </span>
                           )}
                         </div>
                       )}
