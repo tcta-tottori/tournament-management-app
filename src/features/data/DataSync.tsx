@@ -796,7 +796,7 @@ interface FuriganaAffOpsProps {
 
 export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: FuriganaAffOpsProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingLabel, setProcessingLabel] = useState('');
+  const [, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
   const excelFuriganaRef = useRef<HTMLInputElement>(null);
   const excelAffRef = useRef<HTMLInputElement>(null);
