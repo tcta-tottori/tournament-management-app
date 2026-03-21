@@ -563,33 +563,28 @@ export default function EntryRegistration() {
           continue;
         }
         // Use alternative key items
-        const playable = matches
-          .filter(m => m.status !== 'walkover')
-          .sort((a, b) => a.position - b.position);
+        const sortedMatches = [...matches].sort((a, b) => a.position - b.position);
+        // walkover(BYE)も含めてスケジュール枠に紐付ける
         let idx = 0;
         for (const si of altItems) {
-          if (idx >= playable.length) break;
-          scheduled.push({ match: playable[idx], startTime: si.startTime, courtName: si.courtName });
+          if (idx >= sortedMatches.length) break;
+          scheduled.push({ match: sortedMatches[idx], startTime: si.startTime, courtName: si.courtName });
           idx++;
         }
-        // 残りの playable + walkover は unscheduled
-        for (; idx < playable.length; idx++) unscheduled.push(playable[idx]);
-        for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
+        for (; idx < sortedMatches.length; idx++) unscheduled.push(sortedMatches[idx]);
         continue;
       }
 
-      // 通常フロー: playable試合をposition順にソートし、時間割スロットとzip
-      const playable = matches
-        .filter(m => m.status !== 'walkover')
-        .sort((a, b) => a.position - b.position);
+      // 通常フロー: 試合をposition順にソートし、時間割スロットとzip
+      // walkover(BYE)も含めてスケジュール枠に紐付ける
+      const sortedMatches = [...matches].sort((a, b) => a.position - b.position);
       let idx = 0;
       for (const si of schedItems) {
-        if (idx >= playable.length) break;
-        scheduled.push({ match: playable[idx], startTime: si.startTime, courtName: si.courtName });
+        if (idx >= sortedMatches.length) break;
+        scheduled.push({ match: sortedMatches[idx], startTime: si.startTime, courtName: si.courtName });
         idx++;
       }
-      for (; idx < playable.length; idx++) unscheduled.push(playable[idx]);
-      for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
+      for (; idx < sortedMatches.length; idx++) unscheduled.push(sortedMatches[idx]);
     }
 
     // グローバルソート: startTime → courtName(数値)
@@ -1459,23 +1454,23 @@ export default function EntryRegistration() {
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {!isConfirmedEvent && (
               <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors min-h-[32px]">
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all min-h-[32px]">
                 <UserCheck className="w-3.5 h-3.5" />全員受付
               </button>
             )}
             <button onClick={(e) => { e.stopPropagation(); handleConfirmEvent(eventId); }}
-              className={`flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded transition-colors min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-100 hover:bg-gray-200' : 'text-white bg-orange-500 hover:bg-orange-600'}`}>
+              className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100' : 'text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm hover:from-orange-600 hover:to-amber-600'}`}>
               <Lock className="w-3.5 h-3.5" />{isConfirmedEvent ? '再確定' : '確定'}
             </button>
             {isConfirmedEvent && (
               <button onClick={(e) => { e.stopPropagation(); handleRevertConfirm(eventId); }}
-                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors min-h-[32px]">
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-all min-h-[32px]">
                 <Unlock className="w-3.5 h-3.5" />解除
               </button>
             )}
             {!isConfirmedEvent && (
               <button onClick={(e) => { e.stopPropagation(); handleResetEvent(eventId); }}
-                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors min-h-[32px]">
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium text-gray-400 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all min-h-[32px]">
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
@@ -1625,15 +1620,15 @@ export default function EntryRegistration() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all">
                     <UserCheck className="w-3.5 h-3.5" />全員受付済み
                   </button>
                   <button onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all">
                     <RotateCcw className="w-3.5 h-3.5" />リセット
                   </button>
                   <button onClick={handleConfirmAll}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 transition-colors">
+                    className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-sm hover:from-orange-600 hover:to-amber-600 transition-all">
                     <Lock className="w-3.5 h-3.5" />全種目確定
                   </button>
                 </div>

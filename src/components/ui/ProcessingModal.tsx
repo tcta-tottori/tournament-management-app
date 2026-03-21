@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export interface ProcessingStep {
@@ -59,25 +59,13 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
 
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden m-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-50 to-amber-50 px-5 py-4 flex items-center gap-3">
-          <div className="relative">
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L13.5 9.5L20 12L13.5 14.5L12 22L10.5 14.5L4 12L10.5 9.5L12 2Z"
-                fill="url(#procGrad)" />
-              <defs>
-                <linearGradient id="procGrad" x1="4" y1="2" x2="20" y2="22">
-                  <stop offset="0%" stopColor="#f59e0b" />
-                  <stop offset="100%" stopColor="#ef4444" />
-                </linearGradient>
-              </defs>
-            </svg>
-            {!isFinished && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full drive-modal-pulse" />
-            )}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-white/80 shadow-sm flex items-center justify-center">
+            <Lock className="w-5 h-5 text-orange-500" />
           </div>
           <div>
             <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
-            <p className="text-[11px] text-gray-500">処理中...</p>
+            <p className="text-[11px] text-gray-500">{isFinished ? '完了' : '処理中...'}</p>
           </div>
         </div>
 
@@ -86,32 +74,22 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
           {!isFinished && (
             <div className="flex justify-center py-4">
               <div className="relative w-16 h-16">
-                <svg className="absolute inset-0 w-full h-full gemini-arc-spin" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round"
-                    strokeDasharray="30 140" strokeDashoffset="0" />
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round"
-                    strokeDasharray="25 140" strokeDashoffset="-60" />
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round"
-                    strokeDasharray="20 140" strokeDashoffset="-115" />
-                </svg>
-                <svg className="absolute inset-0 w-full h-full gemini-arc-spin-reverse" viewBox="0 0 64 64" style={{ opacity: 0.3 }}>
-                  <circle cx="32" cy="32" r="24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray="15 150" strokeDashoffset="-20" />
-                  <circle cx="32" cy="32" r="24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray="12 150" strokeDashoffset="-90" />
-                </svg>
+                {/* C字型アーク回転 */}
+                <div className="absolute inset-0 drive-ring-flow" style={{
+                  background: 'conic-gradient(from 0deg, #f59e0b, #ef4444, #f97316, transparent)',
+                  borderRadius: '50%',
+                  mask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
+                  WebkitMask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
+                }} />
+                {/* 先端の丸み */}
+                <div className="absolute drive-ring-flow" style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#f59e0b',
+                  top: '6%', left: '50%', marginLeft: -3,
+                }} />
+                {/* 中央アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <svg className="w-6 h-6 gemini-sparkle-pulse" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L13.5 9.5L20 12L13.5 14.5L12 22L10.5 14.5L4 12L10.5 9.5L12 2Z"
-                      fill="url(#sparkleGrad2)" />
-                    <defs>
-                      <linearGradient id="sparkleGrad2" x1="4" y1="2" x2="20" y2="22">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="50%" stopColor="#ef4444" />
-                        <stop offset="100%" stopColor="#f97316" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  <Lock className="w-5 h-5 text-orange-400 drive-icon-pulse" />
                 </div>
               </div>
             </div>
@@ -124,7 +102,7 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
                 <span className="text-xs font-medium text-gray-500">進捗</span>
                 <span className="text-sm font-bold text-orange-600">{Math.round(progress)}%</span>
               </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -165,15 +143,15 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
 
           {/* Result */}
           {result && (
-            <div className={`mt-4 p-3 rounded-lg text-sm ${
+            <div className={`mt-4 p-3.5 rounded-xl text-sm ${
               result.success
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-50 text-green-800 border border-green-100'
+                : 'bg-red-50 text-red-800 border border-red-100'
             }`}>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2.5">
                 {result.success
-                  ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-                  : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  ? <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0 text-green-500" />
+                  : <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-500" />
                 }
                 <p className="font-medium">{result.message}</p>
               </div>
@@ -185,7 +163,7 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
           <div className="px-5 pb-4">
             <button
               onClick={onClose}
-              className="w-full py-2.5 text-sm font-bold text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors"
+              className="w-full py-2.5 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-sm"
             >
               閉じる
             </button>
