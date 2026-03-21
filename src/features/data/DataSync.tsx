@@ -521,74 +521,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     }
   }, [modal]);
 
-  // --- GDrive 大会ファイル一覧取得→選択UI表示 ---
-  const handleListTournamentFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    let steps: LoadingStep[] = [
-      { label: '大会一覧フォルダを取得中...', status: 'loading' },
-    ];
-    modal.setModalTitle('大会データ読込');
-    modal.setModalSteps(steps);
-    modal.setModalResult(null);
-    modal.setModalProgress(0);
-    modal.setModalOpen(true);
-    try {
-      modal.setModalProgress(30);
-      const files = await listTournamentExcelFiles(token);
-      modal.setModalProgress(100);
-      setGdriveFileList(files);
-      if (files.length === 0) {
-        steps = modal.updateStep(steps, 0, { status: 'error', label: '大会ファイルが見つかりません' });
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: false, message: '大会ファイルが見つかりません' });
-      } else {
-        steps = modal.updateStep(steps, 0, { status: 'done', label: `${files.length}件のファイルを検出` });
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: true, message: `${files.length}件のファイルを検出` });
-        setTimeout(() => { modal.setModalOpen(false); setShowFileList(true); }, 500);
-      }
-    } catch (err) {
-      steps = modal.updateStep(steps, 0, { status: 'error', label: `取得失敗: ${(err as Error).message}` });
-      modal.setModalSteps([...steps]);
-      modal.setModalResult({ success: false, message: `大会一覧取得失敗: ${(err as Error).message}` });
-    }
-  }, [modal]);
-
-  // --- GDrive 時間割ファイル一覧取得→選択UI表示 ---
-  const handleListScheduleFiles = useCallback(async () => {
-    const token = gdriveGetSavedToken();
-    if (!token) return;
-    let steps: LoadingStep[] = [
-      { label: '時間割フォルダを取得中...', status: 'loading' },
-    ];
-    modal.setModalTitle('時間割読込');
-    modal.setModalSteps(steps);
-    modal.setModalResult(null);
-    modal.setModalProgress(0);
-    modal.setModalOpen(true);
-    try {
-      modal.setModalProgress(30);
-      const files = await listScheduleExcelFiles(token);
-      modal.setModalProgress(100);
-      setScheduleGDriveFiles(files);
-      if (files.length === 0) {
-        steps = modal.updateStep(steps, 0, { status: 'error', label: '時間割ファイルが見つかりません' });
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: false, message: '時間割ファイルが見つかりません' });
-      } else {
-        steps = modal.updateStep(steps, 0, { status: 'done', label: `${files.length}件のファイルを検出` });
-        modal.setModalSteps([...steps]);
-        modal.setModalResult({ success: true, message: `${files.length}件のファイルを検出` });
-        setTimeout(() => { modal.setModalOpen(false); setShowScheduleFileList(true); }, 500);
-      }
-    } catch (err) {
-      steps = modal.updateStep(steps, 0, { status: 'error', label: `取得失敗: ${(err as Error).message}` });
-      modal.setModalSteps([...steps]);
-      modal.setModalResult({ success: false, message: `時間割一覧取得失敗: ${(err as Error).message}` });
-    }
-  }, [modal]);
-
   // --- GDrive 全データ一括読込（ふりがな・所属 + 大会・時間割） ---
   const handleLoadAll = useCallback(async () => {
     const token = gdriveGetSavedToken();
@@ -796,42 +728,23 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               {isProcessing && processingLabel.includes('一括') && <RefreshCw className="w-5 h-5 animate-spin" />}
             </button>
 
-            {/* 一括読込ボタン（大会・時間割） */}
-            <button
-              onClick={handleLoadTournamentAndSchedule}
-              disabled={isProcessing}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
-            >
-              <GoogleDriveIcon className="w-4.5 h-4.5" />
-              大会・時間割 一括読込
-              {isProcessing && processingLabel.includes('大会') && <RefreshCw className="w-4 h-4 animate-spin" />}
-            </button>
-
-            {/* 個別読込ボタン */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* ふりがな・所属 / 大会・時間割 読込ボタン */}
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleBulkDownload}
                 disabled={isProcessing}
-                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#1a73e8] to-[#8e24aa] rounded-xl hover:from-[#1557b0] hover:to-[#6a1b9a] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#1a73e8] to-[#8e24aa] rounded-xl hover:from-[#1557b0] hover:to-[#6a1b9a] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
                 <GoogleDriveIcon className="w-4 h-4 shrink-0" />
                 <span>ふりがな・所属</span>
               </button>
               <button
-                onClick={handleListTournamentFiles}
+                onClick={handleLoadTournamentAndSchedule}
                 disabled={isProcessing}
-                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#1a73e8] rounded-xl hover:from-[#3b78e7] hover:to-[#1557b0] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#4285F4] to-[#34A853] rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
               >
                 <GoogleDriveIcon className="w-4 h-4 shrink-0" />
-                <span>大会データ</span>
-              </button>
-              <button
-                onClick={handleListScheduleFiles}
-                disabled={isProcessing}
-                className="group relative flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-[#34A853] to-[#0d904f] rounded-xl hover:from-[#2d9249] hover:to-[#0b7a43] disabled:opacity-40 transition-all shadow-md hover:shadow-lg"
-              >
-                <GoogleDriveIcon className="w-4 h-4 shrink-0" />
-                <span>時間割</span>
+                <span>大会・時間割</span>
               </button>
             </div>
           </>
