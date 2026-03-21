@@ -437,6 +437,18 @@
   50% { opacity: 0.82; }
 }
 
+/* 情報バー ティッカーアニメーション */
+.info-ticker {
+  animation: ticker-scroll 20s linear infinite;
+}
+.info-ticker:hover {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* 鳥取カードスタイル */
 .card-tottori {
   background: #fff;
@@ -519,8 +531,12 @@
   animation: drive-pulse 2s ease-in-out infinite;
 }
 
-/* Drive読込アニメーション — 色が流れる一段リング */
-@keyframes drive-ring-flow {
+/* Drive読込アニメーション — C字型リング + カラー回転 */
+@keyframes drive-ring-shape {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes drive-ring-colors {
   0%   { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
@@ -530,8 +546,11 @@
   50%  { opacity: 0.75; transform: scale(0.92); }
 }
 
-.drive-ring-flow {
-  animation: drive-ring-flow 1.8s linear infinite;
+.drive-ring-shape {
+  animation: drive-ring-shape 1.4s linear infinite;
+}
+.drive-ring-colors {
+  animation: drive-ring-colors 2.2s linear infinite;
 }
 
 .drive-icon-pulse {

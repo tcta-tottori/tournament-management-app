@@ -99,13 +99,32 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
             /* ローディングアニメーション — Driveアイコン中央 + C字型カラーアーク回転 */
             <div className="flex justify-center py-4">
               <div className="relative w-20 h-20">
-                {/* C字型アーク: conic-gradient + 切れ目マスク */}
-                <div className="absolute inset-0 drive-ring-flow" style={{
-                  background: 'conic-gradient(from 0deg, #4285F4, #34A853, #FBBC04, #EA4335, transparent)',
-                  borderRadius: '50%',
-                  mask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
-                  WebkitMask: 'radial-gradient(circle, transparent 62%, black 64%, black 72%, transparent 74%)',
-                }} />
+                {/* C字型リング（SVG）— 形状の回転とカラーの回転を分離 */}
+                <svg className="absolute inset-0 w-full h-full drive-ring-shape" viewBox="0 0 80 80">
+                  <defs>
+                    {/* カラーグラデーション（別速度で回転） */}
+                    <linearGradient id="driveArcGrad" gradientTransform="rotate(0)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="80" y2="80">
+                      <stop offset="0%" stopColor="#4285F4" />
+                      <stop offset="25%" stopColor="#34A853" />
+                      <stop offset="50%" stopColor="#FBBC04" />
+                      <stop offset="75%" stopColor="#EA4335" />
+                      <stop offset="100%" stopColor="#4285F4" />
+                    </linearGradient>
+                  </defs>
+                  {/* 背景用の薄いリング */}
+                  <circle cx="40" cy="40" r="32" fill="none" stroke="#e5e7eb" strokeWidth="6" opacity="0.3" />
+                </svg>
+                {/* カラーC字アーク — 別速度で回転 */}
+                <svg className="absolute inset-0 w-full h-full drive-ring-colors" viewBox="0 0 80 80">
+                  <circle
+                    cx="40" cy="40" r="32"
+                    fill="none"
+                    stroke="url(#driveArcGrad)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray="150 51"
+                  />
+                </svg>
                 {/* 中央 Google Drive アイコン */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="drive-icon-pulse">
