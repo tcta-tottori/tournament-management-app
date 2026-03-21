@@ -4,6 +4,7 @@ import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 // 略称→正式名マッピング（時間割の略称がストアに残っている場合のフォールバック用）
 const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
@@ -188,6 +189,28 @@ export default function EntryRegistration() {
   const [procModalSteps, setProcModalSteps] = useState<ProcessingStep[]>([]);
   const [procModalProgress, setProcModalProgress] = useState(0);
   const [procModalResult, setProcModalResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // 確認ダイアログ
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean; title: string; message: string; danger?: boolean; confirmLabel?: string;
+  }>({ open: false, title: '', message: '' });
+  const confirmResolverRef = useRef<((v: boolean) => void) | null>(null);
+  const requestConfirm = useCallback((opts: { title: string; message: string; danger?: boolean; confirmLabel?: string }) => {
+    return new Promise<boolean>(resolve => {
+      confirmResolverRef.current = resolve;
+      setConfirmDialog({ ...opts, open: true });
+    });
+  }, []);
+  const handleConfirmOk = useCallback(() => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
+    confirmResolverRef.current?.(true);
+    confirmResolverRef.current = null;
+  }, []);
+  const handleConfirmCancel = useCallback(() => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
+    confirmResolverRef.current?.(false);
+    confirmResolverRef.current = null;
+  }, []);
 
   // Queries
   const events = useLiveQuery(
@@ -664,7 +687,10 @@ export default function EntryRegistration() {
     // DBから最新データを直接取得（クロージャの古いデータに依存しない）
     const draw = await db.draws.where('eventId').equals(eventId).first();
     if (!draw) return;
-    if (!skipConfirm && !confirm('エントリーを確定し対戦表を生成しますか？')) return;
+    if (!skipConfirm) {
+      const ok = await requestConfirm({ title: 'エントリー確定', message: 'エントリーを確定し対戦表を生成しますか？', confirmLabel: '確定する' });
+      if (!ok) return;
+    }
 
     // 処理中モーダル表示（skipConfirm=true の場合は呼び出し元が管理）
     const showModal = !skipConfirm;
@@ -866,7 +892,8 @@ export default function EntryRegistration() {
     const drawEventIds = new Set(currentDraws.map(d => d.eventId));
     const targets = events.filter(evt => drawEventIds.has(evt.eventId));
     if (targets.length === 0) return;
-    if (!confirm(`全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`)) return;
+    const ok = await requestConfirm({ title: '全種目一括確定', message: `全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`, confirmLabel: '確定する' });
+    if (!ok) return;
 
     setProcModalTitle('全種目 一括確定');
     const initialSteps: ProcessingStep[] = targets.map(t => ({ label: t.name, status: 'waiting' as const }));
@@ -898,7 +925,8 @@ export default function EntryRegistration() {
   // === 確定リセット（対戦表削除）===
   const handleRevertConfirm = useCallback(async (eventId: string) => {
     const evtName = events.find(e => e.eventId === eventId)?.name || eventId;
-    if (!confirm(`「${evtName}」の確定を解除し、対戦表を削除しますか？\nこの操作は取り消せません。`)) return;
+    const ok = await requestConfirm({ title: '確定解除', message: `「${evtName}」の確定を解除し、対戦表を削除しますか？\nこの操作は取り消せません。`, danger: true, confirmLabel: '解除する' });
+    if (!ok) return;
     const matches = await db.matches.where('eventId').equals(eventId).toArray();
     const ids = matches.map(m => m.id).filter((id): id is number => id !== undefined);
     if (ids.length > 0) {
@@ -1698,6 +1726,17 @@ export default function EntryRegistration() {
         progress={procModalProgress}
         result={procModalResult}
         onClose={() => setProcModalOpen(false)}
+      />
+
+      {/* 確認ダイアログ */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger={confirmDialog.danger}
+        confirmLabel={confirmDialog.confirmLabel}
+        onConfirm={handleConfirmOk}
+        onCancel={handleConfirmCancel}
       />
     </div>
   );
