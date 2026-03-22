@@ -2,7 +2,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2 } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
@@ -65,6 +66,9 @@ type DrawSlot = { position: number; entryId: string | null; seed: number; isBye:
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const importedSchedule = useAppStore(state => state.importedSchedule);
+  const setImportedSchedule = useAppStore(state => state.setImportedSchedule);
+  const scheduleFileName = useAppStore(state => state.scheduleFileName);
+  const setScheduleFileName = useAppStore(state => state.setScheduleFileName);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'event' | 'global'>('global'); // 種目別 or 対戦順
 
@@ -147,14 +151,85 @@ export default function MatchManager() {
     return events.filter(e => (allMatchesByEvent.get(e.eventId)?.length || 0) > 0);
   }, [events, allMatchesByEvent]);
 
+  // --- 試合順Excelインポート ---
+  const matchOrderInputRef = useRef<HTMLInputElement>(null);
+  const handleImportMatchOrder = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      // ヘッダー行を探す（"No"を含む行、なければ1行目スキップ）
+      let startRow = 0;
+      for (let i = 0; i < Math.min(rows.length, 5); i++) {
+        const firstCell = String(rows[i][0] || '').toLowerCase().trim();
+        if (firstCell === 'no' || firstCell === 'no.' || firstCell === '#') {
+          startRow = i + 1;
+          break;
+        }
+      }
+      if (startRow === 0 && rows.length > 1) {
+        // ヘッダーなし: 最初のセルが数値なら0行目から、そうでなければ1行目から
+        startRow = /^\d+$/.test(String(rows[0][0]).trim()) ? 0 : 1;
+      }
+
+      // パース: 各行から種目略称+ラウンドを抽出
+      const items: { eventName: string; roundLabel: string; matchOrder: number; courtName: string; startTime: string }[] = [];
+      const roundPattern = /^(.+?)\s*(\d+R|QF|SF|F)\s*$/i;
+      for (let i = startRow; i < rows.length; i++) {
+        const row = rows[i];
+        // 種目・ラウンド列を探す（2列目 or 1列目）
+        let label = '';
+        if (row.length >= 2 && String(row[1]).trim()) {
+          label = String(row[1]).trim();
+        } else if (String(row[0]).trim()) {
+          label = String(row[0]).trim();
+        }
+        if (!label) continue;
+
+        const rm = label.match(roundPattern);
+        if (rm) {
+          items.push({
+            eventName: rm[1].trim(),
+            roundLabel: rm[2].toUpperCase(),
+            matchOrder: items.length + 1,
+            courtName: '',
+            startTime: '',
+          });
+        } else {
+          // ラウンドなし → リーグ戦（全ラウンドまとめて）
+          items.push({
+            eventName: label.trim(),
+            roundLabel: '',  // 空 = リーグ（全ラウンド）
+            matchOrder: items.length + 1,
+            courtName: '',
+            startTime: '',
+          });
+        }
+      }
+
+      if (items.length > 0) {
+        setImportedSchedule(items);
+        setScheduleFileName(file.name);
+        alert(`試合順を取り込みました: ${items.length}項目\n${file.name}`);
+      } else {
+        alert('有効なデータが見つかりませんでした。');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  }, [setImportedSchedule, setScheduleFileName]);
+
   // 時間割の項目順マップ: eventName+round → 時間割上の出現順
   const scheduleOrderMap = useMemo(() => {
     const map = new Map<string, { order: number; time: string }>();
     if (importedSchedule.length === 0) return map;
-    // 時間割項目を種目+回戦でグルーピングし、最初に出現した順序を記録
     let orderIdx = 0;
     for (const item of importedSchedule) {
-      // 種目名からeventIdを見つけるため、イベント名で照合
       const key = `${item.eventName}|${item.roundLabel}`;
       if (!map.has(key)) {
         map.set(key, { order: orderIdx++, time: item.startTime });
@@ -162,6 +237,30 @@ export default function MatchManager() {
     }
     return map;
   }, [importedSchedule]);
+
+  // イベント名の略称マッチング
+  const matchEventName = (fullName: string, abbrev: string): boolean => {
+    // 完全一致
+    if (fullName === abbrev) return true;
+    // 略称がフル名に含まれる or フル名が略称に含まれる
+    if (fullName.includes(abbrev) || abbrev.includes(fullName)) return true;
+    // 「シングルス」「ダブルス」を除去して比較
+    const stripped = fullName.replace(/シングルス|ダブルス/g, '').replace(/級/g, '');
+    if (stripped.includes(abbrev) || abbrev.includes(stripped)) return true;
+    // 「一般」「歳以上」を除去
+    const moreStripped = stripped.replace(/一般/g, '').replace(/歳以上/g, '');
+    if (moreStripped.includes(abbrev) || abbrev.includes(moreStripped)) return true;
+    return false;
+  };
+
+  // リーグ戦判定
+  const isLeagueEvent = useCallback((eventId: string): boolean => {
+    const evDraw = allDraws.get(eventId);
+    if (!evDraw) return false;
+    if (evDraw.drawType === 'roundRobin') return true;
+    const ds = evDraw.drawSize || 0;
+    return ds > 0 && (ds & (ds - 1)) !== 0;
+  }, [allDraws]);
 
   // 全試合を時間割の項目順でグローバルソート（対戦順表示用）
   const globalSortedMatches = useMemo(() => {
@@ -175,41 +274,59 @@ export default function MatchManager() {
       }
     }
 
-    // 時間割の項目順でソート
     if (scheduleOrderMap.size > 0) {
+      // ラウンドラベル照合ヘルパー
+      const matchRound = (rLabel: string, round: number, rName: string): boolean => {
+        if (!rLabel) return false;
+        if (rLabel === rName) return true;
+        if (rLabel === `${round}R` || rLabel === `${round}回戦`) return true;
+        if (rLabel === 'QF' && rName === '準々決勝') return true;
+        if (rLabel === 'SF' && rName === '準決勝') return true;
+        if (rLabel === 'F' && rName === '決勝') return true;
+        if (rLabel === '決勝' && rName === '決勝') return true;
+        if (rLabel === '準決勝' && rName === '準決勝') return true;
+        if (rLabel === '準々決勝' && rName === '準々決勝') return true;
+        return false;
+      };
+
       // 各試合の時間割順序を決定
-      const getScheduleOrder = (m: Match & { eventName: string }) => {
+      const getScheduleOrder = (m: Match & { eventName: string }): number => {
         const evDraw = allDraws.get(m.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
         const rName = getRoundName(m.round, evTotalRounds);
-        // 時間割のroundLabelとマッチング: "1R"形式や"1回戦"形式
+
         for (const [key, val] of scheduleOrderMap) {
           const [evName, rLabel] = key.split('|');
-          if (!m.eventName.includes(evName) && !evName.includes(m.eventName)) continue;
-          // ラウンドラベルの照合
-          if (rLabel === rName) return val.order;
-          if (rLabel === `${m.round}R` || rLabel === `${m.round}回戦`) return val.order;
-          if (rLabel === '決勝' && rName === '決勝') return val.order;
-          if (rLabel === '準決勝' && rName === '準決勝') return val.order;
-          if (rLabel === '準々決勝' && rName === '準々決勝') return val.order;
-          if (rLabel === 'QF' && rName === '準々決勝') return val.order;
-          if (rLabel === 'SF' && rName === '準決勝') return val.order;
-          if (rLabel === 'F' && rName === '決勝') return val.order;
+          if (!matchEventName(m.eventName, evName)) continue;
+
+          // ラウンド指定あり → 特定ラウンドのみマッチ
+          if (rLabel) {
+            if (matchRound(rLabel, m.round, rName)) return val.order;
+          } else {
+            // ラウンド指定なし → リーグ戦: 全ラウンドをこの順番に
+            return val.order;
+          }
         }
         return 9999;
       };
+
       return arr.sort((a, b) => {
         const oa = getScheduleOrder(a);
         const ob = getScheduleOrder(b);
         if (oa !== ob) return oa - ob;
-        // 同じ種目・回戦内ではポジション順（若番順）
+        // 同じグループ内: リーグ戦はmatchOrder順、トーナメントはposition順
+        const aLeague = isLeagueEvent(a.eventId);
+        const bLeague = isLeagueEvent(b.eventId);
+        if (aLeague || bLeague) {
+          return (a.matchOrder || 0) - (b.matchOrder || 0);
+        }
         return (a.position || 0) - (b.position || 0);
       });
     }
 
     // 時間割データがない場合はmatchOrder順
     return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
-  }, [allMatchesByEvent, events, scheduleOrderMap, allDraws]);
+  }, [allMatchesByEvent, events, scheduleOrderMap, allDraws, isLeagueEvent]);
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
@@ -1282,6 +1399,20 @@ ${printableMatches.map(m => {
                 className={`flex-1 px-3 py-1.5 flex items-center justify-center gap-1 font-medium transition-colors ${viewMode === 'event' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <ClipboardList className="w-3.5 h-3.5" />種目別
               </button>
+            </div>
+            {/* 試合順インポート */}
+            <div className="flex items-center gap-2">
+              <input ref={matchOrderInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportMatchOrder} className="hidden" />
+              <button
+                onClick={() => matchOrderInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                試合順取込
+              </button>
+              {scheduleFileName && (
+                <span className="text-[10px] text-gray-500 truncate max-w-[200px]" title={scheduleFileName}>{scheduleFileName}</span>
+              )}
             </div>
             {/* 初回コート確定 */}
             {!hasPlayingMatches && globalSortedMatches.some(m => (m.status === 'waiting' || m.status === 'ready') && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE') && (
