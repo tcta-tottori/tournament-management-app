@@ -21,6 +21,24 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 1.6',
+    date: '2026-03-23',
+    highlights: '対戦順テーブル刷新・試合順Excel取込・ブラケット線修正・BYE配置修正',
+    timeGroups: [
+      {
+        time: '—',
+        summary: '対戦順・エントリーページ改善',
+        changes: [
+          { type: 'feat', text: '対戦順ページをフラットテーブルに再設計（種目・ゲーム数・時間・コート列追加）' },
+          { type: 'feat', text: '試合順Excelインポート機能を追加（リーグ戦のまとめ入れにも対応）' },
+          { type: 'fix', text: 'エントリーページの左山・右山の決勝接続線をExcel標準パターンの直線に修正' },
+          { type: 'fix', text: 'BYE配置をExcelレイアウトに合わせ、エントリーを上から詰めBYEを下部に配置' },
+          { type: 'fix', text: 'トーナメントブラケットのジグザグ線を解消し綺麗な接続線に修正' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 1.5',
     date: '2026-03-22',
     highlights: '2セット+STBスコア入力・ゲームルール編集・棄権(Ret)対応',
@@ -377,7 +395,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 1.5</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 1.6</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">
