@@ -379,12 +379,38 @@ export default function ScoreboardBracket({
     }
   }
 
+  // --- 左山/右山ラベル ---
+  const halfLabels: React.ReactNode[] = [];
+  if (drawSize >= 8) {
+    // 上半分（Top Half）の中央Y
+    const topHalfStartY = r0Y[0];
+    const topHalfEndY = r0Y[halfSize - 1] + SLOT_HEIGHT;
+    const topHalfCenterY = (topHalfStartY + topHalfEndY) / 2;
+    // 下半分（Bottom Half）の中央Y
+    const bottomHalfStartY = r0Y[halfSize];
+    const bottomHalfEndY = r0Y[drawSize - 1] + SLOT_HEIGHT;
+    const bottomHalfCenterY = (bottomHalfStartY + bottomHalfEndY) / 2;
+    const labelX = 2;
+
+    halfLabels.push(
+      <div key="top-half" className="absolute flex items-center" style={{ left: labelX, top: topHalfCenterY - 10 }}>
+        <span className="text-[9px] font-bold text-gray-400 tracking-wider [writing-mode:vertical-rl]">Top Half</span>
+      </div>
+    );
+    halfLabels.push(
+      <div key="bottom-half" className="absolute flex items-center" style={{ left: labelX, top: bottomHalfCenterY - 10 }}>
+        <span className="text-[9px] font-bold text-gray-400 tracking-wider [writing-mode:vertical-rl]">Bottom Half</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative overflow-auto bg-gray-50/50" style={{ width: '100%', height: '100%' }}>
       <div className="relative" style={{ width: containerWidth, height: containerHeight }}>
         <svg className="absolute inset-0 pointer-events-none" width={containerWidth} height={containerHeight}>
           {paths}
         </svg>
+        {halfLabels}
         {slotElements}
         {matchElements}
       </div>
