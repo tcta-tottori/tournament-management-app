@@ -394,12 +394,12 @@ export default function ScoreboardBracket({
 
     halfLabels.push(
       <div key="top-half" className="absolute flex items-center" style={{ left: labelX, top: topHalfCenterY - 10 }}>
-        <span className="text-[9px] font-bold text-gray-400 tracking-wider [writing-mode:vertical-rl]">Top Half</span>
+        <span className="text-[9px] font-bold text-primary-400 tracking-wider [writing-mode:vertical-rl]">Left side</span>
       </div>
     );
     halfLabels.push(
       <div key="bottom-half" className="absolute flex items-center" style={{ left: labelX, top: bottomHalfCenterY - 10 }}>
-        <span className="text-[9px] font-bold text-gray-400 tracking-wider [writing-mode:vertical-rl]">Bottom Half</span>
+        <span className="text-[9px] font-bold text-orange-400 tracking-wider [writing-mode:vertical-rl]">Right side</span>
       </div>
     );
   }
