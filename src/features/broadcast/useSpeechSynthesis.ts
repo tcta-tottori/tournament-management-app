@@ -5,20 +5,38 @@ const MAX_REPEATS = 2; // 最大繰り返し回数（初回を除く）
 /** チャンク間のポーズ（ms）— 自然な間を演出 */
 const CHUNK_PAUSE_MS = 600;
 
-/** 利用可能な日本語女性音声を取得 */
-function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
+/** 推奨音声キーワード（優先順） */
+const PREFERRED_VOICES = [
+  { key: 'kyoko', label: 'Kyoko（落ち着いた女性）' },
+  { key: 'flo', label: 'Flo（明るい女性）' },
+  { key: 'shelley', label: 'Shelley（柔らかい女性）' },
+  { key: 'sandy', label: 'Sandy（はっきりした女性）' },
+];
+
+const VOICE_STORAGE_KEY = 'speech-voice-key';
+
+/** キーワードで日本語音声を検索 */
+function findJapaneseVoice(keyword: string): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
   const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang === 'ja_JP');
+  return jaVoices.find(v => v.name.toLowerCase().includes(keyword)) || null;
+}
 
-  // 上品で自然な声質を優先するキーワード順（ニューラル音声を最優先）
-  const preferredKeywords = ['nanami', 'kyoko', 'o-ren', 'haruka', 'sayaka', 'ayumi', 'mei', 'mizuki', 'google', 'female'];
+/** 利用可能な日本語音声を取得（保存された選択 or デフォルト） */
+function getSelectedVoice(selectedKey: string): SpeechSynthesisVoice | null {
+  // ユーザー選択の音声を検索
+  const selected = findJapaneseVoice(selectedKey);
+  if (selected) return selected;
 
-  for (const keyword of preferredKeywords) {
-    const found = jaVoices.find(v => v.name.toLowerCase().includes(keyword));
+  // フォールバック: 推奨リストの順で検索
+  for (const pref of PREFERRED_VOICES) {
+    const found = findJapaneseVoice(pref.key);
     if (found) return found;
   }
 
-  // フォールバック: 最初の日本語音声
+  // 最終フォールバック
+  const voices = speechSynthesis.getVoices();
+  const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang === 'ja_JP');
   return jaVoices[0] || null;
 }
 
@@ -26,21 +44,36 @@ export function useSpeechSynthesis() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [voiceName, setVoiceName] = useState('');
+  const [selectedVoiceKey, setSelectedVoiceKeyState] = useState(
+    () => localStorage.getItem(VOICE_STORAGE_KEY) || 'kyoko'
+  );
+  /** 利用可能な推奨音声リスト */
+  const [availableVoices, setAvailableVoices] = useState<{ key: string; label: string }[]>([]);
   const cancelledRef = useRef(false);
+
+  const setSelectedVoiceKey = useCallback((key: string) => {
+    setSelectedVoiceKeyState(key);
+    localStorage.setItem(VOICE_STORAGE_KEY, key);
+    const voice = findJapaneseVoice(key);
+    setVoiceName(voice?.name || key);
+  }, []);
 
   useEffect(() => {
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices();
       if (voices.length > 0) {
         setVoicesLoaded(true);
-        const voice = getJapaneseFemaleVoice();
+        // 利用可能な推奨音声を判定
+        const available = PREFERRED_VOICES.filter(pref => findJapaneseVoice(pref.key));
+        setAvailableVoices(available);
+        const voice = getSelectedVoice(selectedVoiceKey);
         setVoiceName(voice?.name || '(なし)');
       }
     };
     loadVoices();
     speechSynthesis.addEventListener('voiceschanged', loadVoices);
     return () => speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, []);
+  }, [selectedVoiceKey]);
 
   const speak = useCallback((text: string, settings: VoiceSettings, onComplete?: () => void) => {
     const synth = window.speechSynthesis;
@@ -48,7 +81,8 @@ export function useSpeechSynthesis() {
     cancelledRef.current = false;
     setIsSpeaking(true);
 
-    const voice = getJapaneseFemaleVoice();
+    const savedKey = localStorage.getItem(VOICE_STORAGE_KEY) || 'kyoko';
+    const voice = getSelectedVoice(savedKey);
 
     // Chrome長文バグ対策：句点で分割
     const baseChunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
@@ -122,8 +156,9 @@ export function useSpeechSynthesis() {
   const testVoice = useCallback((settings: VoiceSettings) => {
     const synth = window.speechSynthesis;
     synth.cancel();
-    const voice = getJapaneseFemaleVoice();
-    const utterance = new SpeechSynthesisUtterance('音声テストです。大会運営システムの音声コールをご利用いただきありがとうございます。');
+    const savedKey = localStorage.getItem(VOICE_STORAGE_KEY) || 'kyoko';
+    const voice = getSelectedVoice(savedKey);
+    const utterance = new SpeechSynthesisUtterance('試合のコールをします。音声テストです。');
     utterance.lang = 'ja-JP';
     utterance.rate = settings.rate;
     utterance.pitch = Math.max(0.1, Math.min(2.0, settings.pitch));
@@ -132,5 +167,9 @@ export function useSpeechSynthesis() {
     synth.speak(utterance);
   }, []);
 
-  return { isSpeaking, voicesLoaded, voiceName, speak, stop, testVoice };
+  return {
+    isSpeaking, voicesLoaded, voiceName,
+    selectedVoiceKey, setSelectedVoiceKey, availableVoices,
+    speak, stop, testVoice,
+  };
 }

@@ -235,7 +235,7 @@ export default function MatchManager() {
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { isSpeaking, voiceName, speak, stop, testVoice } = useSpeechSynthesis();
+  const { isSpeaking, voiceName, speak, stop, testVoice, selectedVoiceKey, setSelectedVoiceKey, availableVoices } = useSpeechSynthesis();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(
@@ -1294,6 +1294,31 @@ ${printableMatches.map(m => {
                     </div>
                     <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">Active</span>
                   </div>
+
+                  {/* 音声選択 */}
+                  {availableVoices.length > 1 && (
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-2">
+                        <Mic className="w-3.5 h-3.5 text-emerald-500" />
+                        音声タイプ
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {availableVoices.map(v => (
+                          <button
+                            key={v.key}
+                            onClick={() => setSelectedVoiceKey(v.key)}
+                            className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all ${
+                              selectedVoiceKey === v.key
+                                ? 'bg-emerald-100 border-emerald-400 text-emerald-700 shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200 hover:text-emerald-600'
+                            }`}
+                          >
+                            {v.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* 速度スライダー */}
                   <div>
