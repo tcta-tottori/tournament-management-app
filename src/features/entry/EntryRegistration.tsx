@@ -101,109 +101,69 @@ type CheckInSlot = {
 };
 
 // === BYE再配置ユーティリティ ===
-// ドロー会議システムと同じアルゴリズム（JTAルール準拠）
-// 1. シード選手の対戦相手位置にBYEを優先配置
-// 2. 残りを4つの山に均等分散（BYE同士の1回戦対戦を回避）
-
-// 標準シード位置（0-indexed）- ドロー会議config.jsのSEED_POSITIONSに準拠
-const SEED_POSITIONS_BY_SIZE: Record<number, number[]> = {
-  8:   [0, 7],
-  16:  [0, 15, 4, 11],
-  32:  [0, 31, 8, 23, 7, 15, 16, 24],
-  64:  [0, 63, 16, 47, 15, 31, 32, 48, 7, 23, 24, 40, 39, 55, 56, 8],
-  128: [0, 127, 32, 95, 31, 63, 64, 96, 15, 47, 48, 80, 79, 111, 112, 16],
-};
-
+// セクション（4ポジション＝2ペア）単位でBYE配置
+// 左右の山にBYEを均等分配し、各セクション内でエントリーとBYEを配置
+// - 4エントリー: BYEなし（2試合）
+// - 3エントリー: 1ウォークオーバー（BYEをペア1の偶数位置に配置）
+// - 2エントリー: 1試合 + 2BYE（BYE-BYEペア1つ）
+// - 1エントリー: 1ウォークオーバー + BYE-BYEペア
+// - 0エントリー: BYE-BYEペア×2（非表示）
 function generateByePositions(drawSize: number, numByes: number): number[] {
   if (numByes <= 0) return [];
 
-  const getOpponent = (idx: number) => idx % 2 === 0 ? idx + 1 : idx - 1;
-  const seedPositions = SEED_POSITIONS_BY_SIZE[drawSize] || [];
-  const seedPosSet = new Set(seedPositions);
-
+  const halfSize = drawSize / 2;
   const byePositions: number[] = [];
-  const isUsed = new Set<number>();
 
-  // 1. シード選手の対戦相手位置にBYEを優先配置（シード順位が高い順）
-  for (const seedPos of seedPositions) {
-    if (byePositions.length >= numByes) break;
-    const opponentPos = getOpponent(seedPos);
-    if (opponentPos >= 0 && opponentPos < drawSize &&
-        !seedPosSet.has(opponentPos) && !isUsed.has(opponentPos)) {
-      byePositions.push(opponentPos);
-      isUsed.add(opponentPos);
-    }
-  }
+  // 左右の山にBYEを均等分配
+  const leftByes = Math.ceil(numByes / 2);
+  const rightByes = Math.floor(numByes / 2);
 
-  // 2. 残りのBYEを4つの山に均等分散配置
-  const remainingByes = numByes - byePositions.length;
-  if (remainingByes > 0) {
-    const halfSize = drawSize / 2;
-    const quarterSize = halfSize / 2;
-    const quarters = [
-      { start: 0, end: quarterSize },
-      { start: quarterSize, end: halfSize },
-      { start: halfSize, end: halfSize + quarterSize },
-      { start: halfSize + quarterSize, end: drawSize },
-    ];
+  for (const [halfOffset, halfByeCount] of [[0, leftByes], [halfSize, rightByes]] as [number, number][]) {
+    const halfEntries = halfSize - halfByeCount;
+    const numSections = halfSize / 4;
 
-    // 各山の既存BYE数を計算
-    const quarterByeCount = quarters.map(q => {
-      let count = 0;
-      for (const pos of byePositions) {
-        if (pos >= q.start && pos < q.end) count++;
+    // セクションごとのエントリー数を決定（上から詰める）
+    const perSection: number[] = new Array(numSections).fill(0);
+    if (halfEntries > 0) {
+      let remaining = halfEntries;
+      for (let s = 0; s < numSections && remaining > 0; s++) {
+        perSection[s] = Math.min(4, remaining);
+        remaining -= perSection[s];
       }
-      return count;
-    });
-
-    // 均等分配: 残りBYEを各山に割り当て
-    const baseBye = Math.floor(remainingByes / 4);
-    const extra = remainingByes % 4;
-    const additionalByes = [baseBye, baseBye, baseBye, baseBye];
-
-    // 端数をBYEが少ない山から割り当て
-    const sortedQ = [0, 1, 2, 3].sort((a, b) => quarterByeCount[a] - quarterByeCount[b]);
-    for (let i = 0; i < extra; i++) {
-      additionalByes[sortedQ[i]]++;
-    }
-
-    // 各山にBYE配置（BYE同士の1回戦対戦を回避、端から交互に配置）
-    for (let qi = 0; qi < 4; qi++) {
-      let count = additionalByes[qi];
-      if (count <= 0) continue;
-
-      // この山の空きスロットを収集
-      const slots: number[] = [];
-      for (let i = quarters[qi].start; i < quarters[qi].end; i++) {
-        if (!seedPosSet.has(i) && !isUsed.has(i)) slots.push(i);
-      }
-
-      // 対戦相手がBYEでないスロットを優先
-      const prioritized = slots.sort((a, b) => {
-        const aOppBye = isUsed.has(getOpponent(a)) ? 1 : 0;
-        const bOppBye = isUsed.has(getOpponent(b)) ? 1 : 0;
-        if (aOppBye !== bOppBye) return aOppBye - bOppBye;
-        return a - b;
-      });
-
-      // 下端・上端から交互に配置して分散
-      let tIdx = 0, bIdx = prioritized.length - 1;
-      let fromBottom = true;
-      let placed = 0;
-      while (placed < count && tIdx <= bIdx) {
-        const slot = fromBottom ? prioritized[bIdx--] : prioritized[tIdx++];
-        if (!isUsed.has(slot)) {
-          byePositions.push(slot);
-          isUsed.add(slot);
-          placed++;
+      // リバランス: 1人・2人セクションを前セクションと均す
+      for (let s = numSections - 1; s > 0; s--) {
+        if (perSection[s] === 1 && perSection[s - 1] >= 3) {
+          perSection[s - 1]--;
+          perSection[s]++;
+        } else if (perSection[s] === 2 && perSection[s - 1] >= 4) {
+          perSection[s - 1]--;
+          perSection[s]++;
         }
-        fromBottom = !fromBottom;
+      }
+    }
+
+    // 各セクション内でBYE位置を決定
+    for (let s = 0; s < numSections; s++) {
+      const sStart = halfOffset + s * 4 + 1; // 1-indexed
+      const entries = perSection[s];
+
+      if (entries === 4) continue;
+      if (entries === 0) {
+        byePositions.push(sStart, sStart + 1, sStart + 2, sStart + 3);
+      } else if (entries === 1) {
+        // エントリーをsStart、BYEをsStart+1（ウォークオーバー）、残りBYE-BYE
+        byePositions.push(sStart + 1, sStart + 2, sStart + 3);
+      } else if (entries === 2) {
+        // エントリーをsStart,sStart+1（試合）、sStart+2,sStart+3をBYE-BYE
+        byePositions.push(sStart + 2, sStart + 3);
+      } else if (entries === 3) {
+        // エントリーをsStart,sStart+2,sStart+3（sStartがウォークオーバー、sStart+2vsStart+3が試合）
+        byePositions.push(sStart + 1);
       }
     }
   }
 
-  // 0-indexed → 1-indexed に変換
-  return byePositions.map(p => p + 1);
+  return byePositions;
 }
 
 function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
