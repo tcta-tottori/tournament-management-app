@@ -37,6 +37,9 @@ export function buildCallText(
 
   const parts: string[] = [];
 
+  // 冒頭の案内
+  parts.push('試合のコールをします。');
+
   // 種目・回戦（#番号を除去、級の前にポーズ）
   parts.push(`${addGradePause(match.eventName)}、${removePositionNumber(match.round)}。`);
 
@@ -90,6 +93,9 @@ export function buildWalkoverCallText(
   affiliationFuriganaMap: Record<string, string> = {},
 ): string {
   const parts: string[] = [];
+
+  // 冒頭の案内
+  parts.push('試合のコールをします。');
 
   // 種目・回戦
   parts.push(`${addGradePause(match.eventName)}、${removePositionNumber(match.round)}。`);
