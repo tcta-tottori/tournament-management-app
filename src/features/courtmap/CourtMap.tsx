@@ -486,54 +486,40 @@ export default function CourtMap() {
                 </div>
               </div>
             ) : (
-              /* ヤマタスポーツパーク: ブロックを行にして上→下に配置（反時計回り90°） */
-              <div className="flex flex-col items-center gap-0 w-full">
-                {[...venue.blocks].reverse().map((block, ri) => {
-                  const blockIdx = venue.blocks.length - 1 - ri;
-                  return (
-                    <div key={blockIdx} className="w-full max-w-3xl">
-                      {/* ブロック: コートを横一列に */}
-                      <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
-                        <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1">
-                          {block.courts[0]}〜{block.courts[block.courts.length - 1]}
-                        </div>
-                        <div className="grid grid-cols-4 gap-2.5">
-                          {block.courts.map(renderCourtButtonPC)}
+              /* ヤマタスポーツパーク: ブロックを縦列で左→右に配置 */
+              <div className="flex items-start gap-0 w-full justify-center">
+                {venue.blocks.map((block, blockIdx) => (
+                  <div key={blockIdx} className="flex items-start">
+                    {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
+                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
+                      <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1 text-center">
+                        {block.courts[block.courts.length - 1]}〜{block.courts[0]}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {[...block.courts].reverse().map(renderCourtButtonPC)}
+                      </div>
+                    </div>
+
+                    {/* 本部表示（指定ブロックの後） */}
+                    {blockIdx === venue.hqPosition && (
+                      <div className="flex flex-col items-center justify-center mx-2 h-full self-center">
+                        <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm">
+                          <span className="text-base">🏠</span>
+                          <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
                         </div>
                       </div>
+                    )}
 
-                      {/* 本部表示（指定ブロックの後 → 回転後は上のブロックとの間） */}
-                      {blockIdx === venue.hqPosition + 1 && (
-                        <div className="flex items-center gap-3 my-3 px-4">
-                          <div className="flex-1 border-t border-dashed border-border-main" />
-                          <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
-                            <span className="text-base">🏠</span>
-                            <span className="text-sm font-bold text-amber-800">本部</span>
-                          </div>
-                          <div className="flex-1 border-t border-dashed border-border-main" />
-                        </div>
-                      )}
-
-                      {/* 通路表示 */}
-                      {blockIdx !== venue.hqPosition + 1 && ri < venue.blocks.length - 1 && (
-                        <div className="flex items-center gap-2 my-2 px-4">
-                          <div className="flex-1 border-t border-dashed border-gray-300" />
-                          <span className="text-[10px] text-gray-500">通路</span>
-                          <div className="flex-1 border-t border-dashed border-gray-300" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* 駐車場（ヤマタのみ・回転後は下に表示） */}
-                {venue.id === 'yamata' && (
-                  <div className="mt-3 w-full max-w-3xl">
-                    <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main text-center">
-                      ↓ 駐車場側
-                    </div>
+                    {/* 通路表示（ブロック間、本部以外） */}
+                    {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
+                      <div className="flex flex-col items-center justify-center mx-1 self-center">
+                        <div className="h-16 border-l border-dashed border-gray-300" />
+                        <span className="text-[9px] text-gray-400 my-1">通路</span>
+                        <div className="h-16 border-l border-dashed border-gray-300" />
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             )}
           </div>

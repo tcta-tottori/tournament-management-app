@@ -660,65 +660,55 @@ export default function LiveDashboard() {
             </div>
           </div>
 
-          {/* === PC横向きレイアウト (md以上) — 反時計回り90°回転 === */}
-          <div className="hidden md:flex flex-col gap-0 items-center w-full">
-            {[...courtBlocks].reverse().map((block, ri) => {
-              const origIdx = courtBlocks.length - 1 - ri;
-              // HQ: 元のhqAfterBlock+1番目のブロックの上に表示
-              const showHq = origIdx === hqAfterBlock + 1;
-              // 通路: HQ以外のブロック間
-              const showPassage = !showHq && ri > 0;
-              return (
-                <div key={origIdx} className="w-full max-w-3xl">
-                  {showHq && (
-                    <div className="flex items-center gap-3 my-3 px-4">
-                      <div className="flex-1 h-px bg-amber-300" />
-                      <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
-                        <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
-                        <span className="text-xs font-bold text-amber-700">本部</span>
-                      </div>
-                      <div className="flex-1 h-px bg-amber-300" />
-                    </div>
-                  )}
-                  {showPassage && (
-                    <div className="flex items-center gap-2 my-2 px-4">
-                      <div className="flex-1 h-px bg-gray-200" />
-                      <span className="text-[9px] text-gray-400">通路</span>
-                      <div className="flex-1 h-px bg-gray-200" />
-                    </div>
-                  )}
-                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3">
-                    <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1">
-                      {block[0]?.court.name.replace(/[^\d]/g, '') || (origIdx * 4 + 1)}〜{block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (origIdx * 4 + block.length)}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2.5">
-                      {block.map(cs => {
-                        const match = cs.currentMatch || cs.nextMatch;
-                        const evtName = match ? eventNameMap.get(match.eventId) : undefined;
-                        return (
-                          <TennisCourtBlockH
-                            key={cs.court.courtId}
-                            cs={cs}
-                            isSelected={selectedCourtId === cs.court.courtId}
-                            onSelect={() => setSelectedCourtId(
-                              selectedCourtId === cs.court.courtId ? null : cs.court.courtId
-                            )}
-                            eventName={evtName}
-                            isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
-                          />
-                        );
-                      })}
-                    </div>
+          {/* === PC縦列レイアウト (md以上) — ブロックを縦列で左→右に配置 === */}
+          <div className="hidden md:flex items-start gap-0 justify-center w-full">
+            {courtBlocks.map((block, blockIdx) => (
+              <div key={blockIdx} className="flex items-start">
+                {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
+                <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
+                  <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1 text-center">
+                    {block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}〜{block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {[...block].reverse().map(cs => {
+                      const match = cs.currentMatch || cs.nextMatch;
+                      const evtName = match ? eventNameMap.get(match.eventId) : undefined;
+                      return (
+                        <TennisCourtBlockH
+                          key={cs.court.courtId}
+                          cs={cs}
+                          isSelected={selectedCourtId === cs.court.courtId}
+                          onSelect={() => setSelectedCourtId(
+                            selectedCourtId === cs.court.courtId ? null : cs.court.courtId
+                          )}
+                          eventName={evtName}
+                          isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-            {/* 駐車場側 */}
-            <div className="mt-3 w-full max-w-3xl">
-              <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main text-center">
-                ↓ 駐車場側
+
+                {/* 本部表示（指定ブロックの後） */}
+                {blockIdx === hqAfterBlock && (
+                  <div className="flex flex-col items-center justify-center mx-2 self-center">
+                    <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
+                      <span className="text-xs font-bold text-amber-700 [writing-mode:vertical-rl]">本部</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 通路表示（ブロック間、本部以外） */}
+                {blockIdx !== hqAfterBlock && blockIdx < courtBlocks.length - 1 && (
+                  <div className="flex flex-col items-center justify-center mx-1 self-center">
+                    <div className="h-16 border-l border-dashed border-gray-300" />
+                    <span className="text-[9px] text-gray-400 my-1">通路</span>
+                    <div className="h-16 border-l border-dashed border-gray-300" />
+                  </div>
+                )}
               </div>
-            </div>
+            ))}
           </div>
 
           {/* === モバイル縦向きレイアウト (md未満) === */}
