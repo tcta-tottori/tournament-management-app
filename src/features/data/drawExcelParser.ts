@@ -106,6 +106,86 @@ function nextPowerOf2(n: number): number {
   return p;
 }
 
+// ---------------------------------------------------------------------------
+// JTA標準シード位置 & BYE配置
+// ---------------------------------------------------------------------------
+
+/** drawSizeに対するJTA標準シード配置位置（1-indexed）を優先順で返す */
+function getSeedPositionsForDrawSize(drawSize: number): number[] {
+  const positions: number[] = [1, drawSize]; // seed 1, seed 2
+  const seedPosMap: Record<number, { seed3_4?: number[], seed5_8?: number[], seed9_16?: number[] }> = {
+    16: { seed3_4: [5, 12] },
+    32: { seed3_4: [9, 24], seed5_8: [8, 16, 17, 25] },
+    64: { seed3_4: [17, 48], seed5_8: [16, 32, 33, 49], seed9_16: [8, 24, 25, 41, 40, 56, 57, 9] },
+    128: { seed3_4: [33, 96], seed5_8: [32, 64, 65, 97], seed9_16: [16, 48, 49, 81, 80, 112, 113, 17] },
+  };
+  const spm = seedPosMap[drawSize];
+  if (spm) {
+    if (spm.seed3_4) positions.push(...spm.seed3_4);
+    if (spm.seed5_8) positions.push(...spm.seed5_8);
+    if (spm.seed9_16) positions.push(...spm.seed9_16);
+  }
+  return positions;
+}
+
+/**
+ * 半分のブラケットにおけるBYE位置を決定する。
+ * シード選手の対抗位置にBYEを優先配置し、残りは上端・下端から交互配置。
+ */
+function determineBYEPositionsForHalf(
+  halfSize: number,
+  halfOffset: number,   // 0 for left half, halfSize for right half
+  byeCount: number,
+  drawSize: number,
+): number[] {
+  if (byeCount <= 0) return [];
+
+  const byePositions: number[] = [];
+  const usedPositions = new Set<number>();
+  const halfStart = halfOffset + 1;
+  const halfEnd = halfOffset + halfSize;
+
+  // シード位置を取得し、この半分に含まれるものをフィルタ
+  const allSeedPositions = getSeedPositionsForDrawSize(drawSize);
+  const seedPosInHalf = allSeedPositions.filter(p => p >= halfStart && p <= halfEnd);
+
+  // 1. シード選手の対抗位置にBYEを配置
+  for (const seedPos of seedPosInHalf) {
+    if (byePositions.length >= byeCount) break;
+    const opponent = seedPos % 2 === 1 ? seedPos + 1 : seedPos - 1;
+    if (opponent >= halfStart && opponent <= halfEnd && !usedPositions.has(opponent)) {
+      byePositions.push(opponent);
+      usedPositions.add(opponent);
+    }
+  }
+
+  // 2. 残りのBYEは上端・下端から交互配置
+  let top = halfStart;
+  let bottom = halfEnd;
+  let fromTop = true;
+  while (byePositions.length < byeCount) {
+    if (fromTop) {
+      while (top <= halfEnd && (usedPositions.has(top) || seedPosInHalf.includes(top))) top++;
+      if (top <= halfEnd) {
+        byePositions.push(top);
+        usedPositions.add(top);
+        top++;
+      }
+    } else {
+      while (bottom >= halfStart && (usedPositions.has(bottom) || seedPosInHalf.includes(bottom))) bottom--;
+      if (bottom >= halfStart) {
+        byePositions.push(bottom);
+        usedPositions.add(bottom);
+        bottom--;
+      }
+    }
+    fromTop = !fromTop;
+    if (top > halfEnd && bottom < halfStart) break;
+  }
+
+  return byePositions;
+}
+
 function isEventHeader(text: string): boolean {
   if (!text) return false;
   // Must contain at least one event keyword and not be a seed line
@@ -475,29 +555,62 @@ export function parseDrawExcel(
     );
 
     // ------------------------------------------------------------------
-    // Calculate draw size and remap right-half positions
+    // Calculate draw size and map entries to proper bracket positions
     // ------------------------------------------------------------------
-    // Excelドローでは左半分(positions 1-N)と右半分(positions N+1-M)で
-    // 構成されるが、drawSizeが2のべき乗に拡張されるとき、右半分の
-    // ポジションが上半分（左ブラケット）に入ってしまう場合がある。
-    // 例: 40人ドロー → drawSize=64, 右半分pos 21-40が上半分(1-32)に重なる
-    // → 右半分をdrawSize/2+1以降にリマップして下半分に配置する
+    // Excelのドロー番号は連番（左1-N, 右N+1-M）だが、実際のトーナメント
+    // ブラケットではBYEがシード選手の対抗位置に配置されるため、
+    // 連番のまま使うと対戦が正しくならない。
+    // JTA標準シード位置に基づいてBYE位置を決定し、エントリーを
+    // 正しいブラケット位置にマッピングする。
     let maxPosition = 0;
     for (const p of [...leftPlayers, ...rightPlayers]) {
       if (p.position > maxPosition) maxPosition = p.position;
     }
+    const totalEntries = leftPlayers.length + rightPlayers.length;
     const drawSize = isRoundRobin
-      ? leftPlayers.length + rightPlayers.length
-      : nextPowerOf2(maxPosition || (leftPlayers.length + rightPlayers.length));
+      ? totalEntries
+      : nextPowerOf2(maxPosition || totalEntries);
 
-    if (!isRoundRobin && rightPlayers.length > 0 && drawSize > maxPosition) {
+    if (!isRoundRobin && drawSize > 2) {
       const halfSize = drawSize / 2;
-      const rightMin = Math.min(...rightPlayers.map(p => p.position));
-      // 右半分のポジションが上半分ブラケット(1-halfSize)に入る場合はリマップ
-      if (rightMin <= halfSize) {
-        const offset = (halfSize + 1) - rightMin;
-        for (const p of rightPlayers) {
-          p.position += offset;
+
+      // エントリーをExcelドロー番号順にソート
+      leftPlayers.sort((a, b) => a.position - b.position);
+      rightPlayers.sort((a, b) => a.position - b.position);
+
+      // 各半分のBYE数を計算
+      const leftByeCount = Math.max(0, halfSize - leftPlayers.length);
+      const rightByeCount = Math.max(0, halfSize - rightPlayers.length);
+
+      if (leftByeCount > 0 || rightByeCount > 0) {
+        // BYE位置を決定
+        const leftByeSet = new Set(determineBYEPositionsForHalf(halfSize, 0, leftByeCount, drawSize));
+        const rightByeSet = new Set(determineBYEPositionsForHalf(halfSize, halfSize, rightByeCount, drawSize));
+
+        // 左半分: BYE以外の位置にエントリーを順番に配置
+        const leftAvail: number[] = [];
+        for (let p = 1; p <= halfSize; p++) {
+          if (!leftByeSet.has(p)) leftAvail.push(p);
+        }
+        for (let i = 0; i < leftPlayers.length && i < leftAvail.length; i++) {
+          leftPlayers[i].position = leftAvail[i];
+        }
+
+        // 右半分: BYE以外の位置にエントリーを順番に配置
+        const rightAvail: number[] = [];
+        for (let p = halfSize + 1; p <= drawSize; p++) {
+          if (!rightByeSet.has(p)) rightAvail.push(p);
+        }
+        for (let i = 0; i < rightPlayers.length && i < rightAvail.length; i++) {
+          rightPlayers[i].position = rightAvail[i];
+        }
+      } else {
+        // BYE不要の場合: 連番でそのまま配置
+        for (let i = 0; i < leftPlayers.length; i++) {
+          leftPlayers[i].position = i + 1;
+        }
+        for (let i = 0; i < rightPlayers.length; i++) {
+          rightPlayers[i].position = halfSize + i + 1;
         }
       }
     }
