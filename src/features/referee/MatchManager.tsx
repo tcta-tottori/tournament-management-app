@@ -22,7 +22,9 @@ function shortEventName(name: string): string {
 }
 
 function stripRoundPrefix(text: string): string {
-  return text.replace(/^[\d～\-]+回戦は|^準々?決勝(以降)?は|^決勝は|^全回戦は/g, '').trim();
+  return text
+    .replace(/^[\d～〜\-~]+回戦[はで\s　]*|^準々?決勝(以降)?[はで\s　]*|^決勝[はで\s　]*|^全回戦[はで\s　]*/g, '')
+    .trim();
 }
 
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
