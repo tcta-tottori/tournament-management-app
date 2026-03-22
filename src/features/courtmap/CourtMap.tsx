@@ -336,8 +336,8 @@ export default function CourtMap() {
     );
   }, [courtStatusMap, selectedCourt, statusStyles, statusLabel, timeOverCourts]);
 
-  /** コートボタン描画（PC用・横向き） */
-  const renderCourtButtonH = useCallback((courtName: string) => {
+  /** コートボタン描画（PC用・回転レイアウト向き） */
+  const renderCourtButtonPC = useCallback((courtName: string) => {
     const cs = courtStatusMap[courtName];
     if (!cs) return null;
     const isOver = timeOverCourts.has(courtName);
@@ -356,12 +356,12 @@ export default function CourtMap() {
           ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.02]' : 'hover:scale-[1.01] hover:shadow-md'}
           ${cs.status === 'playing' && !isOver ? 'animate-pulse-slow' : ''}
         `}
-        style={{ aspectRatio: '1.8 / 1' }}
+        style={{ aspectRatio: '1.6 / 1' }}
       >
         <CourtLinesH status={cs.status} />
-        <div className="relative z-10 flex items-center h-full px-3 py-1.5 gap-2">
-          {/* 左側: コート番号 + ステータス */}
-          <div className="flex flex-col items-center shrink-0 min-w-[40px]">
+        <div className="relative z-10 flex items-center h-full px-2 py-1 gap-2">
+          {/* 左: コート番号 + ステータス */}
+          <div className="flex flex-col items-center shrink-0 min-w-[36px]">
             {cs.status === 'playing' && (
               isOver ? (
                 <AlertCircle className="w-3 h-3 text-red-500 animate-pulse mb-0.5" />
@@ -369,21 +369,21 @@ export default function CourtMap() {
                 <Play className="w-3 h-3 text-green-500 fill-green-500 mb-0.5" />
               )
             )}
-            <div className={`text-2xl font-bold ${style.text} leading-none`}>{courtName}</div>
-            <div className={`text-[10px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
+            <div className={`text-xl font-bold ${style.text} leading-none`}>{courtName}</div>
+            <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
           </div>
-          {/* 右側: 対戦情報 */}
+          {/* 右: 対戦情報 */}
           {cs.currentMatch && (
             <div className="flex-1 min-w-0 border-l border-green-200/60 pl-2 space-y-0">
               <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player1Name}</p>
-              <p className="text-[8px] text-green-600">vs</p>
+              <p className="text-[7px] text-green-600">vs</p>
               <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
             <div className="flex-1 min-w-0 border-l border-blue-100/60 pl-2 space-y-0">
               <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player1Name}</p>
-              <p className="text-[8px] text-blue-400">vs</p>
+              <p className="text-[7px] text-blue-400">vs</p>
               <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player2Name}</p>
             </div>
           )}
@@ -452,27 +452,32 @@ export default function CourtMap() {
             {venue.name} - コート配置図
           </h2>
 
-          {/* === PC横向きレイアウト (md以上) === */}
+          {/* === PC横向きレイアウト (md以上) — 反時計回り90°回転レイアウト === */}
           <div className="hidden md:block w-full">
             {venue.hqSide === 'right' ? (
-              /* 千代テニス場: 横向きレイアウト - ブロックを列として並べ、右に本部 */
+              /* 千代テニス場: ブロックを行として並べ、右に本部 */
               <div className="flex items-stretch gap-3">
-                {venue.blocks.map((block, blockIdx) => (
-                  <div key={blockIdx} className="flex items-stretch gap-3">
-                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
-                      <div className="flex flex-col gap-2">
-                        {[...block.courts].reverse().map(renderCourtButtonH)}
+                <div className="flex-1 flex flex-col gap-3">
+                  {[...venue.blocks].reverse().map((block, ri) => {
+                    const blockIdx = venue.blocks.length - 1 - ri;
+                    return (
+                      <div key={blockIdx}>
+                        <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                          <div className="grid grid-cols-6 gap-2">
+                            {block.courts.map(renderCourtButtonPC)}
+                          </div>
+                        </div>
+                        {ri < venue.blocks.length - 1 && (
+                          <div className="flex items-center gap-2 my-2">
+                            <div className="flex-1 border-t border-dashed border-gray-300" />
+                            <span className="text-[10px] text-gray-500">通路</span>
+                            <div className="flex-1 border-t border-dashed border-gray-300" />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    {blockIdx < venue.blocks.length - 1 && (
-                      <div className="flex flex-col items-center justify-center gap-1 py-2">
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
-                        <span className="text-[10px] text-gray-500 [writing-mode:vertical-rl]">通路</span>
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
                 <div className="flex items-center">
                   <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
@@ -481,48 +486,54 @@ export default function CourtMap() {
                 </div>
               </div>
             ) : (
-              /* ヤマタスポーツパーク: 横向きレイアウト - ブロックを列、コート番号大→小（上→下） */
-              <div className="flex items-start gap-0 justify-center">
-                {venue.blocks.map((block, blockIdx) => (
-                  <div key={blockIdx} className="flex items-start">
-                    {/* ブロック */}
-                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
-                      <div className="flex flex-col gap-2">
-                        {[...block.courts].reverse().map(renderCourtButtonH)}
-                      </div>
-                    </div>
-
-                    {/* 本部表示（指定ブロックの後） */}
-                    {blockIdx === venue.hqPosition && (
-                      <div className="flex flex-col items-center justify-center mx-2 self-stretch">
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
-                        <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-3 shadow-sm my-1">
-                          <span className="text-base">🏠</span>
-                          <span className="text-xs font-bold text-amber-800">本部</span>
+              /* ヤマタスポーツパーク: ブロックを行にして上→下に配置（反時計回り90°） */
+              <div className="flex flex-col items-center gap-0 w-full">
+                {[...venue.blocks].reverse().map((block, ri) => {
+                  const blockIdx = venue.blocks.length - 1 - ri;
+                  return (
+                    <div key={blockIdx} className="w-full max-w-3xl">
+                      {/* ブロック: コートを横一列に */}
+                      <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                        <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1">
+                          {block.courts[0]}〜{block.courts[block.courts.length - 1]}
                         </div>
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
+                        <div className="grid grid-cols-4 gap-2.5">
+                          {block.courts.map(renderCourtButtonPC)}
+                        </div>
                       </div>
-                    )}
 
-                    {/* 通路表示（本部がないブロック間） */}
-                    {blockIdx !== venue.hqPosition && blockIdx < venue.blocks.length - 1 && (
-                      <div className="flex flex-col items-center justify-center mx-1 self-stretch py-4">
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
-                        <span className="text-[10px] text-gray-500 [writing-mode:vertical-rl] my-1">通路</span>
-                        <div className="flex-1 border-l border-dashed border-gray-300" />
-                      </div>
-                    )}
+                      {/* 本部表示（指定ブロックの後 → 回転後は上のブロックとの間） */}
+                      {blockIdx === venue.hqPosition + 1 && (
+                        <div className="flex items-center gap-3 my-3 px-4">
+                          <div className="flex-1 border-t border-dashed border-border-main" />
+                          <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
+                            <span className="text-base">🏠</span>
+                            <span className="text-sm font-bold text-amber-800">本部</span>
+                          </div>
+                          <div className="flex-1 border-t border-dashed border-border-main" />
+                        </div>
+                      )}
+
+                      {/* 通路表示 */}
+                      {blockIdx !== venue.hqPosition + 1 && ri < venue.blocks.length - 1 && (
+                        <div className="flex items-center gap-2 my-2 px-4">
+                          <div className="flex-1 border-t border-dashed border-gray-300" />
+                          <span className="text-[10px] text-gray-500">通路</span>
+                          <div className="flex-1 border-t border-dashed border-gray-300" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* 駐車場（ヤマタのみ・回転後は下に表示） */}
+                {venue.id === 'yamata' && (
+                  <div className="mt-3 w-full max-w-3xl">
+                    <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main text-center">
+                      ↓ 駐車場側
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* 駐車場（ヤマタのみ・PC横向き時は右端に表示） */}
-            {venue.id === 'yamata' && (
-              <div className="mt-3 flex justify-end">
-                <div className="bg-primary-50 rounded-lg px-4 py-1.5 text-xs text-gray-500 font-medium border border-border-main">
-                  駐車場側 →
-                </div>
+                )}
               </div>
             )}
           </div>
