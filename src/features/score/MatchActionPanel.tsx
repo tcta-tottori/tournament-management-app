@@ -5,8 +5,6 @@ import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import {
   Play,
-
-  Check,
   RotateCcw,
   Volume2,
   Printer,
@@ -111,16 +109,6 @@ export default function MatchActionPanel({
   // ------------------------------------------------------------------
   // Match operations
   // ------------------------------------------------------------------
-
-  const handleReadyMatch = async () => {
-    if (isProcessing || !match) return;
-    setIsProcessing(true);
-    try {
-      await updateMatch({ status: 'ready' });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleStartMatch = async () => {
     if (isProcessing || !match) return;
@@ -361,8 +349,7 @@ export default function MatchActionPanel({
   const roundName = getRoundName(match.round);
   const statusCfg = STATUS_CONFIG[match.status] ?? STATUS_CONFIG.waiting;
   const isFinished = match.status === 'finished' || match.status === 'walkover';
-  const canReady = match.status === 'waiting';
-  const canStart = match.status === 'ready';
+  const canStart = match.status === 'waiting' || match.status === 'ready';
   const canFinish = match.status === 'playing';
   const canCall = !!match.courtId && !isFinished;
 
@@ -513,17 +500,6 @@ export default function MatchActionPanel({
           <div className="border-t border-border-main pt-4 space-y-2">
             {/* Status transition buttons */}
             <div className="flex flex-wrap gap-2">
-              {canReady && (
-                <button
-                  onClick={handleReadyMatch}
-                  disabled={isProcessing}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors"
-                >
-                  <Check className="w-4 h-4" />
-                  準備完了
-                </button>
-              )}
-
               {canStart && (
                 <button
                   onClick={handleStartMatch}
