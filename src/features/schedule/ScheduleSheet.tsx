@@ -22,6 +22,21 @@ const EVENT_COLORS = [
   { bg: 'bg-stone-100', text: 'text-stone-800' },
 ];
 
+/** 種目名から時間割Excelの色分けに対応する背景色・文字色を返す */
+function getScheduleEventColor(eventName: string): { bg: string; text: string } | null {
+  const n = eventName.replace(/シングルス|ダブルス|一般|級/g, '').trim();
+  if (/女子\s*45/i.test(n)) return { bg: 'bg-[#1E4E79]/20', text: 'text-[#1E4E79]' };
+  if (/女子\s*B/i.test(n)) return { bg: 'bg-[#7DBEFF]/30', text: 'text-[#1a4f8b]' };
+  if (/女子\s*A/i.test(n)) return { bg: 'bg-[#9BFFFF]/30', text: 'text-[#0a6b6b]' };
+  if (/男子\s*65/i.test(n)) return { bg: 'bg-[#94F592]/30', text: 'text-[#1a6b19]' };
+  if (/男子\s*55/i.test(n)) return { bg: 'bg-[#C5E0B3]/40', text: 'text-[#3d6b2e]' };
+  if (/男子\s*45/i.test(n)) return { bg: 'bg-[#FFFF99]/40', text: 'text-[#7a7a00]' };
+  if (/男子\s*C/i.test(n)) return { bg: 'bg-[#FFCC99]/40', text: 'text-[#8b5e2b]' };
+  if (/男子\s*B/i.test(n)) return { bg: 'bg-[#FFCCFF]/40', text: 'text-[#8b3a8b]' };
+  if (/男子\s*A/i.test(n)) return { bg: 'bg-[#EE8184]/25', text: 'text-[#a83235]' };
+  return null;
+}
+
 function abbreviateEventName(name: string): string {
   return name
     .replace(/一般/g, '')
@@ -202,7 +217,13 @@ export default function ScheduleSheet() {
       }
     }
     seenNames.forEach((name, idx) => {
-      map.set(name, EVENT_COLORS[idx % EVENT_COLORS.length]);
+      // まず時間割Excelの色分けルールで色を決定
+      const excelColor = getScheduleEventColor(name);
+      if (excelColor) {
+        map.set(name, excelColor);
+      } else {
+        map.set(name, EVENT_COLORS[idx % EVENT_COLORS.length]);
+      }
     });
     return map;
   }, [importedSchedule]);

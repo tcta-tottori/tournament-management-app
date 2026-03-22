@@ -22,6 +22,21 @@ function shortEventName(name: string): string {
   return name.replace(/シングルス/g, '').replace(/ダブルス/g, '');
 }
 
+/** 種目名から時間割Excelの色分けに対応する背景色・文字色を返す */
+function getEventColor(eventName: string): { bg: string; text: string; border: string } {
+  const n = eventName.replace(/シングルス|ダブルス|一般|級/g, '').trim();
+  if (/女子\s*45/i.test(n)) return { bg: 'bg-[#1E4E79]/15', text: 'text-[#1E4E79]', border: 'border-[#1E4E79]/30' };
+  if (/女子\s*B/i.test(n)) return { bg: 'bg-[#7DBEFF]/20', text: 'text-[#1a4f8b]', border: 'border-[#7DBEFF]/40' };
+  if (/女子\s*A/i.test(n)) return { bg: 'bg-[#9BFFFF]/25', text: 'text-[#0a6b6b]', border: 'border-[#9BFFFF]/50' };
+  if (/男子\s*65/i.test(n)) return { bg: 'bg-[#94F592]/25', text: 'text-[#1a6b19]', border: 'border-[#94F592]/50' };
+  if (/男子\s*55/i.test(n)) return { bg: 'bg-[#C5E0B3]/30', text: 'text-[#3d6b2e]', border: 'border-[#C5E0B3]/50' };
+  if (/男子\s*45/i.test(n)) return { bg: 'bg-[#FFFF99]/30', text: 'text-[#7a7a00]', border: 'border-[#FFFF99]/50' };
+  if (/男子\s*C/i.test(n)) return { bg: 'bg-[#FFCC99]/30', text: 'text-[#8b5e2b]', border: 'border-[#FFCC99]/50' };
+  if (/男子\s*B/i.test(n)) return { bg: 'bg-[#FFCCFF]/30', text: 'text-[#8b3a8b]', border: 'border-[#FFCCFF]/50' };
+  if (/男子\s*A/i.test(n)) return { bg: 'bg-[#EE8184]/20', text: 'text-[#a83235]', border: 'border-[#EE8184]/40' };
+  return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
+}
+
 function stripRoundPrefix(text: string): string {
   return text
     .replace(/^[\d～〜\-~]+回戦[はで\s　]*|^準々?決勝(以降)?[はで\s　]*|^決勝[はで\s　]*|^全回戦[はで\s　]*/g, '')
@@ -1593,6 +1608,7 @@ ${printableMatches.map(m => {
                         }
                       }
                       let seqNum = 0;
+                      let prevEventRound = '';
                       return globalSortedMatches.map((m) => {
                         seqNum++;
                         const st = statusLabels[m.status] || statusLabels.waiting;
@@ -1608,6 +1624,11 @@ ${printableMatches.map(m => {
                         const evLabel = `${shortEventName(m.eventName)} ${rName}`;
                         const schedTime = m.scheduledTime || '';
                         const sb = standbyInfo.get(m.matchId);
+                        const evColor = getEventColor(m.eventName);
+                        // グループ区切り線（種目+ラウンドが変わったら太線）
+                        const curEventRound = `${m.eventId}|${m.round}`;
+                        const isNewGroup = prevEventRound !== '' && curEventRound !== prevEventRound;
+                        prevEventRound = curEventRound;
                         let statusDisplay: { text: string; color: string };
                         if (m.status === 'playing') {
                           statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
@@ -1622,37 +1643,38 @@ ${printableMatches.map(m => {
                         } else {
                           statusDisplay = st;
                         }
+                        // 状態別の背景（色付きの上に重ねる）
+                        const statusBgClass =
+                          m.status === 'playing' ? 'bg-green-50' :
+                          m.status === 'finished' ? 'bg-gray-50/60' :
+                          sb?.type === 'court' ? 'bg-amber-50/40' :
+                          sb?.type === 'standby' ? 'bg-orange-50/30' : evColor.bg;
                         return (
                           <React.Fragment key={m.matchId}>
-                            <tr className={`border-b border-gray-100 ${
+                            <tr className={`${isNewGroup ? 'border-t-2 border-t-gray-300' : 'border-b border-gray-100'} ${
                               !hasPlayers ? 'opacity-30' : ''
-                            } ${
-                              m.status === 'playing' ? 'bg-green-50' :
-                              m.status === 'finished' ? 'bg-gray-50/60' :
-                              sb?.type === 'court' ? 'bg-amber-50/40' :
-                              sb?.type === 'standby' ? 'bg-orange-50/30' : ''
-                            }`}>
-                              <td className="py-1.5 px-1 text-center font-mono text-blue-500 text-[10px] font-bold">{seqNum}</td>
-                              <td className="py-1.5 px-1 truncate text-[10px] text-gray-600" title={evLabel}>{evLabel}</td>
-                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-500">{gameDisplay}</td>
-                              <td className="py-1.5 px-1">
-                                <div className="text-xs font-medium truncate">{m.player1Name || '-'}</div>
+                            } ${statusBgClass}`}>
+                              <td className="py-1.5 px-1.5 text-center font-mono text-blue-500 text-[10px] font-bold whitespace-nowrap">{seqNum}</td>
+                              <td className={`py-1.5 px-1.5 text-[10px] font-semibold whitespace-nowrap ${evColor.text}`} title={evLabel}>{evLabel}</td>
+                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-500 whitespace-nowrap">{gameDisplay}</td>
+                              <td className="py-1.5 px-1.5 whitespace-nowrap">
+                                <span className="text-xs font-medium">{m.player1Name || '-'}</span>
                               </td>
-                              <td className="py-1.5 px-0 text-center text-blue-300 text-[10px] font-bold">vs</td>
-                              <td className="py-1.5 px-1">
-                                <div className="text-xs font-medium truncate">{m.player2Name || '-'}</div>
+                              <td className="py-1.5 px-0.5 text-center text-blue-300 text-[10px] font-bold whitespace-nowrap">vs</td>
+                              <td className="py-1.5 px-1.5 whitespace-nowrap">
+                                <span className="text-xs font-medium">{m.player2Name || '-'}</span>
                               </td>
-                              <td className="py-1.5 px-1 text-center text-[10px] text-gray-400">{schedTime}</td>
-                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-700">{(() => {
+                              <td className="py-1.5 px-1 text-center text-[10px] text-gray-400 whitespace-nowrap">{schedTime}</td>
+                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-700 whitespace-nowrap">{(() => {
                                 if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
                                 const assignedCourt = courtAssignMap.get(m.matchId);
                                 if (assignedCourt) return assignedCourt;
                                 return '-';
                               })()}</td>
-                              <td className="py-1.5 px-1 text-center">
+                              <td className="py-1.5 px-1 text-center whitespace-nowrap">
                                 <span className={`inline-block px-1 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
                               </td>
-                              <td className="py-1 px-1 text-center">
+                              <td className="py-1 px-1 text-center whitespace-nowrap">
                                 <div className="flex items-center gap-0.5 justify-center">
                                   <button
                                     onClick={() => handlePrintMatch(m)}
