@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
-import { buildCallText, buildWalkoverCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, buildWalkoverCallText, buildRetirementCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -123,9 +123,9 @@ export default function ScoreInputDialog({
   // 試合が変わったらスコアを同期
   useEffect(() => {
     if (!match) return;
-    // W.Oスコアの復元
-    if (match.score && match.score.includes('W.O')) {
-      setRetPlayer(match.score.startsWith('W.O') ? 1 : 2);
+    // W.O/Retスコアの復元
+    if (match.score && (match.score.includes('W.O') || match.score.includes('Ret'))) {
+      setRetPlayer(match.score.startsWith('W.O') || match.score.startsWith('Ret') ? 1 : 2);
     } else {
       setRetPlayer(null);
     }
@@ -328,13 +328,14 @@ export default function ScoreInputDialog({
     if (isTwoSetFormat && superTB.p1 && superTB.p2) {
       scoreParts.push(`[${superTB.p1}-${superTB.p2}]`);
     }
-    // W.Oの場合: スコア部分 + " W.O" を付加
+    // W.O/Retの場合: 試合中ならRet、それ以外はW.O
     if (retPlayer) {
+      const suffix = match?.status === 'playing' ? 'Ret' : 'W.O';
       const base = scoreParts.join(' ');
-      return base ? `${base} W.O` : 'W.O';
+      return base ? `${base} ${suffix}` : suffix;
     }
     return scoreParts.join(' ');
-  }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB]);
+  }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB, match?.status]);
 
   // セットスコア入力ハンドラ
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
@@ -474,13 +475,19 @@ export default function ScoreInputDialog({
       startTime: match.scheduledTime ?? '',
     };
 
-    // W.O（ウォークオーバー）の場合は専用コール
+    // W.O/Retの場合は専用コール
     if (retPlayer) {
-      const woNum = retPlayer === 1 ? numA : numB;
-      const woName = retPlayer === 1 ? match.player1Name : match.player2Name;
+      const retNum = retPlayer === 1 ? numA : numB;
+      const retName = retPlayer === 1 ? match.player1Name : match.player2Name;
       const winNum = retPlayer === 1 ? numB : numA;
       const winName = retPlayer === 1 ? match.player2Name : match.player1Name;
-      speak(buildWalkoverCallText(callData, woNum, woName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
+      if (match.status === 'playing') {
+        // 試合中 → リタイアコール
+        speak(buildRetirementCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
+      } else {
+        // 試合前 → ウォークオーバーコール
+        speak(buildWalkoverCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
+      }
     } else {
       speak(buildCallText(callData, courtNumber, match.scheduledTime ?? '', affiliationFuriganaMap), DEFAULT_VOICE);
     }
@@ -736,10 +743,12 @@ export default function ScoreInputDialog({
               </div>
             )}
 
-            {/* W.O（ウォークオーバー）ボタン — 待機中・準備完了・試合中で表示 */}
+            {/* W.O/Ret ボタン — 待機中・準備完了ではW.O、試合中ではRet */}
             {!isFinished && (
               <div className="space-y-1.5">
-                <span className="text-xs text-gray-500">W.O（ウォークオーバー）</span>
+                <span className="text-xs text-gray-500">
+                  {match.status === 'playing' ? 'Ret（途中棄権）' : 'W.O（ウォークオーバー）'}
+                </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRetPlayer(retPlayer === 1 ? null : 1)}
@@ -750,7 +759,7 @@ export default function ScoreInputDialog({
                     }`}
                   >
                     <UserX className="w-3.5 h-3.5" />
-                    {match.player1Name || 'P1'} W.O
+                    {match.player1Name || 'P1'} {match.status === 'playing' ? 'Ret' : 'W.O'}
                   </button>
                   <button
                     onClick={() => setRetPlayer(retPlayer === 2 ? null : 2)}
@@ -761,7 +770,7 @@ export default function ScoreInputDialog({
                     }`}
                   >
                     <UserX className="w-3.5 h-3.5" />
-                    {match.player2Name || 'P2'} W.O
+                    {match.player2Name || 'P2'} {match.status === 'playing' ? 'Ret' : 'W.O'}
                   </button>
                 </div>
               </div>
@@ -783,13 +792,17 @@ export default function ScoreInputDialog({
               <div className="text-center">
                 <span className="text-xs text-primary-600 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
-                  {retPlayer && ' (W.O)'}
+                  {retPlayer && (match.status === 'playing' ? ' (Ret)' : ' (W.O)')}
                 </span>
               </div>
             )}
             {/* スコア未入力時のヒント */}
             {canFinish && !autoWinner && !scoreValidationError && (
-              <p className="text-center text-xs text-gray-400">スコアを入力するかW.Oを選択すると勝者が判定されます</p>
+              <p className="text-center text-xs text-gray-400">
+                {match.status === 'playing'
+                  ? 'スコアを入力するかRetを選択すると勝者が判定されます'
+                  : 'スコアを入力するかW.Oを選択すると勝者が判定されます'}
+              </p>
             )}
           </div>
         </div>

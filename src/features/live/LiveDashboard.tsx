@@ -142,6 +142,108 @@ function formatElapsed(updatedAt: number | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** テニスコート型SVG（横向き・PC用） */
+function HorizontalCourtLines({ status }: { status: string }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.3)'
+    : status === 'ready' ? 'rgba(59,130,246,0.25)'
+    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
+    : 'rgba(148,163,184,0.18)';
+  return (
+    <svg viewBox="0 0 110 60" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+      <rect x="4" y="4" width="102" height="52" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
+      <line x1="55" y1="2" x2="55" y2="58" stroke={color} strokeWidth="2" />
+      <line x1="30" y1="10" x2="30" y2="50" stroke={color} strokeWidth="0.8" />
+      <line x1="80" y1="10" x2="80" y2="50" stroke={color} strokeWidth="0.8" />
+      <line x1="4" y1="10" x2="106" y2="10" stroke={color} strokeWidth="0.8" />
+      <line x1="4" y1="50" x2="106" y2="50" stroke={color} strokeWidth="0.8" />
+      <line x1="30" y1="30" x2="80" y2="30" stroke={color} strokeWidth="0.8" />
+      <line x1="4" y1="30" x2="8" y2="30" stroke={color} strokeWidth="0.8" />
+      <line x1="102" y1="30" x2="106" y2="30" stroke={color} strokeWidth="0.8" />
+    </svg>
+  );
+}
+
+/** PC用横向きコートカード */
+function TennisCourtBlockH({
+  cs, isSelected, onSelect, eventName, isTimeOver,
+}: {
+  cs: CourtStatus; isSelected: boolean; onSelect: () => void; eventName?: string; isTimeOver?: boolean;
+}) {
+  const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+    playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]' },
+    ready: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', glow: '' },
+    empty: { bg: 'bg-white/80', border: 'border-emerald-200', text: 'text-gray-600', glow: '' },
+    unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
+  };
+  const style = isTimeOver
+    ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+    : statusStyles[cs.status];
+  const courtNum = cs.court.name.replace(/[^\d]/g, '') || cs.court.name;
+  const elapsed = cs.currentMatch?.status === 'playing' ? formatElapsed(cs.currentMatch.updatedAt) : '';
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`relative rounded-lg border-2 transition-all cursor-pointer overflow-hidden
+        ${style.bg} ${style.border} ${style.glow}
+        ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1 scale-[1.02]' : 'hover:scale-[1.01] hover:shadow-md'}
+      `}
+      style={{ aspectRatio: '1.6 / 1', width: '100%' }}
+    >
+      <HorizontalCourtLines status={cs.status} />
+      <div className="relative z-10 flex items-center h-full px-2 py-1 gap-2">
+        {/* 左: コート番号 + バッジ */}
+        <div className="flex flex-col items-center shrink-0 min-w-[36px]">
+          {cs.status === 'playing' && (
+            isTimeOver ? (
+              <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0 animate-pulse mb-0.5">
+                <AlertCircle className="w-2 h-2" /> 超過
+              </span>
+            ) : (
+              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0 mb-0.5">
+                <Play className="w-2 h-2 fill-white" /> LIVE
+              </span>
+            )
+          )}
+          <div className={`text-xl font-black ${style.text} leading-none`}>{courtNum}</div>
+          {elapsed && (
+            <div className="flex items-center gap-0.5 mt-0.5">
+              <Timer className={`w-2.5 h-2.5 ${isTimeOver ? 'text-red-600' : 'text-green-600'}`} />
+              <span className={`text-[9px] font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-green-700'}`}>{elapsed}</span>
+            </div>
+          )}
+        </div>
+        {/* 右: 対戦情報 */}
+        {cs.currentMatch ? (
+          <div className="flex-1 min-w-0 border-l border-green-200/60 pl-2 space-y-0">
+            {eventName && (
+              <p className="text-[9px] font-bold text-green-600/80 truncate leading-none mb-0.5">{eventName}</p>
+            )}
+            <p className="text-[10px] font-bold text-green-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
+            <p className="text-[7px] font-medium text-green-500 leading-none">vs</p>
+            <p className="text-[10px] font-bold text-green-900 truncate leading-tight">{cs.currentMatch.player2Name}</p>
+          </div>
+        ) : cs.nextMatch ? (
+          <div className="flex-1 min-w-0 border-l border-blue-100/60 pl-2 space-y-0">
+            <p className="text-[9px] font-semibold text-blue-500/80 truncate leading-none mb-0.5">次の試合</p>
+            <p className="text-[10px] font-bold text-blue-700 truncate leading-tight">{cs.nextMatch.player1Name}</p>
+            <p className="text-[7px] font-medium text-blue-400 leading-none">vs</p>
+            <p className="text-[10px] font-bold text-blue-700 truncate leading-tight">{cs.nextMatch.player2Name}</p>
+          </div>
+        ) : cs.status === 'unavailable' ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[10px] text-gray-400 font-medium">使用不可</p>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[10px] text-gray-400 font-medium">空き</p>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
 /** Single vertical court card for block-based layout */
 function TennisCourtBlock({
   cs,
@@ -558,11 +660,71 @@ export default function LiveDashboard() {
             </div>
           </div>
 
-          {/* Block-based court layout (venue map style) */}
-          <div className="flex flex-col gap-2 items-center">
+          {/* === PC横向きレイアウト (md以上) — 反時計回り90°回転 === */}
+          <div className="hidden md:flex flex-col gap-0 items-center w-full">
+            {[...courtBlocks].reverse().map((block, ri) => {
+              const origIdx = courtBlocks.length - 1 - ri;
+              // HQ: 元のhqAfterBlock+1番目のブロックの上に表示
+              const showHq = origIdx === hqAfterBlock + 1;
+              // 通路: HQ以外のブロック間
+              const showPassage = !showHq && ri > 0;
+              return (
+                <div key={origIdx} className="w-full max-w-3xl">
+                  {showHq && (
+                    <div className="flex items-center gap-3 my-3 px-4">
+                      <div className="flex-1 h-px bg-amber-300" />
+                      <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
+                        <span className="text-xs font-bold text-amber-700">本部</span>
+                      </div>
+                      <div className="flex-1 h-px bg-amber-300" />
+                    </div>
+                  )}
+                  {showPassage && (
+                    <div className="flex items-center gap-2 my-2 px-4">
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-[9px] text-gray-400">通路</span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                    </div>
+                  )}
+                  <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3">
+                    <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1">
+                      {block[0]?.court.name.replace(/[^\d]/g, '') || (origIdx * 4 + 1)}〜{block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (origIdx * 4 + block.length)}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2.5">
+                      {block.map(cs => {
+                        const match = cs.currentMatch || cs.nextMatch;
+                        const evtName = match ? eventNameMap.get(match.eventId) : undefined;
+                        return (
+                          <TennisCourtBlockH
+                            key={cs.court.courtId}
+                            cs={cs}
+                            isSelected={selectedCourtId === cs.court.courtId}
+                            onSelect={() => setSelectedCourtId(
+                              selectedCourtId === cs.court.courtId ? null : cs.court.courtId
+                            )}
+                            eventName={evtName}
+                            isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {/* 駐車場側 */}
+            <div className="mt-3 w-full max-w-3xl">
+              <div className="bg-primary-50 rounded-lg px-6 py-2 text-xs text-gray-500 font-medium border border-border-main text-center">
+                ↓ 駐車場側
+              </div>
+            </div>
+          </div>
+
+          {/* === モバイル縦向きレイアウト (md未満) === */}
+          <div className="md:hidden flex flex-col gap-2 items-center">
             {courtBlocks.map((block, blockIdx) => (
               <div key={blockIdx} className="contents">
-                {/* Court block */}
                 <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -588,7 +750,6 @@ export default function LiveDashboard() {
                     })}
                   </div>
                 </div>
-                {/* HQ marker between blocks */}
                 {blockIdx === hqAfterBlock && (
                   <div className="flex items-center gap-2 py-1 w-full max-w-lg justify-center">
                     <div className="flex-1 h-px bg-amber-300" />
@@ -599,7 +760,6 @@ export default function LiveDashboard() {
                     <div className="flex-1 h-px bg-amber-300" />
                   </div>
                 )}
-                {/* Passage indicator between blocks (except after HQ) */}
                 {blockIdx < courtBlocks.length - 1 && blockIdx !== hqAfterBlock && (
                   <div className="flex items-center gap-2 w-full max-w-lg">
                     <div className="flex-1 h-px bg-gray-200" />

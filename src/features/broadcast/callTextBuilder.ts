@@ -111,3 +111,31 @@ export function buildWalkoverCallText(
 
   return parts.join(' ');
 }
+
+/**
+ * リタイア（途中棄権）コールテキストを生成
+ * 例: 「男子B級シングルス、1回戦。2番、山本和弥さん、3番、岸本健吾さんの試合は、
+ *      2番、山本和弥さんのリタイアのため、3番、岸本健吾さんの勝利とします。」
+ */
+export function buildRetirementCallText(
+  match: MatchCall,
+  retPlayerNum: number,
+  retPlayerName: string,
+  winnerNum: number,
+  winnerName: string,
+  affiliationFuriganaMap: Record<string, string> = {},
+): string {
+  const parts: string[] = [];
+
+  parts.push('試合のコールをします。');
+  parts.push(`${addGradePause(match.eventName)}、${removePositionNumber(match.round)}。`);
+
+  const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
+  const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
+  parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
+  parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
+
+  parts.push(`この試合は、${retPlayerNum}番、${retPlayerName}さんのリタイアのため、${winnerNum}番、${winnerName}さんの勝利とします。`);
+
+  return parts.join(' ');
+}
