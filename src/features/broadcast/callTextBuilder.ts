@@ -24,6 +24,15 @@ function addGradePause(eventName: string): string {
   return eventName.replace(/([ルスス体])([A-ZＡ-Ｚa-zａ-ｚ0-9０-９][級部])/, '$1、$2');
 }
 
+/**
+ * フルネームから苗字のみを取得する
+ * スペース（全角・半角）区切りで最初の部分を返す
+ */
+function familyName(name: string): string {
+  if (!name) return '';
+  return name.trim().split(/[\s　]+/)[0];
+}
+
 export function buildCallText(
   match: MatchCall,
   courtNumber: string,
@@ -52,13 +61,13 @@ export function buildCallText(
     // ダブルスの所属表示：ペア所属が異なる場合は両方、同じなら1つ
     const affTextA = pairAffA && pairAffA !== affA ? `${affA}、${pairAffA}` : affA;
     const affTextB = pairAffB && pairAffB !== affB ? `${affB}、${pairAffB}` : affB;
-    parts.push(`${match.numberA}番、${match.nameA}さん、${match.pairNameA}さん ペア、${affTextA}。`);
-    parts.push(`${match.numberB}番、${match.nameB}さん、${match.pairNameB}さん ペア、${affTextB}。`);
+    parts.push(`${match.numberA}番、${familyName(match.nameA)}さん、${familyName(match.pairNameA || '')}さん ペア、${affTextA}。`);
+    parts.push(`${match.numberB}番、${familyName(match.nameB)}さん、${familyName(match.pairNameB || '')}さん ペア、${affTextB}。`);
   } else {
     const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
     const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
-    parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
-    parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
+    parts.push(`${match.numberA}番、${familyName(match.nameA)}さん、${affA}。`);
+    parts.push(`${match.numberB}番、${familyName(match.nameB)}さん、${affB}。`);
   }
 
   // コート指定（「行ってください」→「おこなってください」）
@@ -74,7 +83,7 @@ export function buildCallText(
   parts.push(courtText);
 
   // ボール受け取り指示
-  parts.push(`ボールは、${younger.num}番、${younger.name}さんが、本部まで取りに来てください。`);
+  parts.push(`ボールは、${younger.num}番、${familyName(younger.name)}さんが、本部まで取りに来てください。`);
 
   return parts.join(' ');
 }
@@ -103,11 +112,11 @@ export function buildWalkoverCallText(
   // 選手情報
   const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
   const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
-  parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
-  parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
+  parts.push(`${match.numberA}番、${familyName(match.nameA)}さん、${affA}。`);
+  parts.push(`${match.numberB}番、${familyName(match.nameB)}さん、${affB}。`);
 
   // W.O宣言
-  parts.push(`この試合は、${woPlayerNum}番、${woPlayerName}さんのウォークオーバーのため、${winnerNum}番、${winnerName}さんの勝利とします。`);
+  parts.push(`この試合は、${woPlayerNum}番、${familyName(woPlayerName)}さんのウォークオーバーのため、${winnerNum}番、${familyName(winnerName)}さんの勝利とします。`);
 
   return parts.join(' ');
 }
@@ -132,10 +141,10 @@ export function buildRetirementCallText(
 
   const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
   const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
-  parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
-  parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
+  parts.push(`${match.numberA}番、${familyName(match.nameA)}さん、${affA}。`);
+  parts.push(`${match.numberB}番、${familyName(match.nameB)}さん、${affB}。`);
 
-  parts.push(`この試合は、${retPlayerNum}番、${retPlayerName}さんのリタイアのため、${winnerNum}番、${winnerName}さんの勝利とします。`);
+  parts.push(`この試合は、${retPlayerNum}番、${familyName(retPlayerName)}さんのリタイアのため、${winnerNum}番、${familyName(winnerName)}さんの勝利とします。`);
 
   return parts.join(' ');
 }
