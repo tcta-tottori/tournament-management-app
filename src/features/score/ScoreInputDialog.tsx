@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
-import { buildCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, buildWalkoverCallText } from '../broadcast/callTextBuilder';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -105,7 +105,7 @@ export default function ScoreInputDialog({
   const [superTB, setSuperTB] = useState<{ p1: string; p2: string }>({ p1: '', p2: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState('');
-  /** Ret（棄権）モード: null=通常, 1=P1棄権, 2=P2棄権 */
+  /** W.O（ウォークオーバー）モード: null=通常, 1=P1のW.O, 2=P2のW.O */
   const [retPlayer, setRetPlayer] = useState<1 | 2 | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -123,16 +123,16 @@ export default function ScoreInputDialog({
   // 試合が変わったらスコアを同期
   useEffect(() => {
     if (!match) return;
-    // Retスコアの復元
-    if (match.score && match.score.includes('Ret')) {
-      setRetPlayer(match.score.startsWith('Ret') ? 1 : 2);
+    // W.Oスコアの復元
+    if (match.score && match.score.includes('W.O')) {
+      setRetPlayer(match.score.startsWith('W.O') ? 1 : 2);
     } else {
       setRetPlayer(null);
     }
     if (match.score && match.status === 'finished') {
       // 既存スコアをパース: "6-4" or "6-4 7-5" or "6-4 6-7(3) 6-2"
-      // or "6-4 4-6 [10-5]" (super TB) or "Ret" or "4-6 Ret"
-      const cleanScore = match.score.replace(/\s*Ret\s*/g, '');
+      // or "6-4 4-6 [10-5]" (super TB) or "W.O" or "4-6 W.O"
+      const cleanScore = match.score.replace(/\s*W\.O\s*/g, '').replace(/\s*Ret\s*/g, '');
       const setParts = cleanScore.split(/\s+/).filter(Boolean);
       const newSets = Array.from({ length: maxSets }, () => ({ p1: '', p2: '' }));
       const newTB = Array.from<string | null>({ length: maxSets }).fill(null);
@@ -227,7 +227,7 @@ export default function ScoreInputDialog({
   // 勝者自動判定
   const autoWinner = useMemo(() => {
     if (!match) return null;
-    // Ret（棄権）の場合: 棄権した側の相手が勝者
+    // W.O（ウォークオーバー）の場合: W.O側の相手が勝者
     if (retPlayer === 1) return 2 as const;
     if (retPlayer === 2) return 1 as const;
 
@@ -265,7 +265,7 @@ export default function ScoreInputDialog({
 
   // スコアバリデーション: ルールに基づいてスコアの妥当性を検証
   const scoreValidationError = useMemo(() => {
-    if (!match || retPlayer) return null; // 棄権時はバリデーション不要
+    if (!match || retPlayer) return null; // W.O時はバリデーション不要
     if (match.status !== 'playing') return null;
 
     // gameRuleText からゲーム数を抽出（例: "6ゲームマッチ（6-6タイブレーク）"）
@@ -328,10 +328,10 @@ export default function ScoreInputDialog({
     if (isTwoSetFormat && superTB.p1 && superTB.p2) {
       scoreParts.push(`[${superTB.p1}-${superTB.p2}]`);
     }
-    // Retの場合: スコア部分 + " Ret" を付加
+    // W.Oの場合: スコア部分 + " W.O" を付加
     if (retPlayer) {
       const base = scoreParts.join(' ');
-      return base ? `${base} Ret` : 'Ret';
+      return base ? `${base} W.O` : 'W.O';
     }
     return scoreParts.join(' ');
   }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB]);
@@ -464,26 +464,36 @@ export default function ScoreInputDialog({
     if (!match) return;
     const courtName = courts.find(c => c.courtId === match.courtId)?.name ?? '';
     const courtNumber = match.courtId ? courtName.replace(/コート.*$/, '') || match.courtId : '';
+    const numA = parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0;
+    const numB = parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0;
     const callData: MatchCall = {
       id: match.dbId, eventName: match.eventName, round: getRoundName(match.round),
-      numberA: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0,
-      nameA: match.player1Name, affA: match.player1Affiliation,
-      numberB: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0,
-      nameB: match.player2Name, affB: match.player2Affiliation,
+      numberA: numA, nameA: match.player1Name, affA: match.player1Affiliation,
+      numberB: numB, nameB: match.player2Name, affB: match.player2Affiliation,
       type: 'singles', status: 'pending', courtNumber,
       startTime: match.scheduledTime ?? '',
     };
-    speak(buildCallText(callData, courtNumber, match.scheduledTime ?? '', affiliationFuriganaMap), DEFAULT_VOICE);
+
+    // W.O（ウォークオーバー）の場合は専用コール
+    if (retPlayer) {
+      const woNum = retPlayer === 1 ? numA : numB;
+      const woName = retPlayer === 1 ? match.player1Name : match.player2Name;
+      const winNum = retPlayer === 1 ? numB : numA;
+      const winName = retPlayer === 1 ? match.player2Name : match.player1Name;
+      speak(buildWalkoverCallText(callData, woNum, woName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
+    } else {
+      speak(buildCallText(callData, courtNumber, match.scheduledTime ?? '', affiliationFuriganaMap), DEFAULT_VOICE);
+    }
   };
 
   if (!match) return null;
 
   const statusCfg = STATUS_CONFIG[match.status] ?? STATUS_CONFIG.waiting;
   const isFinished = match.status === 'finished' || match.status === 'walkover';
-  const canReady = match.status === 'waiting';
-  const canStart = match.status === 'ready';
-  const canFinish = match.status === 'playing';
-  const canCall = !!match.courtId && !isFinished;
+  const canReady = match.status === 'waiting' && !retPlayer;
+  const canStart = match.status === 'ready' && !retPlayer;
+  const canFinish = match.status === 'playing' || !!retPlayer;
+  const canCall = !isFinished || !!retPlayer;
   const roundName = getRoundName(match.round);
 
   return createPortal(
@@ -726,10 +736,10 @@ export default function ScoreInputDialog({
               </div>
             )}
 
-            {/* 棄権（Ret）ボタン */}
-            {(match.status === 'playing' || isFinished) && !isFinished && (
+            {/* W.O（ウォークオーバー）ボタン — 待機中・準備完了・試合中で表示 */}
+            {!isFinished && (
               <div className="space-y-1.5">
-                <span className="text-xs text-gray-500">棄権 (Ret)</span>
+                <span className="text-xs text-gray-500">W.O（ウォークオーバー）</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRetPlayer(retPlayer === 1 ? null : 1)}
@@ -740,7 +750,7 @@ export default function ScoreInputDialog({
                     }`}
                   >
                     <UserX className="w-3.5 h-3.5" />
-                    {match.player1Name || 'P1'} 棄権
+                    {match.player1Name || 'P1'} W.O
                   </button>
                   <button
                     onClick={() => setRetPlayer(retPlayer === 2 ? null : 2)}
@@ -751,7 +761,7 @@ export default function ScoreInputDialog({
                     }`}
                   >
                     <UserX className="w-3.5 h-3.5" />
-                    {match.player2Name || 'P2'} 棄権
+                    {match.player2Name || 'P2'} W.O
                   </button>
                 </div>
               </div>
@@ -773,13 +783,13 @@ export default function ScoreInputDialog({
               <div className="text-center">
                 <span className="text-xs text-primary-600 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
-                  {retPlayer && ' (Ret)'}
+                  {retPlayer && ' (W.O)'}
                 </span>
               </div>
             )}
             {/* スコア未入力時のヒント */}
             {canFinish && !autoWinner && !scoreValidationError && (
-              <p className="text-center text-xs text-gray-400">スコアを入力するか棄権を選択すると勝者が判定されます</p>
+              <p className="text-center text-xs text-gray-400">スコアを入力するかW.Oを選択すると勝者が判定されます</p>
             )}
           </div>
         </div>

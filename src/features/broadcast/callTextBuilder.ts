@@ -75,3 +75,33 @@ export function buildCallText(
 
   return parts.join(' ');
 }
+
+/**
+ * ウォークオーバー（W.O）コールテキストを生成
+ * 例: 「男子B級シングルス、1回戦。2番、山本和弥さん、3番、岸本健吾さんの試合は、
+ *      2番、山本和弥さんのウォークオーバーのため、3番、岸本健吾さんの勝利とします。」
+ */
+export function buildWalkoverCallText(
+  match: MatchCall,
+  woPlayerNum: number,
+  woPlayerName: string,
+  winnerNum: number,
+  winnerName: string,
+  affiliationFuriganaMap: Record<string, string> = {},
+): string {
+  const parts: string[] = [];
+
+  // 種目・回戦
+  parts.push(`${addGradePause(match.eventName)}、${removePositionNumber(match.round)}。`);
+
+  // 選手情報
+  const affA = resolveAffiliation(match.affA, affiliationFuriganaMap);
+  const affB = resolveAffiliation(match.affB, affiliationFuriganaMap);
+  parts.push(`${match.numberA}番、${match.nameA}さん、${affA}。`);
+  parts.push(`${match.numberB}番、${match.nameB}さん、${affB}。`);
+
+  // W.O宣言
+  parts.push(`この試合は、${woPlayerNum}番、${woPlayerName}さんのウォークオーバーのため、${winnerNum}番、${winnerName}さんの勝利とします。`);
+
+  return parts.join(' ');
+}
