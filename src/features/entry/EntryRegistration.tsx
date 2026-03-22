@@ -793,14 +793,14 @@ export default function EntryRegistration() {
       }
     } else {
       // === トーナメント戦: ブラケット対戦表生成 ===
-      const slots = redistributeByes(
-        draw.slots.map(s => ({
-          ...s, drawPosition: s.position, seed: s.seed,
-          entryId: s.entryId, isBye: s.isBye,
-          entry: null, playerName: '', partnerName: '', affiliation: '',
-        })),
-        draw.drawSize
-      );
+      const mappedSlots = draw.slots.map(s => ({
+        ...s, drawPosition: s.position, seed: s.seed,
+        entryId: s.entryId, isBye: s.isBye,
+        entry: null as Entry | null, playerName: '', partnerName: '', affiliation: '',
+      }));
+      // 既にBYE配置済み（ドロー会議システムからのインポート）ならそのまま使用
+      const hasByeInDraw = mappedSlots.some(s => s.isBye && !s.entryId);
+      const slots = (mappedSlots.length >= draw.drawSize && hasByeInDraw) ? mappedSlots : redistributeByes(mappedSlots, draw.drawSize);
       const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
 
       // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
@@ -1099,7 +1099,10 @@ export default function EntryRegistration() {
     const OFFSET_Y = 24;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
-    const displaySlots = redistributeByes(slots, drawSize);
+    // ドロー会議システムからインポートしたデータは既にBYE配置済み
+    // slots.length === drawSize かつ BYEが含まれている場合はそのまま使用
+    const hasByeSlots = slots.some(s => s.isBye && !s.entryId);
+    const displaySlots = (slots.length >= drawSize && hasByeSlots) ? slots : redistributeByes(slots, drawSize);
     const halfSize = drawSize / 2;
 
     const LINE_ONLY_W = 40;
