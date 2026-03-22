@@ -101,18 +101,67 @@ type CheckInSlot = {
 };
 
 // === BYE再配置ユーティリティ ===
+// セクション（4ポジション）単位でBYEを配置
+// エントリーを各セクションに3〜4人ずつ均等配分し、余ったセクションは空（BYE-BYE）にする
+// 3エントリーのセクションではBYEをペア0の偶数位置に配置（ウォークオーバー）
 function generateByePositions(drawSize: number, numByes: number): number[] {
   if (numByes <= 0) return [];
-  // BYEをペア単位で均等配置（Bresenham分布）
-  // 各ペアの偶数位置（2番目）にBYEを配置し、奇数位置（1番目）の選手がウォークオーバー
-  // 例: drawSize=32, numByes=8 → pairs=16, BYE at pairs 0,2,4,6,8,10,12,14 → pos 2,6,10,14,18,22,26,30
-  // 例: drawSize=32, numByes=12 → pairs=16, BYE at pairs 0,1,2,4,5,6,8,9,10,12,13,14 → pos 2,4,6,10,12,14,18,20,22,26,28,30
-  const numPairs = drawSize / 2;
+
+  const halfSize = drawSize / 2;
   const byePositions: number[] = [];
-  for (let i = 0; i < numByes; i++) {
-    const pairIndex = Math.floor(i * numPairs / numByes);
-    byePositions.push(pairIndex * 2 + 2);
+
+  // 各半分（左山・右山）で独立にBYE配置
+  const leftByes = Math.ceil(numByes / 2);
+  const rightByes = Math.floor(numByes / 2);
+
+  for (const [halfOffset, halfByeCount] of [[0, leftByes], [halfSize, rightByes]] as [number, number][]) {
+    const halfEntries = halfSize - halfByeCount;
+    const numSections = halfSize / 4;
+
+    // セクションごとのエントリー数を決定
+    // 各セクションに3〜4人ずつ配分（空セクションは下部に集約）
+    const perSection: number[] = new Array(numSections).fill(0);
+    if (halfEntries > 0) {
+      let activeCount: number;
+      if (halfEntries <= 4) {
+        activeCount = 1;
+      } else {
+        // セクション数を最大化（各セクション3人以上を目標）
+        activeCount = Math.min(numSections, Math.floor(halfEntries / 3));
+        // 各セクション最大4人に収まるよう調整
+        while (activeCount > 0 && activeCount * 4 < halfEntries) {
+          activeCount++;
+        }
+        activeCount = Math.min(activeCount, numSections);
+      }
+      // 均等配分
+      const base = Math.floor(halfEntries / activeCount);
+      const extra = halfEntries % activeCount;
+      for (let s = 0; s < activeCount; s++) {
+        perSection[s] = base + (s < extra ? 1 : 0);
+      }
+    }
+
+    // 各セクション内でBYE位置を決定
+    for (let s = 0; s < numSections; s++) {
+      const sStart = halfOffset + s * 4 + 1; // 1-indexed position
+      const entries = perSection[s];
+
+      if (entries === 4) continue; // フルセクション、BYEなし
+
+      if (entries === 0) {
+        byePositions.push(sStart, sStart + 1, sStart + 2, sStart + 3);
+      } else if (entries === 1) {
+        byePositions.push(sStart + 1, sStart + 2, sStart + 3);
+      } else if (entries === 2) {
+        byePositions.push(sStart + 2, sStart + 3);
+      } else if (entries === 3) {
+        // BYEをペア0の偶数位置（position 2）に配置 → position 1の選手がウォークオーバー
+        byePositions.push(sStart + 1);
+      }
+    }
   }
+
   return byePositions;
 }
 
