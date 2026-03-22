@@ -474,6 +474,34 @@ export function parseDrawExcel(
       0, // right half draw numbers already account for offset in the Excel
     );
 
+    // ------------------------------------------------------------------
+    // Calculate draw size and remap right-half positions
+    // ------------------------------------------------------------------
+    // Excelドローでは左半分(positions 1-N)と右半分(positions N+1-M)で
+    // 構成されるが、drawSizeが2のべき乗に拡張されるとき、右半分の
+    // ポジションが上半分（左ブラケット）に入ってしまう場合がある。
+    // 例: 40人ドロー → drawSize=64, 右半分pos 21-40が上半分(1-32)に重なる
+    // → 右半分をdrawSize/2+1以降にリマップして下半分に配置する
+    let maxPosition = 0;
+    for (const p of [...leftPlayers, ...rightPlayers]) {
+      if (p.position > maxPosition) maxPosition = p.position;
+    }
+    const drawSize = isRoundRobin
+      ? leftPlayers.length + rightPlayers.length
+      : nextPowerOf2(maxPosition || (leftPlayers.length + rightPlayers.length));
+
+    if (!isRoundRobin && rightPlayers.length > 0 && drawSize > maxPosition) {
+      const halfSize = drawSize / 2;
+      const rightMin = Math.min(...rightPlayers.map(p => p.position));
+      // 右半分のポジションが上半分ブラケット(1-halfSize)に入る場合はリマップ
+      if (rightMin <= halfSize) {
+        const offset = (halfSize + 1) - rightMin;
+        for (const p of rightPlayers) {
+          p.position += offset;
+        }
+      }
+    }
+
     const allPlayers = [...leftPlayers, ...rightPlayers];
 
     // Sort by position
@@ -511,17 +539,6 @@ export function parseDrawExcel(
         // In doubles, seeds apply to the pair; use the draw entry player
       }
     }
-
-    // ------------------------------------------------------------------
-    // Calculate draw size
-    // ------------------------------------------------------------------
-    let maxPosition = 0;
-    for (const p of allPlayers) {
-      if (p.position > maxPosition) maxPosition = p.position;
-    }
-    const drawSize = isRoundRobin
-      ? allPlayers.length
-      : nextPowerOf2(maxPosition || allPlayers.length);
 
     // ゲームルール解析
     const roundGameRules = parseGameRules(rows, section.headerRow, endRow, section.matchFormat);
