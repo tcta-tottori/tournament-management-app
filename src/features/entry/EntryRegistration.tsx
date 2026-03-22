@@ -119,26 +119,31 @@ function generateByePositions(drawSize: number, numByes: number): number[] {
     const numSections = halfSize / 4;
 
     // セクションごとのエントリー数を決定
-    // 各セクションに3〜4人ずつ配分（空セクションは下部に集約）
     const perSection: number[] = new Array(numSections).fill(0);
     if (halfEntries > 0) {
-      let activeCount: number;
-      if (halfEntries <= 4) {
-        activeCount = 1;
-      } else {
-        // セクション数を最大化（各セクション3人以上を目標）
-        activeCount = Math.min(numSections, Math.floor(halfEntries / 3));
-        // 各セクション最大4人に収まるよう調整
-        while (activeCount > 0 && activeCount * 4 < halfEntries) {
-          activeCount++;
+      if (halfEntries >= numSections * 3) {
+        // 全セクションに3〜4人ずつ均等配分（各セクション1ウォークオーバー）
+        // 例: A級 12人/4セクション → [3,3,3,3]
+        const base = Math.floor(halfEntries / numSections);
+        const extra = halfEntries % numSections;
+        for (let s = 0; s < numSections; s++) {
+          perSection[s] = base + (s < extra ? 1 : 0);
         }
-        activeCount = Math.min(activeCount, numSections);
-      }
-      // 均等配分
-      const base = Math.floor(halfEntries / activeCount);
-      const extra = halfEntries % activeCount;
-      for (let s = 0; s < activeCount; s++) {
-        perSection[s] = base + (s < extra ? 1 : 0);
+      } else {
+        // 上から4人ずつ詰める（対戦ペアを最大化、BYE-BYEは下部に集約）
+        // 例: B級 20人/8セクション → [4,4,4,4,4,0,0,0]
+        let remaining = halfEntries;
+        for (let s = 0; s < numSections && remaining > 0; s++) {
+          perSection[s] = Math.min(4, remaining);
+          remaining -= perSection[s];
+        }
+        // 2人セクションのリバランス: [4,2] → [3,3]（ウォークオーバーを適切に配置）
+        for (let s = numSections - 1; s > 0; s--) {
+          if (perSection[s] === 2 && perSection[s - 1] >= 4) {
+            perSection[s - 1]--;
+            perSection[s]++;
+          }
+        }
       }
     }
 
@@ -166,14 +171,30 @@ function generateByePositions(drawSize: number, numByes: number): number[] {
 }
 
 function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
-  // DEF選手（isBye=true, entryId有）は通常のBYE（isBye=true, entryId無）と区別し、
-  // 元のドロー位置を維持する
   const isRealBye = (s: CheckInSlot) => s.isBye && !s.entryId;
   const entrySlots = slots.filter(s => !isRealBye(s));
   const numByes = drawSize - entrySlots.length;
   if (numByes <= 0) return slots;
 
-  // 常にBYEを均等配置で再分配する
+  // インポートデータにすでにBYEが含まれている場合（Excel/ドロー会議インポート）、
+  // 元の配置を維持する（再分配しない）
+  const existingByes = slots.filter(s => isRealBye(s));
+  if (existingByes.length > 0) {
+    // スロット数がdrawSizeに満たない場合のみ、不足分をBYEで埋める
+    if (slots.length < drawSize) {
+      const existingPositions = new Set(slots.map(s => s.drawPosition));
+      const result = [...slots];
+      for (let p = 1; p <= drawSize; p++) {
+        if (!existingPositions.has(p)) {
+          result.push({ drawPosition: p, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
+        }
+      }
+      return result.sort((a, b) => a.drawPosition - b.drawPosition);
+    }
+    return slots;
+  }
+
+  // BYEが存在しない場合のみアルゴリズムで配置
   const byePositions = generateByePositions(drawSize, numByes);
   const byePosSet = new Set(byePositions);
   const nonByePositions: number[] = [];
