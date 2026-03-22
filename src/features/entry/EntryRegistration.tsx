@@ -100,115 +100,6 @@ type CheckInSlot = {
   affiliation: string;
 };
 
-// === BYE再配置ユーティリティ ===
-// セクション（4ポジション＝2ペア）単位でBYE配置
-// 左右の山にBYEを均等分配し、各セクション内でエントリーとBYEを配置
-// - 4エントリー: BYEなし（2試合）
-// - 3エントリー: 1ウォークオーバー（BYEをペア1の偶数位置に配置）
-// - 2エントリー: 1試合 + 2BYE（BYE-BYEペア1つ）
-// - 1エントリー: 1ウォークオーバー + BYE-BYEペア
-// - 0エントリー: BYE-BYEペア×2（非表示）
-function generateByePositions(drawSize: number, numByes: number): number[] {
-  if (numByes <= 0) return [];
-
-  const halfSize = drawSize / 2;
-  const byePositions: number[] = [];
-
-  // 左右の山にBYEを均等分配
-  const leftByes = Math.ceil(numByes / 2);
-  const rightByes = Math.floor(numByes / 2);
-
-  for (const [halfOffset, halfByeCount] of [[0, leftByes], [halfSize, rightByes]] as [number, number][]) {
-    const halfEntries = halfSize - halfByeCount;
-    const numSections = halfSize / 4;
-
-    // セクションごとのエントリー数を決定（上から詰める）
-    const perSection: number[] = new Array(numSections).fill(0);
-    if (halfEntries > 0) {
-      let remaining = halfEntries;
-      for (let s = 0; s < numSections && remaining > 0; s++) {
-        perSection[s] = Math.min(4, remaining);
-        remaining -= perSection[s];
-      }
-      // リバランス: 1人・2人セクションを前セクションと均す
-      for (let s = numSections - 1; s > 0; s--) {
-        if (perSection[s] === 1 && perSection[s - 1] >= 3) {
-          perSection[s - 1]--;
-          perSection[s]++;
-        } else if (perSection[s] === 2 && perSection[s - 1] >= 4) {
-          perSection[s - 1]--;
-          perSection[s]++;
-        }
-      }
-    }
-
-    // 各セクション内でBYE位置を決定
-    for (let s = 0; s < numSections; s++) {
-      const sStart = halfOffset + s * 4 + 1; // 1-indexed
-      const entries = perSection[s];
-
-      if (entries === 4) continue;
-      if (entries === 0) {
-        byePositions.push(sStart, sStart + 1, sStart + 2, sStart + 3);
-      } else if (entries === 1) {
-        // エントリーをsStart、BYEをsStart+1（ウォークオーバー）、残りBYE-BYE
-        byePositions.push(sStart + 1, sStart + 2, sStart + 3);
-      } else if (entries === 2) {
-        // エントリーをsStart,sStart+1（試合）、sStart+2,sStart+3をBYE-BYE
-        byePositions.push(sStart + 2, sStart + 3);
-      } else if (entries === 3) {
-        // エントリーをsStart,sStart+2,sStart+3（sStartがウォークオーバー、sStart+2vsStart+3が試合）
-        byePositions.push(sStart + 1);
-      }
-    }
-  }
-
-  return byePositions;
-}
-
-function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[] {
-  const isRealBye = (s: CheckInSlot) => s.isBye && !s.entryId;
-  const entrySlots = slots.filter(s => !isRealBye(s));
-  const numByes = drawSize - entrySlots.length;
-  if (numByes <= 0) return slots;
-
-  // インポートデータにBYEが含まれている場合、元の配置を維持
-  // （Excel/ドロー会議からのインポートでは、エントリーが正しいドロー位置にあるため
-  //  再配置するとドロー表と異なる対戦順になる）
-  const existingByes = slots.filter(s => isRealBye(s));
-  if (existingByes.length > 0) {
-    // drawSizeに満たない場合のみ不足分をBYEで埋める
-    if (slots.length < drawSize) {
-      const existingPositions = new Set(slots.map(s => s.drawPosition));
-      const result = [...slots];
-      for (let p = 1; p <= drawSize; p++) {
-        if (!existingPositions.has(p)) {
-          result.push({ drawPosition: p, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
-        }
-      }
-      return result.sort((a, b) => a.drawPosition - b.drawPosition);
-    }
-    return slots;
-  }
-
-  // BYEが存在しない場合（手動ドロー作成時など）のみアルゴリズムで配置
-  const byePositions = generateByePositions(drawSize, numByes);
-  const byePosSet = new Set(byePositions);
-  const nonByePositions: number[] = [];
-  for (let p = 1; p <= drawSize; p++) {
-    if (!byePosSet.has(p)) nonByePositions.push(p);
-  }
-
-  const sorted = entrySlots.sort((a, b) => a.drawPosition - b.drawPosition);
-  const result: CheckInSlot[] = [];
-  for (let i = 0; i < nonByePositions.length && i < sorted.length; i++) {
-    result.push({ ...sorted[i], drawPosition: nonByePositions[i] });
-  }
-  for (const bp of byePositions) {
-    result.push({ drawPosition: bp, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
-  }
-  return result.sort((a, b) => a.drawPosition - b.drawPosition);
-}
 
 export default function EntryRegistration() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
@@ -830,18 +721,15 @@ export default function EntryRegistration() {
         matchOrder++;
       }
     } else {
-      // === トーナメント戦: ブラケット対戦表生成 ===
-      const mappedSlots = draw.slots.map(s => ({
+      // トーナメント戦: ブラケット対戦表生成 ===
+      // DBに保存されているドロー位置（position）をそのまま使用する
+      const slots = draw.slots.map(s => ({
         ...s, drawPosition: s.position, seed: s.seed,
         entryId: s.entryId, isBye: s.isBye,
         entry: null as Entry | null, playerName: '', partnerName: '', affiliation: '',
-      }));
-      // BYEを均等配置で再分配
-      const slots = redistributeByes(mappedSlots, draw.drawSize);
+      })).sort((a, b) => a.drawPosition - b.drawPosition);
+      
       const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
-
-      // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
-      await db.draws.update(draw.id!, { slots: drawSlots, updatedAt: Date.now() });
 
       let matchOrder = 1;
 
@@ -1136,8 +1024,8 @@ export default function EntryRegistration() {
     const OFFSET_Y = 24;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
-    // BYEを均等配置で再分配
-    const displaySlots = redistributeByes(slots, drawSize);
+    // DBに保存された位置をそのまま使用する
+    const displaySlots = slots.slice().sort((a, b) => a.drawPosition - b.drawPosition);
     const halfSize = drawSize / 2;
 
     const LINE_ONLY_W = 40;
@@ -1204,9 +1092,13 @@ export default function EntryRegistration() {
           const yM = getY(r + 1, m) + SLOT_HEIGHT / 2;
 
           if (topEmpty || botEmpty) {
-            // 片方が全BYEサブツリー → ストレートライン
+            // 片方が全BYEサブツリー → 次ラウンドのY位置まで接続
             const pY = topEmpty ? yB : yT;
-            paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            if (Math.abs(pY - yM) < 1) {
+              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            } else {
+              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            }
             continue;
           }
 
@@ -1372,7 +1264,11 @@ export default function EntryRegistration() {
 
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
-            paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            if (Math.abs(pY - yM) < 1) {
+              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            } else {
+              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            }
             continue;
           }
 
@@ -1399,7 +1295,11 @@ export default function EntryRegistration() {
 
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
-            paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            if (Math.abs(pY - yM) < 1) {
+              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            } else {
+              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+            }
             continue;
           }
 
