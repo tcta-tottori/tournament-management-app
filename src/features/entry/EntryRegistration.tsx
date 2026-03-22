@@ -101,33 +101,17 @@ type CheckInSlot = {
 };
 
 // === BYE再配置ユーティリティ ===
-function generateSeedPositions(drawSize: number): number[] {
-  const positions = [1, drawSize];
-  let count = 2;
-  let sectionSize = drawSize;
-  while (count < drawSize) {
-    sectionSize /= 2;
-    if (sectionSize < 2) break;
-    const newPositions: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const pos = positions[i];
-      const secIdx = Math.floor((pos - 1) / sectionSize);
-      const secStart = secIdx * sectionSize + 1;
-      const secEnd = secStart + sectionSize - 1;
-      newPositions.push(secStart + secEnd - pos);
-    }
-    positions.push(...newPositions);
-    count *= 2;
-  }
-  return positions;
-}
-
 function generateByePositions(drawSize: number, numByes: number): number[] {
-  const seedPositions = generateSeedPositions(drawSize);
+  if (numByes <= 0) return [];
+  // BYEを均等に配置: drawSize/numByes のセクションごとに偶数位置（セクション末尾）にBYEを置く
+  // 例: drawSize=32, numByes=8 → sectionSize=4, BYE位置 = 2, 6, 10, 14, 18, 22, 26, 30
+  const sectionSize = Math.floor(drawSize / numByes);
   const byePositions: number[] = [];
-  for (let i = 0; i < numByes && i < seedPositions.length; i++) {
-    const p = seedPositions[i];
-    byePositions.push(p % 2 === 1 ? p + 1 : p - 1);
+  for (let i = 0; i < numByes; i++) {
+    const byePos = i * sectionSize + 2;
+    if (byePos <= drawSize) {
+      byePositions.push(byePos);
+    }
   }
   return byePositions;
 }
@@ -140,20 +124,7 @@ function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[]
   const numByes = drawSize - entrySlots.length;
   if (numByes <= 0) return slots;
 
-  const halfPos = drawSize / 2;
-  const hasByeInFirstHalf = slots.some(s => isRealBye(s) && s.drawPosition <= halfPos);
-  if (hasByeInFirstHalf) {
-    if (slots.length >= drawSize) return slots;
-    const existingPos = new Set(slots.map(s => s.drawPosition));
-    const result = [...slots];
-    for (let p = 1; p <= drawSize; p++) {
-      if (!existingPos.has(p)) {
-        result.push({ drawPosition: p, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
-      }
-    }
-    return result.sort((a, b) => a.drawPosition - b.drawPosition);
-  }
-
+  // 常にBYEを均等配置で再分配する
   const byePositions = generateByePositions(drawSize, numByes);
   const byePosSet = new Set(byePositions);
   const nonByePositions: number[] = [];
@@ -798,9 +769,8 @@ export default function EntryRegistration() {
         entryId: s.entryId, isBye: s.isBye,
         entry: null as Entry | null, playerName: '', partnerName: '', affiliation: '',
       }));
-      // 既にBYE配置済み（ドロー会議システムからのインポート）ならそのまま使用
-      const hasByeInDraw = mappedSlots.some(s => s.isBye && !s.entryId);
-      const slots = (mappedSlots.length >= draw.drawSize && hasByeInDraw) ? mappedSlots : redistributeByes(mappedSlots, draw.drawSize);
+      // BYEを均等配置で再分配
+      const slots = redistributeByes(mappedSlots, draw.drawSize);
       const drawSlots = slots.map(s => ({ position: s.drawPosition, entryId: s.entryId, seed: s.seed, isBye: s.isBye }));
 
       // redistributeByes後のスロット位置をDBに保存（全ページで同じ配置を使うため）
@@ -1099,10 +1069,8 @@ export default function EntryRegistration() {
     const OFFSET_Y = 24;
 
     const drawSize = draw?.drawSize || (slots.length <= 1 ? 2 : Math.pow(2, Math.ceil(Math.log2(slots.length))));
-    // ドロー会議システムからインポートしたデータは既にBYE配置済み
-    // slots.length === drawSize かつ BYEが含まれている場合はそのまま使用
-    const hasByeSlots = slots.some(s => s.isBye && !s.entryId);
-    const displaySlots = (slots.length >= drawSize && hasByeSlots) ? slots : redistributeByes(slots, drawSize);
+    // BYEを均等配置で再分配
+    const displaySlots = redistributeByes(slots, drawSize);
     const halfSize = drawSize / 2;
 
     const LINE_ONLY_W = 40;
