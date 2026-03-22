@@ -172,7 +172,26 @@ function redistributeByes(slots: CheckInSlot[], drawSize: number): CheckInSlot[]
   const numByes = drawSize - entrySlots.length;
   if (numByes <= 0) return slots;
 
-  // 常にBYEを再配置（ドロー会議アルゴリズムで均等分散）
+  // インポートデータにBYEが含まれている場合、元の配置を維持
+  // （Excel/ドロー会議からのインポートでは、エントリーが正しいドロー位置にあるため
+  //  再配置するとドロー表と異なる対戦順になる）
+  const existingByes = slots.filter(s => isRealBye(s));
+  if (existingByes.length > 0) {
+    // drawSizeに満たない場合のみ不足分をBYEで埋める
+    if (slots.length < drawSize) {
+      const existingPositions = new Set(slots.map(s => s.drawPosition));
+      const result = [...slots];
+      for (let p = 1; p <= drawSize; p++) {
+        if (!existingPositions.has(p)) {
+          result.push({ drawPosition: p, seed: 0, entryId: null, isBye: true, entry: null, playerName: 'BYE', partnerName: '', affiliation: '' });
+        }
+      }
+      return result.sort((a, b) => a.drawPosition - b.drawPosition);
+    }
+    return slots;
+  }
+
+  // BYEが存在しない場合（手動ドロー作成時など）のみアルゴリズムで配置
   const byePositions = generateByePositions(drawSize, numByes);
   const byePosSet = new Set(byePositions);
   const nonByePositions: number[] = [];
