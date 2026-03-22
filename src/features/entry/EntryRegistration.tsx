@@ -103,15 +103,15 @@ type CheckInSlot = {
 // === BYE再配置ユーティリティ ===
 function generateByePositions(drawSize: number, numByes: number): number[] {
   if (numByes <= 0) return [];
-  // BYEを均等に配置: drawSize/numByes のセクションごとに偶数位置（セクション末尾）にBYEを置く
-  // 例: drawSize=32, numByes=8 → sectionSize=4, BYE位置 = 2, 6, 10, 14, 18, 22, 26, 30
-  const sectionSize = Math.floor(drawSize / numByes);
+  // BYEをペア単位で均等配置（Bresenham分布）
+  // 各ペアの偶数位置（2番目）にBYEを配置し、奇数位置（1番目）の選手がウォークオーバー
+  // 例: drawSize=32, numByes=8 → pairs=16, BYE at pairs 0,2,4,6,8,10,12,14 → pos 2,6,10,14,18,22,26,30
+  // 例: drawSize=32, numByes=12 → pairs=16, BYE at pairs 0,1,2,4,5,6,8,9,10,12,13,14 → pos 2,4,6,10,12,14,18,20,22,26,28,30
+  const numPairs = drawSize / 2;
   const byePositions: number[] = [];
   for (let i = 0; i < numByes; i++) {
-    const byePos = i * sectionSize + 2;
-    if (byePos <= drawSize) {
-      byePositions.push(byePos);
-    }
+    const pairIndex = Math.floor(i * numPairs / numByes);
+    byePositions.push(pairIndex * 2 + 2);
   }
   return byePositions;
 }
