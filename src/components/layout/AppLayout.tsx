@@ -4,7 +4,7 @@ import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, Medal, HardDrive,
-  AlertTriangle, Network
+  AlertTriangle, Network, Sun, Moon
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -72,7 +72,18 @@ for (let i = 0; i < 10; i++) {
 export default function AppLayout() {
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
+  const theme = useAppStore((s) => s.theme);
+  const setTheme = useAppStore((s) => s.setTheme);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+
+  // ダークモードの適用
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
@@ -256,6 +267,15 @@ export default function AppLayout() {
             <span className="hidden sm:inline">ドロー会議</span>
             <ExternalLink className="w-3 h-3" />
           </a>
+
+          {/* テーマ切り替えボタン */}
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+            title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
+          >
+            {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => setVersionModalOpen(true)}
             className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"

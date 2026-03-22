@@ -27,6 +27,38 @@ function stripRoundPrefix(text: string): string {
     .trim();
 }
 
+function shortRoundName(round: number, totalRounds: number): string {
+  if (round === totalRounds) return 'F';
+  if (round === totalRounds - 1) return 'SF';
+  if (round === totalRounds - 2) return 'QF';
+  return `${round}R`;
+}
+
+function getGameCountForRound(evt: { gameRules?: { games?: number }; roundGameRules?: { roundLabel: string; games: number; matchFormat?: string }[] } | undefined, round: number, totalRounds: number): { count: number; format?: string } {
+  if (!evt) return { count: 6 };
+  const rules = evt.roundGameRules;
+  if (!rules || rules.length === 0) return { count: evt.gameRules?.games ?? 6 };
+  if (rules.length === 1) return { count: rules[0].games, format: rules[0].matchFormat };
+  const rName = getRoundName(round, totalRounds);
+  for (const rule of rules) {
+    const label = rule.roundLabel;
+    if (label === '全回戦') continue;
+    const rm = label.match(/(\d+)～(\d+)回戦/);
+    if (rm && round >= parseInt(rm[1]) && round <= parseInt(rm[2])) return { count: rule.games, format: rule.matchFormat };
+    if (label.includes('以降')) {
+      const cl = label.replace('以降', '');
+      if (cl.includes('準々決勝') && round >= totalRounds - 2) return { count: rule.games, format: rule.matchFormat };
+      if (cl.includes('準決勝') && round >= totalRounds - 1) return { count: rule.games, format: rule.matchFormat };
+      if (cl.includes('決勝') && !cl.includes('準') && round >= totalRounds) return { count: rule.games, format: rule.matchFormat };
+      const rn = cl.match(/(\d+)回戦/);
+      if (rn && round >= parseInt(rn[1])) return { count: rule.games, format: rule.matchFormat };
+      continue;
+    }
+    if (rName === label || label.includes(rName)) return { count: rule.games, format: rule.matchFormat };
+  }
+  return { count: rules[0].games, format: rules[0].matchFormat };
+}
+
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
 
 
@@ -1380,39 +1412,44 @@ ${printableMatches.map(m => {
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-              <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
+              <div className="px-3 py-2 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ListOrdered className="w-5 h-5 text-white" />
-                  <span className="font-bold text-white text-sm">対戦順（種目・回戦順）</span>
-                  <span className="text-white/70 text-xs">{globalSortedMatches.length}試合</span>
+                  <ListOrdered className="w-4 h-4 text-white" />
+                  <span className="font-bold text-white text-xs">対戦順</span>
+                  <span className="text-white/70 text-[10px]">{globalSortedMatches.length}試合</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '780px' }}>
+                <table className="w-full text-left border-collapse text-xs" style={{ tableLayout: 'fixed', minWidth: '620px' }}>
                   <colgroup>
-                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '26px' }} />
+                    <col style={{ width: '74px' }} />
+                    <col style={{ width: '26px' }} />
                     <col />
-                    <col style={{ width: '24px' }} />
+                    <col style={{ width: '18px' }} />
                     <col />
-                    <col style={{ width: '48px' }} />
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '26px' }} />
+                    <col style={{ width: '46px' }} />
                     <col style={{ width: '72px' }} />
-                    <col style={{ width: '110px' }} />
                   </colgroup>
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">#</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手1</th>
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">vs</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手2</th>
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">コート</th>
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">状態</th>
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">操作</th>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400">
+                      <th className="px-1 py-1.5 text-center">#</th>
+                      <th className="px-1 py-1.5">種目</th>
+                      <th className="px-1 py-1.5 text-center">G</th>
+                      <th className="px-1 py-1.5">選手1</th>
+                      <th className="px-0 py-1.5 text-center"></th>
+                      <th className="px-1 py-1.5">選手2</th>
+                      <th className="px-1 py-1.5 text-center">時間</th>
+                      <th className="px-1 py-1.5 text-center">C</th>
+                      <th className="px-1 py-1.5 text-center">状態</th>
+                      <th className="px-1 py-1.5 text-center">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
                       const availableCourtCount = courts.filter(c => c.isAvailable).length;
-                      // 初回コート割振り: 対戦順の上から順に1番、2番...と連番でコートを振る
                       let courtNum = 1;
                       const courtAssignMap = new Map<string, string>();
                       for (const m of globalSortedMatches) {
@@ -1424,50 +1461,21 @@ ${printableMatches.map(m => {
                           courtNum++;
                         }
                       }
-                      // 種目・回戦グループのヘッダーを表示するために前回のグループキーを記録
-                      let lastGroupKey = '';
-                      let groupNum = 0;
+                      let seqNum = 0;
                       return globalSortedMatches.map((m) => {
+                        seqNum++;
                         const st = statusLabels[m.status] || statusLabels.waiting;
                         const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
                         const eventDraw = allDraws.get(m.eventId);
                         const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
-                        const rName = getRoundName(m.round, evTotalRounds);
+                        const rName = shortRoundName(m.round, evTotalRounds);
                         const hasPlayers = !!m.player1Name && !!m.player2Name
                           && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                        // 種目・回戦グループの区切り
-                        const groupKey = `${m.eventId}|${m.round}`;
-                        const showGroupSep = groupKey !== lastGroupKey;
-                        if (showGroupSep) { lastGroupKey = groupKey; groupNum = 0; }
-                        groupNum++;
-                        // ゲームルール取得
                         const evt = events.find(e => e.eventId === m.eventId);
-                        let gameRuleText = '';
-                        if (evt?.roundGameRules && evt.roundGameRules.length > 0) {
-                          if (evt.roundGameRules.length === 1) {
-                            gameRuleText = stripRoundPrefix(evt.roundGameRules[0].ruleText);
-                          } else {
-                            for (const rule of evt.roundGameRules) {
-                              const label = rule.roundLabel;
-                              if (label === '全回戦') continue;
-                              const rm = label.match(/(\d+)～(\d+)回戦/);
-                              if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameRuleText = stripRoundPrefix(rule.ruleText); break; } continue; }
-                              if (label.includes('以降')) {
-                                const cl = label.replace('以降', '');
-                                if (cl.includes('準々決勝') && m.round >= evTotalRounds - 2) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
-                                if (cl.includes('準決勝') && m.round >= evTotalRounds - 1) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
-                                if (cl.includes('決勝') && !cl.includes('準') && m.round >= evTotalRounds) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
-                                const rn3 = cl.match(/(\d+)回戦/);
-                                if (rn3 && m.round >= parseInt(rn3[1])) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
-                                continue;
-                              }
-                              if (rName === label || label.includes(rName)) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
-                            }
-                            if (!gameRuleText) gameRuleText = stripRoundPrefix(evt.roundGameRules[0].ruleText);
-                          }
-                        } else if (evt?.gameRules?.games) {
-                          gameRuleText = `${evt.gameRules.games}ゲームマッチ`;
-                        }
+                        const gameInfo = getGameCountForRound(evt, m.round, evTotalRounds);
+                        const gameDisplay = gameInfo.format === 'twoSetsSuper10' ? '2S' : String(gameInfo.count);
+                        const evLabel = `${shortEventName(m.eventName)} ${rName}`;
+                        const schedTime = m.scheduledTime || '';
                         const sb = standbyInfo.get(m.matchId);
                         let statusDisplay: { text: string; color: string };
                         if (m.status === 'playing') {
@@ -1475,7 +1483,7 @@ ${printableMatches.map(m => {
                         } else if (m.status === 'finished') {
                           statusDisplay = st;
                         } else if (sb?.type === 'court') {
-                          statusDisplay = { text: '次コート', color: 'bg-amber-100 text-amber-700' };
+                          statusDisplay = { text: '次C', color: 'bg-amber-100 text-amber-700' };
                         } else if (sb?.type === 'standby') {
                           statusDisplay = { text: sb.label, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
                         } else if (!hasPlayers) {
@@ -1485,23 +1493,6 @@ ${printableMatches.map(m => {
                         }
                         return (
                           <React.Fragment key={m.matchId}>
-                            {showGroupSep && (
-                              <tr className="bg-gray-800">
-                                <td colSpan={7} className="py-1.5 px-3">
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-[11px] font-bold text-white tracking-wider">
-                                      {shortEventName(m.eventName)} {rName}
-                                    </span>
-                                    {gameRuleText && (
-                                      <span className="text-[10px] text-gray-300">{gameRuleText}</span>
-                                    )}
-                                    {m.round === 1 && m.scheduledTime && (
-                                      <span className="text-[10px] text-amber-300 ml-auto">{m.scheduledTime}〜（目安）</span>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
                             <tr className={`border-b border-gray-100 ${
                               !hasPlayers ? 'opacity-30' : ''
                             } ${
@@ -1510,65 +1501,68 @@ ${printableMatches.map(m => {
                               sb?.type === 'court' ? 'bg-amber-50/40' :
                               sb?.type === 'standby' ? 'bg-orange-50/30' : ''
                             }`}>
-                              <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{groupNum}</td>
-                              <td className="py-2 px-2">
-                                <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
+                              <td className="py-1.5 px-1 text-center font-mono text-blue-500 text-[10px] font-bold">{seqNum}</td>
+                              <td className="py-1.5 px-1 truncate text-[10px] text-gray-600" title={evLabel}>{evLabel}</td>
+                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-500">{gameDisplay}</td>
+                              <td className="py-1.5 px-1">
+                                <div className="text-xs font-medium truncate">{m.player1Name || '-'}</div>
                               </td>
-                              <td className="py-2 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
-                              <td className="py-2 px-2">
-                                <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
+                              <td className="py-1.5 px-0 text-center text-blue-300 text-[10px] font-bold">vs</td>
+                              <td className="py-1.5 px-1">
+                                <div className="text-xs font-medium truncate">{m.player2Name || '-'}</div>
                               </td>
-                              <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{(() => {
+                              <td className="py-1.5 px-1 text-center text-[10px] text-gray-400">{schedTime}</td>
+                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-700">{(() => {
                                 if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
                                 const assignedCourt = courtAssignMap.get(m.matchId);
                                 if (assignedCourt) return assignedCourt;
                                 return '-';
                               })()}</td>
-                              <td className="py-2 px-2 text-center">
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
+                              <td className="py-1.5 px-1 text-center">
+                                <span className={`inline-block px-1 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
                               </td>
-                              <td className="py-1.5 px-2 text-center">
-                                <div className="flex items-center gap-1 justify-center">
+                              <td className="py-1 px-1 text-center">
+                                <div className="flex items-center gap-0.5 justify-center">
                                   <button
                                     onClick={() => handlePrintMatch(m)}
-                                    className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
-                                    title="対戦票印刷"
+                                    className="p-0.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
+                                    title="印刷"
                                   >
-                                    <Printer className="w-3.5 h-3.5" />
+                                    <Printer className="w-3 h-3" />
                                   </button>
                                   {hasPlayers && m.status !== 'walkover' && (
                                     <button
                                       onClick={() => startEdit(m)}
-                                      className={`p-1 rounded border transition-all ${
+                                      className={`p-0.5 rounded border transition-all ${
                                         m.status === 'finished'
                                           ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
                                           : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
                                       }`}
                                       title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <Edit3 className="w-3 h-3" />
                                     </button>
                                   )}
                                   {hasPlayers && m.status !== 'walkover' && (
                                     speakingMatchId === m.matchId ? (
                                       <button
                                         onClick={handleVoiceStop}
-                                        className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
+                                        className="p-0.5 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
                                         title="停止"
                                       >
-                                        <Square className="w-3.5 h-3.5" />
+                                        <Square className="w-3 h-3" />
                                       </button>
                                     ) : (
                                       <button
                                         onClick={() => toggleCallTarget(m)}
-                                        className={`p-1 rounded border transition-all ${
+                                        className={`p-0.5 rounded border transition-all ${
                                           callTargetMatchId === m.matchId
                                             ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
                                             : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
                                         }`}
                                         title="音声コール"
                                       >
-                                        <Volume2 className="w-3.5 h-3.5" />
+                                        <Volume2 className="w-3 h-3" />
                                       </button>
                                     )
                                   )}
@@ -1577,47 +1571,47 @@ ${printableMatches.map(m => {
                             </tr>
                             {editingMatchId === m.matchId && (
                               <tr className="bg-blue-50 border-b border-blue-200">
-                                <td colSpan={7} className="px-4 py-3">
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    <span className="text-xs font-bold text-gray-600">スコア入力:</span>
-                                    <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="P1" autoFocus
+                                <td colSpan={10} className="px-3 py-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-bold text-gray-600">スコア:</span>
+                                    <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P1" autoFocus
                                       onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                                    <span className="text-gray-400 font-bold">-</span>
-                                    <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="P2"
+                                    <span className="text-gray-400 font-bold text-xs">-</span>
+                                    <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P2"
                                       onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
                                     {isTiebreakScore && (
                                       <>
-                                        <span className="text-xs text-gray-500">TB:</span>
-                                        <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="TB"
+                                        <span className="text-[10px] text-gray-500">TB:</span>
+                                        <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="TB"
                                           onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
                                       </>
                                     )}
-                                    <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-3 py-1 bg-primary-500 text-white rounded text-xs font-bold disabled:opacity-30">
-                                      <Check className="w-3 h-3 inline mr-1" />確定
+                                    <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-2 py-1 bg-primary-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
+                                      <Check className="w-3 h-3 inline mr-0.5" />確定
                                     </button>
-                                    <button onClick={cancelEdit} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-bold">
-                                      <X className="w-3 h-3 inline mr-1" />キャンセル
+                                    <button onClick={cancelEdit} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
+                                      <X className="w-3 h-3 inline mr-0.5" />取消
                                     </button>
-                                    {autoWinner && <span className="text-xs text-primary-600 font-bold">勝者: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
+                                    {autoWinner && <span className="text-[10px] text-primary-600 font-bold">勝: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
                                   </div>
                                 </td>
                               </tr>
                             )}
                             {callTargetMatchId === m.matchId && (
                               <tr className="bg-emerald-50 border-b border-emerald-200">
-                                <td colSpan={7} className="px-4 py-3">
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    <span className="text-xs font-bold text-emerald-700">コート:</span>
-                                    <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)} className="px-2 py-1 border rounded text-sm">
+                                <td colSpan={10} className="px-3 py-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-bold text-emerald-700">コート:</span>
+                                    <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)} className="px-1.5 py-1 border rounded text-xs">
                                       <option value="">選択</option>
                                       {courts.filter(c => c.isAvailable).map(c => (
                                         <option key={c.courtId} value={c.name}>{c.name}番</option>
                                       ))}
                                     </select>
-                                    <button onClick={() => { if (callCourtNumber) { handleVoiceCall(m, callCourtNumber); setCallTargetMatchId(null); } }} disabled={!callCourtNumber} className="px-3 py-1 bg-emerald-500 text-white rounded text-xs font-bold disabled:opacity-30">
-                                      <Volume2 className="w-3 h-3 inline mr-1" />コール
+                                    <button onClick={() => { if (callCourtNumber) { handleVoiceCall(m, callCourtNumber); setCallTargetMatchId(null); } }} disabled={!callCourtNumber} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
+                                      <Volume2 className="w-3 h-3 inline mr-0.5" />コール
                                     </button>
-                                    <button onClick={() => setCallTargetMatchId(null)} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-bold">
+                                    <button onClick={() => setCallTargetMatchId(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
                                       閉じる
                                     </button>
                                   </div>

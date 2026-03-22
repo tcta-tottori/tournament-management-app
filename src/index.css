@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+:root {
+  --bg-main: #f7f5f2;
+  --text-main: #111827;
+  --text-muted: #4b5563;
+  --border-main: #e5ddd3;
+  --card-bg: #ffffff;
+  --table-stripe: #faf8f5;
+  --input-bg: #ffffff;
+}
+
+.dark {
+  --bg-main: #0f172a; /* Slate 900 */
+  --text-main: #f8fafc; /* Slate 50 */
+  --text-muted: #94a3b8; /* Slate 400 */
+  --border-main: #334155; /* Slate 700 */
+  --card-bg: #1e293b; /* Slate 800 */
+  --table-stripe: #1e293b;
+  --input-bg: #1e293b;
+
+  /* Overwrite primary/secondary for dark mode visibility */
+  --color-primary-50: #064e3b;
+  --color-primary-100: #065f46;
+  --color-secondary-50: #451a03;
+}
+
 @theme {
   /* Primary — Tennis Court Green */
   --color-primary-50: #ecf5ec;
@@ -26,10 +51,11 @@
   /* Sky */
   --color-sky: #e8f4f8;
 
-  /* Backgrounds & Borders */
-  --color-bg-main: #f7f5f2;
-  --color-border-main: #e5ddd3;
-  --color-table-stripe: #faf8f5;
+  /* Backgrounds & Borders — Linked to vars */
+  --color-bg-main: var(--bg-main);
+  --color-text-main: var(--text-main);
+  --color-border-main: var(--border-main);
+  --color-table-stripe: var(--table-stripe);
 
   /* Status Colors */
   --color-success: #2d6a4f;
@@ -39,7 +65,8 @@
 
 @layer base {
   body {
-    @apply bg-bg-main text-gray-900 font-sans antialiased;
+    @apply bg-bg-main text-text-main font-sans antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
@@ -503,13 +530,13 @@
 
 /* 鳥取カードスタイル */
 .card-tottori {
-  background: #fff;
-  border: 1px solid var(--color-border-main);
+  background: var(--card-bg);
+  border: 1px solid var(--border-main);
   border-radius: 12px;
   box-shadow:
     0 1px 3px rgba(139, 94, 47, 0.06),
     0 4px 16px rgba(139, 94, 47, 0.04);
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease, background-color 0.3s ease;
 }
 
 .card-tottori:hover {
