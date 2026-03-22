@@ -32,6 +32,7 @@ type DrawSlot = { position: number; entryId: string | null; seed: number; isBye:
 
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const importedSchedule = useAppStore(state => state.importedSchedule);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'event' | 'global'>('global'); // 種目別 or 対戦順
 
@@ -114,7 +115,23 @@ export default function MatchManager() {
     return events.filter(e => (allMatchesByEvent.get(e.eventId)?.length || 0) > 0);
   }, [events, allMatchesByEvent]);
 
-  // 全試合をmatchOrder順でグローバルソート（対戦順表示用）
+  // 時間割の項目順マップ: eventName+round → 時間割上の出現順
+  const scheduleOrderMap = useMemo(() => {
+    const map = new Map<string, { order: number; time: string }>();
+    if (importedSchedule.length === 0) return map;
+    // 時間割項目を種目+回戦でグルーピングし、最初に出現した順序を記録
+    let orderIdx = 0;
+    for (const item of importedSchedule) {
+      // 種目名からeventIdを見つけるため、イベント名で照合
+      const key = `${item.eventName}|${item.roundLabel}`;
+      if (!map.has(key)) {
+        map.set(key, { order: orderIdx++, time: item.startTime });
+      }
+    }
+    return map;
+  }, [importedSchedule]);
+
+  // 全試合を時間割の項目順でグローバルソート（対戦順表示用）
   const globalSortedMatches = useMemo(() => {
     const arr: (Match & { eventName: string })[] = [];
     for (const [eventId, matches] of allMatchesByEvent) {
@@ -125,8 +142,42 @@ export default function MatchManager() {
         arr.push({ ...m, eventName: name });
       }
     }
+
+    // 時間割の項目順でソート
+    if (scheduleOrderMap.size > 0) {
+      // 各試合の時間割順序を決定
+      const getScheduleOrder = (m: Match & { eventName: string }) => {
+        const evDraw = allDraws.get(m.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+        const rName = getRoundName(m.round, evTotalRounds);
+        // 時間割のroundLabelとマッチング: "1R"形式や"1回戦"形式
+        for (const [key, val] of scheduleOrderMap) {
+          const [evName, rLabel] = key.split('|');
+          if (!m.eventName.includes(evName) && !evName.includes(m.eventName)) continue;
+          // ラウンドラベルの照合
+          if (rLabel === rName) return val.order;
+          if (rLabel === `${m.round}R` || rLabel === `${m.round}回戦`) return val.order;
+          if (rLabel === '決勝' && rName === '決勝') return val.order;
+          if (rLabel === '準決勝' && rName === '準決勝') return val.order;
+          if (rLabel === '準々決勝' && rName === '準々決勝') return val.order;
+          if (rLabel === 'QF' && rName === '準々決勝') return val.order;
+          if (rLabel === 'SF' && rName === '準決勝') return val.order;
+          if (rLabel === 'F' && rName === '決勝') return val.order;
+        }
+        return 9999;
+      };
+      return arr.sort((a, b) => {
+        const oa = getScheduleOrder(a);
+        const ob = getScheduleOrder(b);
+        if (oa !== ob) return oa - ob;
+        // 同じ種目・回戦内ではポジション順（若番順）
+        return (a.position || 0) - (b.position || 0);
+      });
+    }
+
+    // 時間割データがない場合はmatchOrder順
     return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
-  }, [allMatchesByEvent, events]);
+  }, [allMatchesByEvent, events, scheduleOrderMap, allDraws]);
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
@@ -1312,14 +1363,12 @@ ${printableMatches.map(m => {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '720px' }}>
+                <table className="w-full text-left border-collapse text-xs sm:text-sm" style={{ tableLayout: 'fixed', minWidth: '780px' }}>
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '50px' }} />
                     <col />
                     <col style={{ width: '24px' }} />
                     <col />
-                    <col style={{ width: '100px' }} />
                     <col style={{ width: '48px' }} />
                     <col style={{ width: '72px' }} />
                     <col style={{ width: '110px' }} />
@@ -1327,11 +1376,9 @@ ${printableMatches.map(m => {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">#</th>
-                      <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">時間</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手1</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">vs</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-gray-500">選手2</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-gray-500">種目・回戦</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">コート</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">状態</th>
                       <th className="px-2 py-2 text-center text-[10px] font-bold text-gray-500">操作</th>
@@ -1339,7 +1386,6 @@ ${printableMatches.map(m => {
                   </thead>
                   <tbody>
                     {(() => {
-                      let lastTime = '';
                       const availableCourtCount = courts.filter(c => c.isAvailable).length;
                       // 初回コート割振り: 対戦順の上から順に1番、2番...と連番でコートを振る
                       let courtNum = 1;
@@ -1353,6 +1399,9 @@ ${printableMatches.map(m => {
                           courtNum++;
                         }
                       }
+                      // 種目・回戦グループのヘッダーを表示するために前回のグループキーを記録
+                      let lastGroupKey = '';
+                      let groupNum = 0;
                       return globalSortedMatches.map((m) => {
                         const st = statusLabels[m.status] || statusLabels.waiting;
                         const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
@@ -1361,8 +1410,39 @@ ${printableMatches.map(m => {
                         const rName = getRoundName(m.round, evTotalRounds);
                         const hasPlayers = !!m.player1Name && !!m.player2Name
                           && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                        const showTimeSep = m.scheduledTime && m.scheduledTime !== lastTime;
-                        if (m.scheduledTime) lastTime = m.scheduledTime;
+                        // 種目・回戦グループの区切り
+                        const groupKey = `${m.eventId}|${m.round}`;
+                        const showGroupSep = groupKey !== lastGroupKey;
+                        if (showGroupSep) { lastGroupKey = groupKey; groupNum = 0; }
+                        groupNum++;
+                        // ゲームルール取得
+                        const evt = events.find(e => e.eventId === m.eventId);
+                        let gameRuleText = '';
+                        if (evt?.roundGameRules && evt.roundGameRules.length > 0) {
+                          if (evt.roundGameRules.length === 1) {
+                            gameRuleText = stripRoundPrefix(evt.roundGameRules[0].ruleText);
+                          } else {
+                            for (const rule of evt.roundGameRules) {
+                              const label = rule.roundLabel;
+                              if (label === '全回戦') continue;
+                              const rm = label.match(/(\d+)～(\d+)回戦/);
+                              if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameRuleText = stripRoundPrefix(rule.ruleText); break; } continue; }
+                              if (label.includes('以降')) {
+                                const cl = label.replace('以降', '');
+                                if (cl.includes('準々決勝') && m.round >= evTotalRounds - 2) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
+                                if (cl.includes('準決勝') && m.round >= evTotalRounds - 1) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
+                                if (cl.includes('決勝') && !cl.includes('準') && m.round >= evTotalRounds) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
+                                const rn3 = cl.match(/(\d+)回戦/);
+                                if (rn3 && m.round >= parseInt(rn3[1])) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
+                                continue;
+                              }
+                              if (rName === label || label.includes(rName)) { gameRuleText = stripRoundPrefix(rule.ruleText); break; }
+                            }
+                            if (!gameRuleText) gameRuleText = stripRoundPrefix(evt.roundGameRules[0].ruleText);
+                          }
+                        } else if (evt?.gameRules?.games) {
+                          gameRuleText = `${evt.gameRules.games}ゲームマッチ`;
+                        }
                         const sb = standbyInfo.get(m.matchId);
                         let statusDisplay: { text: string; color: string };
                         if (m.status === 'playing') {
@@ -1380,10 +1460,20 @@ ${printableMatches.map(m => {
                         }
                         return (
                           <React.Fragment key={m.matchId}>
-                            {showTimeSep && (
+                            {showGroupSep && (
                               <tr className="bg-gray-800">
-                                <td colSpan={9} className="py-1 px-3 text-[10px] font-bold text-white tracking-wider">
-                                  {m.scheduledTime}〜
+                                <td colSpan={7} className="py-1.5 px-3">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-[11px] font-bold text-white tracking-wider">
+                                      {shortEventName(m.eventName)} {rName}
+                                    </span>
+                                    {gameRuleText && (
+                                      <span className="text-[10px] text-gray-300">{gameRuleText}</span>
+                                    )}
+                                    {m.round === 1 && m.scheduledTime && (
+                                      <span className="text-[10px] text-amber-300 ml-auto">{m.scheduledTime}〜（目安）</span>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             )}
@@ -1395,18 +1485,13 @@ ${printableMatches.map(m => {
                               sb?.type === 'court' ? 'bg-amber-50/40' :
                               sb?.type === 'standby' ? 'bg-orange-50/30' : ''
                             }`}>
-                              <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{m.matchOrder}</td>
-                              <td className="py-2 px-2 text-center text-xs font-mono text-gray-400">{m.scheduledTime || ''}</td>
+                              <td className="py-2 px-2 text-center font-mono text-blue-500 text-xs font-bold">{groupNum}</td>
                               <td className="py-2 px-2">
                                 <div className="text-sm font-medium truncate">{m.player1Name || '-'}</div>
                               </td>
                               <td className="py-2 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
                               <td className="py-2 px-2">
                                 <div className="text-sm font-medium truncate">{m.player2Name || '-'}</div>
-                              </td>
-                              <td className="py-2 px-2">
-                                <div className="text-[10px] text-gray-500 truncate">{shortEventName(m.eventName)}</div>
-                                <div className="text-[10px] font-medium text-gray-700">{rName}</div>
                               </td>
                               <td className="py-2 px-2 text-center text-xs font-bold text-gray-700">{(() => {
                                 if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
@@ -1467,7 +1552,7 @@ ${printableMatches.map(m => {
                             </tr>
                             {editingMatchId === m.matchId && (
                               <tr className="bg-blue-50 border-b border-blue-200">
-                                <td colSpan={9} className="px-4 py-3">
+                                <td colSpan={7} className="px-4 py-3">
                                   <div className="flex items-center gap-3 flex-wrap">
                                     <span className="text-xs font-bold text-gray-600">スコア入力:</span>
                                     <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-16 px-2 py-1 border rounded text-center text-sm" placeholder="P1" autoFocus
@@ -1495,7 +1580,7 @@ ${printableMatches.map(m => {
                             )}
                             {callTargetMatchId === m.matchId && (
                               <tr className="bg-emerald-50 border-b border-emerald-200">
-                                <td colSpan={9} className="px-4 py-3">
+                                <td colSpan={7} className="px-4 py-3">
                                   <div className="flex items-center gap-3 flex-wrap">
                                     <span className="text-xs font-bold text-emerald-700">コート:</span>
                                     <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)} className="px-2 py-1 border rounded text-sm">
