@@ -1309,15 +1309,20 @@ export default function EntryRegistration() {
         }
       }
 
-      // --- 決勝接続線（左SF→中央←右SF） ---
+      // --- 決勝接続線（左SF→中央←右SF）：一本の横直線で繋ぐ ---
       const leftFinalY = leftCalc.getY(halfRounds, 0) + PC_SLOT_H / 2 + leftYOff;
       const rightFinalX = mx(leftEndX);
       const rightFinalY = rightCalc.getY(halfRounds, 0) + PC_SLOT_H / 2 + rightYOff;
-      const centerX = totalW / 2;
       const centerY = (leftFinalY + rightFinalY) / 2;
-      paths.push(<path key="final-L" d={`M ${leftEndX} ${leftFinalY} L ${centerX} ${leftFinalY} L ${centerX} ${centerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-      paths.push(<path key="final-R" d={`M ${rightFinalX} ${rightFinalY} L ${centerX} ${rightFinalY} L ${centerX} ${centerY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-      paths.push(<line key="final-tick" x1={centerX - 8} y1={centerY} x2={centerX + 8} y2={centerY} stroke="#1b4d3e" strokeWidth="2" />);
+      // 左から: 垂直にcenterYへ → 水平に右へ
+      // 右から: 垂直にcenterYへ → 水平に左へ
+      // 両方の水平線がcenterYで一直線になる
+      if (Math.abs(leftFinalY - rightFinalY) < 1) {
+        // 左右同じ高さ → 一本の直線
+        paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      } else {
+        paths.push(<path key="final-L" d={`M ${leftEndX} ${leftFinalY} L ${leftEndX} ${centerY} L ${rightFinalX} ${centerY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      }
 
       // --- スロット描画ヘルパー ---
       const renderSlot = (slot: CheckInSlot, x: number, y: number, viNum: number, keyPrefix: string) => {
