@@ -332,27 +332,21 @@ export default function AppLayout() {
 
       {/* ===== 大会情報バー ===== */}
       {tournament && (
-        <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-b border-primary-100 flex items-center shrink-0 h-7 overflow-hidden text-xs">
-          {/* 固定部分: 大会名（コンパクト表示） */}
-          <div className="flex items-center gap-1.5 px-2 shrink-0 border-r border-primary-100 h-full bg-white/60 max-w-[50vw]">
-            <Trophy className="w-3 h-3 text-primary-600 shrink-0" />
-            <span className="font-bold text-primary-700 text-[11px] truncate">{tournament.name.replace(/\(.*?\)|（.*?）/g, '')}</span>
+        <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
+          {/* 固定部分: 大会名 */}
+          <div className="flex items-center gap-1.5 px-3 shrink-0 h-full info-bar-label max-w-[50vw]">
+            <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="font-bold text-gray-800 text-[11px] truncate">{tournament.name.replace(/\(.*?\)|（.*?）/g, '')}</span>
           </div>
           {/* 流れるティッカー */}
           {tickerItems.length > 0 && (
-            <div className="flex-1 overflow-hidden relative h-full">
-              <div className="info-ticker flex items-center h-full gap-12 whitespace-nowrap">
+            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+              <div className="info-ticker flex items-center h-full whitespace-nowrap">
                 {tickerItems.map((item, i) => (
-                  <span key={i} className={`inline-flex items-center gap-1 ${item.startsWith('⚠') ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                    {item.startsWith('⚠') ? item.slice(2) : item}
-                  </span>
-                ))}
-                {/* Duplicate for seamless loop */}
-                {tickerItems.map((item, i) => (
-                  <span key={`dup-${i}`} className={`inline-flex items-center gap-1 ${item.startsWith('⚠') ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                    {item.startsWith('⚠') ? item.slice(2) : item}
+                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                    {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
                   </span>
                 ))}
               </div>
