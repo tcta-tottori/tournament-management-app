@@ -689,9 +689,9 @@ export default function LiveDashboard() {
                   </div>
                 </div>
 
-                {/* 本部表示（指定ブロックの後） */}
+                {/* 本部表示（指定ブロックの後 = 5と9の間） */}
                 {blockIdx === hqAfterBlock && (
-                  <div className="flex flex-col items-center justify-center mx-2 self-center">
+                  <div className="flex flex-col items-center justify-end mx-2 self-end pb-3">
                     <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm">
                       <div className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
                       <span className="text-xs font-bold text-amber-700 [writing-mode:vertical-rl]">本部</span>
