@@ -159,14 +159,28 @@ function determineBYEPositionsForHalf(
     }
   }
 
-  // 2. 残りのBYEは下端から順に配置（上端の選手を優先的に対戦させる）
+  // 2. 残りのBYEは上端・下端から交互配置
+  let top = halfStart;
   let bottom = halfEnd;
+  let fromTop = true;
   while (byePositions.length < byeCount) {
-    while (bottom >= halfStart && (usedPositions.has(bottom) || seedPosInHalf.includes(bottom))) bottom--;
-    if (bottom < halfStart) break;
-    byePositions.push(bottom);
-    usedPositions.add(bottom);
-    bottom--;
+    if (fromTop) {
+      while (top <= halfEnd && (usedPositions.has(top) || seedPosInHalf.includes(top))) top++;
+      if (top <= halfEnd) {
+        byePositions.push(top);
+        usedPositions.add(top);
+        top++;
+      }
+    } else {
+      while (bottom >= halfStart && (usedPositions.has(bottom) || seedPosInHalf.includes(bottom))) bottom--;
+      if (bottom >= halfStart) {
+        byePositions.push(bottom);
+        usedPositions.add(bottom);
+        bottom--;
+      }
+    }
+    fromTop = !fromTop;
+    if (top > halfEnd && bottom < halfStart) break;
   }
 
   return byePositions;
