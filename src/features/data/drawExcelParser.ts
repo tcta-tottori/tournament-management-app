@@ -110,77 +110,88 @@ function nextPowerOf2(n: number): number {
 // JTA標準シード位置 & BYE配置
 // ---------------------------------------------------------------------------
 
-/** drawSizeに対するJTA標準シード配置位置（1-indexed）を優先順で返す */
-function getSeedPositionsForDrawSize(drawSize: number): number[] {
-  const positions: number[] = [1, drawSize]; // seed 1, seed 2
-  const seedPosMap: Record<number, { seed3_4?: number[]; seed5_8?: number[]; seed9_16?: number[] }> = {
-    16: { seed3_4: [5, 12] },
-    32: { seed3_4: [9, 24], seed5_8: [8, 16, 17, 25] },
-    64: { seed3_4: [17, 48], seed5_8: [16, 32, 33, 49], seed9_16: [8, 24, 25, 41, 40, 56, 57, 9] },
-    128: { seed3_4: [33, 96], seed5_8: [32, 64, 65, 97], seed9_16: [16, 48, 49, 81, 80, 112, 113, 17] },
-  };
-  const spm = seedPosMap[drawSize];
-  if (spm) {
-    if (spm.seed3_4) positions.push(...spm.seed3_4);
-    if (spm.seed5_8) positions.push(...spm.seed5_8);
-    if (spm.seed9_16) positions.push(...spm.seed9_16);
-  }
-  return positions;
-}
-
 /**
  * 半分のブラケットにおけるBYE位置を決定する。
- * シード選手の対抗位置にBYEを優先配置し、残りは下端から順に配置。
+ * JTA標準方式: 各エイス（8ポジション単位）にBYEを均等分配し、
+ * グローバルエイスインデックスに基づいてパターンA/B/Cを使い分ける。
+ *
+ * パターンA: {1, 7, 6, ...} 上端walkover＋下端ペア空
+ * パターンB: {2, 3, 7, ...} 中央ペア空＋下端walkover
+ * パターンC: {3, 6, 7, ...} 中央walkover＋下端ペア空
+ *
+ * グローバルエイスパターン:
+ *   32ドロー(4エイス): A, B, C, B
+ *   64ドロー(8エイス): A, B, C, B, A, A, B, B
  */
 function determineBYEPositionsForHalf(
   halfSize: number,
   halfOffset: number,   // 0 for left half, halfSize for right half
   byeCount: number,
-  drawSize: number,
+  _drawSize: number,
 ): number[] {
   if (byeCount <= 0) return [];
 
-  const byePositions: number[] = [];
-  const usedPositions = new Set<number>();
   const halfStart = halfOffset + 1;
-  const halfEnd = halfOffset + halfSize;
 
-  // シード位置を取得し、この半分に含まれるものをフィルタ
-  const allSeedPositions = getSeedPositionsForDrawSize(drawSize);
-  const seedPosInHalf = allSeedPositions.filter(p => p >= halfStart && p <= halfEnd);
+  // エイス（8ポジション単位）に分割してBYEを均等配分
+  const eighthSize = 8;
+  const numEighths = Math.max(1, halfSize / eighthSize);
 
-  // 1. シード選手の対抗位置にBYEを配置
-  for (const seedPos of seedPosInHalf) {
-    if (byePositions.length >= byeCount) break;
-    const opponent = seedPos % 2 === 1 ? seedPos + 1 : seedPos - 1;
-    if (opponent >= halfStart && opponent <= halfEnd && !usedPositions.has(opponent)) {
-      byePositions.push(opponent);
-      usedPositions.add(opponent);
+  // halfSize < 8 の場合は簡易処理（末尾からBYEを配置）
+  if (halfSize < eighthSize) {
+    const byePositions: number[] = [];
+    for (let i = halfSize; i >= 1 && byePositions.length < byeCount; i--) {
+      byePositions.push(halfOffset + i);
     }
+    return byePositions;
   }
 
-  // 2. 残りのBYEは上端・下端から交互配置
-  let top = halfStart;
-  let bottom = halfEnd;
-  let fromTop = true;
-  while (byePositions.length < byeCount) {
-    if (fromTop) {
-      while (top <= halfEnd && (usedPositions.has(top) || seedPosInHalf.includes(top))) top++;
-      if (top <= halfEnd) {
-        byePositions.push(top);
-        usedPositions.add(top);
-        top++;
-      }
-    } else {
-      while (bottom >= halfStart && (usedPositions.has(bottom) || seedPosInHalf.includes(bottom))) bottom--;
-      if (bottom >= halfStart) {
-        byePositions.push(bottom);
-        usedPositions.add(bottom);
-        bottom--;
-      }
+  // 各エイスのBYE数を計算（均等配分、余りは最後のエイスから減らす）
+  const baseByes = Math.floor(byeCount / numEighths);
+  let remainder = byeCount - baseByes * numEighths;
+  const eighthByes: number[] = new Array(numEighths).fill(baseByes);
+
+  // 余りを最後のエイスから逆順に配分（右半分の先頭エイスが少なくなるように）
+  for (let i = numEighths - 1; i >= 0 && remainder > 0; i--) {
+    eighthByes[i]++;
+    remainder--;
+  }
+
+  // BYEパターン定義（エイス内0-indexedオフセット、優先順）
+  const PATTERN_A = [1, 7, 6, 5, 4, 0, 2, 3];
+  const PATTERN_B = [2, 3, 7, 6, 5, 0, 1, 4];
+  const PATTERN_C = [3, 6, 7, 2, 5, 0, 1, 4];
+
+  // グローバルエイスインデックスに基づくパターンマップ
+  // ドローサイズごとにグローバルエイスのパターン配列を定義
+  const totalEighths = _drawSize / eighthSize;
+  const globalEighthOffset = halfOffset / eighthSize;
+
+  // グローバルエイスパターンテーブル
+  const GLOBAL_PATTERNS: Record<number, number[][]> = {
+    2:  [PATTERN_A, PATTERN_B],
+    4:  [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B],
+    8:  [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B],
+    16: [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B,
+         PATTERN_C, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B],
+  };
+
+  const globalPatterns = GLOBAL_PATTERNS[totalEighths] || GLOBAL_PATTERNS[8] || [];
+
+  const byePositions: number[] = [];
+
+  for (let ei = 0; ei < numEighths; ei++) {
+    const eByes = eighthByes[ei];
+    if (eByes <= 0) continue;
+
+    const eStart = halfStart + ei * eighthSize; // 1-indexed start of this eighth
+    const globalEi = globalEighthOffset + ei;
+
+    const byeOrder = globalPatterns[globalEi] || PATTERN_A;
+
+    for (let bi = 0; bi < eByes && bi < byeOrder.length; bi++) {
+      byePositions.push(eStart + byeOrder[bi]);
     }
-    fromTop = !fromTop;
-    if (top > halfEnd && bottom < halfStart) break;
   }
 
   return byePositions;
