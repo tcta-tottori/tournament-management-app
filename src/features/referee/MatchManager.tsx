@@ -168,6 +168,15 @@ export default function MatchManager() {
 
   // --- 試合順Excelインポート ---
   const matchOrderInputRef = useRef<HTMLInputElement>(null);
+  /** セルテキストを正規化（全角→半角、全角スペース→半角） */
+  const normalizeLabel = useCallback((text: string): string => {
+    return text
+      .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[\u3000]+/g, ' ')
+      .trim();
+  }, []);
+
   const handleImportMatchOrder = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -175,98 +184,128 @@ export default function MatchManager() {
     reader.onload = (ev) => {
       const data = new Uint8Array(ev.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-      // ヘッダー行を探す（"No"を含む行、なければ1行目スキップ）
-      let startRow = 0;
-      for (let i = 0; i < Math.min(rows.length, 5); i++) {
-        const firstCell = String(rows[i][0] || '').toLowerCase().trim();
-        if (firstCell === 'no' || firstCell === 'no.' || firstCell === '#') {
-          startRow = i + 1;
-          break;
-        }
-      }
-      if (startRow === 0 && rows.length > 1) {
-        // ヘッダーなし: 最初のセルが数値なら0行目から、そうでなければ1行目から
-        startRow = /^\d+$/.test(String(rows[0][0]).trim()) ? 0 : 1;
-      }
-
-      // パース: 各行から種目略称+ラウンドを抽出
-      const items: { eventName: string; roundLabel: string; matchOrder: number; courtName: string; startTime: string }[] = [];
       const roundPattern = /^(.+?)\s*(\d+R|QF|SF|F)\s*$/i;
-      for (let i = startRow; i < rows.length; i++) {
-        const row = rows[i];
-        // 種目・ラウンド列を探す（2列目 or 1列目）
-        let label = '';
-        if (row.length >= 2 && String(row[1]).trim()) {
-          label = String(row[1]).trim();
-        } else if (String(row[0]).trim()) {
-          label = String(row[0]).trim();
-        }
-        if (!label) continue;
 
-        const rm = label.match(roundPattern);
-        if (rm) {
-          items.push({
-            eventName: rm[1].trim(),
-            roundLabel: rm[2].toUpperCase(),
-            matchOrder: items.length + 1,
-            courtName: '',
-            startTime: '',
-          });
-        } else {
-          // ラウンドなし → リーグ戦（全ラウンドまとめて）
-          items.push({
-            eventName: label.trim(),
-            roundLabel: '',  // 空 = リーグ（全ラウンド）
-            matchOrder: items.length + 1,
-            courtName: '',
-            startTime: '',
-          });
+      const parseLabel = (raw: string): { eventName: string; roundLabel: string } => {
+        const norm = normalizeLabel(raw);
+        const rm = norm.match(roundPattern);
+        if (rm) return { eventName: rm[1].trim(), roundLabel: rm[2].toUpperCase() };
+        return { eventName: norm, roundLabel: '' };
+      };
+
+      let flatList: { eventName: string; roundLabel: string }[] = [];
+
+      // 全シートを走査し「パターン2」のB列フラットリストを探す（最後のシートから）
+      for (let si = wb.SheetNames.length - 1; si >= 0; si--) {
+        const ws = wb.Sheets[wb.SheetNames[si]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        // 「パターン2」行を探し、「コートNO.」行の次からB列を読む
+        let dataStart = -1;
+        for (let i = 0; i < rows.length; i++) {
+          const cellA = normalizeLabel(String(rows[i]?.[0] ?? ''));
+          if (/パターン\s*2/i.test(cellA)) {
+            for (let j = i + 1; j < Math.min(i + 5, rows.length); j++) {
+              const a = normalizeLabel(String(rows[j]?.[0] ?? ''));
+              if (/コート/i.test(a)) {
+                dataStart = j + 1;
+                break;
+              }
+            }
+            if (dataStart === -1) dataStart = i + 2;
+            break;
+          }
+        }
+
+        if (dataStart >= 0) {
+          for (let i = dataStart; i < rows.length; i++) {
+            const cellB = String(rows[i]?.[1] ?? '').trim();
+            if (!cellB) continue;
+            flatList.push(parseLabel(cellB));
+          }
+          if (flatList.length > 10) break;
+          flatList = [];
         }
       }
 
-      if (items.length > 0) {
-        setImportedSchedule(items);
-        setScheduleFileName(file.name);
-        alert(`試合順を取り込みました: ${items.length}項目\n${file.name}`);
-      } else {
+      // フラットリストが見つからない場合、旧ロジック(2列形式)にフォールバック
+      if (flatList.length === 0) {
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        let startRow = 0;
+        for (let i = 0; i < Math.min(rows.length, 5); i++) {
+          const firstCell = String(rows[i][0] || '').toLowerCase().trim();
+          if (firstCell === 'no' || firstCell === 'no.' || firstCell === '#') {
+            startRow = i + 1;
+            break;
+          }
+        }
+        if (startRow === 0 && rows.length > 1) {
+          startRow = /^\d+$/.test(String(rows[0][0]).trim()) ? 0 : 1;
+        }
+        for (let i = startRow; i < rows.length; i++) {
+          const row = rows[i];
+          let label = '';
+          if (row.length >= 2 && String(row[1]).trim()) label = String(row[1]).trim();
+          else if (String(row[0]).trim()) label = String(row[0]).trim();
+          if (!label) continue;
+          flatList.push(parseLabel(label));
+        }
+      }
+
+      if (flatList.length === 0) {
         alert('有効なデータが見つかりませんでした。');
+        return;
       }
+
+      // フラットリストをimportedSchedule形式に変換（1行=1試合分）
+      const items = flatList.map((item, i) => ({
+        eventName: item.eventName,
+        roundLabel: item.roundLabel,
+        matchOrder: i + 1,
+        courtName: '',
+        startTime: '',
+      }));
+
+      setImportedSchedule(items);
+      setScheduleFileName(file.name);
+      alert(`試合順を取り込みました: ${items.length}項目\n${file.name}`);
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
-  }, [setImportedSchedule, setScheduleFileName]);
+  }, [setImportedSchedule, setScheduleFileName, normalizeLabel]);
 
-  // 時間割の項目順マップ: eventName+round → 時間割上の出現順
-  const scheduleOrderMap = useMemo(() => {
-    const map = new Map<string, { order: number; time: string }>();
-    if (importedSchedule.length === 0) return map;
-    let orderIdx = 0;
-    for (const item of importedSchedule) {
-      const key = `${item.eventName}|${item.roundLabel}`;
-      if (!map.has(key)) {
-        map.set(key, { order: orderIdx++, time: item.startTime });
-      }
-    }
-    return map;
-  }, [importedSchedule]);
+  // イベント名の略称マッチング（正規化して比較）
+  const normalizeEventName = useCallback((name: string): string => {
+    return name
+      .replace(/シングルス|ダブルス|一般|歳以上|級/g, '')
+      .replace(/[\s\u3000]+/g, '')
+      .trim();
+  }, []);
 
-  // イベント名の略称マッチング
-  const matchEventName = (fullName: string, abbrev: string): boolean => {
-    // 完全一致
+  const matchEventName = useCallback((fullName: string, abbrev: string): boolean => {
     if (fullName === abbrev) return true;
-    // 略称がフル名に含まれる or フル名が略称に含まれる
-    if (fullName.includes(abbrev) || abbrev.includes(fullName)) return true;
-    // 「シングルス」「ダブルス」を除去して比較
-    const stripped = fullName.replace(/シングルス|ダブルス/g, '').replace(/級/g, '');
-    if (stripped.includes(abbrev) || abbrev.includes(stripped)) return true;
-    // 「一般」「歳以上」を除去
-    const moreStripped = stripped.replace(/一般/g, '').replace(/歳以上/g, '');
-    if (moreStripped.includes(abbrev) || abbrev.includes(moreStripped)) return true;
+    const normFull = normalizeEventName(fullName);
+    const normAbbr = normalizeEventName(abbrev);
+    if (normFull === normAbbr) return true;
+    if (normFull.includes(normAbbr) || normAbbr.includes(normFull)) return true;
     return false;
-  };
+  }, [normalizeEventName]);
+
+  // ラウンドラベル照合
+  const matchRoundLabel = useCallback((rLabel: string, round: number, evTotalRounds: number): boolean => {
+    if (!rLabel) return false;
+    const upper = rLabel.toUpperCase().trim();
+    if (upper === `${round}R`) return true;
+    const rName = getRoundName(round, evTotalRounds);
+    if (rLabel === rName) return true;
+    if (upper === 'QF' && rName === '準々決勝') return true;
+    if (upper === 'SF' && rName === '準決勝') return true;
+    if (upper === 'F' && rName === '決勝') return true;
+    const sLabel = shortRoundName(round, evTotalRounds);
+    if (upper === sLabel.toUpperCase()) return true;
+    return false;
+  }, []);
 
   // リーグ戦判定
   const isLeagueEvent = useCallback((eventId: string): boolean => {
@@ -277,7 +316,7 @@ export default function MatchManager() {
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
-  // 全試合を時間割の項目順でグローバルソート（対戦順表示用）
+  // 全試合を時間割のB列フラットリスト順でソート（対戦順表示用）
   const globalSortedMatches = useMemo(() => {
     const arr: (Match & { eventName: string })[] = [];
     for (const [eventId, matches] of allMatchesByEvent) {
@@ -289,59 +328,78 @@ export default function MatchManager() {
       }
     }
 
-    if (scheduleOrderMap.size > 0) {
-      // ラウンドラベル照合ヘルパー
-      const matchRound = (rLabel: string, round: number, rName: string): boolean => {
-        if (!rLabel) return false;
-        if (rLabel === rName) return true;
-        if (rLabel === `${round}R` || rLabel === `${round}回戦`) return true;
-        if (rLabel === 'QF' && rName === '準々決勝') return true;
-        if (rLabel === 'SF' && rName === '準決勝') return true;
-        if (rLabel === 'F' && rName === '決勝') return true;
-        if (rLabel === '決勝' && rName === '決勝') return true;
-        if (rLabel === '準決勝' && rName === '準決勝') return true;
-        if (rLabel === '準々決勝' && rName === '準々決勝') return true;
-        return false;
-      };
-
-      // 各試合の時間割順序を決定
-      const getScheduleOrder = (m: Match & { eventName: string }): number => {
-        const evDraw = allDraws.get(m.eventId);
-        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
-        const rName = getRoundName(m.round, evTotalRounds);
-
-        for (const [key, val] of scheduleOrderMap) {
-          const [evName, rLabel] = key.split('|');
-          if (!matchEventName(m.eventName, evName)) continue;
-
-          // ラウンド指定あり → 特定ラウンドのみマッチ
-          if (rLabel) {
-            if (matchRound(rLabel, m.round, rName)) return val.order;
-          } else {
-            // ラウンド指定なし → リーグ戦: 全ラウンドをこの順番に
-            return val.order;
-          }
-        }
-        return 9999;
-      };
-
-      return arr.sort((a, b) => {
-        const oa = getScheduleOrder(a);
-        const ob = getScheduleOrder(b);
-        if (oa !== ob) return oa - ob;
-        // 同じグループ内: リーグ戦はmatchOrder順、トーナメントはposition順
-        const aLeague = isLeagueEvent(a.eventId);
-        const bLeague = isLeagueEvent(b.eventId);
-        if (aLeague || bLeague) {
-          return (a.matchOrder || 0) - (b.matchOrder || 0);
-        }
-        return (a.position || 0) - (b.position || 0);
-      });
+    if (importedSchedule.length === 0) {
+      return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
     }
 
-    // 時間割データがない場合はmatchOrder順
-    return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
-  }, [allMatchesByEvent, events, scheduleOrderMap, allDraws, isLeagueEvent]);
+    // フラットリストの連続する同一eventName+roundLabelをグループ化
+    type SGroup = { eventName: string; roundLabel: string; count: number; startOrder: number };
+    const groups: SGroup[] = [];
+    let curG: SGroup | null = null;
+    for (let i = 0; i < importedSchedule.length; i++) {
+      const item = importedSchedule[i];
+      if (curG && curG.eventName === item.eventName && curG.roundLabel === item.roundLabel) {
+        curG.count++;
+      } else {
+        curG = { eventName: item.eventName, roundLabel: item.roundLabel, count: 1, startOrder: i };
+        groups.push(curG);
+      }
+    }
+
+    // 種目+ラウンド別にDB試合をソートして準備
+    const matchesByKey = new Map<string, (Match & { eventName: string })[]>();
+    for (const m of arr) {
+      const evDraw = allDraws.get(m.eventId);
+      const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+      const rLabel = shortRoundName(m.round, evTotalRounds);
+      const isLg = isLeagueEvent(m.eventId);
+      const key = isLg ? `${m.eventId}|league` : `${m.eventId}|${rLabel}`;
+      if (!matchesByKey.has(key)) matchesByKey.set(key, []);
+      matchesByKey.get(key)!.push(m);
+    }
+    for (const [key, ms] of matchesByKey) {
+      const isLg = key.endsWith('|league');
+      ms.sort((a, b) => isLg ? (a.matchOrder || 0) - (b.matchOrder || 0) : (a.position || 0) - (b.position || 0));
+    }
+
+    // グループ順にDB試合を消費して順番を割り当て
+    const matchOrder = new Map<string, number>();
+    const consumed = new Map<string, number>();
+
+    for (const g of groups) {
+      let matchKey: string | null = null;
+      for (const [key, ms] of matchesByKey) {
+        if (ms.length === 0) continue;
+        const m0 = ms[0];
+        const evDraw = allDraws.get(m0.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+        const isLg = key.endsWith('|league');
+        if (!matchEventName(m0.eventName, g.eventName)) continue;
+        if (g.roundLabel) {
+          if (isLg) continue;
+          if (matchRoundLabel(g.roundLabel, m0.round, evTotalRounds)) { matchKey = key; break; }
+        } else {
+          if (isLg) { matchKey = key; break; }
+        }
+      }
+      if (!matchKey) continue;
+
+      const ms = matchesByKey.get(matchKey)!;
+      const c = consumed.get(matchKey) || 0;
+      for (let i = 0; i < g.count && c + i < ms.length; i++) {
+        matchOrder.set(ms[c + i].matchId, g.startOrder + i);
+      }
+      consumed.set(matchKey, c + g.count);
+    }
+
+    return arr.sort((a, b) => {
+      const oa = matchOrder.get(a.matchId) ?? 9999;
+      const ob = matchOrder.get(b.matchId) ?? 9999;
+      if (oa !== ob) return oa - ob;
+      return (a.matchOrder || 0) - (b.matchOrder || 0);
+    });
+  }, [allMatchesByEvent, events, importedSchedule, allDraws, isLeagueEvent, matchEventName, matchRoundLabel]);
+
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
@@ -1385,9 +1443,9 @@ ${printableMatches.map(m => {
   };
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 max-w-7xl mx-auto">
-      {/* TOP: プルダウン式コントロールパネル */}
-      <div className="shrink-0 mb-3 sticky top-0 z-10 bg-bg-main pt-0">
+    <div className="max-w-full mx-auto lg:h-full flex flex-col lg:flex-row lg:gap-4 p-4">
+      {/* LEFT: コントロールパネル */}
+      <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0 sticky top-0 z-20 lg:self-start bg-bg-main pb-1">
         <button
           onClick={() => setControlsOpen(prev => !prev)}
           className="w-full flex items-center justify-between bg-white px-4 py-2.5 rounded-xl shadow-sm border border-border-main hover:bg-gray-50 transition-colors"
@@ -1552,8 +1610,8 @@ ${printableMatches.map(m => {
         </div>
       </div>
 
-      {/* Main content */}
-      <div ref={matchContentRef} className="flex-1 min-w-0 overflow-auto space-y-3">
+      {/* RIGHT: メインコンテンツ */}
+      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full">
         {/* === 対戦順（グローバル）表示 === */}
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
@@ -1566,31 +1624,19 @@ ${printableMatches.map(m => {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs" style={{ tableLayout: 'fixed', minWidth: '620px' }}>
-                  <colgroup>
-                    <col style={{ width: '26px' }} />
-                    <col style={{ width: '74px' }} />
-                    <col style={{ width: '26px' }} />
-                    <col />
-                    <col style={{ width: '18px' }} />
-                    <col />
-                    <col style={{ width: '38px' }} />
-                    <col style={{ width: '26px' }} />
-                    <col style={{ width: '46px' }} />
-                    <col style={{ width: '72px' }} />
-                  </colgroup>
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400">
-                      <th className="px-1 py-1.5 text-center">#</th>
-                      <th className="px-1 py-1.5">種目</th>
-                      <th className="px-1 py-1.5 text-center">G</th>
-                      <th className="px-1 py-1.5">選手1</th>
-                      <th className="px-0 py-1.5 text-center"></th>
-                      <th className="px-1 py-1.5">選手2</th>
-                      <th className="px-1 py-1.5 text-center">時間</th>
-                      <th className="px-1 py-1.5 text-center">C</th>
-                      <th className="px-1 py-1.5 text-center">状態</th>
-                      <th className="px-1 py-1.5 text-center">操作</th>
+                      <th className="px-1.5 py-1.5 text-center whitespace-nowrap">#</th>
+                      <th className="px-1.5 py-1.5 whitespace-nowrap">種目</th>
+                      <th className="px-1 py-1.5 text-center whitespace-nowrap">G</th>
+                      <th className="px-1.5 py-1.5 whitespace-nowrap">選手1</th>
+                      <th className="px-0.5 py-1.5 text-center whitespace-nowrap"></th>
+                      <th className="px-1.5 py-1.5 whitespace-nowrap">選手2</th>
+                      <th className="px-1 py-1.5 text-center whitespace-nowrap">時間</th>
+                      <th className="px-1 py-1.5 text-center whitespace-nowrap">C</th>
+                      <th className="px-1 py-1.5 text-center whitespace-nowrap">状態</th>
+                      <th className="px-1 py-1.5 text-center whitespace-nowrap">操作</th>
                     </tr>
                   </thead>
                   <tbody>
