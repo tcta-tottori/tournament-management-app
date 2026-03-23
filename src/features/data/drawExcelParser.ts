@@ -110,23 +110,63 @@ function nextPowerOf2(n: number): number {
 // JTA標準シード位置 & BYE配置
 // ---------------------------------------------------------------------------
 
+/** drawSizeに対するJTA標準シード配置位置（1-indexed）を優先順で返す */
+function getSeedPositionsForDrawSize(drawSize: number): number[] {
+  const positions: number[] = [1, drawSize]; // seed 1, seed 2
+  const seedPosMap: Record<number, { seed3_4?: number[]; seed5_8?: number[]; seed9_16?: number[] }> = {
+    16: { seed3_4: [5, 12] },
+    32: { seed3_4: [9, 24], seed5_8: [8, 16, 17, 25] },
+    64: { seed3_4: [17, 48], seed5_8: [16, 32, 33, 49], seed9_16: [8, 24, 25, 41, 40, 56, 57, 9] },
+    128: { seed3_4: [33, 96], seed5_8: [32, 64, 65, 97], seed9_16: [16, 48, 49, 81, 80, 112, 113, 17] },
+  };
+  const spm = seedPosMap[drawSize];
+  if (spm) {
+    if (spm.seed3_4) positions.push(...spm.seed3_4);
+    if (spm.seed5_8) positions.push(...spm.seed5_8);
+    if (spm.seed9_16) positions.push(...spm.seed9_16);
+  }
+  return positions;
+}
+
 /**
  * 半分のブラケットにおけるBYE位置を決定する。
- * Excelレイアウトに合わせ、エントリーを上から順に詰め、BYEは下部に配置する。
+ * シード選手の対抗位置にBYEを優先配置し、残りは下端から順に配置。
  */
 function determineBYEPositionsForHalf(
   halfSize: number,
   halfOffset: number,   // 0 for left half, halfSize for right half
   byeCount: number,
-  _drawSize: number,
+  drawSize: number,
 ): number[] {
   if (byeCount <= 0) return [];
 
-  // BYEは半分の末尾（下部）に配置
   const byePositions: number[] = [];
+  const usedPositions = new Set<number>();
+  const halfStart = halfOffset + 1;
   const halfEnd = halfOffset + halfSize;
-  for (let i = 0; i < byeCount; i++) {
-    byePositions.push(halfEnd - i);
+
+  // シード位置を取得し、この半分に含まれるものをフィルタ
+  const allSeedPositions = getSeedPositionsForDrawSize(drawSize);
+  const seedPosInHalf = allSeedPositions.filter(p => p >= halfStart && p <= halfEnd);
+
+  // 1. シード選手の対抗位置にBYEを配置
+  for (const seedPos of seedPosInHalf) {
+    if (byePositions.length >= byeCount) break;
+    const opponent = seedPos % 2 === 1 ? seedPos + 1 : seedPos - 1;
+    if (opponent >= halfStart && opponent <= halfEnd && !usedPositions.has(opponent)) {
+      byePositions.push(opponent);
+      usedPositions.add(opponent);
+    }
+  }
+
+  // 2. 残りのBYEは下端から順に配置（上端の選手を優先的に対戦させる）
+  let bottom = halfEnd;
+  while (byePositions.length < byeCount) {
+    while (bottom >= halfStart && (usedPositions.has(bottom) || seedPosInHalf.includes(bottom))) bottom--;
+    if (bottom < halfStart) break;
+    byePositions.push(bottom);
+    usedPositions.add(bottom);
+    bottom--;
   }
 
   return byePositions;
