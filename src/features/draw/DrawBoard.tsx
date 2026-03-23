@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import DrawRenderer from './DrawRenderer';
@@ -10,6 +10,8 @@ import {
   exportRoundRobinResultAsJpeg,
   exportRoundRobinResultAsExcel,
 } from './DrawResultExporter';
+import ScoreInputDialog from '../score/ScoreInputDialog';
+import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch, Image, FileSpreadsheet } from 'lucide-react';
 
 export type DrawSlotData = {
@@ -44,6 +46,7 @@ export default function DrawBoard() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'tournament' | 'roundRobin'>('tournament');
+  const [scoreMatch, setScoreMatch] = useState<ScoreInputMatch | null>(null);
 
   const events = useLiveQuery(() => db.events.toArray()) || [];
   const entries = useLiveQuery(
@@ -293,6 +296,49 @@ export default function DrawBoard() {
     }
   };
 
+  // --- Score dialog helpers ---
+  const handleMatchClick = useCallback((round: number, position: number) => {
+    const m = matches.find(x => x.round === round && x.position === position);
+    if (!m || !m.id) return;
+    const eventObj = events.find(e => e.eventId === selectedEventId);
+    setScoreMatch({
+      matchId: m.matchId,
+      dbId: m.id,
+      round: m.round,
+      position: m.position,
+      matchOrder: m.matchOrder,
+      player1Name: m.player1Name,
+      player2Name: m.player2Name,
+      player1Affiliation: m.player1Affiliation,
+      player2Affiliation: m.player2Affiliation,
+      player1EntryId: m.player1EntryId,
+      player2EntryId: m.player2EntryId,
+      score: m.score,
+      winnerEntryId: m.winnerEntryId,
+      courtId: m.courtId,
+      status: m.status,
+      scheduledTime: m.scheduledTime,
+      eventName: eventObj?.name || '',
+      updatedAt: m.updatedAt,
+    });
+  }, [matches, events, selectedEventId]);
+
+  const totalRounds = drawData ? Math.log2(drawData.drawSize) : 0;
+  const makeRoundName = useCallback((round: number) => {
+    if (round === totalRounds) return '決勝';
+    if (round === totalRounds - 1) return '準決勝';
+    if (round === totalRounds - 2) return '準々決勝';
+    return `${round}回戦`;
+  }, [totalRounds]);
+
+  const occupiedCourtIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of matches) {
+      if (m.status === 'playing' && m.courtId) set.add(m.courtId);
+    }
+    return set;
+  }, [matches]);
+
   return (
     <div className="h-full flex flex-col p-4 md:p-6 mx-auto space-y-6">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-border-main shrink-0">
@@ -438,6 +484,7 @@ export default function DrawBoard() {
                   selectedPosition={selectedPosition}
                   matchResults={matchResults}
                   eventType={events.find(e => e.eventId === selectedEventId)?.type}
+                  onMatchClick={handleMatchClick}
                 />
               )
             ) : (
@@ -452,6 +499,21 @@ export default function DrawBoard() {
         <div className="flex items-center justify-center p-8 text-center bg-white rounded-xl border border-border-main shadow-sm h-64">
            <p className="font-semibold text-gray-500">上部のドロップダウンから対象種目を選択してください</p>
         </div>
+      )}
+
+      {/* Score input dialog */}
+      {scoreMatch && (
+        <ScoreInputDialog
+          match={scoreMatch}
+          courts={courts.filter(c => c.isAvailable).map(c => ({
+            courtId: c.courtId,
+            name: c.name,
+            isAvailable: !occupiedCourtIds.has(c.courtId) || c.courtId === scoreMatch.courtId,
+          }))}
+          onClose={() => setScoreMatch(null)}
+          onMatchUpdate={() => {}}
+          getRoundName={makeRoundName}
+        />
       )}
     </div>
   );
