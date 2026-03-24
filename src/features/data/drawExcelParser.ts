@@ -107,94 +107,133 @@ function nextPowerOf2(n: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// JTA標準シード位置 & BYE配置
+// R1ペアリング検出 & ブラケット位置マッピング
 // ---------------------------------------------------------------------------
 
+/** セル値が日時（時刻）かどうかを判定 */
+function isTimeValue(v: unknown): boolean {
+  if (v == null) return false;
+  // SheetJS cellDates:true → Date object for time cells
+  if (v instanceof Date) return true;
+  // Some XLSX libraries return time as fractional number (0-1)
+  if (typeof v === 'number' && v > 0 && v < 1) return true;
+  // Check for time-like string "H:MM" or "HH:MM"
+  if (typeof v === 'string' && /^\d{1,2}:\d{2}$/.test(v.trim())) return true;
+  return false;
+}
+
 /**
- * 半分のブラケットにおけるBYE位置を決定する。
- * JTA標準方式: 各エイス（8ポジション単位）にBYEを均等分配し、
- * グローバルエイスインデックスに基づいてパターンA/B/Cを使い分ける。
+ * Excelブラケットエリアのギャップ行（エントリー間の行）に
+ * 試合時刻があるかどうかを調べ、R1ペアリングを検出する。
  *
- * パターンA: {1, 7, 6, ...} 上端walkover＋下端ペア空
- * パターンB: {2, 3, 7, ...} 中央ペア空＋下端walkover
- * パターンC: {3, 6, 7, ...} 中央walkover＋下端ペア空
- *
- * グローバルエイスパターン:
- *   32ドロー(4エイス): A, B, C, B
- *   64ドロー(8エイス): A, B, C, B, A, A, B, B
+ * @param rows - シートの全行データ
+ * @param entryRows - 各エントリーの行インデックス（0-based, rows配列のインデックス）
+ * @param side - 'left' | 'right'
+ * @returns R1で対戦するエントリーのインデックスペア配列 (entryRows内のインデックス)
  */
-function determineBYEPositionsForHalf(
-  halfSize: number,
-  halfOffset: number,   // 0 for left half, halfSize for right half
-  byeCount: number,
-  _drawSize: number,
+function detectR1Pairings(
+  rows: unknown[][],
+  entryRows: number[],
+  side: 'left' | 'right',
 ): number[] {
-  if (byeCount <= 0) return [];
+  if (entryRows.length < 2) return [];
 
-  const halfStart = halfOffset + 1;
+  // ブラケットエリアの列範囲 (0-indexed)
+  const colRange = side === 'left'
+    ? { start: 5, end: 12 }  // cols F(5) to M(12)
+    : { start: 13, end: 18 }; // cols N(13) to S(18)
 
-  // エイス（8ポジション単位）に分割してBYEを均等配分
-  const eighthSize = 8;
-  const numEighths = Math.max(1, halfSize / eighthSize);
+  // 各ギャップ行で時刻セルを探し、最も外側の列（R1列）を特定
+  interface GapInfo {
+    entryIdx: number; // entryRows内のインデックス（上側エントリー）
+    gapRow: number;
+    timeCols: number[];
+  }
 
-  // halfSize < 8 の場合は簡易処理（末尾からBYEを配置）
-  if (halfSize < eighthSize) {
-    const byePositions: number[] = [];
-    for (let i = halfSize; i >= 1 && byePositions.length < byeCount; i--) {
-      byePositions.push(halfOffset + i);
+  const gaps: GapInfo[] = [];
+  let allTimeCols = new Set<number>();
+
+  for (let i = 0; i < entryRows.length - 1; i++) {
+    const gapRow = entryRows[i] + 1;
+    const row = rows[gapRow];
+    if (!row) continue;
+
+    const timeCols: number[] = [];
+    for (let c = colRange.start; c <= colRange.end; c++) {
+      if (isTimeValue(row[c])) {
+        timeCols.push(c);
+        allTimeCols.add(c);
+      }
     }
-    return byePositions;
-  }
 
-  // 各エイスのBYE数を計算（均等配分、余りは最後のエイスから減らす）
-  const baseByes = Math.floor(byeCount / numEighths);
-  let remainder = byeCount - baseByes * numEighths;
-  const eighthByes: number[] = new Array(numEighths).fill(baseByes);
-
-  // 余りを最後のエイスから逆順に配分（右半分の先頭エイスが少なくなるように）
-  for (let i = numEighths - 1; i >= 0 && remainder > 0; i--) {
-    eighthByes[i]++;
-    remainder--;
-  }
-
-  // BYEパターン定義（エイス内0-indexedオフセット、優先順）
-  const PATTERN_A = [1, 7, 6, 5, 4, 0, 2, 3];
-  const PATTERN_B = [2, 3, 7, 6, 5, 0, 1, 4];
-  const PATTERN_C = [3, 6, 7, 2, 5, 0, 1, 4];
-
-  // グローバルエイスインデックスに基づくパターンマップ
-  // ドローサイズごとにグローバルエイスのパターン配列を定義
-  const totalEighths = _drawSize / eighthSize;
-  const globalEighthOffset = halfOffset / eighthSize;
-
-  // グローバルエイスパターンテーブル
-  const GLOBAL_PATTERNS: Record<number, number[][]> = {
-    2:  [PATTERN_A, PATTERN_B],
-    4:  [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B],
-    8:  [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B],
-    16: [PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B,
-         PATTERN_C, PATTERN_B, PATTERN_C, PATTERN_B, PATTERN_A, PATTERN_A, PATTERN_B, PATTERN_B],
-  };
-
-  const globalPatterns = GLOBAL_PATTERNS[totalEighths] || GLOBAL_PATTERNS[8] || [];
-
-  const byePositions: number[] = [];
-
-  for (let ei = 0; ei < numEighths; ei++) {
-    const eByes = eighthByes[ei];
-    if (eByes <= 0) continue;
-
-    const eStart = halfStart + ei * eighthSize; // 1-indexed start of this eighth
-    const globalEi = globalEighthOffset + ei;
-
-    const byeOrder = globalPatterns[globalEi] || PATTERN_A;
-
-    for (let bi = 0; bi < eByes && bi < byeOrder.length; bi++) {
-      byePositions.push(eStart + byeOrder[bi]);
+    if (timeCols.length > 0) {
+      gaps.push({ entryIdx: i, gapRow, timeCols });
     }
   }
 
-  return byePositions;
+  if (allTimeCols.size === 0) return [];
+
+  // R1列 = 左側は最小列、右側は最大列（ブラケットの最外側）
+  const r1Col = side === 'left'
+    ? Math.min(...allTimeCols)
+    : Math.max(...allTimeCols);
+
+  // R1列に時刻があるギャップ → そのエントリーペアがR1で対戦
+  const r1PairIndices: number[] = [];
+  for (const gap of gaps) {
+    if (gap.timeCols.includes(r1Col)) {
+      r1PairIndices.push(gap.entryIdx);
+    }
+  }
+
+  return r1PairIndices;
+}
+
+/**
+ * R1ペアリング情報からブラケット位置を割り当てる。
+ *
+ * R1で対戦するペア → 同じペア枠（連続2ポジション）に配置
+ * walkovers（R1なし） → エントリー + BYEのペア枠に配置
+ *
+ * @param players - ドロー番号順にソートされたエントリー配列
+ * @param entryRows - 各エントリーの行インデックス
+ * @param halfSize - 半分のブラケットサイズ
+ * @param halfOffset - ポジションオフセット（左半分=0, 右半分=halfSize）
+ * @param rows - シートの全行データ
+ * @param side - 'left' | 'right'
+ */
+function assignPositionsFromR1Pairings(
+  players: ParsedDrawPlayer[],
+  entryRows: number[],
+  _halfSize: number,
+  halfOffset: number,
+  rows: unknown[][],
+  side: 'left' | 'right',
+): void {
+  if (players.length === 0) return;
+
+  const r1PairIndices = detectR1Pairings(rows, entryRows, side);
+  const r1Set = new Set(r1PairIndices);
+
+  // ブラケット位置を順番に割り当て
+  let pos = halfOffset + 1; // 1-indexed
+  let i = 0;
+
+  while (i < players.length) {
+    if (r1Set.has(i) && i + 1 < players.length) {
+      // R1ペア: 2エントリーが同じペア枠
+      players[i].position = pos;
+      players[i + 1].position = pos + 1;
+      pos += 2;
+      i += 2;
+    } else {
+      // Walkover: エントリー + BYE
+      players[i].position = pos;
+      // BYE is at pos + 1 (implicit, not stored)
+      pos += 2;
+      i += 1;
+    }
+  }
 }
 
 function isEventHeader(text: string): boolean {
@@ -398,6 +437,11 @@ const DOUBLES_RIGHT: ColumnLayout = {
 // Player extraction
 // ---------------------------------------------------------------------------
 
+interface ExtractionResult {
+  players: ParsedDrawPlayer[];
+  entryRows: number[]; // 各エントリーの行インデックス（rows配列の0-basedインデックス）
+}
+
 function extractPlayersFromHalf(
   rows: unknown[][],
   startRow: number,
@@ -405,8 +449,9 @@ function extractPlayersFromHalf(
   layout: ColumnLayout,
   isDoubles: boolean,
   positionOffset: number,
-): ParsedDrawPlayer[] {
+): ExtractionResult {
   const players: ParsedDrawPlayer[] = [];
+  const entryRows: number[] = [];
 
   for (let r = startRow; r < endRow; r++) {
     const row = rows[r];
@@ -444,9 +489,10 @@ function extractPlayersFromHalf(
     }
 
     players.push(player);
+    entryRows.push(r);
   }
 
-  return players;
+  return { players, entryRows };
 }
 
 // ---------------------------------------------------------------------------
@@ -546,33 +592,35 @@ export function parseDrawExcel(
     const rightLayout = isDoubles ? DOUBLES_RIGHT : SINGLES_RIGHT;
 
     // Extract players from left half
-    const leftPlayers = extractPlayersFromHalf(
+    const leftResult = extractPlayersFromHalf(
       rows,
       startRow,
       endRow,
       leftLayout,
       isDoubles,
-      0, // positions are as-is from the draw numbers
+      0,
     );
+    const leftPlayers = leftResult.players;
+    const leftEntryRows = leftResult.entryRows;
 
     // Extract players from right half
-    const rightPlayers = extractPlayersFromHalf(
+    const rightResult = extractPlayersFromHalf(
       rows,
       startRow,
       endRow,
       rightLayout,
       isDoubles,
-      0, // right half draw numbers already account for offset in the Excel
+      0,
     );
+    const rightPlayers = rightResult.players;
+    const rightEntryRows = rightResult.entryRows;
 
     // ------------------------------------------------------------------
     // Calculate draw size and map entries to proper bracket positions
     // ------------------------------------------------------------------
-    // Excelのドロー番号は連番（左1-N, 右N+1-M）だが、実際のトーナメント
-    // ブラケットではBYEがシード選手の対抗位置に配置されるため、
-    // 連番のまま使うと対戦が正しくならない。
-    // JTA標準シード位置に基づいてBYE位置を決定し、エントリーを
-    // 正しいブラケット位置にマッピングする。
+    // Excelのブラケットエリアの試合時刻（ギャップ行）からR1ペアリングを
+    // 検出し、エントリーを正しいブラケット位置にマッピングする。
+    // R1で対戦するペアは同じペア枠に、walkoverはBYEとのペアに配置。
     let maxPosition = 0;
     for (const p of [...leftPlayers, ...rightPlayers]) {
       if (p.position > maxPosition) maxPosition = p.position;
@@ -594,27 +642,13 @@ export function parseDrawExcel(
       const rightByeCount = Math.max(0, halfSize - rightPlayers.length);
 
       if (leftByeCount > 0 || rightByeCount > 0) {
-        // BYE位置を決定
-        const leftByeSet = new Set(determineBYEPositionsForHalf(halfSize, 0, leftByeCount, drawSize));
-        const rightByeSet = new Set(determineBYEPositionsForHalf(halfSize, halfSize, rightByeCount, drawSize));
-
-        // 左半分: BYE以外の位置にエントリーを順番に配置
-        const leftAvail: number[] = [];
-        for (let p = 1; p <= halfSize; p++) {
-          if (!leftByeSet.has(p)) leftAvail.push(p);
-        }
-        for (let i = 0; i < leftPlayers.length && i < leftAvail.length; i++) {
-          leftPlayers[i].position = leftAvail[i];
-        }
-
-        // 右半分: BYE以外の位置にエントリーを順番に配置
-        const rightAvail: number[] = [];
-        for (let p = halfSize + 1; p <= drawSize; p++) {
-          if (!rightByeSet.has(p)) rightAvail.push(p);
-        }
-        for (let i = 0; i < rightPlayers.length && i < rightAvail.length; i++) {
-          rightPlayers[i].position = rightAvail[i];
-        }
+        // Excelの試合時刻からR1ペアリングを検出してブラケット位置を割り当て
+        assignPositionsFromR1Pairings(
+          leftPlayers, leftEntryRows, halfSize, 0, rows, 'left',
+        );
+        assignPositionsFromR1Pairings(
+          rightPlayers, rightEntryRows, halfSize, halfSize, rows, 'right',
+        );
       } else {
         // BYE不要の場合: 連番でそのまま配置
         for (let i = 0; i < leftPlayers.length; i++) {
