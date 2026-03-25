@@ -397,15 +397,6 @@ export default function EntryRegistration() {
     );
   }, []);
 
-  // 種目名の正規化（マッチング用）
-  const normalizeEventName = (name: string): string => {
-    return name
-      .replace(/[　\s]+/g, '')  // Remove all whitespace
-      .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // Full-width to half-width
-      .replace(/級$/, '')
-      .toLowerCase();
-  };
-
   // ラウンド番号 → 時間割ラベル変換
   const roundNumberToLabel = (round: number, totalRounds: number): string => {
     if (round === totalRounds) return 'F';
@@ -432,7 +423,7 @@ export default function EntryRegistration() {
     const existingCourts = await db.courts.where('tournamentId').equals(tid).toArray();
     const courtNameToId = new Map(existingCourts.map(c => [c.name, c.courtId]));
     for (const item of importedSchedule) {
-      if (!courtNameToId.has(item.courtName)) {
+      if (item.courtName && !courtNameToId.has(item.courtName)) {
         const courtId = `C-${Date.now()}-${item.courtName}`;
         await db.courts.add({
           tournamentId: tid, courtId, name: item.courtName,
@@ -443,18 +434,66 @@ export default function EntryRegistration() {
       }
     }
 
-    // 種目名 → eventId マッピング
-    const eventNameMap = new Map<string, string>(); // normalizedName → eventId
-    for (const evt of allEvents) {
-      eventNameMap.set(normalizeEventName(evt.name), evt.eventId);
+    // 種目+ラウンドごとの試合プール (playable試合をposition順にキューとして保持)
+    // key: "eventId|roundLabel"
+    const matchQueues = new Map<string, Match[]>();
+    const walkoverMatches: Match[] = [];
+    const orphanMatches: Match[] = [];
+
+    for (const m of allMatches) {
+      if (m.status === 'walkover') {
+        walkoverMatches.push(m);
+        continue;
+      }
+      const draw = drawMap.get(m.eventId);
+      if (!draw) { orphanMatches.push(m); continue; }
+      const totalRounds = Math.log2(draw.drawSize);
+      const rLabel = roundNumberToLabel(m.round, totalRounds);
+      const key = `${m.eventId}|${rLabel}`;
+      if (!matchQueues.has(key)) matchQueues.set(key, []);
+      matchQueues.get(key)!.push(m);
+    }
+    // 各キュー内をposition順にソート
+    for (const [, q] of matchQueues) {
+      q.sort((a, b) => a.position - b.position);
     }
 
-    // 時間割アイテムを種目+ラウンドでグループ化
-    // key: eventId|roundLabel
-    const scheduleGrouped = new Map<string, typeof importedSchedule>();
-    const unmatchedScheduleItems: string[] = [];
+    // 消費ポインタ: 各キューから次に割り当てる試合のインデックス
+    const queuePointers = new Map<string, number>();
+
+    // ラウンドラベルの代替キーを探す
+    const findMatchKey = (eventId: string, roundLabel: string): string | null => {
+      const key = `${eventId}|${roundLabel}`;
+      if (matchQueues.has(key)) return key;
+      // ラベル別名変換
+      const aliases: string[] = [];
+      if (/^\d+R$/.test(roundLabel)) aliases.push(`${eventId}|${roundLabel.replace('R', '回戦')}`);
+      if (/^\d+回戦$/.test(roundLabel)) aliases.push(`${eventId}|${roundLabel.replace('回戦', 'R')}`);
+      if (roundLabel === 'F') aliases.push(`${eventId}|決勝`);
+      if (roundLabel === '決勝') aliases.push(`${eventId}|F`);
+      if (roundLabel === 'SF') aliases.push(`${eventId}|準決勝`);
+      if (roundLabel === 'QF') aliases.push(`${eventId}|準々決勝`);
+      for (const alt of aliases) {
+        if (matchQueues.has(alt)) return alt;
+      }
+      // ラウンドラベルなし（リーグや小規模種目）→ eventIdで始まるキューを探す
+      if (!roundLabel) {
+        for (const [k, q] of matchQueues) {
+          if (k.startsWith(eventId + '|')) {
+            const ptr = queuePointers.get(k) || 0;
+            if (ptr < q.length) return k;
+          }
+        }
+      }
+      return null;
+    };
+
+    // importedSchedule を順番に走査し、試合を1つずつ消費して順序を決定
+    const ordered: { match: Match; courtName: string; startTime: string }[] = [];
+    const unmatchedItems: string[] = [];
+
     for (const item of importedSchedule) {
-      // 種目名マッチング（略称→正式名変換 + 柔軟マッチング）
+      // 種目名 → eventId
       let matchedEventId: string | null = null;
       const resolvedName = SCHEDULE_CODE_TO_NAME[item.eventName.toLowerCase()] || item.eventName;
       for (const evt of allEvents) {
@@ -464,162 +503,58 @@ export default function EntryRegistration() {
         }
       }
       if (!matchedEventId) {
-        unmatchedScheduleItems.push(`${item.eventName}(${item.roundLabel}@${item.startTime})`);
+        unmatchedItems.push(`${item.eventName}(${item.roundLabel})`);
         continue;
       }
 
-      const key = `${matchedEventId}|${item.roundLabel}`;
-      if (!scheduleGrouped.has(key)) scheduleGrouped.set(key, []);
-      scheduleGrouped.get(key)!.push(item);
-    }
+      // 対応するキューから次の試合を消費
+      const qKey = findMatchKey(matchedEventId, item.roundLabel);
+      if (!qKey) continue;
+      const queue = matchQueues.get(qKey)!;
+      const ptr = queuePointers.get(qKey) || 0;
+      if (ptr >= queue.length) continue;
 
-    // 各グループ内を startTime → courtName(数値) でソート
-    for (const [, items] of scheduleGrouped) {
-      items.sort((a, b) => {
-        const timeCmp = a.startTime.localeCompare(b.startTime);
-        if (timeCmp !== 0) return timeCmp;
-        return (parseInt(a.courtName) || 0) - (parseInt(b.courtName) || 0);
+      ordered.push({
+        match: queue[ptr],
+        courtName: item.courtName,
+        startTime: item.startTime,
       });
+      queuePointers.set(qKey, ptr + 1);
     }
 
-    // デバッグ: マッチング状況をログ出力
-    if (unmatchedScheduleItems.length > 0) {
-      console.warn('[スケジュール紐付け] マッチしなかった時間割:', unmatchedScheduleItems.slice(0, 20));
-    }
-    console.log('[スケジュール紐付け] 時間割グループ数:', scheduleGrouped.size,
-      '/ DB種目:', allEvents.map(e => e.name),
-      '/ 時間割種目:', [...new Set(importedSchedule.map(i => i.eventName))]);
-
-    // 試合を種目+ラウンドでグループ化して時間割とマッチング
-    type MatchWithSchedule = { match: Match; startTime: string; courtName: string };
-    const scheduled: MatchWithSchedule[] = [];
-    const unscheduled: Match[] = [];
-
-    // 種目+ラウンドごとの試合グループ
-    const matchGrouped = new Map<string, Match[]>();
-    for (const m of allMatches) {
-      const draw = drawMap.get(m.eventId);
-      if (!draw) { unscheduled.push(m); continue; }
-      const totalRounds = Math.log2(draw.drawSize);
-      const rLabel = roundNumberToLabel(m.round, totalRounds);
-      // "1回戦" → "1R" 形式も試す
-      const key = `${m.eventId}|${rLabel}`;
-      if (!matchGrouped.has(key)) matchGrouped.set(key, []);
-      matchGrouped.get(key)!.push(m);
+    if (unmatchedItems.length > 0) {
+      console.warn('[スケジュール紐付け] マッチしなかった時間割:', [...new Set(unmatchedItems)].slice(0, 20));
     }
 
-    // デバッグ: matchGroupedの各キーの試合数と状態
-    for (const [key, matches] of matchGrouped) {
-      const walkoverCount = matches.filter(m => m.status === 'walkover').length;
-      const hasSchedule = scheduleGrouped.has(key);
-      if (!hasSchedule || walkoverCount > 0) {
-        console.log(`[紐付け] ${key}: 全${matches.length}試合(WO=${walkoverCount}), スケジュール=${hasSchedule ? scheduleGrouped.get(key)!.length + '枠' : 'なし'}`);
-      }
-    }
-
-    // 各グループで試合をposition順にソートし、時間割スロットとzip
-    for (const [key, matches] of matchGrouped) {
-      const schedItems = scheduleGrouped.get(key);
-      if (!schedItems || schedItems.length === 0) {
-        // 時間割ラベルの別形式も試す (1R ↔ 1回戦)
-        const [evtId, rLabel] = key.split('|');
-        let altKey: string | null = null;
-        if (/^\d+R$/.test(rLabel)) altKey = `${evtId}|${rLabel.replace('R', '回戦')}`;
-        else if (/^\d+回戦$/.test(rLabel)) altKey = `${evtId}|${rLabel.replace('回戦', 'R')}`;
-        else if (rLabel === 'F') altKey = `${evtId}|決勝`;
-        else if (rLabel === '決勝') altKey = `${evtId}|F`;
-        else if (rLabel === 'SF') altKey = `${evtId}|準決勝`;
-        else if (rLabel === 'QF') altKey = `${evtId}|準々決勝`;
-
-        const altItems = altKey ? scheduleGrouped.get(altKey) : null;
-        if (!altItems || altItems.length === 0) {
-          unscheduled.push(...matches);
-          continue;
-        }
-        // Use alternative key items
-        const playable2 = matches.filter(m => m.status !== 'walkover').sort((a, b) => a.position - b.position);
-        let idx2 = 0;
-        for (const si of altItems) {
-          if (idx2 >= playable2.length) break;
-          scheduled.push({ match: playable2[idx2], startTime: si.startTime, courtName: si.courtName });
-          idx2++;
-        }
-        for (; idx2 < playable2.length; idx2++) unscheduled.push(playable2[idx2]);
-        for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
-        continue;
-      }
-
-      // 通常フロー: playable試合（walkover除外）をposition順にソートし、時間割スロットとzip
-      const playable = matches.filter(m => m.status !== 'walkover').sort((a, b) => a.position - b.position);
-      let idx = 0;
-      for (const si of schedItems) {
-        if (idx >= playable.length) break;
-        scheduled.push({ match: playable[idx], startTime: si.startTime, courtName: si.courtName });
-        idx++;
-      }
-      for (; idx < playable.length; idx++) unscheduled.push(playable[idx]);
-      for (const m of matches.filter(m => m.status === 'walkover')) unscheduled.push(m);
-    }
-
-    // グローバルソート: 時間割の種目+回戦の出現順に従う
-    // 同じ種目+回戦内では position（若番＝ドロー左上）順
-    // importedSchedule の種目+回戦の初出順でグループ順を決定
-    const groupOrderMap = new Map<string, number>(); // "eventId|roundLabel" → 出現順
-    let groupIdx = 0;
-    for (const item of importedSchedule) {
-      let matchedEventId: string | null = null;
-      const resolvedName = SCHEDULE_CODE_TO_NAME[item.eventName.toLowerCase()] || item.eventName;
-      for (const evt of allEvents) {
-        if (matchEventName(resolvedName, evt.name)) {
-          matchedEventId = evt.eventId;
-          break;
-        }
-      }
-      if (!matchedEventId) continue;
-      const gKey = `${matchedEventId}|${item.roundLabel}`;
-      if (!groupOrderMap.has(gKey)) {
-        groupOrderMap.set(gKey, groupIdx++);
-      }
-    }
-
-    scheduled.sort((a, b) => {
-      // 種目+ラウンドのグループ順を取得
-      const drawA = drawMap.get(a.match.eventId);
-      const drawB = drawMap.get(b.match.eventId);
-      const totalRoundsA = drawA ? Math.log2(drawA.drawSize) : 1;
-      const totalRoundsB = drawB ? Math.log2(drawB.drawSize) : 1;
-      const rlA = roundNumberToLabel(a.match.round, totalRoundsA);
-      const rlB = roundNumberToLabel(b.match.round, totalRoundsB);
-      const gKeyA = `${a.match.eventId}|${rlA}`;
-      const gKeyB = `${b.match.eventId}|${rlB}`;
-      const orderA = groupOrderMap.get(gKeyA) ?? 99999;
-      const orderB = groupOrderMap.get(gKeyB) ?? 99999;
-      if (orderA !== orderB) return orderA - orderB;
-      // 同じ種目+回戦内では position 順（若番＝ドロー左上から）
-      return a.match.position - b.match.position;
-    });
-
-    // matchOrder を割り当てて DB 更新
+    // matchOrder を割り当て
     let order = 1;
     const updates: { id: number; matchOrder: number; courtId: string | null; scheduledTime: string | null }[] = [];
 
-    for (const { match, startTime, courtName } of scheduled) {
+    for (const { match, startTime, courtName } of ordered) {
       if (!match.id) continue;
       updates.push({
         id: match.id,
         matchOrder: order++,
         courtId: courtNameToId.get(courtName) || null,
-        scheduledTime: startTime,
+        scheduledTime: startTime || null,
       });
     }
 
-    // unscheduled は既存順序を維持
-    const unscheduledSorted = unscheduled.sort((a, b) => {
+    // キューに残った未消費の試合（スケジュールに載っていない分）
+    const remaining: Match[] = [];
+    for (const [key, queue] of matchQueues) {
+      const ptr = queuePointers.get(key) || 0;
+      for (let i = ptr; i < queue.length; i++) {
+        remaining.push(queue[i]);
+      }
+    }
+    // walkover, orphan, remaining をまとめて末尾に追加
+    const tail = [...remaining, ...walkoverMatches, ...orphanMatches].sort((a, b) => {
       if (a.eventId !== b.eventId) return a.eventId.localeCompare(b.eventId);
       if (a.round !== b.round) return a.round - b.round;
       return a.position - b.position;
     });
-    for (const m of unscheduledSorted) {
+    for (const m of tail) {
       if (!m.id) continue;
       updates.push({
         id: m.id,

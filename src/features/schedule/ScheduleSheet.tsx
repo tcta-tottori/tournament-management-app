@@ -487,16 +487,26 @@ export default function ScheduleSheet() {
       const importedCourtNames: string[] = [];
       let globalOrder = 0;
 
+      // グリッド部分（コート番号がある行）を読み取り
+      let continueFromRow = rows.length;
+      const eventNameColIdx = timeColumns.length > 0 ? timeColumns[0].colIdx : 1;
+
+      let lastCourtRow = -1;
       for (let r = dataStartIdx; r < rows.length; r++) {
         const row = rows[r];
         if (!row || row.length === 0) continue;
         const rawCourtName = String(row[0] ?? '').trim();
-        if (!rawCourtName) continue;
-        const courtNum = parseInt(rawCourtName, 10);
-        if (isNaN(courtNum)) {
-          if (items.length > 0) break;
+        if (!rawCourtName) {
+          // 列Aが空 → グリッド行の後なら続きの行に移行
+          if (lastCourtRow >= 0) { continueFromRow = r; break; }
           continue;
         }
+        const courtNum = parseInt(rawCourtName, 10);
+        if (isNaN(courtNum)) {
+          if (items.length > 0) { continueFromRow = r; break; }
+          continue;
+        }
+        lastCourtRow = r;
         const courtName = String(courtNum);
         if (!importedCourtNames.includes(courtName)) importedCourtNames.push(courtName);
 
@@ -528,13 +538,35 @@ export default function ScheduleSheet() {
         }
       }
 
+      // グリッド後の続きの行（コート番号なし、B列のみ）を読み取り
+      // Excel「パターン2」のB列全体を対戦順として取得する
+      for (let r = continueFromRow; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row) continue;
+        const cellValue = String(row[eventNameColIdx] ?? '').replace(/[\u3000]+/g, ' ').trim();
+        if (!cellValue) continue;
+        // 「パターン」等のセクションヘッダーが出たら終了
+        const colA = String(row[0] ?? '').trim();
+        if (colA && /パターン|コートNO/i.test(colA.replace(/[\s\u3000]+/g, ''))) break;
+        // 種目+ラウンドをパース。ラウンドなし（リーグ等の小種目）も受け入れる
+        const parsed = parseCellEventRound(cellValue);
+        globalOrder++;
+        items.push({
+          eventName: parsed?.eventName || cellValue,
+          roundLabel: parsed?.roundLabel || '',
+          matchOrder: globalOrder,
+          courtName: '',
+          startTime: '',
+        });
+      }
+
       if (items.length === 0) {
         setStatusMessage('Excelからスケジュールデータを読み取れませんでした。');
         return;
       }
 
       setImportedSchedule(items);
-      setStatusMessage(`Excelから ${items.length} 件のスケジュールを読み込みました（${importedCourtNames.length}コート x ${timeColumns.length}時間枠）。`);
+      setStatusMessage(`Excelから ${items.length} 件のスケジュールを読み込みました。`);
     } catch (err) {
       console.error(err);
       setStatusMessage(`Excel読み込みに失敗しました: ${(err as Error).message}`);
@@ -593,16 +625,24 @@ export default function ScheduleSheet() {
       const importedCourtNames: string[] = [];
       let globalOrder = 0;
 
+      let continueFromRow2 = rows.length;
+      const eventNameColIdx2 = timeColumns.length > 0 ? timeColumns[0].colIdx : 1;
+      let lastCourtRow2 = -1;
+
       for (let r = dataStartIdx; r < rows.length; r++) {
         const row = rows[r];
         if (!row || row.length === 0) continue;
         const rawCourtName = String(row[0] ?? '').trim();
-        if (!rawCourtName) continue;
-        const courtNum = parseInt(rawCourtName, 10);
-        if (isNaN(courtNum)) {
-          if (items.length > 0) break;
+        if (!rawCourtName) {
+          if (lastCourtRow2 >= 0) { continueFromRow2 = r; break; }
           continue;
         }
+        const courtNum = parseInt(rawCourtName, 10);
+        if (isNaN(courtNum)) {
+          if (items.length > 0) { continueFromRow2 = r; break; }
+          continue;
+        }
+        lastCourtRow2 = r;
         const courtName = String(courtNum);
         if (!importedCourtNames.includes(courtName)) importedCourtNames.push(courtName);
 
@@ -632,6 +672,25 @@ export default function ScheduleSheet() {
             startTime: tc.time,
           });
         }
+      }
+
+      // グリッド後の続きの行を読み取り
+      for (let r = continueFromRow2; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row) continue;
+        const cellValue = String(row[eventNameColIdx2] ?? '').replace(/[\u3000]+/g, ' ').trim();
+        if (!cellValue) continue;
+        const colA = String(row[0] ?? '').trim();
+        if (colA && /パターン|コートNO/i.test(colA.replace(/[\s\u3000]+/g, ''))) break;
+        const parsed = parseCellEventRound(cellValue);
+        globalOrder++;
+        items.push({
+          eventName: parsed?.eventName || cellValue,
+          roundLabel: parsed?.roundLabel || '',
+          matchOrder: globalOrder,
+          courtName: '',
+          startTime: '',
+        });
       }
 
       if (items.length === 0) {
