@@ -154,20 +154,26 @@ function detectR1Pairings(
   let allTimeCols = new Set<number>();
 
   for (let i = 0; i < entryRows.length - 1; i++) {
-    const gapRow = entryRows[i] + 1;
-    const row = rows[gapRow];
-    if (!row) continue;
+    // エントリー間の全行をスキャン（ダブルスではパートナー行があるため+1だけでは不十分）
+    const scanStart = entryRows[i] + 1;
+    const scanEnd = entryRows[i + 1];
 
-    const timeCols: number[] = [];
-    for (let c = colRange.start; c <= colRange.end; c++) {
-      if (isTimeValue(row[c])) {
-        timeCols.push(c);
-        allTimeCols.add(c);
+    for (let gapRow = scanStart; gapRow < scanEnd; gapRow++) {
+      const row = rows[gapRow];
+      if (!row) continue;
+
+      const timeCols: number[] = [];
+      for (let c = colRange.start; c <= colRange.end; c++) {
+        if (isTimeValue(row[c])) {
+          timeCols.push(c);
+          allTimeCols.add(c);
+        }
       }
-    }
 
-    if (timeCols.length > 0) {
-      gaps.push({ entryIdx: i, gapRow, timeCols });
+      if (timeCols.length > 0) {
+        gaps.push({ entryIdx: i, gapRow, timeCols });
+        break; // このエントリーペア間で最初の時刻行を採用
+      }
     }
   }
 
@@ -539,8 +545,11 @@ export function parseDrawExcel(
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
+    // イベントヘッダーは列Aまたは列Bにある（シングルス=A、ダブルス=B）
     const colA = cellStr(row, 0);
-    if (isEventHeader(colA)) {
+    const colB = cellStr(row, 1);
+    const headerText = isEventHeader(colA) ? colA : isEventHeader(colB) ? colB : '';
+    if (headerText) {
       // Look for match format in later columns on the same row
       let matchFormat = '';
       for (let c = 1; c < row.length; c++) {
@@ -556,7 +565,7 @@ export function parseDrawExcel(
           break;
         }
       }
-      sections.push({ headerRow: r, eventName: colA, matchFormat });
+      sections.push({ headerRow: r, eventName: headerText, matchFormat });
     }
   }
 
@@ -637,27 +646,40 @@ export function parseDrawExcel(
       leftPlayers.sort((a, b) => a.position - b.position);
       rightPlayers.sort((a, b) => a.position - b.position);
 
-      // 各半分のBYE数を計算
-      const leftByeCount = Math.max(0, halfSize - leftPlayers.length);
-      const rightByeCount = Math.max(0, halfSize - rightPlayers.length);
+      // 明示的BYEエントリー（"ｂｙｅ"等）を除外してからR1検出・位置割り当て
+      // 除外しないとBYEがペア枠を消費してスロットが溢れる
+      const leftReal = leftPlayers.filter(p => !p.isBye);
+      const leftRealRows = leftEntryRows.filter((_, idx) => !leftPlayers[idx]?.isBye);
+      const rightReal = rightPlayers.filter(p => !p.isBye);
+      const rightRealRows = rightEntryRows.filter((_, idx) => !rightPlayers[idx]?.isBye);
+
+      // 各半分のBYE数を計算（実選手数ベース）
+      const leftByeCount = Math.max(0, halfSize - leftReal.length);
+      const rightByeCount = Math.max(0, halfSize - rightReal.length);
 
       if (leftByeCount > 0 || rightByeCount > 0) {
         // Excelの試合時刻からR1ペアリングを検出してブラケット位置を割り当て
         assignPositionsFromR1Pairings(
-          leftPlayers, leftEntryRows, halfSize, 0, rows, 'left',
+          leftReal, leftRealRows, halfSize, 0, rows, 'left',
         );
         assignPositionsFromR1Pairings(
-          rightPlayers, rightEntryRows, halfSize, halfSize, rows, 'right',
+          rightReal, rightRealRows, halfSize, halfSize, rows, 'right',
         );
       } else {
         // BYE不要の場合: 連番でそのまま配置
-        for (let i = 0; i < leftPlayers.length; i++) {
-          leftPlayers[i].position = i + 1;
+        for (let i = 0; i < leftReal.length; i++) {
+          leftReal[i].position = i + 1;
         }
-        for (let i = 0; i < rightPlayers.length; i++) {
-          rightPlayers[i].position = halfSize + i + 1;
+        for (let i = 0; i < rightReal.length; i++) {
+          rightReal[i].position = halfSize + i + 1;
         }
       }
+
+      // 明示的BYEエントリーを除外した実選手のみで構成
+      leftPlayers.length = 0;
+      leftPlayers.push(...leftReal);
+      rightPlayers.length = 0;
+      rightPlayers.push(...rightReal);
     }
 
     const allPlayers = [...leftPlayers, ...rightPlayers];
