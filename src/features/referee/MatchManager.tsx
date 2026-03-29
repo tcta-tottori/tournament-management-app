@@ -278,6 +278,8 @@ export default function MatchManager() {
   // イベント名の略称マッチング（正規化して比較）
   const normalizeEventName = useCallback((name: string): string => {
     return name
+      .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
       .replace(/シングルス|ダブルス|一般|歳以上|級/g, '')
       .replace(/[\s\u3000]+/g, '')
       .trim();
