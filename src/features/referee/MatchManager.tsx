@@ -316,7 +316,8 @@ export default function MatchManager() {
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
-  // 全試合を時間割のB列フラットリスト順でソート（対戦順表示用）
+  // 全試合を時間割のフラットリスト順でソート（対戦順表示用）
+  // importedScheduleの各アイテムを1つずつDB試合にマッピングし、時間割と同じ並びにする
   const globalSortedMatches = useMemo(() => {
     const arr: (Match & { eventName: string })[] = [];
     for (const [eventId, matches] of allMatchesByEvent) {
@@ -332,69 +333,49 @@ export default function MatchManager() {
       return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
     }
 
-    // フラットリストの連続する同一eventName+roundLabelをグループ化
-    type SGroup = { eventName: string; roundLabel: string; count: number; startOrder: number };
-    const groups: SGroup[] = [];
-    let curG: SGroup | null = null;
+    // 種目+ラウンド別にDB試合をプール化（ポジション順にソート）
+    type Pool = { matches: (Match & { eventName: string })[]; consumed: number };
+    const pools = new Map<string, Pool>();
+    for (const m of arr) {
+      const isLg = isLeagueEvent(m.eventId);
+      const key = isLg ? `${m.eventId}|league` : `${m.eventId}|R${m.round}`;
+      if (!pools.has(key)) pools.set(key, { matches: [], consumed: 0 });
+      pools.get(key)!.matches.push(m);
+    }
+    for (const [key, pool] of pools) {
+      const isLg = key.endsWith('|league');
+      pool.matches.sort((a, b) => isLg ? (a.matchOrder || 0) - (b.matchOrder || 0) : (a.position || 0) - (b.position || 0));
+    }
+
+    // importedScheduleの各アイテムを1つずつDB試合にマッピング
+    const orderMap = new Map<string, number>();
     for (let i = 0; i < importedSchedule.length; i++) {
       const item = importedSchedule[i];
-      if (curG && curG.eventName === item.eventName && curG.roundLabel === item.roundLabel) {
-        curG.count++;
-      } else {
-        curG = { eventName: item.eventName, roundLabel: item.roundLabel, count: 1, startOrder: i };
-        groups.push(curG);
-      }
-    }
 
-    // 種目+ラウンド別にDB試合をソートして準備
-    const matchesByKey = new Map<string, (Match & { eventName: string })[]>();
-    for (const m of arr) {
-      const evDraw = allDraws.get(m.eventId);
-      const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
-      const rLabel = shortRoundName(m.round, evTotalRounds);
-      const isLg = isLeagueEvent(m.eventId);
-      const key = isLg ? `${m.eventId}|league` : `${m.eventId}|${rLabel}`;
-      if (!matchesByKey.has(key)) matchesByKey.set(key, []);
-      matchesByKey.get(key)!.push(m);
-    }
-    for (const [key, ms] of matchesByKey) {
-      const isLg = key.endsWith('|league');
-      ms.sort((a, b) => isLg ? (a.matchOrder || 0) - (b.matchOrder || 0) : (a.position || 0) - (b.position || 0));
-    }
-
-    // グループ順にDB試合を消費して順番を割り当て
-    const matchOrder = new Map<string, number>();
-    const consumed = new Map<string, number>();
-
-    for (const g of groups) {
-      let matchKey: string | null = null;
-      for (const [key, ms] of matchesByKey) {
-        if (ms.length === 0) continue;
-        const m0 = ms[0];
-        const evDraw = allDraws.get(m0.eventId);
+      for (const [key, pool] of pools) {
+        if (pool.consumed >= pool.matches.length) continue;
+        const nextMatch = pool.matches[pool.consumed];
+        const evDraw = allDraws.get(nextMatch.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
         const isLg = key.endsWith('|league');
-        if (!matchEventName(m0.eventName, g.eventName)) continue;
-        if (g.roundLabel) {
-          if (isLg) continue;
-          if (matchRoundLabel(g.roundLabel, m0.round, evTotalRounds)) { matchKey = key; break; }
-        } else {
-          if (isLg) { matchKey = key; break; }
-        }
-      }
-      if (!matchKey) continue;
 
-      const ms = matchesByKey.get(matchKey)!;
-      const c = consumed.get(matchKey) || 0;
-      for (let i = 0; i < g.count && c + i < ms.length; i++) {
-        matchOrder.set(ms[c + i].matchId, g.startOrder + i);
+        if (!matchEventName(nextMatch.eventName, item.eventName)) continue;
+        if (item.roundLabel) {
+          if (isLg) continue;
+          if (!matchRoundLabel(item.roundLabel, nextMatch.round, evTotalRounds)) continue;
+        } else {
+          if (!isLg) continue;
+        }
+
+        orderMap.set(nextMatch.matchId, i);
+        pool.consumed++;
+        break;
       }
-      consumed.set(matchKey, c + g.count);
     }
 
     return arr.sort((a, b) => {
-      const oa = matchOrder.get(a.matchId) ?? 9999;
-      const ob = matchOrder.get(b.matchId) ?? 9999;
+      const oa = orderMap.get(a.matchId) ?? 9999;
+      const ob = orderMap.get(b.matchId) ?? 9999;
       if (oa !== ob) return oa - ob;
       return (a.matchOrder || 0) - (b.matchOrder || 0);
     });
