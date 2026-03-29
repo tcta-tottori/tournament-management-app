@@ -288,7 +288,7 @@ export default function ScoreInputDialog({
       const winner = Math.max(p1, p2);
       const loser = Math.min(p1, p2);
 
-      // タイブレーク: winner = requiredGames+1, loser = requiredGames (e.g. 7-6)
+      // タイブレーク: winner = requiredGames+1, loser = requiredGames (e.g. 7-6, 9-8)
       // ノーアドの場合なども考慮して、loser < requiredGames の時 winner == requiredGames
       if (winner === requiredGames + 1 && loser === requiredGames) {
         // タイブレークスコア — OK, タイブレーク内ポイントが必要
@@ -297,9 +297,9 @@ export default function ScoreInputDialog({
         }
       } else if (winner === requiredGames && loser < requiredGames) {
         // 通常勝利 — OK
-      } else if (winner === 9 && loser === 8) {
-        // 8-8 TB — OK (ノーアドバンテージ特殊ルール)
-      } else if (winner > requiredGames + 1 || (winner === requiredGames + 1 && loser !== requiredGames)) {
+      } else if (winner === requiredGames + 1 && loser === requiredGames - 1) {
+        // アドバンテージ勝利 (例: 8ゲームで9-7, 6ゲームで7-5) — OK
+      } else if (winner > requiredGames + 1 || (winner === requiredGames + 1 && loser < requiredGames - 1)) {
         errors.push(`Set${i + 1}: ${requiredGames}ゲームマッチのスコアとして不正です (${p1}-${p2})`);
       } else if (winner < requiredGames && (p1 + p2 > 0)) {
         // 途中スコアとして可能なので警告しない
