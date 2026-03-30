@@ -32,13 +32,16 @@ function cellVal(ws: XLSX.WorkSheet, ref: string): string {
   return String(cell.v ?? '').trim();
 }
 
-function _cellNum(ws: XLSX.WorkSheet, ref: string): number | null {
-  const cell = ws[ref];
-  if (!cell || cell.v === undefined || cell.v === null) return null;
-  const n = Number(cell.v);
-  return isNaN(n) ? null : n;
+/** 列番号→列名 (0=A, 1=B, ...) */
+function colName(idx: number): string {
+  let s = '';
+  let n = idx;
+  while (n >= 0) {
+    s = String.fromCharCode((n % 26) + 65) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
 }
-void _cellNum; // reserved for future use
 
 /** 姓を抽出 */
 function extractLastName(fullName: string): string {
@@ -46,7 +49,203 @@ function extractLastName(fullName: string): string {
   return parts[0] || fullName;
 }
 
-/** リストシートからチーム情報をパース */
+// ============================================================
+// 予選リーグシートから直接パース（リストシート不要）
+// ============================================================
+
+/** リーグ行を検出 */
+interface LeagueRow {
+  leagueId: string;
+  row: number;       // リーグヘッダー行 (男子名がある行)
+  courtRow: number;  // コート行 (女子名がある行)
+  courtName: string;
+}
+
+function detectLeagueRows(ws: XLSX.WorkSheet): LeagueRow[] {
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  const results: LeagueRow[] = [];
+
+  for (let r = 0; r <= range.e.r; r++) {
+    const bVal = cellVal(ws, `B${r + 1}`);
+    if (!bVal) continue;
+    // "A リーグ", "Aリーグ", "I  リーグ" etc.
+    const m = bVal.match(/^([A-Z])\s*リーグ$/);
+    if (m) {
+      const courtRow = r + 2; // 次の行
+      // コート名を探す: 次の行、または数行先まで探索
+      let courtName = '';
+      for (let cr = courtRow; cr <= Math.min(courtRow + 2, range.e.r + 1); cr++) {
+        const cv = cellVal(ws, `B${cr}`);
+        if (cv && cv.replace(/[\r\n]/g, '').includes('コート')) {
+          courtName = cv.replace(/[\r\n]/g, '').trim();
+          break;
+        }
+        if (cv && !cv.includes('リーグ') && !cv.includes('■')) {
+          courtName = cv.replace(/[\r\n]/g, '').trim();
+          break;
+        }
+      }
+      results.push({
+        leagueId: m[1],
+        row: r + 1,       // 1-based
+        courtRow,
+        courtName,
+      });
+    }
+  }
+
+  return results;
+}
+
+/** 行の中から番号付きチームデータを検出し、列位置パターンを自動検出 */
+interface DetectedTeam {
+  pairNumber: number;
+  maleName: string;
+  maleAffiliation: string;
+  femaleName: string;
+  femaleAffiliation: string;
+}
+
+function extractTeamsFromRows(ws: XLSX.WorkSheet, maleRow: number, femaleRow: number): DetectedTeam[] {
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  const teams: DetectedTeam[] = [];
+
+  // 行をスキャンして、数値セルの位置を見つける → その右が名前、さらに右が所属
+  for (let c = 0; c <= range.e.c; c++) {
+    const ref = colName(c) + maleRow;
+    const cell = ws[ref];
+    if (!cell) continue;
+    const val = cell.v;
+    // 数値セルがチーム番号
+    if (typeof val === 'number' && val >= 1 && val <= 200) {
+      const pairNumber = val;
+      // 番号の次の列から名前・所属を探す
+      let maleName = '';
+      let maleAffiliation = '';
+      let femaleName = '';
+      let femaleAffiliation = '';
+
+      // 名前を探す: 番号の右側の列を順にチェック
+      for (let nc = c + 1; nc <= Math.min(c + 5, range.e.c); nc++) {
+        const nVal = cellVal(ws, colName(nc) + maleRow);
+        if (nVal && !maleName) {
+          maleName = nVal;
+        } else if (nVal && maleName && !maleAffiliation) {
+          maleAffiliation = nVal;
+          break;
+        }
+      }
+
+      // 女子名（次の行の同じ列付近）
+      for (let nc = c + 1; nc <= Math.min(c + 5, range.e.c); nc++) {
+        const nVal = cellVal(ws, colName(nc) + femaleRow);
+        if (nVal && !femaleName) {
+          femaleName = nVal;
+        } else if (nVal && femaleName && !femaleAffiliation) {
+          femaleAffiliation = nVal;
+          break;
+        }
+      }
+
+      if (maleName) {
+        teams.push({ pairNumber, maleName, maleAffiliation, femaleName, femaleAffiliation });
+      }
+    }
+  }
+
+  return teams;
+}
+
+/** 5チームリーグの5チーム目を検出（リーグヘッダーの2行後以降にあるケース） */
+function extractFifthTeam(ws: XLSX.WorkSheet, startRow: number, nextLeagueRow: number | null): DetectedTeam | null {
+  // リーグヘッダー+2 から次のリーグヘッダーまでの間に追加チームがないか探す
+  const endRow = nextLeagueRow ? nextLeagueRow - 1 : startRow + 4;
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+  for (let r = startRow + 2; r <= Math.min(endRow, range.e.r + 1); r++) {
+    // B列にリーグ名もコート名もない行で、G列付近に番号がある行
+    const bVal = cellVal(ws, `B${r}`);
+    if (bVal && (bVal.includes('リーグ') || bVal.includes('■'))) break;
+
+    const teams = extractTeamsFromRows(ws, r, r + 1);
+    // 5チーム目の番号は通常、前の4チームの番号+1
+    if (teams.length >= 1) {
+      return teams[0];
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// 大会情報パース
+// ============================================================
+
+function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): TournamentInfo {
+  // まず表紙シートを試す
+  const coverSheet = wb.Sheets['表紙'];
+  if (coverSheet) {
+    let name = '';
+    // B3-B5あたりから大会名を取得
+    for (let r = 1; r <= 10; r++) {
+      const v = cellVal(coverSheet, `B${r}`);
+      if (v && v.length > 2 && !v.includes('令和') && !v.includes('平成')) {
+        name = v;
+        break;
+      }
+    }
+    // 令和の年度を探す
+    for (let r = 1; r <= 5; r++) {
+      const v = cellVal(coverSheet, `B${r}`);
+      if (v && (v.includes('令和') || v.includes('平成'))) {
+        name = v + ' ' + name;
+        break;
+      }
+    }
+
+    let date = '';
+    let venue = '';
+    // 日程・会場を探す
+    for (let r = 5; r <= 20; r++) {
+      for (const col of ['G', 'F', 'J']) {
+        const label = cellVal(coverSheet, `${col}${r}`);
+        if (label.includes('日程')) {
+          date = cellVal(coverSheet, `M${r}`) || cellVal(coverSheet, `O${r}`);
+        }
+        if (label.includes('会場')) {
+          venue = cellVal(coverSheet, `M${r}`) || cellVal(coverSheet, `O${r}`);
+        }
+      }
+    }
+
+    const rules: string[] = [];
+    for (let r = 20; r <= 40; r++) {
+      const v = cellVal(coverSheet, `F${r}`);
+      if (v && v.startsWith('（')) rules.push(v);
+    }
+
+    if (name) return { name: name.trim(), date, venue, rules };
+  }
+
+  // 表紙がない場合、リーグシートから取得
+  const ws = wb.Sheets[leagueSheetName];
+  if (!ws) return { name: 'ミックスダブルス大会', date: '', venue: '', rules: [] };
+
+  const name = cellVal(ws, 'A1').replace(/\s+/g, ' ').trim() || 'ミックスダブルス大会';
+  const date = cellVal(ws, 'O2') || cellVal(ws, 'M9');
+  const venue = cellVal(ws, 'O3') || cellVal(ws, 'M10');
+  const rules: string[] = [];
+  for (let r = 5; r <= 15; r++) {
+    const v = cellVal(ws, `F${r}`);
+    if (v) rules.push(v);
+  }
+
+  return { name, date, venue, rules };
+}
+
+// ============================================================
+// リストシートからのパース (旧フォーマット用)
+// ============================================================
+
 function parseListSheet(wb: XLSX.WorkBook): Map<string, { league: string; number: string; name: string; affiliation: string }[]> {
   const ws = wb.Sheets['リスト'];
   if (!ws) return new Map();
@@ -70,65 +269,28 @@ function parseListSheet(wb: XLSX.WorkBook): Map<string, { league: string; number
   return byLeague;
 }
 
-/** 予選シートからリーグ情報をパース */
-function parseYosenSheet(wb: XLSX.WorkBook, listData: Map<string, { league: string; number: string; name: string; affiliation: string }[]>): {
-  info: TournamentInfo;
-  leagues: MixedLeague[];
-} {
-  const ws = wb.Sheets['予選'];
-  if (!ws) throw new Error('「予選」シートが見つかりません');
-
-  // 大会情報
-  const name = cellVal(ws, 'A1').replace(/\s+/g, ' ').trim() || 'ミックスダブルス大会';
-  const date = cellVal(ws, 'O2');
-  const venue = cellVal(ws, 'O3');
-  const rules: string[] = [];
-  for (let r = 5; r <= 12; r++) {
-    const rule = cellVal(ws, `F${r}`);
-    if (rule) rules.push(rule);
-  }
-  const info: TournamentInfo = { name, date, venue, rules };
-
-  // リーグ解析 - リストシートから構築
+/** リストシートベースでリーグ構築 */
+function buildLeaguesFromList(
+  listData: Map<string, { league: string; number: string; name: string; affiliation: string }[]>,
+  leagueRows: LeagueRow[]
+): MixedLeague[] {
   const leagues: MixedLeague[] = [];
-  // 予選シートからリーグの行位置とコート名を検出
-  const leagueRowMap: { leagueId: string; row: number; courtName: string }[] = [];
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
-  for (let r = 14; r <= Math.min(50, range.e.r); r++) {
-    const bVal = cellVal(ws, `B${r}`);
-    if (bVal && bVal.includes('リーグ')) {
-      const lid = bVal.replace('リーグ', '').trim();
-      const courtName = cellVal(ws, `B${r + 1}`);
-      leagueRowMap.push({ leagueId: lid, row: r, courtName });
-    }
-  }
-
-  // リストシートベースでチーム構築
-  const normalizedLeagueIds = Array.from(listData.keys());
-
-  for (const rawLid of normalizedLeagueIds) {
+  for (const [rawLid, players] of listData) {
     const lid = rawLid.trim();
-    const players = listData.get(rawLid);
-    if (!players) continue;
-
-    // ペアを構築 (2行ずつ = 1チーム: male -1, female -2)
     const teams: MixedTeam[] = [];
     let pairNum = 1;
 
     for (let i = 0; i < players.length; i += 2) {
       const maleEntry = players[i];
       const femaleEntry = i + 1 < players.length ? players[i + 1] : null;
-
       if (!maleEntry) continue;
 
-      // 通し番号を取得
       const numParts = maleEntry.number.split('-');
       const globalNum = parseInt(numParts[0]) || pairNum;
 
       const male: MixedPlayer = { name: maleEntry.name, affiliation: maleEntry.affiliation };
       const female: MixedPlayer = { name: femaleEntry?.name || '', affiliation: femaleEntry?.affiliation || '' };
-
       const teamName = extractLastName(male.name) + '・' + extractLastName(female.name);
 
       teams.push({
@@ -136,31 +298,78 @@ function parseYosenSheet(wb: XLSX.WorkBook, listData: Map<string, { league: stri
         leagueId: lid,
         numberInLeague: pairNum,
         pairNumber: globalNum,
-        male,
-        female,
-        teamName,
+        male, female, teamName,
       });
       pairNum++;
     }
 
-    // コート名を検索
-    const leagueRow = leagueRowMap.find(l => l.leagueId === lid);
+    const leagueRow = leagueRows.find(l => l.leagueId === lid);
     const courtName = leagueRow?.courtName || '';
-
     const matchOrder = teams.length >= 5 ? MATCH_ORDER_5 : MATCH_ORDER_4;
 
+    leagues.push({ leagueId: lid, courtName, teams, matchOrder });
+  }
+
+  return leagues;
+}
+
+/** 予選リーグシートから直接リーグ構築（リストシートなし） */
+function buildLeaguesFromSheet(ws: XLSX.WorkSheet, leagueRows: LeagueRow[]): MixedLeague[] {
+  const leagues: MixedLeague[] = [];
+
+  for (let i = 0; i < leagueRows.length; i++) {
+    const lr = leagueRows[i];
+    const nextLr = i + 1 < leagueRows.length ? leagueRows[i + 1] : null;
+
+    // メイン行（4チーム分）
+    const mainTeams = extractTeamsFromRows(ws, lr.row, lr.courtRow);
+
+    // 5チーム目を探す（L,Mリーグ等）
+    // 次のリーグまでの間に追加行があるか
+    let extraTeam: DetectedTeam | null = null;
+    if (nextLr) {
+      const gap = nextLr.row - lr.row;
+      if (gap >= 4) {
+        // 2行以上余分にある場合、5チーム目を探す
+        extraTeam = extractFifthTeam(ws, lr.courtRow, nextLr.row);
+      }
+    } else {
+      // 最後のリーグ: 2行後に5チーム目があるかチェック
+      extraTeam = extractFifthTeam(ws, lr.courtRow, null);
+    }
+
+    const allDetected = [...mainTeams];
+    if (extraTeam) allDetected.push(extraTeam);
+
+    const teams: MixedTeam[] = allDetected.map((dt, idx) => {
+      const male: MixedPlayer = { name: dt.maleName, affiliation: dt.maleAffiliation };
+      const female: MixedPlayer = { name: dt.femaleName, affiliation: dt.femaleAffiliation };
+      const teamName = extractLastName(dt.maleName) + '・' + extractLastName(dt.femaleName);
+      return {
+        teamId: `${lr.leagueId}-${idx + 1}`,
+        leagueId: lr.leagueId,
+        numberInLeague: idx + 1,
+        pairNumber: dt.pairNumber,
+        male, female, teamName,
+      };
+    });
+
+    const matchOrder = teams.length >= 5 ? MATCH_ORDER_5 : MATCH_ORDER_4;
     leagues.push({
-      leagueId: lid,
-      courtName,
+      leagueId: lr.leagueId,
+      courtName: lr.courtName,
       teams,
       matchOrder,
     });
   }
 
-  return { info, leagues };
+  return leagues;
 }
 
-/** リーグ試合データ生成 */
+// ============================================================
+// リーグ試合データ生成
+// ============================================================
+
 function generateLeagueMatches(leagues: MixedLeague[]): LeagueMatchScore[] {
   const matches: LeagueMatchScore[] = [];
 
@@ -187,8 +396,15 @@ function generateLeagueMatches(leagues: MixedLeague[]): LeagueMatchScore[] {
   return matches;
 }
 
+// ============================================================
+// メインエントリーポイント
+// ============================================================
+
 /**
  * Excelファイルをパースしてミックス大会データを生成
+ * 2つのフォーマットに対応:
+ *   A) 「リスト」シートあり → リストシートからチーム構築
+ *   B) 「リスト」シートなし → 予選リーグシートから直接解析
  */
 export function parseMixedExcel(file: ArrayBuffer): {
   info: TournamentInfo;
@@ -197,8 +413,38 @@ export function parseMixedExcel(file: ArrayBuffer): {
 } {
   const wb = XLSX.read(file, { type: 'array' });
 
+  // リーグシート名を検出
+  const leagueSheetName = wb.SheetNames.find(n =>
+    n === '予選' || n === '予選リーグ' || n.includes('予選')
+  );
+  if (!leagueSheetName) {
+    throw new Error('予選リーグのシートが見つかりません。シート名に「予選」を含めてください。');
+  }
+
+  const ws = wb.Sheets[leagueSheetName];
+  const info = parseTournamentInfo(wb, leagueSheetName);
+
+  // リーグ行を検出
+  const leagueRows = detectLeagueRows(ws);
+  if (leagueRows.length === 0) {
+    throw new Error('リーグデータが見つかりません。「A リーグ」のような行が必要です。');
+  }
+
+  // リストシートがあるか判定
   const listData = parseListSheet(wb);
-  const { info, leagues } = parseYosenSheet(wb, listData);
+  let leagues: MixedLeague[];
+
+  if (listData.size > 0) {
+    // フォーマットA: リストシートベース
+    leagues = buildLeaguesFromList(listData, leagueRows);
+  } else {
+    // フォーマットB: 予選リーグシートから直接
+    leagues = buildLeaguesFromSheet(ws, leagueRows);
+  }
+
+  // 空のリーグを除外
+  leagues = leagues.filter(l => l.teams.length >= 2);
+
   const matches = generateLeagueMatches(leagues);
 
   return { info, leagues, matches };
