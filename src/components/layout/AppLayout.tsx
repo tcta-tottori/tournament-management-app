@@ -4,7 +4,7 @@ import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, Medal, HardDrive,
-  AlertTriangle, Network, Sun, Moon
+  AlertTriangle, Network, Sun, Moon, Heart
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -27,6 +27,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-10', path: '/results', label: '結果', icon: Medal },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
+  { id: 'S-13', path: '/mixed', label: 'ミックス', icon: Heart },
 ];
 
 /** 抽選・ドロー表タブを非表示にするパス */
@@ -281,7 +282,7 @@ export default function AppLayout() {
             className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
             title="バージョン情報・更新履歴"
           >
-            <span className="header-version">Ver 1.6</span>
+            <span className="header-version">Ver 1.7</span>
             <span className="text-[8px] text-white/40 leading-tight mt-0.5 whitespace-nowrap">{__BUILD_TIMESTAMP__}</span>
           </button>
         </div>
