@@ -7,6 +7,9 @@ import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import type { ImportedScheduleItem } from '../../stores/appStore';
+import { parseMixedExcel } from '../mixed/mixedExcelParser';
+import { useMixedStore } from '../mixed/mixedStore';
+import { useNavigate } from 'react-router-dom';
 
 // ドロー会議システムのイベントコード → 大会運営システムの種目定義
 const EVENT_MAP: Record<string, { name: string; type: 'Singles' | 'Doubles' }> = {
@@ -562,6 +565,17 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     try {
       const result = parseDrawExcel(arrayBuffer, fileName);
       if (!result.events || result.events.length === 0) {
+        // ミックス大会フォーマットを試行
+        try {
+          const mixedResult = parseMixedExcel(arrayBuffer);
+          if (mixedResult.leagues.length > 0) {
+            const mixedStore = useMixedStore.getState();
+            mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
+            mixedStore.setImportFileName(fileName);
+            navigate('/mixed');
+            return;
+          }
+        } catch { /* fall through */ }
         setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。' });
         return;
       }
@@ -650,6 +664,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   }, []);
 
   // --- Excel file handler (new) ---
+  const navigate = useNavigate();
   const handleExcelFile = useCallback((file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -657,6 +672,20 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         const arrayBuffer = e.target?.result as ArrayBuffer;
         const result = parseDrawExcel(arrayBuffer, file.name);
         if (!result.events || result.events.length === 0) {
+          // ドロー検出失敗 → ミックス大会フォーマットを試行
+          try {
+            const mixedResult = parseMixedExcel(arrayBuffer);
+            if (mixedResult.leagues.length > 0) {
+              // ミックス大会として読み込み成功 → ストアに保存して遷移
+              const mixedStore = useMixedStore.getState();
+              mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
+              mixedStore.setImportFileName(file.name);
+              navigate('/mixed');
+              return;
+            }
+          } catch {
+            // ミックスパーサーも失敗 → 元のエラーを表示
+          }
           setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。ドロー表のExcelファイルを選択してください。' });
           return;
         }
@@ -678,7 +707,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       }
     };
     reader.readAsArrayBuffer(file);
-  }, []);
+  }, [navigate]);
 
   // --- Schedule Excel handler ---
   const handleScheduleFile = useCallback((file: File) => {
