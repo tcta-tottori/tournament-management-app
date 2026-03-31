@@ -165,7 +165,7 @@ function extractFifthTeam(ws: XLSX.WorkSheet, startRow: number, nextLeagueRow: n
 
   for (let r = startRow + 1; r <= Math.min(endRow, range.e.r + 1); r++) {
     const bVal = cellVal(ws, `B${r}`);
-    if (bVal && bVal.match(/^[A-Z]\s*リーグ$/) || (bVal && bVal.includes('■'))) break;
+    if ((bVal && bVal.match(/^[A-Z]\s*リーグ$/)) || (bVal && bVal.includes('■'))) break;
 
     const teams = extractTeamsFromRows(ws, r, r + 1);
     if (teams.length >= 1) {
