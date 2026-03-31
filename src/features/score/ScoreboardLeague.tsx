@@ -1,43 +1,159 @@
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { DrawSlotData, MatchResult } from '../../features/draw/DrawBoard';
+import { Maximize2, X } from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface ScoreboardLeagueProps {
   slots: DrawSlotData[];
   matchResults: MatchResult[];
   onMatchSelect: (player1EntryId: string, player2EntryId: string) => void;
-  selectedMatchKey?: string | null; // "entryId1-entryId2" format
+  selectedMatchKey?: string | null;
+  leagueName?: string;
+  gameRuleText?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Optimized match order (same as mixedLogic.ts)
+// ---------------------------------------------------------------------------
+
+const MATCH_ORDER_4: [number, number][] = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
+const MATCH_ORDER_5: [number, number][] = [[0,1],[2,3],[0,4],[1,2],[0,3],[1,4],[2,4],[1,3],[3,4],[0,2]];
+
+function generateMatchOrder(n: number): [number, number][] {
+  if (n === 4) return MATCH_ORDER_4;
+  if (n === 5) return MATCH_ORDER_5;
+  const order: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      order.push([i, j]);
+    }
+  }
+  return order;
+}
+
+function toCircledNum(n: number): string {
+  const circled = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯';
+  return n >= 1 && n <= 16 ? circled[n - 1] : String(n);
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function ScoreboardLeague({
   slots,
   matchResults,
   onMatchSelect,
   selectedMatchKey,
+  leagueName = 'リーグ',
+  gameRuleText,
 }: ScoreboardLeagueProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // BYEを除いた実選手のみ
-  const players = slots.filter(s => !s.isBye);
+  const players = useMemo(() => slots.filter(s => !s.isBye), [slots]);
   const n = players.length;
 
-  if (n < 2) {
-    return <div className="p-8 text-center text-gray-500">リーグ表示には2人以上の選手が必要です</div>;
-  }
+  // 対戦順
+  const matchOrder = useMemo(() => (n >= 2 ? generateMatchOrder(n) : []), [n]);
 
-  // 対戦順を計算（ラウンドロビンの標準対戦順）
-  const matchOrder: [number, number][] = [];
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      matchOrder.push([i, j]);
+  // 試合結果検索
+  const findMatch = useCallback(
+    (p1Idx: number, p2Idx: number): MatchResult | undefined => {
+      if (p1Idx >= players.length || p2Idx >= players.length) return undefined;
+      const p1 = players[p1Idx];
+      const p2 = players[p2Idx];
+      return matchResults.find(
+        m =>
+          (m.player1EntryId === p1.entryId && m.player2EntryId === p2.entryId) ||
+          (m.player1EntryId === p2.entryId && m.player2EntryId === p1.entryId),
+      );
+    },
+    [players, matchResults],
+  );
+
+  // 現在の対戦（対戦順で最初の未完了試合）
+  const currentMatchIdx = useMemo(() => {
+    for (let i = 0; i < matchOrder.length; i++) {
+      const [a, b] = matchOrder[i];
+      const match = findMatch(a, b);
+      if (!match || (match.status !== 'finished' && match.status !== 'walkover')) {
+        return i;
+      }
     }
+    return -1; // 全試合完了
+  }, [matchOrder, findMatch]);
+
+  const allMatchesDone = currentMatchIdx === -1;
+
+  // 勝敗集計
+  const stats = useMemo(
+    () =>
+      players.map(p => {
+        let wins = 0,
+          losses = 0;
+        for (const other of players) {
+          if (other.entryId === p.entryId) continue;
+          const match = matchResults.find(
+            m =>
+              (m.player1EntryId === p.entryId && m.player2EntryId === other.entryId) ||
+              (m.player1EntryId === other.entryId && m.player2EntryId === p.entryId),
+          );
+          if (match && match.winnerEntryId) {
+            if (match.winnerEntryId === p.entryId) wins++;
+            else losses++;
+          }
+        }
+        return { wins, losses };
+      }),
+    [players, matchResults],
+  );
+
+  // 順位計算
+  const rankMap = useMemo(() => {
+    const rankings = players.map((_, i) => i);
+    rankings.sort((a, b) => {
+      if (stats[b].wins !== stats[a].wins) return stats[b].wins - stats[a].wins;
+      return stats[a].losses - stats[b].losses;
+    });
+    const map = new Map<number, number>();
+    rankings.forEach((playerIdx, rankIdx) => {
+      map.set(playerIdx, rankIdx + 1);
+    });
+    return map;
+  }, [players, stats]);
+
+  // フルスクリーン同期
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, [isFullscreen]);
+
+  // --- Early return ---
+  if (n < 2) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        リーグ表示には2人以上の選手が必要です
+      </div>
+    );
   }
 
-  // 試合結果を選手ペアで検索
-  const findMatchBetween = (p1: DrawSlotData, p2: DrawSlotData): MatchResult | undefined => {
-    return matchResults.find(m =>
-      (m.player1EntryId === p1.entryId && m.player2EntryId === p2.entryId) ||
-      (m.player1EntryId === p2.entryId && m.player2EntryId === p1.entryId)
-    );
+  // --- Helpers ---
+  const isCurrentMatch = (rowIdx: number, colIdx: number): boolean => {
+    if (currentMatchIdx < 0) return false;
+    const [a, b] = matchOrder[currentMatchIdx];
+    return (rowIdx === a && colIdx === b) || (rowIdx === b && colIdx === a);
   };
 
-  // 選択中のマッチキーを正規化して比較するヘルパー
   const isMatchSelected = (entryId1: string, entryId2: string): boolean => {
     if (!selectedMatchKey) return false;
     const key1 = `${entryId1}-${entryId2}`;
@@ -45,45 +161,23 @@ export default function ScoreboardLeague({
     return selectedMatchKey === key1 || selectedMatchKey === key2;
   };
 
-  // 勝敗集計
-  const stats = players.map((p) => {
-    let wins = 0;
-    let losses = 0;
-    for (const other of players) {
-      if (other.entryId === p.entryId) continue;
-      const match = findMatchBetween(p, other);
-      if (match && match.winnerEntryId) {
-        if (match.winnerEntryId === p.entryId) wins++;
-        else losses++;
-      }
-    }
-    return { wins, losses };
-  });
-
-  // 順位計算（勝数降順、同勝数なら敗数昇順）
-  const rankings = players.map((_, i) => i);
-  rankings.sort((a, b) => {
-    if (stats[b].wins !== stats[a].wins) return stats[b].wins - stats[a].wins;
-    return stats[a].losses - stats[b].losses;
-  });
-  const rankMap = new Map<number, number>();
-  rankings.forEach((playerIdx, rankIdx) => {
-    rankMap.set(playerIdx, rankIdx + 1);
-  });
-
-  // セル内容とスタイルの決定
   const getCellInfo = (rowIdx: number, colIdx: number) => {
     const p1 = players[rowIdx];
     const p2 = players[colIdx];
-    const match = findMatchBetween(p1, p2);
+    const match = matchResults.find(
+      m =>
+        (m.player1EntryId === p1.entryId && m.player2EntryId === p2.entryId) ||
+        (m.player1EntryId === p2.entryId && m.player2EntryId === p1.entryId),
+    );
     const entryId1 = p1.entryId;
     const entryId2 = p2.entryId;
     const selected = entryId1 && entryId2 ? isMatchSelected(entryId1, entryId2) : false;
+    const isCurrent = isCurrentMatch(rowIdx, colIdx);
 
-    if (!match) {
+    if (!match || (match.status !== 'finished' && match.status !== 'walkover' && match.status !== 'playing')) {
       return {
         text: '',
-        className: 'hover:bg-primary-50 cursor-pointer',
+        className: `hover:bg-primary-50 cursor-pointer ${isCurrent ? 'league-match-blink' : ''}`,
         selected,
         entryId1,
         entryId2,
@@ -103,7 +197,7 @@ export default function ScoreboardLeague({
     if (match.status === 'playing') {
       return {
         text: '試合中',
-        className: 'bg-green-100 animate-pulse cursor-pointer',
+        className: `bg-green-100 animate-pulse cursor-pointer ${isCurrent ? 'ring-2 ring-yellow-400 ring-inset' : ''}`,
         selected,
         entryId1,
         entryId2,
@@ -112,7 +206,6 @@ export default function ScoreboardLeague({
 
     if (match.status === 'finished' && match.winnerEntryId) {
       const isWin = match.winnerEntryId === p1.entryId;
-      // スコアの表示: 勝者側から見たスコアか、シンボル
       const scoreText = match.score || (isWin ? '○' : '●');
       return {
         text: scoreText,
@@ -125,10 +218,9 @@ export default function ScoreboardLeague({
       };
     }
 
-    // ready / waiting その他
     return {
       text: '',
-      className: 'hover:bg-primary-50 cursor-pointer',
+      className: `hover:bg-primary-50 cursor-pointer ${isCurrent ? 'league-match-blink' : ''}`,
       selected,
       entryId1,
       entryId2,
@@ -141,105 +233,260 @@ export default function ScoreboardLeague({
     }
   };
 
-  return (
-    <div className="overflow-auto p-2 sm:p-4 md:p-6" style={{ width: '100%', height: '100%' }}>
-      <div className="inline-block min-w-full">
-        <table className="border-collapse border-2 border-gray-900 text-xs sm:text-sm">
-          <thead>
-            <tr>
-              {/* ヘッダー左上: "決勝リーグ" */}
-              <th className="border-2 border-gray-900 bg-gray-50 px-2 sm:px-3 py-2 text-center font-bold min-w-[120px] sm:min-w-[200px]">
-                決勝リーグ
-              </th>
-              {/* 各選手の列ヘッダー */}
-              {players.map((p, i) => (
-                <th
-                  key={`col-${i}`}
-                  className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold whitespace-nowrap min-w-[70px] sm:min-w-[100px]"
-                >
-                  {p.name}
-                </th>
-              ))}
-              <th className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold min-w-[50px] sm:min-w-[80px]">
-                勝敗
-              </th>
-              <th className="border-2 border-gray-900 bg-gray-50 px-1.5 sm:px-3 py-2 text-center font-bold min-w-[40px] sm:min-w-[70px]">
-                順位
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player, rowIdx) => (
-              <tr key={`row-${rowIdx}`}>
-                {/* 選手名セル */}
-                <td className="border-2 border-gray-900 px-3 py-3 font-medium whitespace-nowrap">
-                  <span className="text-gray-500 mr-2">{rowIdx + 1}</span>
-                  {player.name}
-                  {player.affiliation && (
-                    <span className="text-gray-400 ml-1 text-xs">（{player.affiliation}）</span>
-                  )}
-                </td>
-                {/* 対戦結果セル */}
-                {players.map((_, colIdx) => {
-                  const isSelf = rowIdx === colIdx;
+  // --- Fullscreen ---
+  const handleFullscreen = async () => {
+    setIsFullscreen(true);
+    try {
+      await document.documentElement.requestFullscreen?.();
+      await (screen.orientation as any)?.lock?.('landscape');
+    } catch {
+      /* orientation lock may not be available */
+    }
+  };
 
-                  if (isSelf) {
-                    return (
-                      <td
-                        key={`cell-${rowIdx}-${colIdx}`}
-                        className="border-2 border-gray-900 bg-gray-200 relative min-w-[70px] sm:min-w-[100px]"
-                      >
-                        <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                          <line x1="0" y1="0" x2="100%" y2="100%" stroke="#374151" strokeWidth="1.5" />
-                        </svg>
-                      </td>
-                    );
-                  }
+  const handleExitFullscreen = async () => {
+    setIsFullscreen(false);
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      (screen.orientation as any)?.unlock?.();
+    } catch {
+      /* ignore */
+    }
+  };
 
-                  const cell = getCellInfo(rowIdx, colIdx);
+  // --- Render helpers ---
+  const renderTable = (isFS = false) => {
+    const textSize = isFS ? 'text-sm' : 'text-xs sm:text-sm';
+    const cellPad = isFS ? 'px-3 py-3' : 'px-2 py-3';
+    const headerPad = isFS ? 'px-3 py-2' : 'px-1.5 sm:px-3 py-2';
+    const minW = isFS ? 'min-w-[90px]' : 'min-w-[70px] sm:min-w-[100px]';
 
+    return (
+      <table className={`border-collapse border-2 border-gray-900 ${textSize}`}>
+        <thead>
+          <tr>
+            <th
+              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[140px]' : 'min-w-[120px] sm:min-w-[200px]'}`}
+            >
+              {leagueName}
+            </th>
+            {players.map((p, i) => (
+              <th
+                key={`col-${i}`}
+                className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold whitespace-nowrap ${minW}`}
+              >
+                {p.name}
+              </th>
+            ))}
+            <th
+              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[60px]' : 'min-w-[50px] sm:min-w-[80px]'}`}
+            >
+              勝敗
+            </th>
+            <th
+              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[50px]' : 'min-w-[40px] sm:min-w-[70px]'}`}
+            >
+              順位
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((player, rowIdx) => (
+            <tr key={`row-${rowIdx}`}>
+              {/* 選手名セル */}
+              <td className={`border-2 border-gray-900 px-3 ${cellPad} font-medium whitespace-nowrap`}>
+                <span className="text-gray-500 mr-2">{toCircledNum(rowIdx + 1)}</span>
+                {player.name}
+                {player.affiliation && (
+                  <span className="text-gray-400 ml-1 text-xs">（{player.affiliation}）</span>
+                )}
+              </td>
+              {/* 対戦結果セル */}
+              {players.map((_, colIdx) => {
+                const isSelf = rowIdx === colIdx;
+
+                if (isSelf) {
                   return (
                     <td
                       key={`cell-${rowIdx}-${colIdx}`}
-                      className={`border-2 border-gray-900 px-2 py-3 text-center min-w-[100px] ${cell.className} ${
-                        cell.selected ? 'ring-2 ring-primary-500 ring-inset' : ''
-                      }`}
-                      onClick={() => handleCellClick(cell.entryId1, cell.entryId2)}
+                      className={`border-2 border-gray-900 bg-gray-200 relative ${minW}`}
                     >
-                      {cell.text}
+                      <svg
+                        className="absolute inset-0 w-full h-full"
+                        preserveAspectRatio="none"
+                      >
+                        <line
+                          x1="0"
+                          y1="0"
+                          x2="100%"
+                          y2="100%"
+                          stroke="#374151"
+                          strokeWidth="1.5"
+                        />
+                      </svg>
                     </td>
                   );
-                })}
-                {/* 勝敗 */}
-                <td className="border-2 border-gray-900 px-2 py-3 text-center font-medium whitespace-nowrap">
-                  {stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0
-                    ? `${stats[rowIdx].wins} - ${stats[rowIdx].losses}`
-                    : ''}
-                </td>
-                {/* 順位 */}
-                <td className="border-2 border-gray-900 px-2 py-3 text-center font-bold text-lg">
-                  {(stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0) ? rankMap.get(rowIdx) : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                }
 
-        {/* 対戦順 */}
-        <div className="mt-3 text-sm text-gray-600">
-          <span className="font-medium">※対戦順　</span>
-          {matchOrder.map(([a, b], idx) => (
-            <span key={idx} className="mr-2">
-              {toCircledNum(a + 1)}-{toCircledNum(b + 1)}
-            </span>
+                const cell = getCellInfo(rowIdx, colIdx);
+
+                return (
+                  <td
+                    key={`cell-${rowIdx}-${colIdx}`}
+                    className={`border-2 border-gray-900 ${cellPad} text-center ${minW} ${cell.className} ${
+                      cell.selected ? 'ring-2 ring-primary-500 ring-inset' : ''
+                    }`}
+                    onClick={() => handleCellClick(cell.entryId1, cell.entryId2)}
+                  >
+                    {cell.text}
+                  </td>
+                );
+              })}
+              {/* 勝敗 */}
+              <td
+                className={`border-2 border-gray-900 ${cellPad} text-center font-medium whitespace-nowrap`}
+              >
+                {allMatchesDone || stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0
+                  ? `${stats[rowIdx].wins} - ${stats[rowIdx].losses}`
+                  : ''}
+              </td>
+              {/* 順位 */}
+              <td
+                className={`border-2 border-gray-900 ${cellPad} text-center font-bold ${isFS ? 'text-xl' : 'text-lg'}`}
+              >
+                {allMatchesDone || stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0
+                  ? rankMap.get(rowIdx)
+                  : ''}
+              </td>
+            </tr>
           ))}
-        </div>
+        </tbody>
+      </table>
+    );
+  };
+
+  const renderMatchProgress = () => (
+    <div className="mt-3 space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="font-bold text-gray-600 mr-1">対戦順:</span>
+        {matchOrder.map(([a, b], idx) => {
+          const match = findMatch(a, b);
+          const isDone =
+            match && (match.status === 'finished' || match.status === 'walkover');
+          const isPlaying = match?.status === 'playing';
+          const isCurrent = idx === currentMatchIdx;
+
+          return (
+            <span
+              key={idx}
+              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                isDone
+                  ? 'bg-primary-100 text-primary-700'
+                  : isPlaying
+                    ? 'bg-green-100 text-green-700 animate-pulse'
+                    : isCurrent
+                      ? 'bg-yellow-200 text-yellow-800 font-bold league-match-blink'
+                      : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {isCurrent && <span className="text-yellow-600 mr-0.5">▶</span>}
+              <span className={isDone ? 'line-through' : ''}>
+                {toCircledNum(a + 1)}-{toCircledNum(b + 1)}
+              </span>
+              {isDone && <span className="ml-0.5 text-primary-500">✓</span>}
+            </span>
+          );
+        })}
       </div>
+      {allMatchesDone && (
+        <div className="text-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-bold">
+            🏆 全試合完了
+          </span>
+        </div>
+      )}
+      {!allMatchesDone && currentMatchIdx >= 0 && (
+        <div className="text-xs text-gray-500">
+          <span className="font-medium">
+            現在: 第{currentMatchIdx + 1}試合（
+            {toCircledNum(matchOrder[currentMatchIdx][0] + 1)}{players[matchOrder[currentMatchIdx][0]].name}
+            {' vs '}
+            {toCircledNum(matchOrder[currentMatchIdx][1] + 1)}{players[matchOrder[currentMatchIdx][1]].name}
+            ）
+          </span>
+          <span className="ml-2 text-gray-400">
+            {currentMatchIdx}/{matchOrder.length} 完了
+          </span>
+        </div>
+      )}
     </div>
   );
-}
 
-function toCircledNum(n: number): string {
-  const circled = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯';
-  return n >= 1 && n <= 16 ? circled[n - 1] : String(n);
+  // --- Render ---
+  return (
+    <div className="overflow-auto p-2 sm:p-4 md:p-6" style={{ width: '100%', height: '100%' }}>
+      <style>{`
+        @keyframes league-match-highlight {
+          0%, 100% { background-color: rgba(253, 224, 71, 0.25); }
+          50% { background-color: rgba(253, 224, 71, 0.65); }
+        }
+        .league-match-blink {
+          animation: league-match-highlight 1.5s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div className="inline-block min-w-full">
+        {/* スマホ用 全試合モードボタン */}
+        <div className="flex items-center justify-end mb-2 sm:hidden">
+          <button
+            onClick={handleFullscreen}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:scale-95 transition-all shadow-sm"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            全試合モード
+          </button>
+        </div>
+
+        {/* リーグ表 */}
+        {renderTable()}
+
+        {/* 対戦順・進行状況 */}
+        {renderMatchProgress()}
+      </div>
+
+      {/* フルスクリーンモード（ポータル） */}
+      {isFullscreen &&
+        createPortal(
+          <div className="fixed inset-0 z-[90] bg-white flex flex-col">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white shrink-0">
+              <h2 className="text-sm font-bold flex items-center gap-2">
+                <Maximize2 className="w-4 h-4" />
+                {leagueName} - 全試合モード
+              </h2>
+              {gameRuleText && (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded hidden sm:inline">
+                  {gameRuleText}
+                </span>
+              )}
+              <button
+                onClick={handleExitFullscreen}
+                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* テーブル */}
+            <div className="flex-1 overflow-auto p-3">
+              <div className="inline-block min-w-full">
+                {renderTable(true)}
+                {renderMatchProgress()}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
 }

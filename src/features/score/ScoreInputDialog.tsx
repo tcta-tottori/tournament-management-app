@@ -796,12 +796,10 @@ export default function ScoreInputDialog({
                 </span>
               </div>
             )}
-            {/* スコア未入力時のヒント */}
+            {/* スコア未入力時の案内 */}
             {canFinish && !autoWinner && !scoreValidationError && (
               <p className="text-center text-xs text-gray-400">
-                {match.status === 'playing'
-                  ? 'スコアを入力するかRetを選択すると勝者が判定されます'
-                  : 'スコアを入力するかW.Oを選択すると勝者が判定されます'}
+                スコア未入力・途中の場合も下のボタンで勝者を選択して完了できます
               </p>
             )}
           </div>
@@ -827,6 +825,18 @@ export default function ScoreInputDialog({
                 className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25">
                 <Trophy className="w-4 h-4" /> 結果確定
               </button>
+            )}
+            {canFinish && !autoWinner && (
+              <>
+                <button onClick={() => handleFinishMatch(1)} disabled={isProcessing}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
+                  <Trophy className="w-3.5 h-3.5" /> {match.player1Name || 'P1'} 勝利
+                </button>
+                <button onClick={() => handleFinishMatch(2)} disabled={isProcessing}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
+                  <Trophy className="w-3.5 h-3.5" /> {match.player2Name || 'P2'} 勝利
+                </button>
+              </>
             )}
           </div>
 
