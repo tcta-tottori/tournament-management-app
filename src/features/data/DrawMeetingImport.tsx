@@ -1324,29 +1324,151 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
 
   const hasPreview = parsedData && summary;
   const hasExcelPreview = parsedExcel;
-  const showButtons = !hasPreview && !hasExcelPreview;
+  const isMixedImported = useMixedStore(s => s.isImported);
+  const showButtons = !hasPreview && !hasExcelPreview && !mixedPending;
 
   return (
     <div className="space-y-4">
+      {/* ミックス大会 確認セクション（インライン表示） */}
+      {mixedPending && (
+        <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                <h3 className="font-bold text-sm">ミックス大会情報の確認</h3>
+              </div>
+              <button onClick={() => setMixedPending(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-gray-500">大会情報を確認・修正してから確定してください。</p>
+
+            {/* 大会名 */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-500 mb-1 block">大会名</label>
+              <input
+                type="text"
+                value={mixedEditName}
+                onChange={e => setMixedEditName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            {/* 日付・会場 横並び */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />開催日</label>
+                <input
+                  type="text"
+                  value={mixedEditDate}
+                  onChange={e => setMixedEditDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="例: 2026年4月1日"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />会場</label>
+                <input
+                  type="text"
+                  value={mixedEditVenue}
+                  onChange={e => setMixedEditVenue(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="例: ヤマタスポーツパーク"
+                />
+              </div>
+            </div>
+
+            {/* 読込概要 */}
+            <div className="flex gap-3 text-center">
+              <div className="flex-1 bg-emerald-50 rounded-lg p-2 border border-emerald-100">
+                <div className="text-lg font-bold text-emerald-700">{mixedPending.leagues.length}</div>
+                <div className="text-[10px] text-gray-500">リーグ</div>
+              </div>
+              <div className="flex-1 bg-teal-50 rounded-lg p-2 border border-teal-100">
+                <div className="text-lg font-bold text-teal-700">{mixedPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
+                <div className="text-[10px] text-gray-500">ペア</div>
+              </div>
+              <div className="flex-1 bg-cyan-50 rounded-lg p-2 border border-cyan-100">
+                <div className="text-lg font-bold text-cyan-700">{mixedPending.matches.length}</div>
+                <div className="text-[10px] text-gray-500">試合</div>
+              </div>
+            </div>
+
+            {/* ルール */}
+            {mixedPending.info.rules.length > 0 && (
+              <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
+                <div className="text-[11px] text-amber-700">
+                  {mixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
+                </div>
+              </div>
+            )}
+
+            {/* ボタン */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setMixedPending(null)}
+                className="flex-shrink-0 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  const info: TournamentInfo = {
+                    ...mixedPending!.info,
+                    name: mixedEditName,
+                    date: mixedEditDate,
+                    venue: mixedEditVenue,
+                  };
+                  const mixedStore = useMixedStore.getState();
+                  mixedStore.importData(info, mixedPending!.leagues, mixedPending!.matches);
+                  mixedStore.setImportFileName(mixedPending!.fileName);
+                  setMixedPending(null);
+                  navigate('/entry');
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-md transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                確定してエントリーへ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Excel読込ボタン */}
       {showButtons && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          {isMixedImported ? (
+            /* ミックス/団体戦モード: 大会Excel読込のみ */
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
             >
               <FileSpreadsheet className="w-4.5 h-4.5" />
               大会Excel読込
             </button>
-            <button
-              onClick={() => scheduleFileInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
-            >
-              <CalendarClock className="w-4.5 h-4.5" />
-              時間割Excel読込
-            </button>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+              >
+                <FileSpreadsheet className="w-4.5 h-4.5" />
+                大会Excel読込
+              </button>
+              <button
+                onClick={() => scheduleFileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+              >
+                <CalendarClock className="w-4.5 h-4.5" />
+                時間割Excel読込
+              </button>
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -1370,7 +1492,10 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             }}
           />
           <p className="text-[10px] text-gray-400 text-center">
-            ドローExcel (.xlsx) / 時間割Excel (.xlsx) を読み込みます。Google ドライブからの読込は上部の連携セクションをご利用ください。
+            {isMixedImported
+              ? 'ドローExcel (.xlsx) を読み込みます。'
+              : 'ドローExcel (.xlsx) / 時間割Excel (.xlsx) を読み込みます。Google ドライブからの読込は上部の連携セクションをご利用ください。'
+            }
           </p>
         </div>
       )}
@@ -1892,8 +2017,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         </div>
         );
       })()}
-      {/* ── 時間割読込セクション ── */}
-      {scheduleItems.length > 0 && (() => {
+      {/* ── 時間割読込セクション（ミックス/団体戦モードでは非表示） ── */}
+      {!isMixedImported && scheduleItems.length > 0 && (() => {
         // 色分けロジック: 男子=青系, 女子=赤系, 種目ごとに色味を変え, ラウンドで濃淡
         const getScheduleColor = (eventName: string, roundLabel: string) => {
           const isFemale = /女子|レディース|LD|LS|LB/i.test(eventName);
@@ -2043,8 +2168,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         );
       })()}
 
-      {/* 時間割エラー */}
-      {scheduleError && (
+      {/* 時間割エラー（ミックスモードでは非表示） */}
+      {!isMixedImported && scheduleError && (
         <div className="p-3 rounded-lg text-sm flex items-start gap-2 bg-red-50 text-red-800 border border-red-200">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{scheduleError}</span>
@@ -2165,118 +2290,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         document.body
       )}
 
-      {/* ミックス大会 確認ダイアログ */}
-      {mixedPending && createPortal(
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setMixedPending(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[460px] max-w-[95vw] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <h3 className="font-bold text-sm">ミックス大会情報の確認</h3>
-                </div>
-                <button onClick={() => setMixedPending(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">大会情報を確認・修正してから確定してください。</p>
-
-              {/* 大会名 */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-500 mb-1 block">大会名</label>
-                <input
-                  type="text"
-                  value={mixedEditName}
-                  onChange={e => setMixedEditName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              </div>
-
-              {/* 日付 */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />開催日</label>
-                <input
-                  type="text"
-                  value={mixedEditDate}
-                  onChange={e => setMixedEditDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="例: 2026年4月1日"
-                />
-              </div>
-
-              {/* 会場 */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />会場</label>
-                <input
-                  type="text"
-                  value={mixedEditVenue}
-                  onChange={e => setMixedEditVenue(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="例: ヤマタスポーツパーク"
-                />
-              </div>
-
-              {/* 読込概要 */}
-              <div className="flex gap-3 text-center">
-                <div className="flex-1 bg-emerald-50 rounded-lg p-2 border border-emerald-100">
-                  <div className="text-lg font-bold text-emerald-700">{mixedPending.leagues.length}</div>
-                  <div className="text-[10px] text-gray-500">リーグ</div>
-                </div>
-                <div className="flex-1 bg-teal-50 rounded-lg p-2 border border-teal-100">
-                  <div className="text-lg font-bold text-teal-700">{mixedPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
-                  <div className="text-[10px] text-gray-500">ペア</div>
-                </div>
-                <div className="flex-1 bg-cyan-50 rounded-lg p-2 border border-cyan-100">
-                  <div className="text-lg font-bold text-cyan-700">{mixedPending.matches.length}</div>
-                  <div className="text-[10px] text-gray-500">試合</div>
-                </div>
-              </div>
-
-              {/* ルール */}
-              {mixedPending.info.rules.length > 0 && (
-                <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
-                  <div className="text-[11px] text-amber-700">
-                    {mixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
-                  </div>
-                </div>
-              )}
-
-              {/* ボタン */}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => setMixedPending(null)}
-                  className="flex-shrink-0 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={() => {
-                    const info: TournamentInfo = {
-                      ...mixedPending!.info,
-                      name: mixedEditName,
-                      date: mixedEditDate,
-                      venue: mixedEditVenue,
-                    };
-                    const mixedStore = useMixedStore.getState();
-                    mixedStore.importData(info, mixedPending!.leagues, mixedPending!.matches);
-                    mixedStore.setImportFileName(mixedPending!.fileName);
-                    setMixedPending(null);
-                    navigate('/entry');
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-md transition-all"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  確定してエントリーへ
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* ミックス大会確認はインラインで表示済み */}
     </div>
   );
 }

@@ -743,39 +743,6 @@ export default function ScoreInputDialog({
               </div>
             )}
 
-            {/* W.O/Ret ボタン — 待機中・準備完了ではW.O、試合中ではRet */}
-            {!isFinished && (
-              <div className="space-y-1.5">
-                <span className="text-xs text-gray-500">
-                  {match.status === 'playing' ? 'Ret（途中棄権）' : 'W.O（ウォークオーバー）'}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setRetPlayer(retPlayer === 1 ? null : 1)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg border transition-colors ${
-                      retPlayer === 1
-                        ? 'bg-red-100 border-red-300 text-red-700'
-                        : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
-                    }`}
-                  >
-                    <UserX className="w-3.5 h-3.5" />
-                    {match.player1Name || 'P1'} {match.status === 'playing' ? 'Ret' : 'W.O'}
-                  </button>
-                  <button
-                    onClick={() => setRetPlayer(retPlayer === 2 ? null : 2)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg border transition-colors ${
-                      retPlayer === 2
-                        ? 'bg-red-100 border-red-300 text-red-700'
-                        : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
-                    }`}
-                  >
-                    <UserX className="w-3.5 h-3.5" />
-                    {match.player2Name || 'P2'} {match.status === 'playing' ? 'Ret' : 'W.O'}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* スコアバリデーションエラー */}
             {scoreValidationError && canFinish && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-2 space-y-0.5">
@@ -792,72 +759,120 @@ export default function ScoreInputDialog({
               <div className="text-center">
                 <span className="text-xs text-primary-600 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
-                  {retPlayer && (match.status === 'playing' ? ' (Ret)' : ' (W.O)')}
+                  {retPlayer && (match.status === 'playing' ? ' (DEF/Ret)' : ' (DEF/W.O)')}
                 </span>
               </div>
-            )}
-            {/* スコア未入力時の案内 */}
-            {canFinish && !autoWinner && !scoreValidationError && (
-              <p className="text-center text-xs text-gray-400">
-                スコア未入力・途中の場合も下のボタンで勝者を選択して完了できます
-              </p>
             )}
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="px-4 sm:px-6 pb-4 sm:pb-5 space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {canReady && (
-              <button onClick={handleReadyMatch} disabled={isProcessing}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                <Check className="w-4 h-4" /> 準備完了
-              </button>
-            )}
-            {canStart && (
-              <button onClick={handleStartMatch} disabled={isProcessing}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors">
-                <Play className="w-4 h-4" /> 試合開始
-              </button>
-            )}
-            {canFinish && autoWinner && !scoreValidationError && (
-              <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-lg shadow-primary-500/25">
-                <Trophy className="w-4 h-4" /> 結果確定
-              </button>
-            )}
-            {canFinish && !autoWinner && (
-              <>
-                <button onClick={() => handleFinishMatch(1)} disabled={isProcessing}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
-                  <Trophy className="w-3.5 h-3.5" /> {match.player1Name || 'P1'} 勝利
+        {/* ===== エントリー（結果入力）ボタン ===== */}
+        <div className="px-4 sm:px-6 pb-3 space-y-2">
+          {/* 準備完了 / 試合開始 */}
+          {(canReady || canStart) && (
+            <div className="flex gap-2">
+              {canReady && (
+                <button onClick={handleReadyMatch} disabled={isProcessing}
+                  className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                  <Check className="w-5 h-5" /> 準備完了
                 </button>
-                <button onClick={() => handleFinishMatch(2)} disabled={isProcessing}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
-                  <Trophy className="w-3.5 h-3.5" /> {match.player2Name || 'P2'} 勝利
+              )}
+              {canStart && (
+                <button onClick={handleStartMatch} disabled={isProcessing}
+                  className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                  <Play className="w-5 h-5" /> 試合開始
                 </button>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          {/* Secondary actions */}
+          {/* エントリー（結果確定）ボタン */}
+          {canFinish && (
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-primary-500" />
+                エントリー（結果入力）
+              </span>
+              {autoWinner && !scoreValidationError ? (
+                <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
+                  className="w-full inline-flex items-center justify-center gap-2 text-base font-bold px-4 py-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-primary-500/25 min-h-[56px]">
+                  <Trophy className="w-5 h-5" /> 結果確定
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => handleFinishMatch(1)} disabled={isProcessing}
+                    className="inline-flex items-center justify-center gap-1.5 text-sm font-bold px-3 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[52px]">
+                    <Trophy className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{match.player1Name || 'P1'}</span>
+                  </button>
+                  <button onClick={() => handleFinishMatch(2)} disabled={isProcessing}
+                    className="inline-flex items-center justify-center gap-1.5 text-sm font-bold px-3 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[52px]">
+                    <Trophy className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{match.player2Name || 'P2'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ===== DEF（棄権）ボタン ===== */}
+        {!isFinished && (
+          <div className="px-4 sm:px-6 pb-3">
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
+                <UserX className="w-3.5 h-3.5" />
+                DEF（{match.status === 'playing' ? '途中棄権' : '棄権'}）
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setRetPlayer(retPlayer === 1 ? null : 1)}
+                  className={`flex items-center justify-center gap-2 text-sm font-bold py-3.5 rounded-xl border-2 transition-all active:scale-[0.98] min-h-[52px] ${
+                    retPlayer === 1
+                      ? 'bg-red-100 border-red-400 text-red-700 shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 hover:bg-red-50'
+                  }`}
+                >
+                  <UserX className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{match.player1Name || 'P1'}</span>
+                  <span className="text-xs font-bold shrink-0">DEF</span>
+                </button>
+                <button
+                  onClick={() => setRetPlayer(retPlayer === 2 ? null : 2)}
+                  className={`flex items-center justify-center gap-2 text-sm font-bold py-3.5 rounded-xl border-2 transition-all active:scale-[0.98] min-h-[52px] ${
+                    retPlayer === 2
+                      ? 'bg-red-100 border-red-400 text-red-700 shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 hover:bg-red-50'
+                  }`}
+                >
+                  <UserX className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{match.player2Name || 'P2'}</span>
+                  <span className="text-xs font-bold shrink-0">DEF</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== その他アクション ===== */}
+        <div className="px-4 sm:px-6 pb-4 sm:pb-5">
           <div className="flex flex-wrap gap-2">
             {canCall && (
               isSpeaking ? (
                 <button onClick={() => stop()}
-                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors">
+                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 active:scale-[0.98] transition-all min-h-[44px]">
                   <VolumeX className="w-4 h-4" /> 停止
                 </button>
               ) : (
                 <button onClick={handleCall}
-                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors">
+                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] transition-all min-h-[44px]">
                   <Volume2 className="w-4 h-4" /> コール
                 </button>
               )
             )}
             {(match.status === 'ready' || match.status === 'playing' || isFinished) && (
               <button onClick={handleResetMatch} disabled={isProcessing}
-                className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                className="inline-flex items-center gap-1.5 text-sm px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all min-h-[44px]">
                 <RotateCcw className="w-4 h-4" /> リセット
               </button>
             )}
