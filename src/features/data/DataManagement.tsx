@@ -202,6 +202,8 @@ export default function DataManagement() {
       useAppStore.getState().setScheduleFileName('');
       useAppStore.getState().setScheduleSlots([]);
       useAppStore.getState().setAllScheduleMatches([]);
+      // ミックス大会データもリセット
+      useMixedStore.getState().resetAll();
       setResetDone(true);
       setTimeout(() => setResetDone(false), 3000);
     } catch (err) {
