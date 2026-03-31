@@ -6,7 +6,7 @@ import MixedScoreInput from './MixedScoreInput';
 import type { LeagueMatchScore } from './types';
 
 export default function MixedDrawView() {
-  const { leagues, leagueMatches } = useMixedStore();
+  const { leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
 
   return (

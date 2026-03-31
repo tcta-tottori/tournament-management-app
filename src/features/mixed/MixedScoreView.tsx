@@ -1,7 +1,7 @@
 import { useMixedStore } from './mixedStore';
 import MixedBracketView from './MixedBracketView';
 import MixedStandingsView from './MixedStandingsView';
-import { Trophy, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function MixedScoreView() {
   const { brackets, leagueMatches, leagues } = useMixedStore();
