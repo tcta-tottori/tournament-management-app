@@ -45,6 +45,8 @@ interface MixedState {
 
   // Team status & league move
   setTeamStatus: (teamId: string, status: 'none' | 'entry' | 'def') => void;
+  setLeagueAllStatus: (leagueId: string, status: 'none' | 'entry' | 'def') => void;
+  setAllTeamsStatus: (status: 'none' | 'entry' | 'def') => void;
   moveTeamToLeague: (teamId: string, targetLeagueId: string) => void;
 
   // Tournament info editing
@@ -218,6 +220,24 @@ export const useMixedStore = create<MixedState>()(
             allTeams: state.allTeams.map(updateTeam),
           };
         });
+      },
+
+      setLeagueAllStatus: (leagueId, status) => {
+        set(state => {
+          const updateTeam = (team: MixedTeam): MixedTeam =>
+            team.leagueId === leagueId ? { ...team, status } : team;
+          return {
+            leagues: state.leagues.map(l => l.leagueId === leagueId ? { ...l, teams: l.teams.map(t => ({ ...t, status })) } : l),
+            allTeams: state.allTeams.map(updateTeam),
+          };
+        });
+      },
+
+      setAllTeamsStatus: (status) => {
+        set(state => ({
+          leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(t => ({ ...t, status })) })),
+          allTeams: state.allTeams.map(t => ({ ...t, status })),
+        }));
       },
 
       moveTeamToLeague: (teamId, targetLeagueId) => {

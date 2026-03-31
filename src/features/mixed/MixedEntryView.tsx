@@ -1,6 +1,6 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { MapPin, Pencil, ArrowRightLeft } from 'lucide-react';
+import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { MixedTeam } from './types';
 
@@ -117,7 +117,7 @@ function rowBg(status: 'none' | 'entry' | 'def'): string {
 }
 
 export default function MixedEntryView() {
-  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, moveTeamToLeague } = useMixedStore();
+  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague } = useMixedStore();
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
 
@@ -125,12 +125,30 @@ export default function MixedEntryView() {
     return <MixedImportView />;
   }
 
+  const allEntry = allTeams.length > 0 && allTeams.every(t => t.status === 'entry');
+
   return (
     <div className="p-2 sm:p-4 space-y-3">
+      {/* 一括操作 */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setAllTeamsStatus(allEntry ? 'none' : 'entry')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            allEntry
+              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <Users size={13} />
+          {allEntry ? '全員Entry解除' : '全員Entry'}
+        </button>
+      </div>
+
       <div className="space-y-3">
         {leagues.map(league => {
           const entryCount = league.teams.filter(t => t.status === 'entry').length;
           const defCount = league.teams.filter(t => t.status === 'def').length;
+          const leagueAllEntry = league.teams.length > 0 && league.teams.every(t => t.status === 'entry');
           return (
             <div key={league.leagueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               {/* リーグヘッダー */}
@@ -174,6 +192,17 @@ export default function MixedEntryView() {
                     </button>
                   )}
                 </div>
+                <button
+                  onClick={() => setLeagueAllStatus(league.leagueId, leagueAllEntry ? 'none' : 'entry')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors shrink-0 ${
+                    leagueAllEntry
+                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                      : 'bg-white/80 text-gray-500 hover:bg-white hover:text-emerald-600 border border-gray-200'
+                  }`}
+                >
+                  <UserCheck size={12} />
+                  {leagueAllEntry ? 'Entry解除' : '全員Entry'}
+                </button>
               </div>
 
               {/* PC: テーブル表示 */}
