@@ -572,7 +572,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             const mixedStore = useMixedStore.getState();
             mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
             mixedStore.setImportFileName(fileName);
-            navigate('/mixed');
+            navigate('/entry');
             return;
           }
         } catch { /* fall through */ }
@@ -680,7 +680,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
               const mixedStore = useMixedStore.getState();
               mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
               mixedStore.setImportFileName(file.name);
-              navigate('/mixed');
+              navigate('/entry');
               return;
             }
           } catch {

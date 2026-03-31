@@ -25,6 +25,8 @@ import {
   Trophy,
   AlertTriangle,
 } from 'lucide-react';
+import { useMixedStore } from '../mixed/mixedStore';
+import MixedScoreView from '../mixed/MixedScoreView';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,6 +108,13 @@ type ViewMode = 'bracket' | 'table';
 // Main component
 // ---------------------------------------------------------------------------
 export default function Scoreboard() {
+  const isMixedImported = useMixedStore(s => s.isImported);
+
+  // ミックスダブルスモード
+  if (isMixedImported) {
+    return <MixedScoreView />;
+  }
+
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
 

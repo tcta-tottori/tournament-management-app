@@ -43,9 +43,6 @@ interface AppState {
   scheduleFileName: string;
   setScheduleFileName: (name: string) => void;
 
-  // テーマ設定 (light | dark)
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -72,8 +69,6 @@ export const useAppStore = create<AppState>()(
       setImportedSchedule: (items) => set({ importedSchedule: items }),
       scheduleFileName: '',
       setScheduleFileName: (name) => set({ scheduleFileName: name }),
-      theme: 'light',
-      setTheme: (theme) => set({ theme }),
     }),
     {
       name: 'tennis-tournament-storage', // localStorage に保存

@@ -69,6 +69,11 @@ export function calculateLeagueStandings(
           (m.team1Id === b.teamId && m.team2Id === a.teamId)
         );
         if (h2h && h2h.winnerId) {
+          // 直接対決で順位決定
+          const winner = h2h.winnerId === a.teamId ? a : b;
+          const loser = h2h.winnerId === a.teamId ? b : a;
+          winner.tiebreakReason = '直接対決勝ち';
+          loser.tiebreakReason = '直接対決負け';
           return h2h.winnerId === a.teamId ? -1 : 1;
         }
       }
@@ -77,7 +82,11 @@ export function calculateLeagueStandings(
         // 3チーム以上同率: 取得ゲーム率
         const ratioA = a.gamesLost === 0 ? Infinity : a.gamesWon / a.gamesLost;
         const ratioB = b.gamesLost === 0 ? Infinity : b.gamesWon / b.gamesLost;
-        if (ratioA !== ratioB) return ratioB - ratioA;
+        if (ratioA !== ratioB) {
+          a.tiebreakReason = `ゲーム率 ${ratioA === Infinity ? '∞' : ratioA.toFixed(2)}`;
+          b.tiebreakReason = `ゲーム率 ${ratioB === Infinity ? '∞' : ratioB.toFixed(2)}`;
+          return ratioB - ratioA;
+        }
       }
 
       // 最終: ゲーム率

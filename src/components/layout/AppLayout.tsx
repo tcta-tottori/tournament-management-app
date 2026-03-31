@@ -4,11 +4,12 @@ import {
   Database, Users, Dices, Trophy,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, Medal, HardDrive,
-  AlertTriangle, Network, Sun, Moon, Heart
+  AlertTriangle, Network
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
+import { useMixedStore } from '../../features/mixed/mixedStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
@@ -27,11 +28,13 @@ const ALL_MAIN_TABS = [
   { id: 'S-10', path: '/results', label: '結果', icon: Medal },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
-  { id: 'S-13', path: '/mixed', label: 'ミックス', icon: Heart },
 ];
 
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
+
+/** ミックスダブルス読込時に非表示にするパス */
+const MIXED_HIDDEN_PATHS = ['/referee', '/schedule-sheet', '/draw-lot', '/court-bracket'];
 
 // 金の微粒子 — 空気中に漂う細かい金色パーティクル
 // type: 0=微粒子(1-1.5px), 1=小粒子(1.5-2.5px), 2=中粒子(2.5-3.5px, キラッと光る)
@@ -73,18 +76,8 @@ for (let i = 0; i < 10; i++) {
 export default function AppLayout() {
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
-  const theme = useAppStore((s) => s.theme);
-  const setTheme = useAppStore((s) => s.setTheme);
+  const isMixedImported = useMixedStore((s) => s.isImported);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
-
-  // ダークモードの適用
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
@@ -169,16 +162,26 @@ export default function AppLayout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMatches, courts, matchDuration, now]);
 
-  // ミックス or 団体戦の種目があるかどうかでタブを出し分け
+  // ミックス読込時は対戦順・タイムテーブル等を非表示
   const allTabs = useMemo(() => {
-    const hasDrawEvents = (events ?? []).some(
-      (e) =>
-        /ミックス|団体|mixed|team/i.test(e.name) ||
-        /ミックス|団体|mixed|team/i.test(e.type || '')
-    );
-    if (hasDrawEvents) return ALL_MAIN_TABS;
-    return ALL_MAIN_TABS.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
-  }, [events]);
+    let tabs = ALL_MAIN_TABS;
+
+    // ミックスダブルス読込時: 不要なタブを非表示
+    if (isMixedImported) {
+      tabs = tabs.filter((t) => !MIXED_HIDDEN_PATHS.includes(t.path));
+    } else {
+      // 通常モード: ミックス/団体戦の種目がなければ抽選・ドロー表タブを非表示
+      const hasDrawEvents = (events ?? []).some(
+        (e) =>
+          /ミックス|団体|mixed|team/i.test(e.name) ||
+          /ミックス|団体|mixed|team/i.test(e.type || '')
+      );
+      if (!hasDrawEvents) {
+        tabs = tabs.filter((t) => !DRAW_TAB_PATHS.includes(t.path));
+      }
+    }
+    return tabs;
+  }, [events, isMixedImported]);
 
 
   // モバイル用: 全タブ表示
@@ -269,14 +272,6 @@ export default function AppLayout() {
             <ExternalLink className="w-3 h-3" />
           </a>
 
-          {/* テーマ切り替えボタン */}
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
-            title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
-          >
-            {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-          </button>
           <button
             onClick={() => setVersionModalOpen(true)}
             className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"

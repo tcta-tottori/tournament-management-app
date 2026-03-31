@@ -21,6 +21,8 @@ import {
   Crown,
   Users,
 } from 'lucide-react';
+import { useMixedStore } from '../mixed/mixedStore';
+import MixedResultsExport from '../mixed/MixedResultsExport';
 
 // ---------- helpers ----------
 
@@ -165,6 +167,13 @@ function analyzeRoundRobin(draw: Draw, matches: Match[], entries: Entry[], playe
 // ---------- component ----------
 
 export default function ResultsPage() {
+  const isMixedImported = useMixedStore(s => s.isImported);
+
+  // ミックスダブルスモード
+  if (isMixedImported) {
+    return <MixedResultsExport />;
+  }
+
   const currentTournamentId = useAppStore(s => s.currentTournamentId);
 
   const tournaments = useLiveQuery(() => db.tournaments.toArray()) || [];

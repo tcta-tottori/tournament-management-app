@@ -57,6 +57,7 @@ export interface LeagueStanding {
   gamesLost: number;
   gameRatio: number;
   headToHeadWin: number;    // 直接対決判定用
+  tiebreakReason?: string;  // 順位決定理由 (例: "直接対決", "ゲーム取得率")
 }
 
 /** 順位別トーナメントカテゴリ */

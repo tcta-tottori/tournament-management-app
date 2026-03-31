@@ -42,7 +42,6 @@ import Manual from './features/manual/Manual'
 import BackupPage from './features/backup/BackupPage';
 import ResultsPage from './features/results/ResultsPage';
 import CourtBracketPage from './features/court-bracket/CourtBracketPage';
-import MixedTournament from './features/mixed/MixedTournament';
 // BroadcastPanel は Scoreboard の MatchActionPanel に統合済み
 
 createRoot(document.getElementById('root')!).render(
@@ -65,7 +64,6 @@ createRoot(document.getElementById('root')!).render(
           <Route path="schedule" element={<CourtSchedule />} />
           <Route path="dashboard" element={<LiveDashboard />} />
           <Route path="results" element={<ResultsPage />} />
-          <Route path="mixed" element={<MixedTournament />} />
 
           <Route path="manual" element={<Manual />} />
           <Route path="backup" element={<BackupPage />} />

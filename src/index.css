@@ -10,20 +10,6 @@
   --input-bg: #ffffff;
 }
 
-.dark {
-  --bg-main: #0f172a; /* Slate 900 */
-  --text-main: #f8fafc; /* Slate 50 */
-  --text-muted: #94a3b8; /* Slate 400 */
-  --border-main: #334155; /* Slate 700 */
-  --card-bg: #1e293b; /* Slate 800 */
-  --table-stripe: #1e293b;
-  --input-bg: #1e293b;
-
-  /* Overwrite primary/secondary for dark mode visibility */
-  --color-primary-50: #064e3b;
-  --color-primary-100: #065f46;
-  --color-secondary-50: #451a03;
-}
 
 @theme {
   /* Primary — Tennis Court Green */

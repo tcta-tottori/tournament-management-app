@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Check, Circle, Play } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Pencil } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 
 export default function MixedLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId } = useMixedStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
+  const [editingCourt, setEditingCourt] = useState(false);
+  const [courtNameInput, setCourtNameInput] = useState('');
 
   const selectedLeague = leagues.find(l => l.leagueId === selectedLeagueId) || leagues[0];
   const allStandings = calculateLeagueStandings(leagues, leagueMatches);
@@ -101,7 +103,38 @@ export default function MixedLeagueView() {
                   {selectedLeague.leagueId.trim()}
                 </span>
                 {selectedLeague.leagueId.trim()}リーグ
-                <span className="text-sm text-gray-400 font-normal ml-2">{selectedLeague.courtName}</span>
+                {editingCourt ? (
+                  <span className="ml-2 inline-flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={courtNameInput}
+                      onChange={e => setCourtNameInput(e.target.value)}
+                      onBlur={() => {
+                        updateCourtName(selectedLeague.leagueId, courtNameInput);
+                        setEditingCourt(false);
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          updateCourtName(selectedLeague.leagueId, courtNameInput);
+                          setEditingCourt(false);
+                        }
+                        if (e.key === 'Escape') setEditingCourt(false);
+                      }}
+                      className="px-2 py-0.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-32"
+                      autoFocus
+                    />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => { setEditingCourt(true); setCourtNameInput(selectedLeague.courtName); }}
+                    className="ml-2 inline-flex items-center gap-1 text-sm text-gray-400 font-normal hover:text-emerald-600 transition-colors"
+                    title="コート名を編集"
+                  >
+                    <MapPin size={14} />
+                    {selectedLeague.courtName || '(未設定)'}
+                    <Pencil size={10} className="opacity-0 group-hover:opacity-100" />
+                  </button>
+                )}
               </h2>
             </div>
             <div className="flex items-center gap-3">
@@ -238,22 +271,42 @@ export default function MixedLeagueView() {
         {standings.length > 0 && finishedCount > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <h3 className="text-sm font-bold text-gray-700 mb-3">暫定順位</h3>
-            <div className="space-y-2">
-              {standings.map((s, i) => (
-                <div key={s.teamId} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
-                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-                    ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-gray-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-gray-200 text-gray-600'}
-                  `}>
-                    {s.rank}
-                  </span>
-                  <span className="flex-1 font-medium text-sm">{s.teamName}</span>
-                  <span className="text-sm text-gray-600 font-mono">{s.wins}勝{s.losses}敗</span>
-                  <span className="text-xs text-gray-400">
-                    ({s.gamesWon}-{s.gamesLost})
-                  </span>
-                </div>
-              ))}
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="py-2 px-2 text-center w-10">順位</th>
+                  <th className="py-2 px-2 text-left">ペア名</th>
+                  <th className="py-2 px-2 text-center w-16">勝敗</th>
+                  <th className="py-2 px-2 text-center w-16">取得G</th>
+                  <th className="py-2 px-2 text-center w-16">失G</th>
+                  <th className="py-2 px-2 text-center w-20">ゲーム率</th>
+                  <th className="py-2 px-2 text-left w-28">判定理由</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((s, i) => (
+                  <tr key={s.teamId} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
+                        ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-gray-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-gray-200 text-gray-600'}
+                      `}>
+                        {s.rank}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 font-medium text-gray-800">{s.teamName}</td>
+                    <td className="py-2 px-2 text-center font-mono text-gray-700">{s.wins}-{s.losses}</td>
+                    <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
+                    <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
+                    <td className="py-2 px-2 text-center font-mono text-gray-600">
+                      {s.gamesLost === 0 ? (s.gamesWon > 0 ? '∞' : '-') : (s.gamesWon / s.gamesLost).toFixed(2)}
+                    </td>
+                    <td className="py-2 px-2 text-xs text-gray-400">
+                      {s.tiebreakReason || ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

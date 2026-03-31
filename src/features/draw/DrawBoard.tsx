@@ -13,6 +13,8 @@ import {
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch, Image, FileSpreadsheet } from 'lucide-react';
+import { useMixedStore } from '../mixed/mixedStore';
+import MixedDrawView from '../mixed/MixedDrawView';
 
 export type DrawSlotData = {
   position: number;
@@ -40,6 +42,13 @@ export type MatchResult = {
 };
 
 export default function DrawBoard() {
+  const isMixedImported = useMixedStore(s => s.isImported);
+
+  // ミックスダブルスモード
+  if (isMixedImported) {
+    return <MixedDrawView />;
+  }
+
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [editedSlots, setEditedSlots] = useState<DrawSlotData[]>([]);
   const [isSaving, setIsSaving] = useState(false);

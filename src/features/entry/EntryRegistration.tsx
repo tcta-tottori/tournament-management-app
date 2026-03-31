@@ -5,6 +5,8 @@ import { useAppStore } from '../../stores/appStore';
 import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useMixedStore } from '../mixed/mixedStore';
+import MixedEntryView from '../mixed/MixedEntryView';
 
 // 略称→正式名マッピング（時間割の略称がストアに残っている場合のフォールバック用）
 const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
@@ -102,7 +104,13 @@ type CheckInSlot = {
 
 
 export default function EntryRegistration() {
+  const isMixedImported = useMixedStore(s => s.isImported);
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+
+  // ミックスダブルスモード
+  if (isMixedImported) {
+    return <MixedEntryView />;
+  }
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');

@@ -39,6 +39,9 @@ interface MixedState {
   setBracketMatchStatus: (matchId: string, status: BracketMatch['status']) => void;
   advanceWinner: (matchId: string) => void;
 
+  // Court editing
+  updateCourtName: (leagueId: string, courtName: string) => void;
+
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
   setSelectedLeagueId: (id: string | null) => void;
@@ -165,6 +168,14 @@ export const useMixedStore = create<MixedState>()(
           });
           return { brackets: newBrackets };
         });
+      },
+
+      updateCourtName: (leagueId, courtName) => {
+        set(state => ({
+          leagues: state.leagues.map(l =>
+            l.leagueId === leagueId ? { ...l, courtName } : l
+          ),
+        }));
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
