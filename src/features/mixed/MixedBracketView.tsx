@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Trophy, Medal, Award, Users } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket } from './types';
 
+/** 全角数字→半角変換 */
+function toHalfWidth(s: string): string {
+  return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+}
+
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
-  { id: '1st', label: '1位トーナメント', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
-  { id: '2nd', label: '2位トーナメント', icon: Medal, color: 'from-gray-400 to-gray-500' },
-  { id: '3rd', label: '3位トーナメント', icon: Award, color: 'from-orange-400 to-orange-500' },
-  { id: '4th', label: '4位・5位トーナメント', icon: Users, color: 'from-slate-400 to-slate-500' },
+  { id: '1st', label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
+  { id: '2nd', label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
+  { id: '3rd', label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
+  { id: '4th', label: '4-5位', icon: Users, color: 'from-slate-400 to-slate-500' },
 ];
 
 export default function MixedBracketView() {
@@ -15,6 +20,7 @@ export default function MixedBracketView() {
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
+  const score2Ref = useRef<HTMLInputElement>(null);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -48,15 +54,30 @@ export default function MixedBracketView() {
     const s2 = parseInt(score2Input);
     if (isNaN(s1) || isNaN(s2) || s1 === s2) return;
     updateBracketScore(editingMatch.matchId, s1, s2);
-    // Advance winner
     setTimeout(() => advanceWinner(editingMatch.matchId), 50);
     setEditingMatch(null);
+  };
+
+  const handleScore1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setScore1Input(raw);
+    if (raw.length === 1 && /^[0-7]$/.test(raw)) {
+      setTimeout(() => {
+        score2Ref.current?.focus();
+        score2Ref.current?.select();
+      }, 50);
+    }
+  };
+
+  const handleScore2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setScore2Input(raw);
   };
 
   return (
     <div className="space-y-4">
       {/* カテゴリタブ */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {CATEGORY_TABS.map(tab => {
           const Icon = tab.icon;
           const bracket = brackets.find(b => b.category === tab.id);
@@ -69,17 +90,17 @@ export default function MixedBracketView() {
               key={tab.id}
               onClick={() => setSelectedBracketCategory(tab.id)}
               className={`
-                flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all
+                flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap
                 ${isActive
                   ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                 }
               `}
             >
-              <Icon size={16} />
+              <Icon size={14} />
               {tab.label}
               {bracket && (
-                <span className={`text-xs ml-1 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                <span className={`text-[10px] ml-0.5 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
                   ({finished}/{total})
                 </span>
               )}
@@ -100,10 +121,10 @@ export default function MixedBracketView() {
       {/* スコア入力モーダル */}
       {editingMatch && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-800 mb-4">スコア入力</h3>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 mb-5">
               <div className="flex-1 text-center">
                 <div className="font-medium text-sm">{editingMatch.team1Name}</div>
                 <div className="text-xs text-gray-400">{editingMatch.team1League}</div>
@@ -115,25 +136,26 @@ export default function MixedBracketView() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="flex items-center justify-center gap-4 mb-5">
               <input
-                type="number"
-                min={0}
-                max={7}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
                 value={score1Input}
-                onChange={e => setScore1Input(e.target.value)}
-                className="w-16 h-14 text-center text-2xl font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={handleScore1Change}
+                className="w-14 h-12 text-center text-2xl font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
               <span className="text-2xl font-bold text-gray-300">-</span>
               <input
-                type="number"
-                min={0}
-                max={7}
+                ref={score2Ref}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
                 value={score2Input}
-                onChange={e => setScore2Input(e.target.value)}
-                className="w-16 h-14 text-center text-2xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                onChange={handleScore2Change}
                 onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
+                className="w-14 h-12 text-center text-2xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
 
@@ -178,7 +200,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
 
           return (
             <div key={round} className="flex-shrink-0" style={{ width: MATCH_WIDTH + ROUND_GAP }}>
-              {/* ラウンドラベル */}
               <div className="text-center mb-3">
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
                   ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :
@@ -187,7 +208,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                 </span>
               </div>
 
-              {/* 試合カード */}
               <div className="space-y-0">
                 {roundMatches.map((match, matchIdx) => {
                   const topPadding = roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
@@ -206,7 +226,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                         `}
                         style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
                       >
-                        {/* Team 1 */}
                         <div className={`flex items-center px-2 h-[34px] text-xs border-b border-gray-100
                           ${match.winnerId === match.team1Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                         `}>
@@ -218,7 +237,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                             </span>
                           )}
                         </div>
-                        {/* Team 2 */}
                         <div className={`flex items-center px-2 h-[34px] text-xs
                           ${match.winnerId === match.team2Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                         `}>

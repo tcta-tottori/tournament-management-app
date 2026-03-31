@@ -1,7 +1,66 @@
 import type {
   MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding,
-  PlacementBracket, PlacementCategory, BracketMatch
+  PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry
 } from './types';
+
+/** 4チームリーグの対戦順 */
+const MATCH_ORDER_4: MatchOrderEntry[] = [
+  { matchNumber: 1, team1Index: 1, team2Index: 2 },
+  { matchNumber: 2, team1Index: 3, team2Index: 4 },
+  { matchNumber: 3, team1Index: 1, team2Index: 3 },
+  { matchNumber: 4, team1Index: 2, team2Index: 4 },
+  { matchNumber: 5, team1Index: 1, team2Index: 4 },
+  { matchNumber: 6, team1Index: 2, team2Index: 3 },
+];
+
+/** 5チームリーグの対戦順 */
+const MATCH_ORDER_5: MatchOrderEntry[] = [
+  { matchNumber: 1, team1Index: 1, team2Index: 2 },
+  { matchNumber: 2, team1Index: 3, team2Index: 4 },
+  { matchNumber: 3, team1Index: 1, team2Index: 5 },
+  { matchNumber: 4, team1Index: 2, team2Index: 3 },
+  { matchNumber: 5, team1Index: 1, team2Index: 4 },
+  { matchNumber: 6, team1Index: 2, team2Index: 5 },
+  { matchNumber: 7, team1Index: 3, team2Index: 5 },
+  { matchNumber: 8, team1Index: 2, team2Index: 4 },
+  { matchNumber: 9, team1Index: 4, team2Index: 5 },
+  { matchNumber: 10, team1Index: 1, team2Index: 3 },
+];
+
+/** ラウンドロビン対戦順を生成（一般N人用） */
+function generateMatchOrder(n: number): MatchOrderEntry[] {
+  if (n === 4) return MATCH_ORDER_4;
+  if (n === 5) return MATCH_ORDER_5;
+  const order: MatchOrderEntry[] = [];
+  let num = 1;
+  for (let i = 1; i <= n; i++) {
+    for (let j = i + 1; j <= n; j++) {
+      order.push({ matchNumber: num++, team1Index: i, team2Index: j });
+    }
+  }
+  return order;
+}
+
+/** リーグの試合データを再生成 */
+export function regenerateLeagueMatches(league: MixedLeague): LeagueMatchScore[] {
+  const matchOrder = generateMatchOrder(league.teams.length);
+  const matches: LeagueMatchScore[] = [];
+  for (const mo of matchOrder) {
+    const team1 = league.teams[mo.team1Index - 1];
+    const team2 = league.teams[mo.team2Index - 1];
+    if (!team1 || !team2) continue;
+    matches.push({
+      matchId: `league-${league.leagueId}-${mo.matchNumber}`,
+      leagueId: league.leagueId,
+      matchNumber: mo.matchNumber,
+      team1Id: team1.teamId,
+      team2Id: team2.teamId,
+      score1: null, score2: null, winnerId: null,
+      status: 'waiting',
+    });
+  }
+  return matches;
+}
 
 /**
  * リーグ順位計算

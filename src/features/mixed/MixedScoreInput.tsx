@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore, MixedTeam } from './types';
+
+/** 全角数字→半角変換 */
+function toHalfWidth(s: string): string {
+  return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+}
 
 interface Props {
   match: LeagueMatchScore;
@@ -18,6 +23,9 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   const [score1, setScore1] = useState<string>(match.score1?.toString() ?? '');
   const [score2, setScore2] = useState<string>(match.score2?.toString() ?? '');
   const [error, setError] = useState('');
+
+  const score1Ref = useRef<HTMLInputElement>(null);
+  const score2Ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setScore1(match.score1?.toString() ?? '');
@@ -41,16 +49,9 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
       setError('同点は不可です（タイブレーク結果を入力）');
       return false;
     }
-    // 6ゲームマッチ: 6-X, X-6, or 7-6/6-7 (tiebreak)
     if (s1 > 7 || s2 > 7) {
       setError('スコアは0〜7の範囲で入力してください');
       return false;
-    }
-    if (s1 === 7 && s2 !== 6 && s2 !== 5) {
-      // 7 is only valid as 7-6 or 7-5
-    }
-    if (s2 === 7 && s1 !== 6 && s1 !== 5) {
-      // same
     }
     setError('');
     return true;
@@ -64,116 +65,105 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
     onClose();
   }, [score1, score2, match.matchId, updateLeagueScore, onClose, validate]);
 
-  // キーボードショートカット
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'Enter' && !e.shiftKey) handleSave();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave, onClose]);
+  }, [onClose]);
 
   const handleClear = useCallback(() => {
-    // Reset to waiting state
     setLeagueMatchStatus(match.matchId, 'waiting');
-    // Reset scores by setting to a special clear state
-    updateLeagueScore(match.matchId, -1, -1); // Will be handled as reset
+    updateLeagueScore(match.matchId, -1, -1);
     onClose();
   }, [match.matchId, setLeagueMatchStatus, updateLeagueScore, onClose]);
 
-  // Quick score buttons
-  const quickScores = [
-    ['6-0', '6-1', '6-2', '6-3', '6-4'],
-    ['0-6', '1-6', '2-6', '3-6', '4-6'],
-    ['7-5', '5-7', '7-6', '6-7'],
-  ];
+  /** スコア入力ハンドラ（全角変換 + 自動フォーカス移動） */
+  const handleScore1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setScore1(raw);
+    setError('');
+    // 1桁入力したら自動的に次の入力欄へ
+    if (raw.length === 1 && /^[0-7]$/.test(raw)) {
+      setTimeout(() => {
+        score2Ref.current?.focus();
+        score2Ref.current?.select();
+      }, 50);
+    }
+  };
+
+  const handleScore2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setScore2(raw);
+    setError('');
+  };
+
+  const handleScore2KeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[480px] max-w-[95vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-[95vw] overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* ヘッダー */}
-        <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-6 py-4">
+        <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-5 py-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold">スコア入力</h3>
+            <div>
+              <h3 className="font-bold text-sm">スコア入力</h3>
+              <div className="text-xs text-emerald-200">
+                第{match.matchNumber}試合 ・ {match.leagueId.trim()}リーグ
+              </div>
+            </div>
             <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
               <X size={18} />
             </button>
           </div>
-          <div className="text-sm text-emerald-200 mt-1">
-            第{match.matchNumber}試合 ・ {match.leagueId.trim()}リーグ
-          </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
           {/* 対戦カード */}
-          <div className="flex items-center gap-4 mb-6">
-            {/* Team 1 */}
-            <div className="flex-1 text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
-              <div className="text-xs text-blue-500 mb-1">チーム{team1?.numberInLeague}</div>
-              <div className="font-bold text-gray-800">{team1?.male.name}</div>
-              <div className="text-sm text-gray-600">{team1?.female.name}</div>
-              <div className="text-xs text-gray-400 mt-1">{team1?.male.affiliation}</div>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+              <div className="text-xs text-blue-500 mb-0.5">チーム{team1?.numberInLeague}</div>
+              <div className="font-bold text-sm text-gray-800">{team1?.male.name}</div>
+              <div className="text-xs text-gray-600">{team1?.female.name}</div>
             </div>
-
-            <div className="text-2xl font-bold text-gray-300">VS</div>
-
-            {/* Team 2 */}
-            <div className="flex-1 text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl">
-              <div className="text-xs text-red-500 mb-1">チーム{team2?.numberInLeague}</div>
-              <div className="font-bold text-gray-800">{team2?.male.name}</div>
-              <div className="text-sm text-gray-600">{team2?.female.name}</div>
-              <div className="text-xs text-gray-400 mt-1">{team2?.male.affiliation}</div>
+            <div className="text-xl font-bold text-gray-300">VS</div>
+            <div className="flex-1 text-center p-3 bg-gradient-to-br from-red-50 to-red-100 rounded-xl">
+              <div className="text-xs text-red-500 mb-0.5">チーム{team2?.numberInLeague}</div>
+              <div className="font-bold text-sm text-gray-800">{team2?.male.name}</div>
+              <div className="text-xs text-gray-600">{team2?.female.name}</div>
             </div>
           </div>
 
           {/* スコア入力 */}
           <div className="flex items-center justify-center gap-4 mb-4">
             <input
-              type="number"
-              min={0}
-              max={7}
+              ref={score1Ref}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
               value={score1}
-              onChange={e => setScore1(e.target.value)}
-              className="w-20 h-16 text-center text-3xl font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={handleScore1Change}
+              className="w-16 h-14 text-center text-3xl font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="0"
               autoFocus
             />
             <span className="text-3xl font-bold text-gray-400">-</span>
             <input
-              type="number"
-              min={0}
-              max={7}
+              ref={score2Ref}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
               value={score2}
-              onChange={e => setScore2(e.target.value)}
-              className="w-20 h-16 text-center text-3xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              onChange={handleScore2Change}
+              onKeyDown={handleScore2KeyDown}
+              className="w-16 h-14 text-center text-3xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
               placeholder="0"
             />
-          </div>
-
-          {/* クイックスコアボタン */}
-          <div className="space-y-2 mb-4">
-            {quickScores.map((row, ri) => (
-              <div key={ri} className="flex justify-center gap-2">
-                {row.map(qs => {
-                  const [q1, q2] = qs.split('-');
-                  return (
-                    <button
-                      key={qs}
-                      onClick={() => { setScore1(q1); setScore2(q2); setError(''); }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-mono transition-all border
-                        ${score1 === q1 && score2 === q2
-                          ? 'bg-emerald-100 border-emerald-300 text-emerald-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }
-                      `}
-                    >
-                      {qs}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
           </div>
 
           {/* エラー */}

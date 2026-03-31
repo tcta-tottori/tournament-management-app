@@ -1,88 +1,18 @@
 import { useState } from 'react';
-import { Trophy, Swords, BarChart3, RotateCcw, Check, MapPin, Pencil } from 'lucide-react';
+import { Check, MapPin, Pencil } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
-import MixedStandingsView from './MixedStandingsView';
-import MixedBracketView from './MixedBracketView';
 import MixedScoreInput from './MixedScoreInput';
 import type { LeagueMatchScore } from './types';
 
-type DrawTab = 'all' | 'standings' | 'tournament';
-
 export default function MixedDrawView() {
-  const { tournamentInfo, brackets, resetAll, leagues, leagueMatches } = useMixedStore();
-  const [activeTab, setActiveTab] = useState<DrawTab>('all');
+  const { leagues, leagueMatches } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
 
-  const totalMatches = leagueMatches.length;
-  const finishedMatches = leagueMatches.filter(m => m.status === 'finished').length;
-
-  const tabs: { id: DrawTab; label: string; icon: React.ElementType }[] = [
-    { id: 'all', label: 'すべて表示', icon: Swords },
-    { id: 'standings', label: '順位表', icon: BarChart3 },
-    { id: 'tournament', label: '決勝トーナメント', icon: Trophy },
-  ];
-
   return (
-    <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
-      {/* ヘッダー */}
-      <div className="bg-gradient-to-r from-emerald-700 to-teal-700 rounded-xl p-4 sm:p-5 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-              <Trophy size={22} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold">ミックスダブルス ドロー表</h2>
-              <p className="text-emerald-200 text-xs sm:text-sm truncate">{tournamentInfo?.name} | {finishedMatches}/{totalMatches} 試合完了</p>
-            </div>
-          </div>
-          <button
-            onClick={() => { if (confirm('データをすべてリセットしますか？')) resetAll(); }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors shrink-0"
-          >
-            <RotateCcw size={14} />
-            <span className="hidden sm:inline">リセット</span>
-          </button>
-        </div>
-      </div>
+    <div className="p-2 sm:p-4 space-y-3">
+      <AllLeaguesView onEditMatch={setEditingMatch} />
 
-      {/* サブタブ */}
-      <div className="flex gap-2 overflow-x-auto">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          const isDisabled = tab.id === 'tournament' && brackets.length === 0;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => !isDisabled && setActiveTab(tab.id)}
-              disabled={isDisabled}
-              className={`
-                flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap
-                ${isActive
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : isDisabled
-                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }
-              `}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* コンテンツ */}
-      {activeTab === 'all' && (
-        <AllLeaguesView onEditMatch={setEditingMatch} />
-      )}
-      {activeTab === 'standings' && <MixedStandingsView />}
-      {activeTab === 'tournament' && <MixedBracketView />}
-
-      {/* スコア入力ダイアログ */}
       {editingMatch && (
         <MixedScoreInput
           match={editingMatch}
@@ -94,7 +24,7 @@ export default function MixedDrawView() {
   );
 }
 
-/** 全リーグ一覧表示（スマホ対応） */
+/** 全リーグ一覧表示 */
 function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) => void }) {
   const { leagues, leagueMatches, updateCourtName } = useMixedStore();
   const allStandings = calculateLeagueStandings(leagues, leagueMatches);
@@ -144,7 +74,6 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                   {league.leagueId.trim()}リーグ
                   <span className="text-xs font-normal text-gray-400 ml-1">{league.teams.length}ペア</span>
                 </h3>
-                {/* コート名 */}
                 {editingCourtId === league.leagueId ? (
                   <div className="flex items-center gap-1">
                     <MapPin size={10} className="text-gray-400 shrink-0" />
@@ -184,7 +113,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
               </div>
             </div>
 
-            {/* 対戦マトリックス - スマホはスクロール */}
+            {/* 対戦マトリックス */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 620 : 520 }}>
                 <thead>
@@ -240,7 +169,8 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           {standing ? `${standing.wins}-${standing.losses}` : '-'}
                         </td>
                         <td className="px-1 sm:px-2 py-1 text-center border-l border-gray-200">
-                          {standing && standing.rank > 0 && (
+                          {/* 全試合完了時のみ順位表示 */}
+                          {isComplete && standing && standing.rank > 0 && (
                             <span className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full text-[9px] sm:text-[10px] font-bold
                               ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
                                 standing.rank === 2 ? 'bg-gray-200 text-gray-600' :

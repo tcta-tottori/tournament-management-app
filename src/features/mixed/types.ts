@@ -15,6 +15,7 @@ export interface MixedTeam {
   male: MixedPlayer;
   female: MixedPlayer;
   teamName: string;         // "藤田・山根" (姓のみ)
+  status: 'entry' | 'def';  // エントリー状態
 }
 
 /** 対戦順定義 */

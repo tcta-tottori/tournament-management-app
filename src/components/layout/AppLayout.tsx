@@ -166,9 +166,14 @@ export default function AppLayout() {
   const allTabs = useMemo(() => {
     let tabs = ALL_MAIN_TABS;
 
-    // ミックスダブルス読込時: 不要なタブを非表示
+    // ミックスダブルス読込時: 不要なタブを非表示 + ラベル変更
     if (isMixedImported) {
       tabs = tabs.filter((t) => !MIXED_HIDDEN_PATHS.includes(t.path));
+      tabs = tabs.map(t => {
+        if (t.path === '/draw-table') return { ...t, label: '予選リーグ' };
+        if (t.path === '/score') return { ...t, label: '決勝トーナメント' };
+        return t;
+      });
     } else {
       // 通常モード: ミックス/団体戦の種目がなければ抽選・ドロー表タブを非表示
       const hasDrawEvents = (events ?? []).some(

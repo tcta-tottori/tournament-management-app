@@ -5,7 +5,7 @@ import type {
   PlacementBracket, PlacementCategory, BracketMatch,
   MixedPhase, TournamentInfo
 } from './types';
-import { calculateLeagueStandings, generateAllBrackets } from './mixedLogic';
+import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches } from './mixedLogic';
 
 interface MixedState {
   // Data
@@ -42,6 +42,10 @@ interface MixedState {
   // Court & Team editing
   updateCourtName: (leagueId: string, courtName: string) => void;
   updateTeamPlayer: (teamId: string, field: 'maleName' | 'maleAffiliation' | 'femaleName' | 'femaleAffiliation', value: string) => void;
+
+  // Team status & league move
+  setTeamStatus: (teamId: string, status: 'entry' | 'def') => void;
+  moveTeamToLeague: (teamId: string, targetLeagueId: string) => void;
 
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
@@ -182,7 +186,7 @@ export const useMixedStore = create<MixedState>()(
       updateTeamPlayer: (teamId, field, value) => {
         const extractLast = (n: string) => n.replace(/\u3000/g, ' ').trim().split(/\s+/)[0] || n;
         set(state => {
-          const updateTeam = (team: import('./types').MixedTeam): import('./types').MixedTeam => {
+          const updateTeam = (team: MixedTeam): MixedTeam => {
             if (team.teamId !== teamId) return team;
             const updated = { ...team };
             if (field === 'maleName') { updated.male = { ...updated.male, name: value }; updated.teamName = extractLast(value) + '・' + extractLast(updated.female.name); }
@@ -195,6 +199,69 @@ export const useMixedStore = create<MixedState>()(
             leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateTeam) })),
             allTeams: state.allTeams.map(updateTeam),
           };
+        });
+      },
+
+      setTeamStatus: (teamId, status) => {
+        set(state => {
+          const updateTeam = (team: MixedTeam): MixedTeam =>
+            team.teamId === teamId ? { ...team, status } : team;
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateTeam) })),
+            allTeams: state.allTeams.map(updateTeam),
+          };
+        });
+      },
+
+      moveTeamToLeague: (teamId, targetLeagueId) => {
+        set(state => {
+          // Find the team and its source league
+          let movingTeam: MixedTeam | null = null;
+          let sourceLeagueId = '';
+          for (const l of state.leagues) {
+            const t = l.teams.find(t => t.teamId === teamId);
+            if (t) { movingTeam = t; sourceLeagueId = l.leagueId; break; }
+          }
+          if (!movingTeam || sourceLeagueId === targetLeagueId) return state;
+
+          // Update leagues
+          const newLeagues = state.leagues.map(l => {
+            if (l.leagueId === sourceLeagueId) {
+              // Remove team from source
+              const newTeams = l.teams.filter(t => t.teamId !== teamId)
+                .map((t, i) => ({ ...t, numberInLeague: i + 1 }));
+              return { ...l, teams: newTeams, matchOrder: [] };
+            }
+            if (l.leagueId === targetLeagueId) {
+              // Add team to target
+              const newNum = l.teams.length + 1;
+              const newTeam: MixedTeam = {
+                ...movingTeam!,
+                leagueId: targetLeagueId,
+                teamId: `${targetLeagueId}-${newNum}`,
+                numberInLeague: newNum,
+              };
+              const newTeams = [...l.teams, newTeam];
+              return { ...l, teams: newTeams, matchOrder: [] };
+            }
+            return l;
+          });
+
+          // Regenerate matches for affected leagues
+          let newMatches = state.leagueMatches.filter(
+            m => m.leagueId !== sourceLeagueId && m.leagueId !== targetLeagueId
+          );
+          for (const l of newLeagues) {
+            if (l.leagueId === sourceLeagueId || l.leagueId === targetLeagueId) {
+              if (l.teams.length >= 2) {
+                newMatches = [...newMatches, ...regenerateLeagueMatches(l)];
+              }
+            }
+          }
+
+          const allTeams = newLeagues.flatMap(l => l.teams);
+
+          return { leagues: newLeagues, leagueMatches: newMatches, allTeams };
         });
       },
 
