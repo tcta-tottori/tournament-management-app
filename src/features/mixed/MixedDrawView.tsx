@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, MapPin, Pencil } from 'lucide-react';
+import { Check, MapPin, Pencil, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
@@ -31,6 +31,24 @@ export default function MixedDrawView() {
   );
 }
 
+/** タイブレークスコアの表示テキストを生成 */
+function formatScoreText(match: LeagueMatchScore, rowTeamId: string): string {
+  const isTeam1 = match.team1Id === rowTeamId;
+  const myScore = isTeam1 ? match.score1 : match.score2;
+  const oppScore = isTeam1 ? match.score2 : match.score1;
+  const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
+
+  if (match.tiebreakScore != null && ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
+    // 勝者側: 7-6(TB), 敗者側: (TB)6-7
+    if (won) {
+      return `${myScore}-${oppScore}(${match.tiebreakScore})`;
+    } else {
+      return `(${match.tiebreakScore})${myScore}-${oppScore}`;
+    }
+  }
+  return `${myScore}-${oppScore}`;
+}
+
 /** 全リーグ一覧表示 */
 function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?: React.MouseEvent) => void }) {
   const { leagues, leagueMatches, updateCourtName } = useMixedStore();
@@ -47,6 +65,9 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
         const standings = allStandings.get(league.leagueId) || [];
         const isComplete = finishedCount === totalCount && totalCount > 0;
 
+        // タイブレーク（同率順位）があるか判定
+        const hasTiebreak = standings.some(s => s.tiebreakReason);
+
         const scoreMatrix = new Map<string, LeagueMatchScore>();
         for (const m of lMatches) {
           scoreMatrix.set(`${m.team1Id}-${m.team2Id}`, m);
@@ -58,14 +79,8 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           const match = scoreMatrix.get(`${rowTeamId}-${colTeamId}`);
           if (!match || match.status !== 'finished') return { text: '', color: '', bg: 'bg-white hover:bg-emerald-50 cursor-pointer' };
           const isTeam1 = match.team1Id === rowTeamId;
-          const myScore = isTeam1 ? match.score1 : match.score2;
-          const oppScore = isTeam1 ? match.score2 : match.score1;
           const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
-          // タイブレーク表記: 7-6(3) のような形式
-          let scoreText = `${myScore}-${oppScore}`;
-          if (match.tiebreakScore != null && ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
-            scoreText = `${myScore}-${oppScore}(${match.tiebreakScore})`;
-          }
+          const scoreText = formatScoreText(match, rowTeamId);
           return {
             text: scoreText,
             color: won ? 'text-emerald-700 font-bold' : 'text-red-600',
@@ -126,19 +141,22 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
 
             {/* 対戦マトリックス */}
             <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 620 : 520 }}>
+              <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 680 : 560 }}>
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-1.5 sm:px-2 py-1 text-left text-[10px] sm:text-xs text-gray-500 w-6">#</th>
                     <th className="px-1.5 sm:px-2 py-1 text-left text-[10px] sm:text-xs text-gray-500 min-w-[100px] sm:min-w-[140px]">ペア名</th>
                     <th className="px-1.5 sm:px-2 py-1 text-left text-[10px] sm:text-xs text-gray-500 min-w-[60px] sm:min-w-[80px]">所属</th>
                     {league.teams.map((_, i) => (
-                      <th key={i} className="px-0.5 sm:px-1 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-12 sm:w-16">
+                      <th key={i} className="px-0.5 sm:px-1 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-14 sm:w-[70px]">
                         <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] sm:text-[10px] font-bold">{i + 1}</span>
                       </th>
                     ))}
                     <th className="px-1 sm:px-2 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-10 sm:w-14">勝敗</th>
                     <th className="px-1 sm:px-2 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-8 sm:w-10">位</th>
+                    {isComplete && hasTiebreak && (
+                      <th className="px-1 sm:px-2 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-20 sm:w-28">判定</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -162,7 +180,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                           return (
                             <td
                               key={colIdx}
-                              className={`px-0.5 sm:px-1 py-1 text-center text-[10px] sm:text-xs ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors`}
+                              className={`px-0.5 sm:px-1 py-1 text-center text-[9px] sm:text-[11px] ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors whitespace-nowrap`}
                               onClick={e => {
                                 if (team.teamId === colTeam.teamId) return;
                                 const match = lMatches.find(m =>
@@ -190,6 +208,16 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                             </span>
                           )}
                         </td>
+                        {isComplete && hasTiebreak && (
+                          <td className="px-1 sm:px-2 py-1 text-center border-l border-gray-200">
+                            {standing?.tiebreakReason && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                <Info size={9} className="shrink-0" />
+                                {standing.tiebreakReason}
+                              </span>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

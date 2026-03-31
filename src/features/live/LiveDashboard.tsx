@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
+import { useMixedStore } from '../mixed/mixedStore';
+import MixedLiveCourtView from '../mixed/MixedLiveCourtView';
 import type { Match, Court } from '../../db/database';
 import {
   BarChart2, Play, CheckCircle, Clock, Trophy, Users, MapPin,
@@ -346,6 +348,16 @@ function TennisCourtBlock({
 // ---------------------------------------------------------------------------
 
 export default function LiveDashboard() {
+  const isMixedImported = useMixedStore(s => s.isImported);
+
+  if (isMixedImported) {
+    return <MixedLiveCourtView />;
+  }
+
+  return <LiveDashboardInner />;
+}
+
+function LiveDashboardInner() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);

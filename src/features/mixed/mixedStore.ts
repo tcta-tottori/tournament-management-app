@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type {
   MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding,
   PlacementBracket, PlacementCategory, BracketMatch,
-  MixedPhase, TournamentInfo
+  MixedPhase, TournamentInfo, ExcelSheetData
 } from './types';
 import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches } from './mixedLogic';
 
@@ -14,6 +14,7 @@ interface MixedState {
   leagueMatches: LeagueMatchScore[];
   brackets: PlacementBracket[];
   allTeams: MixedTeam[];
+  rawExcelSheets: ExcelSheetData[];
 
   // UI State
   currentPhase: MixedPhase;
@@ -24,6 +25,7 @@ interface MixedState {
 
   // Actions: Import
   importData: (info: TournamentInfo, leagues: MixedLeague[], matches: LeagueMatchScore[]) => void;
+  setRawExcelSheets: (sheets: ExcelSheetData[]) => void;
   resetAll: () => void;
 
   // Actions: League
@@ -55,6 +57,9 @@ interface MixedState {
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
 
+  // Auto-populate non-1st brackets from league standings
+  autoPopulateBrackets: () => void;
+
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
   setSelectedLeagueId: (id: string | null) => void;
@@ -70,6 +75,7 @@ export const useMixedStore = create<MixedState>()(
       leagueMatches: [],
       brackets: [],
       allTeams: [],
+      rawExcelSheets: [],
       currentPhase: 'import',
       selectedLeagueId: null,
       selectedBracketCategory: '1st',
@@ -90,12 +96,15 @@ export const useMixedStore = create<MixedState>()(
         });
       },
 
+      setRawExcelSheets: (sheets) => set({ rawExcelSheets: sheets }),
+
       resetAll: () => set({
         tournamentInfo: null,
         leagues: [],
         leagueMatches: [],
         brackets: [],
         allTeams: [],
+        rawExcelSheets: [],
         currentPhase: 'import',
         selectedLeagueId: null,
         selectedBracketCategory: '1st',
@@ -370,6 +379,20 @@ export const useMixedStore = create<MixedState>()(
           newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };
           return { brackets: newBrackets };
         });
+      },
+
+      autoPopulateBrackets: () => {
+        const { leagues, leagueMatches, allTeams } = get();
+        // Check if all leagues are complete
+        const allComplete = leagues.every(l => {
+          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+          return lm.length > 0 && lm.every(m => m.status === 'finished');
+        });
+        if (!allComplete) return;
+
+        const standings = calculateLeagueStandings(leagues, leagueMatches);
+        const brackets = generateAllBrackets(standings, allTeams, leagues);
+        set({ brackets });
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),

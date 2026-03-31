@@ -105,3 +105,9 @@ export interface TournamentInfo {
   venue: string;
   rules: string[];
 }
+
+/** Excelシート生データ（ビューア用） */
+export interface ExcelSheetData {
+  name: string;
+  data: string[][];
+}

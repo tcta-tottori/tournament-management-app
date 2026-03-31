@@ -399,6 +399,18 @@ function generateLeagueMatches(leagues: MixedLeague[]): LeagueMatchScore[] {
  *   A) 「リスト」シートあり → リストシートからチーム構築
  *   B) 「リスト」シートなし → 予選リーグシートから直接解析
  */
+/** Excelの全シートを2D配列に変換（ビューア用） */
+export function extractExcelSheets(file: ArrayBuffer): { name: string; data: string[][] }[] {
+  const wb = XLSX.read(file, { type: 'array' });
+  return wb.SheetNames.map(name => {
+    const ws = wb.Sheets[name];
+    const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
+    // 文字列に統一
+    const data = rows.map(row => row.map(cell => cell == null ? '' : String(cell)));
+    return { name, data };
+  });
+}
+
 export function parseMixedExcel(file: ArrayBuffer): {
   info: TournamentInfo;
   leagues: MixedLeague[];

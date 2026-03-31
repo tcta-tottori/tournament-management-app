@@ -12,7 +12,6 @@ function toHalfWidth(s: string): string {
 function extractGameRule(rules: string[]): string | null {
   for (const r of rules) {
     if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(r)) {
-      // 番号プレフィックス（（１）等）を除去して本文のみ返す
       return r.replace(/^（[０-９\d]+）\s*/, '').trim();
     }
   }
@@ -43,7 +42,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const popupRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
 
-  // スクロール位置を保存
   useEffect(() => {
     scrollPosRef.current = window.scrollY;
     return () => {
@@ -60,14 +58,21 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     setError('');
   }, [match]);
 
-  // タイブレークかどうか判定
   const isTiebreak = useMemo(() => {
     const s1 = parseInt(score1);
     const s2 = parseInt(score2);
     return (s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7);
   }, [score1, score2]);
 
-  // ゲームルールのみ抽出
+  // どちらが敗者か (6の方)
+  const loserSide = useMemo(() => {
+    const s1 = parseInt(score1);
+    const s2 = parseInt(score2);
+    if (s1 === 7 && s2 === 6) return 2;
+    if (s1 === 6 && s2 === 7) return 1;
+    return 0;
+  }, [score1, score2]);
+
   const gameRule = useMemo(() => {
     return extractGameRule(tournamentInfo?.rules || []);
   }, [tournamentInfo]);
@@ -79,7 +84,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     if (s1 < 0 || s2 < 0) { setError('スコアは0以上で入力してください'); return false; }
     if (s1 === s2) { setError('同点は不可です'); return false; }
     if (s1 > 7 || s2 > 7) { setError('スコアは0〜7の範囲で入力してください'); return false; }
-    // タイブレーク時のバリデーション
     if ((s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7)) {
       const tb = parseInt(tiebreakInput);
       if (tiebreakInput && !isNaN(tb) && tb < 0) {
@@ -126,7 +130,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore2(raw);
     setError('');
-    // タイブレークならTBフィールドにフォーカス
     const s1 = parseInt(score1);
     const s2n = parseInt(raw);
     if (raw.length === 1 && ((s1 === 7 && s2n === 6) || (s1 === 6 && s2n === 7))) {
@@ -139,7 +142,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     setTiebreakInput(raw);
   };
 
-  // ポップアップの表示位置を計算
   const popupStyle: React.CSSProperties = {};
   if (anchorY !== undefined) {
     const vh = window.innerHeight;
@@ -153,11 +155,26 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     popupStyle.transform = 'translateX(-50%)';
   }
 
+  /** タイブレーク入力欄 */
+  const tbInput = (
+    <input
+      ref={tiebreakRef}
+      type="text"
+      inputMode="numeric"
+      maxLength={2}
+      value={tiebreakInput}
+      onChange={handleTiebreakChange}
+      onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+      className="w-9 h-14 text-center text-lg font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
+      placeholder="?"
+    />
+  );
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
       <div
         ref={popupRef}
-        className={`bg-white rounded-2xl shadow-2xl w-[420px] max-w-[95vw] overflow-hidden ${!anchorY ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
+        className={`bg-white rounded-2xl shadow-2xl w-[440px] max-w-[95vw] overflow-hidden ${!anchorY ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
         style={anchorY ? popupStyle : undefined}
         onClick={e => e.stopPropagation()}
       >
@@ -199,8 +216,14 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
             </div>
           </div>
 
-          {/* スコア入力 */}
-          <div className="flex items-center justify-center gap-4 mb-3">
+          {/* スコア入力 — タイブレーク入力は敗者側(6)の外側に配置 */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            {isTiebreak && loserSide === 1 && (
+              <div className="flex flex-col items-center">
+                <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                {tbInput}
+              </div>
+            )}
             <input
               ref={score1Ref}
               type="text"
@@ -224,29 +247,13 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               className="w-16 h-14 text-center text-3xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               placeholder="0"
             />
-          </div>
-
-          {/* タイブレークスコア入力 */}
-          {isTiebreak && (
-            <div className="mb-3 flex items-center justify-center gap-2">
-              <div className="text-xs text-gray-500">タイブレーク</div>
-              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-                <span className="text-sm font-bold text-blue-700">7</span>
-                <span className="text-sm text-gray-400">-</span>
-                <input
-                  ref={tiebreakRef}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={2}
-                  value={tiebreakInput}
-                  onChange={handleTiebreakChange}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-                  className="w-10 h-8 text-center text-sm font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="?"
-                />
+            {isTiebreak && loserSide === 2 && (
+              <div className="flex flex-col items-center">
+                <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                {tbInput}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {error && (
             <div className="flex items-center gap-2 text-red-600 text-sm mb-3 bg-red-50 px-3 py-2 rounded-lg">

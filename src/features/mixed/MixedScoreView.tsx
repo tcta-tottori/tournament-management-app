@@ -1,10 +1,20 @@
+import { useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
+import { calculateLeagueStandings } from './mixedLogic';
 import MixedBracketView from './MixedBracketView';
 import MixedStandingsView from './MixedStandingsView';
-import { Trophy } from 'lucide-react';
+import { Trophy, CheckCircle, Clock } from 'lucide-react';
+import type { PlacementCategory } from './types';
+
+const CATEGORIES: { cat: PlacementCategory; label: string; desc: string; color: string }[] = [
+  { cat: '1st', label: '1位トーナメント', desc: '各リーグ1位（抽選）', color: 'yellow' },
+  { cat: '2nd', label: '2位トーナメント', desc: '各リーグ2位', color: 'gray' },
+  { cat: '3rd', label: '3位トーナメント', desc: '各リーグ3位', color: 'orange' },
+  { cat: '4th', label: '4-5位トーナメント', desc: '各リーグ4位以下', color: 'slate' },
+];
 
 export default function MixedScoreView() {
-  const { brackets, leagueMatches, leagues } = useMixedStore();
+  const { brackets, leagueMatches, leagues, autoPopulateBrackets } = useMixedStore();
 
   const allLeaguesComplete = leagues.every(league => {
     const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
@@ -13,6 +23,20 @@ export default function MixedScoreView() {
 
   const totalFinished = leagueMatches.filter(m => m.status === 'finished').length;
   const totalMatches = leagueMatches.length;
+
+  // 全リーグ完了時にブラケットがまだなければ自動生成 (2位以降)
+  useEffect(() => {
+    if (allLeaguesComplete && brackets.length === 0) {
+      autoPopulateBrackets();
+    }
+  }, [allLeaguesComplete, brackets.length, autoPopulateBrackets]);
+
+  // 完了したリーグから順位を取得
+  const allStandings = useMemo(() => calculateLeagueStandings(leagues, leagueMatches), [leagues, leagueMatches]);
+  const completedLeagues = leagues.filter(l => {
+    const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+    return lm.length > 0 && lm.every(m => m.status === 'finished');
+  });
 
   // ブラケット生成済み
   if (brackets.length > 0) {
@@ -23,7 +47,7 @@ export default function MixedScoreView() {
     );
   }
 
-  // ブラケット未生成
+  // ブラケット未生成: プレビュー表示
   return (
     <div className="p-2 sm:p-4 space-y-4">
       {/* トーナメント構造プレビュー */}
@@ -32,23 +56,67 @@ export default function MixedScoreView() {
           <Trophy size={16} className="text-yellow-500" />
           決勝トーナメント構成
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: '1位トーナメント', desc: '各リーグ1位', color: 'yellow' },
-            { label: '2位トーナメント', desc: '各リーグ2位', color: 'gray' },
-            { label: '3位トーナメント', desc: '各リーグ3位', color: 'orange' },
-            { label: '4-5位トーナメント', desc: '各リーグ4位以下', color: 'slate' },
-          ].map(({ label, desc, color }) => (
-            <div key={label} className={`p-3 rounded-lg border bg-${color}-50 border-${color}-200`}>
-              <div className="text-xs font-bold text-gray-700">{label}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{desc}</div>
-              <div className="text-[10px] text-gray-400 mt-1">{leagues.length}チーム → トーナメント</div>
-            </div>
-          ))}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {CATEGORIES.map(({ cat, label, desc, color }) => {
+            // 完了リーグから該当順位のチームを収集
+            const teamsForCat: { teamName: string; league: string }[] = [];
+            const rank = cat === '1st' ? 1 : cat === '2nd' ? 2 : cat === '3rd' ? 3 : 4;
+            for (const league of completedLeagues) {
+              const standings = allStandings.get(league.leagueId) || [];
+              if (rank <= 3) {
+                const entry = standings.find(s => s.rank === rank);
+                if (entry) teamsForCat.push({ teamName: entry.teamName, league: league.leagueId.trim() });
+              } else {
+                const entries = standings.filter(s => s.rank >= 4);
+                for (const e of entries) teamsForCat.push({ teamName: e.teamName, league: league.leagueId.trim() });
+              }
+            }
+            const pendingLeagues = leagues.length - completedLeagues.length;
+
+            return (
+              <div key={cat} className={`rounded-lg border p-3 bg-${color}-50 border-${color}-200`}>
+                <div className="text-xs font-bold text-gray-700 mb-1">{label}</div>
+                <div className="text-[10px] text-gray-500 mb-2">{desc}</div>
+
+                {teamsForCat.length > 0 && (
+                  <div className="space-y-0.5 mb-2">
+                    {teamsForCat.map((t, i) => (
+                      <div key={i} className="flex items-center justify-between text-[10px]">
+                        <span className="flex items-center gap-1">
+                          <CheckCircle size={9} className="text-emerald-500" />
+                          <span className="text-gray-700">{t.teamName}</span>
+                        </span>
+                        <span className="text-gray-400">{t.league}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {pendingLeagues > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                    <Clock size={9} />
+                    残り{pendingLeagues}リーグ待ち
+                  </div>
+                )}
+
+                <div className="text-[10px] text-gray-400 mt-1">
+                  確定: {teamsForCat.length} / 見込み: {cat === '4th' ? '多数' : leagues.length}チーム
+                </div>
+              </div>
+            );
+          })}
         </div>
+
         <div className="mt-3 text-xs text-gray-400">
           予選リーグ進捗: {totalFinished}/{totalMatches} 試合完了
-          {!allLeaguesComplete && ' — 全リーグ完了後にトーナメントを生成できます'}
+          {completedLeagues.length > 0 && (
+            <span className="text-emerald-600 ml-2">
+              {completedLeagues.length}/{leagues.length}リーグ完了
+              ({completedLeagues.map(l => l.leagueId.trim()).join(', ')})
+            </span>
+          )}
+          {!allLeaguesComplete && ' — 全リーグ完了後にトーナメントが自動生成されます'}
         </div>
       </div>
 

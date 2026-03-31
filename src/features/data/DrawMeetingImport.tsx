@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import type { ImportedScheduleItem } from '../../stores/appStore';
-import { parseMixedExcel } from '../mixed/mixedExcelParser';
+import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useNavigate } from 'react-router-dom';
@@ -580,6 +580,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         try {
           const mixedResult = parseMixedExcel(arrayBuffer);
           if (mixedResult.leagues.length > 0) {
+            // Extract raw sheet data for viewer
+            try {
+              const sheets = extractExcelSheets(arrayBuffer);
+              useMixedStore.getState().setRawExcelSheets(sheets);
+            } catch { /* ignore extraction errors */ }
             setMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName });
             setMixedEditName(mixedResult.info.name);
             setMixedEditDate(mixedResult.info.date);
@@ -687,6 +692,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           try {
             const mixedResult = parseMixedExcel(arrayBuffer);
             if (mixedResult.leagues.length > 0) {
+              // Extract raw sheet data for viewer
+              try {
+                const sheets = extractExcelSheets(arrayBuffer);
+                useMixedStore.getState().setRawExcelSheets(sheets);
+              } catch { /* ignore */ }
               // ミックス大会として読み込み成功 → 確認ダイアログを表示
               setMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName: file.name });
               setMixedEditName(mixedResult.info.name);

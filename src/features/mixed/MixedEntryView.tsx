@@ -205,16 +205,16 @@ export default function MixedEntryView() {
                 </button>
               </div>
 
-              {/* PC: テーブル表示 */}
-              <div className="hidden sm:block">
-                <table className="w-full text-sm">
+              {/* PC: ドロー表スタイルのテーブル表示 */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: 560 }}>
                   <thead>
                     <tr className="bg-gray-50 text-xs text-gray-500">
-                      <th className="px-2 py-1.5 text-center w-8">#</th>
-                      <th className="px-2 py-1.5 text-left">選手名</th>
-                      <th className="px-2 py-1.5 text-left">所属</th>
-                      <th className="px-2 py-1.5 text-center w-20">状態</th>
-                      <th className="px-2 py-1.5 text-center w-10">移動</th>
+                      <th className="px-2 py-1 text-center w-8">#</th>
+                      <th className="px-2 py-1 text-left min-w-[140px]">ペア名</th>
+                      <th className="px-2 py-1 text-left min-w-[80px]">所属</th>
+                      <th className="px-2 py-1 text-center w-20">状態</th>
+                      <th className="px-2 py-1 text-center w-10">移動</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -223,51 +223,51 @@ export default function MixedEntryView() {
                       const isDef = st === 'def';
                       return (
                         <tr key={team.teamId} className={`border-t border-gray-100 ${rowBg(st)} transition-colors`}>
-                          <td className="px-2 py-1.5 text-center">
-                            <span className="inline-flex items-center justify-center w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-bold rounded-full shadow-sm">
+                          <td className="px-2 py-1 text-center">
+                            <span className="inline-flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">
                               {idx + 1}
                             </span>
                           </td>
                           <td className="px-2 py-1">
-                            <div className={`leading-tight ${isDef ? 'opacity-50 line-through' : ''}`}>
-                              <div>
+                            <div className={`${isDef ? 'opacity-50 line-through' : ''}`}>
+                              <div className="flex items-center gap-0.5">
                                 <EditableCell
                                   value={team.male.name}
                                   onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                                  className="text-sm font-medium text-gray-800"
+                                  className="text-xs font-medium text-gray-800"
                                 />
                               </div>
-                              <div>
+                              <div className="flex items-center gap-0.5">
                                 <EditableCell
                                   value={team.female.name}
                                   onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                                  className="text-sm font-medium text-gray-800"
+                                  className="text-xs font-medium text-gray-800"
                                 />
                               </div>
                             </div>
                           </td>
                           <td className="px-2 py-1">
-                            <div className={`leading-tight ${isDef ? 'opacity-50' : ''}`}>
+                            <div className={`${isDef ? 'opacity-50' : ''}`}>
                               <div>
                                 <EditableCell
                                   value={team.male.affiliation}
                                   onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
-                                  className="text-xs text-gray-500"
+                                  className="text-[11px] text-gray-500"
                                 />
                               </div>
                               <div>
                                 <EditableCell
                                   value={team.female.affiliation}
                                   onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                                  className="text-xs text-gray-500"
+                                  className="text-[11px] text-gray-500"
                                 />
                               </div>
                             </div>
                           </td>
-                          <td className="px-2 py-1.5 text-center">
+                          <td className="px-2 py-1 text-center">
                             <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} />
                           </td>
-                          <td className="px-2 py-1.5 text-center">
+                          <td className="px-2 py-1 text-center">
                             <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                           </td>
                         </tr>

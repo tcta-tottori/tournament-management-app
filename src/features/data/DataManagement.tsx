@@ -11,6 +11,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useMixedStore } from '../mixed/mixedStore';
+import MixedExcelViewer from '../mixed/MixedExcelViewer';
 
 /** ミックス大会情報表示・編集セクション */
 function MixedTournamentInfoSection() {
@@ -232,6 +233,9 @@ export default function DataManagement() {
 
       {/* ミックス大会情報 */}
       {isMixedImported && <MixedTournamentInfoSection />}
+
+      {/* Excelデータビューア */}
+      {isMixedImported && <MixedExcelViewer />}
 
       {/* Google ドライブ連携（接続 + 一括読込 + フォルダ + 大会/時間割読込） */}
       <DataSync
