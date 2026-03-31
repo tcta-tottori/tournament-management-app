@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -10,11 +10,144 @@ import DataSync, { FuriganaAffiliationOps } from './DataSync';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useMixedStore } from '../mixed/mixedStore';
+
+/** ミックス大会情報表示・編集セクション */
+function MixedTournamentInfoSection() {
+  const { tournamentInfo, updateTournamentInfo, leagues, allTeams } = useMixedStore();
+  const [editingField, setEditingField] = useState<'name' | 'date' | 'venue' | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  if (!tournamentInfo) return null;
+
+  const startEdit = (field: 'name' | 'date' | 'venue') => {
+    setEditingField(field);
+    setEditValue(tournamentInfo[field]);
+  };
+
+  const saveEdit = () => {
+    if (editingField) {
+      updateTournamentInfo(editingField, editValue);
+      setEditingField(null);
+    }
+  };
+
+  const entryCount = allTeams.filter(t => t.status === 'entry').length;
+  const defCount = allTeams.filter(t => t.status === 'def').length;
+
+  return (
+    <section className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3 border-b border-emerald-100">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-semibold text-emerald-700">ミックス大会情報</h2>
+        </div>
+      </div>
+      <div className="p-4 space-y-3">
+        {/* 大会名 */}
+        <div className="flex items-start gap-3">
+          <Trophy className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-gray-400 font-medium">大会名</div>
+            {editingField === 'name' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
+                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                autoFocus
+              />
+            ) : (
+              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-emerald-600 transition-colors">
+                {tournamentInfo.name}
+                <Pencil size={10} className="opacity-40" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 日付 */}
+        <div className="flex items-start gap-3">
+          <Calendar className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-gray-400 font-medium">開催日</div>
+            {editingField === 'date' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
+                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                autoFocus
+              />
+            ) : (
+              <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                {tournamentInfo.date || '(未設定)'}
+                <Pencil size={10} className="opacity-40" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 会場 */}
+        <div className="flex items-start gap-3">
+          <MapPin className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-gray-400 font-medium">会場</div>
+            {editingField === 'venue' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
+                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                autoFocus
+              />
+            ) : (
+              <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                {tournamentInfo.venue || '(未設定)'}
+                <Pencil size={10} className="opacity-40" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 統計 */}
+        <div className="flex items-start gap-3">
+          <Users className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="text-[10px] text-gray-400 font-medium">参加状況</div>
+            <div className="text-sm text-gray-700">
+              {allTeams.length}ペア / {leagues.length}リーグ
+              {entryCount > 0 && <span className="text-emerald-600 ml-2">Entry {entryCount}</span>}
+              {defCount > 0 && <span className="text-orange-500 ml-2">DEF {defCount}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* ルール */}
+        {tournamentInfo.rules.length > 0 && (
+          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="text-[10px] font-medium text-amber-600 mb-1">ゲームルール</div>
+            <div className="text-xs text-amber-700">
+              {tournamentInfo.rules.map((r, i) => <div key={i}>{r}</div>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export default function DataManagement() {
   // 共有 Google Drive 接続状態（再レンダリングトリガー用）
   const [, setGdriveVersion] = useState(0);
   const gdriveConnected = !!getSavedClientId() && gdriveIsTokenValid();
+  const isMixedImported = useMixedStore(s => s.isImported);
 
   // セクション開閉状態
   const [dataImportOpen, setDataImportOpen] = useState(true);
@@ -94,6 +227,9 @@ export default function DataManagement() {
           </p>
         </div>
       </header>
+
+      {/* ミックス大会情報 */}
+      {isMixedImported && <MixedTournamentInfoSection />}
 
       {/* Google ドライブ連携（接続 + 一括読込 + フォルダ + 大会/時間割読込） */}
       <DataSync

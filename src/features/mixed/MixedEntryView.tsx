@@ -1,6 +1,6 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { MapPin, Pencil, ArrowRightLeft, UserX, UserCheck } from 'lucide-react';
+import { MapPin, Pencil, ArrowRightLeft } from 'lucide-react';
 import { useState } from 'react';
 import type { MixedTeam } from './types';
 
@@ -32,7 +32,7 @@ function EditableCell({ value, onSave, className = '' }: {
 
   return (
     <span
-      onClick={() => { setInput(value); setEditing(true); }}
+      onClick={e => { e.stopPropagation(); setInput(value); setEditing(true); }}
       className={`cursor-pointer hover:bg-emerald-50 px-1 py-0.5 rounded transition-colors ${className}`}
       title="クリックで編集"
     >
@@ -53,7 +53,7 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={e => { e.stopPropagation(); setOpen(true); }}
         className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
         title="リーグ移動"
       >
@@ -63,7 +63,7 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" onClick={e => e.stopPropagation()}>
       <select
         autoFocus
         className="text-xs border border-emerald-400 rounded px-1 py-0.5 focus:outline-none"
@@ -87,6 +87,35 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
   );
 }
 
+/** 3状態ステータスボタン */
+function StatusButton({ status, onClick, size = 'normal' }: {
+  status: 'none' | 'entry' | 'def';
+  onClick: () => void;
+  size?: 'normal' | 'small';
+}) {
+  const cls = size === 'small' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]';
+  if (status === 'entry') {
+    return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors`}>Entry</button>;
+  }
+  if (status === 'def') {
+    return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors`}>DEF</button>;
+  }
+  return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors`}>未登録</button>;
+}
+
+function cycleStatus(current: 'none' | 'entry' | 'def'): 'none' | 'entry' | 'def' {
+  if (current === 'none') return 'entry';
+  if (current === 'entry') return 'def';
+  return 'none';
+}
+
+/** 行の背景色 */
+function rowBg(status: 'none' | 'entry' | 'def'): string {
+  if (status === 'entry') return 'bg-emerald-50/60';
+  if (status === 'def') return 'bg-orange-50/60';
+  return '';
+}
+
 export default function MixedEntryView() {
   const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, moveTeamToLeague } = useMixedStore();
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
@@ -98,12 +127,10 @@ export default function MixedEntryView() {
 
   return (
     <div className="p-2 sm:p-4 space-y-3">
-      {/* リーグごとグループ表示 */}
       <div className="space-y-3">
         {leagues.map(league => {
-          const entryCount = league.teams.filter(t => (t.status || 'entry') === 'entry').length;
+          const entryCount = league.teams.filter(t => t.status === 'entry').length;
           const defCount = league.teams.filter(t => t.status === 'def').length;
-
           return (
             <div key={league.leagueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               {/* リーグヘッダー */}
@@ -115,10 +142,11 @@ export default function MixedEntryView() {
                   <h3 className="text-sm sm:text-base font-bold text-gray-800">
                     {league.leagueId.trim()} リーグ
                     <span className="text-xs font-normal text-gray-400 ml-2">
-                      {entryCount}ペア{defCount > 0 && ` / DEF ${defCount}`}
+                      {league.teams.length}ペア
+                      {entryCount > 0 && <span className="text-emerald-600 ml-1">Entry {entryCount}</span>}
+                      {defCount > 0 && <span className="text-orange-500 ml-1">DEF {defCount}</span>}
                     </span>
                   </h3>
-                  {/* コート名 */}
                   {editingCourtId === league.leagueId ? (
                     <div className="flex items-center gap-1 mt-0.5">
                       <MapPin size={11} className="text-gray-400 shrink-0" />
@@ -162,10 +190,11 @@ export default function MixedEntryView() {
                   </thead>
                   <tbody>
                     {league.teams.map((team, idx) => {
-                      const isDef = team.status === 'def';
+                      const st = team.status || 'none';
+                      const isDef = st === 'def';
                       return (
-                        <tr key={team.teamId} className={`border-t border-gray-100 ${isDef ? 'bg-red-50/40' : 'hover:bg-emerald-50/30'} transition-colors`}>
-                          <td className="px-2 py-1.5 text-center" rowSpan={1}>
+                        <tr key={team.teamId} className={`border-t border-gray-100 ${rowBg(st)} transition-colors`}>
+                          <td className="px-2 py-1.5 text-center">
                             <span className="inline-flex items-center justify-center w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-bold rounded-full shadow-sm">
                               {idx + 1}
                             </span>
@@ -176,14 +205,14 @@ export default function MixedEntryView() {
                                 <EditableCell
                                   value={team.male.name}
                                   onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                                  className="text-sm font-semibold text-gray-800"
+                                  className="text-sm font-medium text-gray-800"
                                 />
                               </div>
                               <div>
                                 <EditableCell
                                   value={team.female.name}
                                   onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                                  className="text-sm text-gray-600"
+                                  className="text-sm font-medium text-gray-800"
                                 />
                               </div>
                             </div>
@@ -201,22 +230,13 @@ export default function MixedEntryView() {
                                 <EditableCell
                                   value={team.female.affiliation}
                                   onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                                  className="text-xs text-gray-400"
+                                  className="text-xs text-gray-500"
                                 />
                               </div>
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <button
-                              onClick={() => setTeamStatus(team.teamId, isDef ? 'entry' : 'def')}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                                isDef
-                                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                                  : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                              }`}
-                            >
-                              {isDef ? <><UserX size={11} />DEF</> : <><UserCheck size={11} />Entry</>}
-                            </button>
+                            <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} />
                           </td>
                           <td className="px-2 py-1.5 text-center">
                             <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
@@ -231,50 +251,42 @@ export default function MixedEntryView() {
               {/* スマホ: リスト表示 */}
               <div className="sm:hidden divide-y divide-gray-100">
                 {league.teams.map((team, idx) => {
-                  const isDef = team.status === 'def';
+                  const st = team.status || 'none';
+                  const isDef = st === 'def';
                   return (
-                    <div key={team.teamId} className={`px-3 py-2 ${isDef ? 'bg-red-50/40' : ''}`}>
+                    <div key={team.teamId} className={`px-3 py-2 ${rowBg(st)}`}>
                       <div className="flex items-start gap-2">
                         <span className="mt-0.5 w-5 h-5 bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-50' : ''}`}>
-                          {/* 男子 */}
                           <div className="flex items-baseline gap-1">
                             <EditableCell
                               value={team.male.name}
                               onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                              className="text-sm font-semibold text-gray-800"
+                              className="text-sm font-medium text-gray-800"
                             />
                             <EditableCell
                               value={team.male.affiliation}
                               onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
-                              className="text-[11px] text-gray-400"
+                              className="text-[11px] text-gray-500"
                             />
                           </div>
-                          {/* 女子 */}
                           <div className="flex items-baseline gap-1">
                             <EditableCell
                               value={team.female.name}
                               onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                              className="text-sm text-gray-600"
+                              className="text-sm font-medium text-gray-800"
                             />
                             <EditableCell
                               value={team.female.affiliation}
                               onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                              className="text-[11px] text-gray-300"
+                              className="text-[11px] text-gray-500"
                             />
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => setTeamStatus(team.teamId, isDef ? 'entry' : 'def')}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              isDef ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'
-                            }`}
-                          >
-                            {isDef ? 'DEF' : 'Entry'}
-                          </button>
+                          <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} size="small" />
                           <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                         </div>
                       </div>
@@ -287,9 +299,8 @@ export default function MixedEntryView() {
         })}
       </div>
 
-      {/* サマリー */}
       <div className="text-center text-xs text-gray-400 py-2">
-        全{allTeams.length}ペア / {leagues.length}リーグ / Entry {allTeams.filter(t => (t.status || 'entry') === 'entry').length} / DEF {allTeams.filter(t => t.status === 'def').length}
+        全{allTeams.length}ペア / {leagues.length}リーグ / Entry {allTeams.filter(t => t.status === 'entry').length} / DEF {allTeams.filter(t => t.status === 'def').length}
       </div>
     </div>
   );

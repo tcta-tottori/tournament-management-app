@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Trophy, Medal, Award, Users } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket } from './types';
 
@@ -16,7 +16,7 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
 ];
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -74,6 +74,10 @@ export default function MixedBracketView() {
     setScore2Input(raw);
   };
 
+  // 1位トーナメントかつ試合がまだ始まっていないかチェック
+  const is1stBracket = selectedBracketCategory === '1st';
+  const noMatchesStarted = currentBracket?.matches.every(m => m.status === 'waiting' || m.status === 'bye') ?? true;
+
   return (
     <div className="space-y-4">
       {/* カテゴリタブ */}
@@ -109,6 +113,14 @@ export default function MixedBracketView() {
         })}
       </div>
 
+      {/* 1位トーナメント: ルーレット抽選 */}
+      {is1stBracket && noMatchesStarted && currentBracket && (
+        <RouletteDrawPanel
+          bracket={currentBracket}
+          onShuffle={shuffleBracketSeeds}
+        />
+      )}
+
       {/* ブラケット表示 */}
       {currentBracket && (
         <BracketDisplay
@@ -143,7 +155,7 @@ export default function MixedBracketView() {
                 maxLength={1}
                 value={score1Input}
                 onChange={handleScore1Change}
-                className="w-14 h-12 text-center text-2xl font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-14 h-12 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 autoFocus
               />
               <span className="text-2xl font-bold text-gray-300">-</span>
@@ -155,7 +167,7 @@ export default function MixedBracketView() {
                 value={score2Input}
                 onChange={handleScore2Change}
                 onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
-                className="w-14 h-12 text-center text-2xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-14 h-12 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
 
@@ -170,6 +182,214 @@ export default function MixedBracketView() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** ルーレット抽選パネル */
+function RouletteDrawPanel({ bracket, onShuffle }: {
+  bracket: PlacementBracket;
+  onShuffle: (category: PlacementCategory, newOrder: string[]) => void;
+}) {
+  const [spinning, setSpinning] = useState(false);
+  const [currentHighlight, setCurrentHighlight] = useState(-1);
+  const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(new Map());
+  const [currentTeamIdx, setCurrentTeamIdx] = useState(0);
+  const [drawComplete, setDrawComplete] = useState(false);
+  const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ドロー枠の数（BYEを除いた1回戦のスロット数）
+  const round1Matches = bracket.matches.filter(m => m.round === 1);
+  const totalSlots = round1Matches.length * 2;
+  const teams = bracket.teams;
+
+  // 未割当のスロット番号リスト
+  const getAvailableSlots = useCallback(() => {
+    const all = Array.from({ length: totalSlots }, (_, i) => i);
+    return all.filter(i => !assignedSlots.has(i));
+  }, [totalSlots, assignedSlots]);
+
+  // ルーレット回転
+  const spinRoulette = useCallback(() => {
+    if (currentTeamIdx >= teams.length) return;
+    const available = getAvailableSlots();
+    if (available.length === 0) return;
+
+    setSpinning(true);
+    let count = 0;
+    const totalSpins = 15 + Math.floor(Math.random() * 10);
+
+    const spin = () => {
+      const idx = available[Math.floor(Math.random() * available.length)];
+      setCurrentHighlight(idx);
+      count++;
+
+      if (count < totalSpins) {
+        const delay = 50 + count * 15; // 徐々に遅くなる
+        spinTimerRef.current = setTimeout(spin, delay);
+      } else {
+        // 停止 - このスロットに割り当て
+        const finalSlot = available[Math.floor(Math.random() * available.length)];
+        setCurrentHighlight(finalSlot);
+        setAssignedSlots(prev => {
+          const next = new Map(prev);
+          next.set(finalSlot, teams[currentTeamIdx].teamId);
+          return next;
+        });
+        setSpinning(false);
+        setCurrentTeamIdx(prev => prev + 1);
+      }
+    };
+    spin();
+  }, [currentTeamIdx, teams, getAvailableSlots]);
+
+  // 全自動抽選
+  const autoDrawAll = useCallback(() => {
+    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const newOrder = shuffled.map(t => t.teamId);
+    onShuffle(bracket.category, newOrder);
+    setDrawComplete(true);
+  }, [teams, bracket.category, onShuffle]);
+
+  // 手動割当確定
+  const confirmManualDraw = useCallback(() => {
+    // assignedSlots を元に順序を決定
+    const ordered: string[] = new Array(totalSlots).fill('');
+    assignedSlots.forEach((teamId, slot) => { ordered[slot] = teamId; });
+    const newOrder = ordered.filter(id => id !== '');
+    // 未割当のチームも末尾に追加
+    const assignedIds = new Set(newOrder);
+    for (const t of teams) {
+      if (!assignedIds.has(t.teamId)) newOrder.push(t.teamId);
+    }
+    onShuffle(bracket.category, newOrder);
+    setDrawComplete(true);
+  }, [assignedSlots, totalSlots, teams, bracket.category, onShuffle]);
+
+  // リセット
+  const resetDraw = () => {
+    setAssignedSlots(new Map());
+    setCurrentTeamIdx(0);
+    setCurrentHighlight(-1);
+    setDrawComplete(false);
+    if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+  };
+
+  useEffect(() => {
+    return () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); };
+  }, []);
+
+  // 全チーム割当済みかチェック
+  const allAssigned = currentTeamIdx >= teams.length;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-yellow-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-3 border-b border-yellow-100">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
+            <Shuffle size={16} className="text-yellow-600" />
+            1位トーナメント 抽選
+          </h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={resetDraw}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <RotateCcw size={12} />
+              リセット
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {!drawComplete ? (
+          <>
+            {/* 抽選スロット表示 */}
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
+              {Array.from({ length: totalSlots }, (_, i) => {
+                const assignedTeamId = assignedSlots.get(i);
+                const assignedTeam = assignedTeamId ? teams.find(t => t.teamId === assignedTeamId) : null;
+                const isHighlighted = currentHighlight === i && spinning;
+                const isAvailable = !assignedSlots.has(i);
+
+                return (
+                  <div
+                    key={i}
+                    className={`
+                      relative p-2 rounded-lg border-2 text-center transition-all min-h-[56px] flex flex-col items-center justify-center
+                      ${isHighlighted ? 'border-yellow-400 bg-yellow-100 scale-105 shadow-lg' :
+                        assignedTeam ? 'border-emerald-300 bg-emerald-50' :
+                        isAvailable ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-gray-100'}
+                    `}
+                  >
+                    <div className="text-[10px] text-gray-400 font-mono">#{i + 1}</div>
+                    {assignedTeam ? (
+                      <>
+                        <div className="text-[10px] font-bold text-emerald-700 truncate w-full">{assignedTeam.teamName}</div>
+                        <div className="text-[8px] text-emerald-500">{assignedTeam.leagueId}リーグ</div>
+                      </>
+                    ) : (
+                      <div className="text-[10px] text-gray-300">―</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 次の抽選チーム */}
+            {!allAssigned && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-xs text-yellow-600 mb-1">次の抽選</div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-bold text-yellow-800">{teams[currentTeamIdx]?.teamName}</span>
+                    <span className="text-xs text-yellow-600 ml-2">({teams[currentTeamIdx]?.leagueId}リーグ)</span>
+                  </div>
+                  <button
+                    onClick={spinRoulette}
+                    disabled={spinning}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all
+                      ${spinning
+                        ? 'bg-yellow-200 text-yellow-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white hover:from-yellow-600 hover:to-amber-600 shadow-md'
+                      }
+                    `}
+                  >
+                    <Shuffle size={14} className={spinning ? 'animate-spin' : ''} />
+                    {spinning ? '抽選中...' : 'ルーレット'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ボタン群 */}
+            <div className="flex gap-3">
+              <button
+                onClick={autoDrawAll}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-xl hover:from-yellow-600 hover:to-amber-600 text-sm font-medium shadow-md transition-all"
+              >
+                <Shuffle size={14} />
+                全自動抽選
+              </button>
+              {allAssigned && (
+                <button
+                  onClick={confirmManualDraw}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-medium shadow-md transition-all"
+                >
+                  <Hand size={14} />
+                  この配置で確定
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <div className="text-emerald-600 font-bold text-sm mb-2">抽選完了</div>
+            <p className="text-xs text-gray-500">トーナメント表に反映されました</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

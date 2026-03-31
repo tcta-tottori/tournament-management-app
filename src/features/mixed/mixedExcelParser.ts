@@ -298,7 +298,7 @@ function buildLeaguesFromList(
         numberInLeague: pairNum,
         pairNumber: globalNum,
         male, female, teamName,
-        status: 'entry',
+        status: 'none',
       });
       pairNum++;
     }
@@ -342,7 +342,7 @@ function buildLeaguesFromSheet(ws: XLSX.WorkSheet, leagueRows: LeagueRow[]): Mix
         numberInLeague: idx + 1,
         pairNumber: dt.pairNumber,
         male, female, teamName,
-        status: 'entry' as const,
+        status: 'none' as const,
       };
     });
 

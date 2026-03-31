@@ -8,16 +8,23 @@ import type { LeagueMatchScore } from './types';
 export default function MixedDrawView() {
   const { leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
+  const [clickY, setClickY] = useState<number | undefined>(undefined);
+
+  const handleEditMatch = (m: LeagueMatchScore, e?: React.MouseEvent) => {
+    setClickY(e?.clientY);
+    setEditingMatch(m);
+  };
 
   return (
     <div className="p-2 sm:p-4 space-y-3">
-      <AllLeaguesView onEditMatch={setEditingMatch} />
+      <AllLeaguesView onEditMatch={handleEditMatch} />
 
       {editingMatch && (
         <MixedScoreInput
           match={editingMatch}
           teams={leagues.find(l => l.leagueId === editingMatch.leagueId)?.teams || []}
           onClose={() => setEditingMatch(null)}
+          anchorY={clickY}
         />
       )}
     </div>
@@ -25,7 +32,7 @@ export default function MixedDrawView() {
 }
 
 /** 全リーグ一覧表示 */
-function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) => void }) {
+function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?: React.MouseEvent) => void }) {
   const { leagues, leagueMatches, updateCourtName } = useMixedStore();
   const allStandings = calculateLeagueStandings(leagues, leagueMatches);
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
@@ -40,7 +47,6 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
         const standings = allStandings.get(league.leagueId) || [];
         const isComplete = finishedCount === totalCount && totalCount > 0;
 
-        // スコアマトリックス
         const scoreMatrix = new Map<string, LeagueMatchScore>();
         for (const m of lMatches) {
           scoreMatrix.set(`${m.team1Id}-${m.team2Id}`, m);
@@ -140,11 +146,11 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                         </td>
                         <td className="px-1.5 sm:px-2 py-1">
                           <div className="text-[11px] sm:text-xs font-medium text-gray-800 leading-tight truncate">{team.male.name}</div>
-                          <div className="text-[11px] sm:text-xs text-gray-500 leading-tight truncate">{team.female.name}</div>
+                          <div className="text-[11px] sm:text-xs font-medium text-gray-800 leading-tight truncate">{team.female.name}</div>
                         </td>
                         <td className="px-1.5 sm:px-2 py-1">
-                          <div className="text-[10px] sm:text-[11px] text-gray-400 leading-tight truncate">{team.male.affiliation}</div>
-                          <div className="text-[10px] sm:text-[11px] text-gray-300 leading-tight truncate">{team.female.affiliation}</div>
+                          <div className="text-[10px] sm:text-[11px] text-gray-500 leading-tight truncate">{team.male.affiliation}</div>
+                          <div className="text-[10px] sm:text-[11px] text-gray-500 leading-tight truncate">{team.female.affiliation}</div>
                         </td>
                         {league.teams.map((colTeam, colIdx) => {
                           const cell = getCellDisplay(team.teamId, colTeam.teamId);
@@ -152,13 +158,13 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                             <td
                               key={colIdx}
                               className={`px-0.5 sm:px-1 py-1 text-center text-[10px] sm:text-xs ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors`}
-                              onClick={() => {
+                              onClick={e => {
                                 if (team.teamId === colTeam.teamId) return;
                                 const match = lMatches.find(m =>
                                   (m.team1Id === team.teamId && m.team2Id === colTeam.teamId) ||
                                   (m.team1Id === colTeam.teamId && m.team2Id === team.teamId)
                                 );
-                                if (match) onEditMatch(match);
+                                if (match) onEditMatch(match, e);
                               }}
                             >
                               {cell.text || (team.teamId !== colTeam.teamId && <span className="text-gray-300 text-[9px]">-</span>)}
@@ -169,7 +175,6 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           {standing ? `${standing.wins}-${standing.losses}` : '-'}
                         </td>
                         <td className="px-1 sm:px-2 py-1 text-center border-l border-gray-200">
-                          {/* 全試合完了時のみ順位表示 */}
                           {isComplete && standing && standing.rank > 0 && (
                             <span className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full text-[9px] sm:text-[10px] font-bold
                               ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :

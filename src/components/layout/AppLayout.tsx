@@ -77,6 +77,10 @@ export default function AppLayout() {
   const location = useLocation();
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
   const isMixedImported = useMixedStore((s) => s.isImported);
+  const mixedTournamentInfo = useMixedStore((s) => s.tournamentInfo);
+  const mixedLeagueMatches = useMixedStore((s) => s.leagueMatches);
+  const mixedLeagues = useMixedStore((s) => s.leagues);
+  const mixedBrackets = useMixedStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
 
   // 現在の大会情報を取得
@@ -161,6 +165,33 @@ export default function AppLayout() {
     return items;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMatches, courts, matchDuration, now]);
+
+  // ミックスダブルス用ティッカー
+  const mixedTickerItems = useMemo(() => {
+    if (!isMixedImported || mixedLeagueMatches.length === 0) return [];
+    const items: string[] = [];
+    const finished = mixedLeagueMatches.filter(m => m.status === 'finished').length;
+    const total = mixedLeagueMatches.length;
+    const pct = Math.round((finished / total) * 100);
+    items.push(`予選リーグ: ${finished}/${total}試合完了 (${pct}%)`);
+
+    // リーグごとの進捗
+    const completedLeagues = mixedLeagues.filter(l => {
+      const lm = mixedLeagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+    if (completedLeagues.length > 0) {
+      items.push(`${completedLeagues.length}/${mixedLeagues.length}リーグ完了 (${completedLeagues.map(l => l.leagueId.trim()).join(',')})`);
+    }
+
+    if (mixedBrackets.length > 0) {
+      const bracketFinished = mixedBrackets.reduce((sum, b) => sum + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
+      const bracketTotal = mixedBrackets.reduce((sum, b) => sum + b.matches.length, 0);
+      items.push(`決勝トーナメント: ${bracketFinished}/${bracketTotal}試合完了`);
+    }
+
+    return items;
+  }, [isMixedImported, mixedLeagueMatches, mixedLeagues, mixedBrackets]);
 
   // ミックス読込時は対戦順・タイムテーブル等を非表示
   const allTabs = useMemo(() => {
@@ -353,29 +384,33 @@ export default function AppLayout() {
       </nav>
 
       {/* ===== 大会情報バー ===== */}
-      {tournament && (
-        <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
-          {/* 固定部分: 大会名 */}
-          <div className="flex items-center gap-1.5 px-3 shrink-0 h-full info-bar-label max-w-[50vw]">
-            <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="font-bold text-gray-800 text-[11px] truncate">{tournament.name.replace(/\(.*?\)|（.*?）/g, '')}</span>
-          </div>
-          {/* 流れるティッカー */}
-          {tickerItems.length > 0 && (
-            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-              <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                {tickerItems.map((item, i) => (
-                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                    {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
-                  </span>
-                ))}
-              </div>
+      {(tournament || (isMixedImported && mixedTournamentInfo)) && (() => {
+        const displayName = isMixedImported && mixedTournamentInfo
+          ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+          : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
+        const activeTickerItems = isMixedImported ? mixedTickerItems : tickerItems;
+        return (
+          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
+            <div className="flex items-center gap-1.5 px-3 shrink-0 h-full info-bar-label max-w-[50vw]">
+              <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="font-bold text-gray-800 text-[11px] truncate">{displayName}</span>
             </div>
-          )}
-        </div>
-      )}
+            {activeTickerItems.length > 0 && (
+              <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+                <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                  {activeTickerItems.map((item, i) => (
+                    <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                      {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                      <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                      {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
       <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
