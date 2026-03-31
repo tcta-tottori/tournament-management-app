@@ -87,26 +87,39 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
   );
 }
 
-/** 3状態ステータスボタン */
-function StatusButton({ status, onClick, size = 'normal' }: {
+/** Entry / DEF 個別ボタン */
+function EntryDefButtons({ status, onSetStatus, size = 'normal' }: {
   status: 'none' | 'entry' | 'def';
-  onClick: () => void;
+  onSetStatus: (s: 'none' | 'entry' | 'def') => void;
   size?: 'normal' | 'small';
 }) {
-  const cls = size === 'small' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]';
-  if (status === 'entry') {
-    return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors`}>Entry</button>;
-  }
-  if (status === 'def') {
-    return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors`}>DEF</button>;
-  }
-  return <button onClick={e => { e.stopPropagation(); onClick(); }} className={`${cls} rounded-full font-medium bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors`}>未登録</button>;
-}
-
-function cycleStatus(current: 'none' | 'entry' | 'def'): 'none' | 'entry' | 'def' {
-  if (current === 'none') return 'entry';
-  if (current === 'entry') return 'def';
-  return 'none';
+  const base = size === 'small'
+    ? 'px-2.5 py-1.5 text-[11px] min-w-[44px] min-h-[32px]'
+    : 'px-3 py-1.5 text-xs min-w-[48px] min-h-[36px]';
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => onSetStatus(status === 'entry' ? 'none' : 'entry')}
+        className={`${base} rounded-lg font-bold transition-all active:scale-95 ${
+          status === 'entry'
+            ? 'bg-emerald-500 text-white shadow-sm hover:bg-emerald-600'
+            : 'bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200'
+        }`}
+      >
+        Entry
+      </button>
+      <button
+        onClick={() => onSetStatus(status === 'def' ? 'none' : 'def')}
+        className={`${base} rounded-lg font-bold transition-all active:scale-95 ${
+          status === 'def'
+            ? 'bg-orange-500 text-white shadow-sm hover:bg-orange-600'
+            : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-600 border border-gray-200'
+        }`}
+      >
+        DEF
+      </button>
+    </div>
+  );
 }
 
 /** 行の背景色 */
@@ -293,7 +306,7 @@ export default function MixedEntryView() {
                             </div>
                             {/* 操作ボタン */}
                             <div className="flex items-center gap-1 mt-1 justify-end">
-                              <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} />
+                              <EntryDefButtons status={st} onSetStatus={s => setTeamStatus(team.teamId, s)} />
                               <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                             </div>
                           </td>
@@ -342,7 +355,7 @@ export default function MixedEntryView() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} size="small" />
+                          <EntryDefButtons status={st} onSetStatus={s => setTeamStatus(team.teamId, s)} size="small" />
                           <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                         </div>
                       </div>

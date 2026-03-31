@@ -4,6 +4,7 @@ import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
+import { GameRatioCell } from './GameRatioCell';
 
 export default function MixedLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName } = useMixedStore();
@@ -298,7 +299,7 @@ export default function MixedLeagueView() {
                     <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
                     <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
                     <td className="py-2 px-2 text-center font-mono text-gray-600">
-                      {s.gamesLost === 0 ? (s.gamesWon > 0 ? '∞' : '-') : (s.gamesWon / s.gamesLost).toFixed(2)}
+                      <GameRatioCell gamesWon={s.gamesWon} gamesLost={s.gamesLost} />
                     </td>
                     <td className="py-2 px-2 text-xs text-gray-400">
                       {s.tiebreakReason || ''}

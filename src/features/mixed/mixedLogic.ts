@@ -142,8 +142,8 @@ export function calculateLeagueStandings(
         const ratioA = a.gamesLost === 0 ? Infinity : a.gamesWon / a.gamesLost;
         const ratioB = b.gamesLost === 0 ? Infinity : b.gamesWon / b.gamesLost;
         if (ratioA !== ratioB) {
-          a.tiebreakReason = `ゲーム率 ${ratioA === Infinity ? '∞' : ratioA.toFixed(2)}`;
-          b.tiebreakReason = `ゲーム率 ${ratioB === Infinity ? '∞' : ratioB.toFixed(2)}`;
+          a.tiebreakReason = `ゲーム率 ${ratioA === Infinity ? '∞' : ratioA.toFixed(3)}`;
+          b.tiebreakReason = `ゲーム率 ${ratioB === Infinity ? '∞' : ratioB.toFixed(3)}`;
           return ratioB - ratioA;
         }
       }

@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import type { PlacementCategory, LeagueMatchScore } from './types';
+import { GameRatioCell } from './GameRatioCell';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -426,10 +427,17 @@ export default function MixedResultsExport() {
                             {isComplete && hasTiebreak && (
                               <td className="px-2 py-1 text-center border-l border-gray-200">
                                 {standing?.tiebreakReason && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                    <Info size={9} className="shrink-0" />
-                                    {standing.tiebreakReason}
-                                  </span>
+                                  standing.tiebreakReason.startsWith('ゲーム率') ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                      <Info size={9} className="shrink-0" />
+                                      <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} className="text-[9px]" />
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                      <Info size={9} className="shrink-0" />
+                                      {standing.tiebreakReason}
+                                    </span>
+                                  )
                                 )}
                               </td>
                             )}
