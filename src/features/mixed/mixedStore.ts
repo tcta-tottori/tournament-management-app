@@ -27,7 +27,7 @@ interface MixedState {
   resetAll: () => void;
 
   // Actions: League
-  updateLeagueScore: (matchId: string, score1: number, score2: number) => void;
+  updateLeagueScore: (matchId: string, score1: number, score2: number, tiebreakScore?: number | null) => void;
   setLeagueMatchStatus: (matchId: string, status: LeagueMatchScore['status']) => void;
 
   // Actions: Standings & Brackets
@@ -101,12 +101,13 @@ export const useMixedStore = create<MixedState>()(
         isImported: false,
       }),
 
-      updateLeagueScore: (matchId, score1, score2) => {
+      updateLeagueScore: (matchId, score1, score2, tiebreakScore) => {
         set(state => ({
           leagueMatches: state.leagueMatches.map(m => {
             if (m.matchId !== matchId) return m;
             const winnerId = score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null;
-            return { ...m, score1, score2, winnerId, status: 'finished' as const };
+            const tb = tiebreakScore !== undefined ? tiebreakScore : null;
+            return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
           }),
         }));
       },

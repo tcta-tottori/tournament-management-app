@@ -55,7 +55,7 @@ export function regenerateLeagueMatches(league: MixedLeague): LeagueMatchScore[]
       matchNumber: mo.matchNumber,
       team1Id: team1.teamId,
       team2Id: team2.teamId,
-      score1: null, score2: null, winnerId: null,
+      score1: null, score2: null, tiebreakScore: null, winnerId: null,
       status: 'waiting',
     });
   }

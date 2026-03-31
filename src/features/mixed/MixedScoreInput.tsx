@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore, MixedTeam } from './types';
@@ -8,11 +8,21 @@ function toHalfWidth(s: string): string {
   return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 }
 
+/** ルール一覧からゲームルールのみ抽出 */
+function extractGameRule(rules: string[]): string | null {
+  for (const r of rules) {
+    if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(r)) {
+      // 番号プレフィックス（（１）等）を除去して本文のみ返す
+      return r.replace(/^（[０-９\d]+）\s*/, '').trim();
+    }
+  }
+  return null;
+}
+
 interface Props {
   match: LeagueMatchScore;
   teams: MixedTeam[];
   onClose: () => void;
-  /** クリック位置(viewport座標) — スクロール位置保持のため */
   anchorY?: number;
 }
 
@@ -24,17 +34,18 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
 
   const [score1, setScore1] = useState<string>(match.score1?.toString() ?? '');
   const [score2, setScore2] = useState<string>(match.score2?.toString() ?? '');
+  const [tiebreakInput, setTiebreakInput] = useState<string>(match.tiebreakScore?.toString() ?? '');
   const [error, setError] = useState('');
 
   const score1Ref = useRef<HTMLInputElement>(null);
   const score2Ref = useRef<HTMLInputElement>(null);
+  const tiebreakRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
 
   // スクロール位置を保存
   useEffect(() => {
     scrollPosRef.current = window.scrollY;
-    // ポップアップが閉じた時に元の位置に戻すためのクリーンアップ
     return () => {
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollPosRef.current);
@@ -45,8 +56,21 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   useEffect(() => {
     setScore1(match.score1?.toString() ?? '');
     setScore2(match.score2?.toString() ?? '');
+    setTiebreakInput(match.tiebreakScore?.toString() ?? '');
     setError('');
   }, [match]);
+
+  // タイブレークかどうか判定
+  const isTiebreak = useMemo(() => {
+    const s1 = parseInt(score1);
+    const s2 = parseInt(score2);
+    return (s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7);
+  }, [score1, score2]);
+
+  // ゲームルールのみ抽出
+  const gameRule = useMemo(() => {
+    return extractGameRule(tournamentInfo?.rules || []);
+  }, [tournamentInfo]);
 
   const validate = useCallback((): boolean => {
     const s1 = parseInt(score1);
@@ -55,15 +79,27 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     if (s1 < 0 || s2 < 0) { setError('スコアは0以上で入力してください'); return false; }
     if (s1 === s2) { setError('同点は不可です'); return false; }
     if (s1 > 7 || s2 > 7) { setError('スコアは0〜7の範囲で入力してください'); return false; }
+    // タイブレーク時のバリデーション
+    if ((s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7)) {
+      const tb = parseInt(tiebreakInput);
+      if (tiebreakInput && !isNaN(tb) && tb < 0) {
+        setError('タイブレークスコアは0以上で入力してください');
+        return false;
+      }
+    }
     setError('');
     return true;
-  }, [score1, score2]);
+  }, [score1, score2, tiebreakInput]);
 
   const handleSave = useCallback(() => {
     if (!validate()) return;
-    updateLeagueScore(match.matchId, parseInt(score1), parseInt(score2));
+    const s1 = parseInt(score1);
+    const s2 = parseInt(score2);
+    const isTb = (s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7);
+    const tb = isTb && tiebreakInput ? parseInt(tiebreakInput) : null;
+    updateLeagueScore(match.matchId, s1, s2, tb);
     onClose();
-  }, [score1, score2, match.matchId, updateLeagueScore, onClose, validate]);
+  }, [score1, score2, tiebreakInput, match.matchId, updateLeagueScore, onClose, validate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -73,7 +109,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
 
   const handleClear = useCallback(() => {
     setLeagueMatchStatus(match.matchId, 'waiting');
-    updateLeagueScore(match.matchId, -1, -1);
+    updateLeagueScore(match.matchId, -1, -1, null);
     onClose();
   }, [match.matchId, setLeagueMatchStatus, updateLeagueScore, onClose]);
 
@@ -90,13 +126,24 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore2(raw);
     setError('');
+    // タイブレークならTBフィールドにフォーカス
+    const s1 = parseInt(score1);
+    const s2n = parseInt(raw);
+    if (raw.length === 1 && ((s1 === 7 && s2n === 6) || (s1 === 6 && s2n === 7))) {
+      setTimeout(() => { tiebreakRef.current?.focus(); tiebreakRef.current?.select(); }, 50);
+    }
+  };
+
+  const handleTiebreakChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setTiebreakInput(raw);
   };
 
   // ポップアップの表示位置を計算
   const popupStyle: React.CSSProperties = {};
   if (anchorY !== undefined) {
     const vh = window.innerHeight;
-    const popupH = 360;
+    const popupH = 380;
     let top = anchorY - popupH / 2;
     if (top < 10) top = 10;
     if (top + popupH > vh - 10) top = vh - popupH - 10;
@@ -105,9 +152,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     popupStyle.left = '50%';
     popupStyle.transform = 'translateX(-50%)';
   }
-
-  // ゲームルール
-  const rules = tournamentInfo?.rules || [];
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
@@ -133,12 +177,10 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
         </div>
 
         <div className="p-4">
-          {/* ゲームルール */}
-          {rules.length > 0 && (
+          {/* ゲームルールのみ表示 */}
+          {gameRule && (
             <div className="mb-3 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="text-[10px] text-amber-700 font-medium">
-                {rules.map((r, i) => <div key={i}>{r}</div>)}
-              </div>
+              <div className="text-[11px] text-amber-700 font-medium">{gameRule}</div>
             </div>
           )}
 
@@ -178,11 +220,33 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               maxLength={1}
               value={score2}
               onChange={handleScore2Change}
-              onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+              onKeyDown={e => { if (e.key === 'Enter' && !isTiebreak) handleSave(); }}
               className="w-16 h-14 text-center text-3xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               placeholder="0"
             />
           </div>
+
+          {/* タイブレークスコア入力 */}
+          {isTiebreak && (
+            <div className="mb-3 flex items-center justify-center gap-2">
+              <div className="text-xs text-gray-500">タイブレーク</div>
+              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+                <span className="text-sm font-bold text-blue-700">7</span>
+                <span className="text-sm text-gray-400">-</span>
+                <input
+                  ref={tiebreakRef}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={tiebreakInput}
+                  onChange={handleTiebreakChange}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+                  className="w-10 h-8 text-center text-sm font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="?"
+                />
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 text-red-600 text-sm mb-3 bg-red-50 px-3 py-2 rounded-lg">

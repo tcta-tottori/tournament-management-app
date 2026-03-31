@@ -61,8 +61,13 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           const myScore = isTeam1 ? match.score1 : match.score2;
           const oppScore = isTeam1 ? match.score2 : match.score1;
           const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
+          // タイブレーク表記: 7-6(3) のような形式
+          let scoreText = `${myScore}-${oppScore}`;
+          if (match.tiebreakScore != null && ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
+            scoreText = `${myScore}-${oppScore}(${match.tiebreakScore})`;
+          }
           return {
-            text: `${myScore}-${oppScore}`,
+            text: scoreText,
             color: won ? 'text-emerald-700 font-bold' : 'text-red-600',
             bg: won ? 'bg-emerald-50 cursor-pointer' : 'bg-red-50 cursor-pointer',
           };

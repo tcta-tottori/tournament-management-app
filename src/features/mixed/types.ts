@@ -42,6 +42,7 @@ export interface LeagueMatchScore {
   team2Id: string;
   score1: number | null;    // team1の取得ゲーム数
   score2: number | null;    // team2の取得ゲーム数
+  tiebreakScore: number | null; // タイブレーク敗者側スコア (7-6時のみ)
   winnerId: string | null;
   status: 'waiting' | 'playing' | 'finished';
 }

@@ -379,6 +379,7 @@ function generateLeagueMatches(leagues: MixedLeague[]): LeagueMatchScore[] {
         team2Id: team2.teamId,
         score1: null,
         score2: null,
+        tiebreakScore: null,
         winnerId: null,
         status: 'waiting',
       });
