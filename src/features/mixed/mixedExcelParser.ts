@@ -156,19 +156,18 @@ function extractTeamsFromRows(ws: XLSX.WorkSheet, maleRow: number, femaleRow: nu
   return teams;
 }
 
-/** 5チームリーグの5チーム目を検出（リーグヘッダーの2行後以降にあるケース） */
+/** 5チームリーグの5チーム目を検出（リーグヘッダーの後方にあるケース） */
 function extractFifthTeam(ws: XLSX.WorkSheet, startRow: number, nextLeagueRow: number | null): DetectedTeam | null {
-  // リーグヘッダー+2 から次のリーグヘッダーまでの間に追加チームがないか探す
-  const endRow = nextLeagueRow ? nextLeagueRow - 1 : startRow + 4;
+  // courtRow+1 から次のリーグヘッダーまでの間に追加チームがないか探す
+  // ※5チーム目はコート名と同じ行(courtRow+1)に配置されていることがある
+  const endRow = nextLeagueRow ? nextLeagueRow - 1 : startRow + 6;
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
-  for (let r = startRow + 2; r <= Math.min(endRow, range.e.r + 1); r++) {
-    // B列にリーグ名もコート名もない行で、G列付近に番号がある行
+  for (let r = startRow + 1; r <= Math.min(endRow, range.e.r + 1); r++) {
     const bVal = cellVal(ws, `B${r}`);
-    if (bVal && (bVal.includes('リーグ') || bVal.includes('■'))) break;
+    if (bVal && bVal.match(/^[A-Z]\s*リーグ$/) || (bVal && bVal.includes('■'))) break;
 
     const teams = extractTeamsFromRows(ws, r, r + 1);
-    // 5チーム目の番号は通常、前の4チームの番号+1
     if (teams.length >= 1) {
       return teams[0];
     }
@@ -324,19 +323,10 @@ function buildLeaguesFromSheet(ws: XLSX.WorkSheet, leagueRows: LeagueRow[]): Mix
     // メイン行（4チーム分）
     const mainTeams = extractTeamsFromRows(ws, lr.row, lr.courtRow);
 
-    // 5チーム目を探す（L,Mリーグ等）
-    // 次のリーグまでの間に追加行があるか
+    // 5チーム目を探す（M リーグ等）
+    // courtRow以降、次のリーグヘッダーまでの間に追加チームがないか常にチェック
     let extraTeam: DetectedTeam | null = null;
-    if (nextLr) {
-      const gap = nextLr.row - lr.row;
-      if (gap >= 4) {
-        // 2行以上余分にある場合、5チーム目を探す
-        extraTeam = extractFifthTeam(ws, lr.courtRow, nextLr.row);
-      }
-    } else {
-      // 最後のリーグ: 2行後に5チーム目があるかチェック
-      extraTeam = extractFifthTeam(ws, lr.courtRow, null);
-    }
+    extraTeam = extractFifthTeam(ws, lr.courtRow, nextLr ? nextLr.row : null);
 
     const allDetected = [...mainTeams];
     if (extraTeam) allDetected.push(extraTeam);

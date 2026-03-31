@@ -1,26 +1,99 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { Users, Search, RotateCcw } from 'lucide-react';
+import { Users, RotateCcw, MapPin, Pencil, X, Check } from 'lucide-react';
 import { useState } from 'react';
+import type { MixedTeam } from './types';
+
+/** インライン編集セル */
+function EditableCell({ value, onSave, className = '' }: {
+  value: string;
+  onSave: (v: string) => void;
+  className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState(value);
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onBlur={() => { onSave(input); setEditing(false); }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { onSave(input); setEditing(false); }
+          if (e.key === 'Escape') { setInput(value); setEditing(false); }
+        }}
+        className="w-full px-1 py-0.5 border border-emerald-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={() => { setInput(value); setEditing(true); }}
+      className={`cursor-pointer hover:bg-emerald-50 hover:text-emerald-700 px-1 py-0.5 rounded transition-colors ${className}`}
+      title="クリックで編集"
+    >
+      {value || <span className="text-gray-300 italic">未入力</span>}
+    </span>
+  );
+}
+
+/** チームカード（ドロー表風） */
+function TeamCard({ team, pairNum }: { team: MixedTeam; pairNum: number }) {
+  const { updateTeamPlayer } = useMixedStore();
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-md transition-all overflow-hidden min-w-[200px] flex-1">
+      {/* ペア番号バッジ */}
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100">
+        <span className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-sm">
+          {pairNum}
+        </span>
+        <span className="text-xs text-gray-400 font-medium">No.{team.pairNumber}</span>
+      </div>
+      {/* 男子 */}
+      <div className="px-3 py-1.5 flex items-center gap-1 border-b border-gray-50">
+        <span className="text-[10px] text-blue-500 font-bold w-3 shrink-0">♂</span>
+        <EditableCell
+          value={team.male.name}
+          onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
+          className="text-sm font-semibold text-gray-800 flex-1"
+        />
+        <EditableCell
+          value={team.male.affiliation}
+          onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
+          className="text-[11px] text-gray-400"
+        />
+      </div>
+      {/* 女子 */}
+      <div className="px-3 py-1.5 flex items-center gap-1">
+        <span className="text-[10px] text-pink-500 font-bold w-3 shrink-0">♀</span>
+        <EditableCell
+          value={team.female.name}
+          onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
+          className="text-sm font-semibold text-gray-800 flex-1"
+        />
+        <EditableCell
+          value={team.female.affiliation}
+          onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
+          className="text-[11px] text-gray-400"
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function MixedEntryView() {
-  const { leagues, allTeams, tournamentInfo, isImported, resetAll } = useMixedStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const { leagues, allTeams, tournamentInfo, isImported, resetAll, updateCourtName } = useMixedStore();
+  const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
+  const [courtInput, setCourtInput] = useState('');
 
   if (!isImported) {
     return <MixedImportView />;
   }
-
-  const filteredTeams = allTeams.filter(team => {
-    const matchesSearch = !searchQuery ||
-      team.male.name.includes(searchQuery) ||
-      team.female.name.includes(searchQuery) ||
-      team.male.affiliation.includes(searchQuery) ||
-      team.female.affiliation.includes(searchQuery);
-    const matchesLeague = !selectedLeagueId || team.leagueId === selectedLeagueId;
-    return matchesSearch && matchesLeague;
-  });
 
   return (
     <div className="p-4 space-y-4">
@@ -33,74 +106,80 @@ export default function MixedEntryView() {
             </div>
             <div>
               <h2 className="text-xl font-bold">ミックスダブルス エントリー</h2>
-              <p className="text-emerald-200 text-sm">{tournamentInfo?.name} | {allTeams.length}ペア | {leagues.length}リーグ</p>
+              <p className="text-emerald-200 text-sm">
+                {tournamentInfo?.name} | {allTeams.length}ペア | {leagues.length}リーグ
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => { if (confirm('データをすべてリセットしますか？')) resetAll(); }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
-          >
-            <RotateCcw size={14} />
-            リセット
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-sm">
+              <div className="text-emerald-300 text-xs">選手名・所属をクリックで編集可能</div>
+            </div>
+            <button
+              onClick={() => { if (confirm('データをすべてリセットしますか？')) resetAll(); }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
+            >
+              <RotateCcw size={14} />
+              リセット
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* フィルター */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="選手名・所属で検索..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-        <select
-          value={selectedLeagueId || ''}
-          onChange={e => setSelectedLeagueId(e.target.value || null)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="">全リーグ</option>
-          {leagues.map(l => (
-            <option key={l.leagueId} value={l.leagueId}>{l.leagueId.trim()}リーグ ({l.teams.length}ペア)</option>
-          ))}
-        </select>
-        <span className="text-sm text-gray-500">{filteredTeams.length}ペア表示</span>
-      </div>
+      {/* リーグごとのドロー表風レイアウト */}
+      <div className="space-y-3">
+        {leagues.map(league => (
+          <div key={league.leagueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {/* リーグヘッダー */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+              <span className="w-10 h-10 bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-lg font-bold rounded-lg flex items-center justify-center shadow-md">
+                {league.leagueId.trim()}
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-gray-800">
+                  {league.leagueId.trim()} リーグ
+                </h3>
+                {/* コート名（編集可能） */}
+                {editingCourtId === league.leagueId ? (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <MapPin size={12} className="text-gray-400" />
+                    <input
+                      type="text"
+                      value={courtInput}
+                      onChange={e => setCourtInput(e.target.value)}
+                      onBlur={() => { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }
+                        if (e.key === 'Escape') setEditingCourtId(null);
+                      }}
+                      className="px-1.5 py-0.5 text-xs border border-emerald-400 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors mt-0.5"
+                  >
+                    <MapPin size={12} />
+                    {league.courtName || '(コート未設定)'}
+                    <Pencil size={9} className="opacity-50" />
+                  </button>
+                )}
+              </div>
+              <div className="ml-auto text-sm text-gray-500">
+                {league.teams.length}ペア
+              </div>
+            </div>
 
-      {/* チーム一覧テーブル */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 text-xs text-gray-500">
-              <th className="px-4 py-3 text-left w-12">#</th>
-              <th className="px-4 py-3 text-left w-16">リーグ</th>
-              <th className="px-4 py-3 text-left">男子選手</th>
-              <th className="px-4 py-3 text-left">男子所属</th>
-              <th className="px-4 py-3 text-left">女子選手</th>
-              <th className="px-4 py-3 text-left">女子所属</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTeams.map((team, idx) => (
-              <tr key={team.teamId} className="border-t border-gray-100 hover:bg-emerald-50/30 transition-colors">
-                <td className="px-4 py-2.5 text-sm text-gray-400">{idx + 1}</td>
-                <td className="px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center w-7 h-7 bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg">
-                    {team.leagueId.trim()}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-sm font-medium text-gray-800">{team.male.name}</td>
-                <td className="px-4 py-2.5 text-sm text-gray-500">{team.male.affiliation}</td>
-                <td className="px-4 py-2.5 text-sm font-medium text-gray-800">{team.female.name}</td>
-                <td className="px-4 py-2.5 text-sm text-gray-500">{team.female.affiliation}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            {/* チームカード横並び */}
+            <div className="p-3 flex gap-3 overflow-x-auto">
+              {league.teams.map((team, idx) => (
+                <TeamCard key={team.teamId} team={team} pairNum={idx + 1} />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

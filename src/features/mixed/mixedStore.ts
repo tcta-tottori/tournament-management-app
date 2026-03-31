@@ -39,8 +39,9 @@ interface MixedState {
   setBracketMatchStatus: (matchId: string, status: BracketMatch['status']) => void;
   advanceWinner: (matchId: string) => void;
 
-  // Court editing
+  // Court & Team editing
   updateCourtName: (leagueId: string, courtName: string) => void;
+  updateTeamPlayer: (teamId: string, field: 'maleName' | 'maleAffiliation' | 'femaleName' | 'femaleAffiliation', value: string) => void;
 
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
@@ -176,6 +177,25 @@ export const useMixedStore = create<MixedState>()(
             l.leagueId === leagueId ? { ...l, courtName } : l
           ),
         }));
+      },
+
+      updateTeamPlayer: (teamId, field, value) => {
+        const extractLast = (n: string) => n.replace(/\u3000/g, ' ').trim().split(/\s+/)[0] || n;
+        set(state => {
+          const updateTeam = (team: import('./types').MixedTeam): import('./types').MixedTeam => {
+            if (team.teamId !== teamId) return team;
+            const updated = { ...team };
+            if (field === 'maleName') { updated.male = { ...updated.male, name: value }; updated.teamName = extractLast(value) + '・' + extractLast(updated.female.name); }
+            else if (field === 'maleAffiliation') updated.male = { ...updated.male, affiliation: value };
+            else if (field === 'femaleName') { updated.female = { ...updated.female, name: value }; updated.teamName = extractLast(updated.male.name) + '・' + extractLast(value); }
+            else if (field === 'femaleAffiliation') updated.female = { ...updated.female, affiliation: value };
+            return updated;
+          };
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateTeam) })),
+            allTeams: state.allTeams.map(updateTeam),
+          };
+        });
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
