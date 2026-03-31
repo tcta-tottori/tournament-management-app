@@ -151,13 +151,13 @@ export default function MixedEntryView() {
           const leagueAllEntry = league.teams.length > 0 && league.teams.every(t => t.status === 'entry');
           return (
             <div key={league.leagueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              {/* リーグヘッダー */}
-              <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
-                <span className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-base sm:text-lg font-bold rounded-lg flex items-center justify-center shadow-md shrink-0">
+              {/* リーグヘッダー — スマホ用 */}
+              <div className="sm:hidden flex items-center gap-2 px-3 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+                <span className="w-9 h-9 bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-base font-bold rounded-lg flex items-center justify-center shadow-md shrink-0">
                   {league.leagueId.trim()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-800">
+                  <h3 className="text-sm font-bold text-gray-800">
                     {league.leagueId.trim()} リーグ
                     <span className="text-xs font-normal text-gray-400 ml-2">
                       {league.teams.length}ペア
@@ -205,74 +205,101 @@ export default function MixedEntryView() {
                 </button>
               </div>
 
-              {/* PC: ドロー表スタイルのテーブル表示 */}
+              {/* PC: ドロー表横1行スタイル — リーグ名+コートを左端セルに統合 */}
               <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: 560 }}>
-                  <thead>
-                    <tr className="bg-gray-50 text-xs text-gray-500">
-                      <th className="px-2 py-1 text-center w-8">#</th>
-                      <th className="px-2 py-1 text-left min-w-[140px]">ペア名</th>
-                      <th className="px-2 py-1 text-left min-w-[80px]">所属</th>
-                      <th className="px-2 py-1 text-center w-20">状態</th>
-                      <th className="px-2 py-1 text-center w-10">移動</th>
-                    </tr>
-                  </thead>
+                <table className="w-full border-collapse" style={{ minWidth: league.teams.length * 200 + 120 }}>
                   <tbody>
-                    {league.teams.map((team, idx) => {
-                      const st = team.status || 'none';
-                      const isDef = st === 'def';
-                      return (
-                        <tr key={team.teamId} className={`border-t border-gray-100 ${rowBg(st)} transition-colors`}>
-                          <td className="px-2 py-1 text-center">
-                            <span className="inline-flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">
-                              {idx + 1}
-                            </span>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className={`${isDef ? 'opacity-50 line-through' : ''}`}>
-                              <div className="flex items-center gap-0.5">
-                                <EditableCell
-                                  value={team.male.name}
-                                  onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                                  className="text-xs font-medium text-gray-800"
-                                />
-                              </div>
-                              <div className="flex items-center gap-0.5">
-                                <EditableCell
-                                  value={team.female.name}
-                                  onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                                  className="text-xs font-medium text-gray-800"
-                                />
+                    <tr>
+                      {/* リーグ名+コート列 */}
+                      <td className="border border-gray-200 px-3 py-2 align-middle text-center bg-white" style={{ minWidth: 100 }}>
+                        <div className="font-bold text-lg text-gray-800 leading-tight">{league.leagueId.trim()} リーグ</div>
+                        {editingCourtId === league.leagueId ? (
+                          <div className="flex items-center justify-center gap-1 mt-1">
+                            <input
+                              type="text"
+                              value={courtInput}
+                              onChange={e => setCourtInput(e.target.value)}
+                              onBlur={() => { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }
+                                if (e.key === 'Escape') setEditingCourtId(null);
+                              }}
+                              className="px-1.5 py-0.5 text-xs border border-emerald-400 rounded focus:outline-none w-20 text-center"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
+                            className="text-xs text-gray-500 hover:text-emerald-600 transition-colors mt-0.5"
+                          >
+                            {league.courtName || '(コート未設定)'}
+                          </button>
+                        )}
+                        <div className="mt-1">
+                          <button
+                            onClick={() => setLeagueAllStatus(league.leagueId, leagueAllEntry ? 'none' : 'entry')}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                              leagueAllEntry
+                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            <UserCheck size={10} />
+                            {leagueAllEntry ? '解除' : '全Entry'}
+                          </button>
+                        </div>
+                      </td>
+                      {/* チーム列 */}
+                      {league.teams.map((team, idx) => {
+                        const st = team.status || 'none';
+                        const isDef = st === 'def';
+                        return (
+                          <td
+                            key={team.teamId}
+                            className={`border border-gray-200 px-2 py-1.5 align-top ${rowBg(st)} transition-colors`}
+                            style={{ minWidth: 190 }}
+                          >
+                            <div className="flex items-start gap-1">
+                              <span className="text-sm font-bold text-gray-500 mt-0.5 shrink-0 w-4 text-right">{idx + 1}</span>
+                              <div className={`flex-1 min-w-0 ${isDef ? 'opacity-50 line-through' : ''}`}>
+                                {/* 男子: 名前 所属 */}
+                                <div className="flex items-baseline gap-1 leading-snug">
+                                  <EditableCell
+                                    value={team.male.name}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
+                                    className="text-sm font-medium text-gray-800 whitespace-nowrap"
+                                  />
+                                  <EditableCell
+                                    value={team.male.affiliation}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
+                                    className="text-[11px] text-gray-500 whitespace-nowrap"
+                                  />
+                                </div>
+                                {/* 女子: 名前 所属 */}
+                                <div className="flex items-baseline gap-1 leading-snug">
+                                  <EditableCell
+                                    value={team.female.name}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
+                                    className="text-sm font-medium text-gray-800 whitespace-nowrap"
+                                  />
+                                  <EditableCell
+                                    value={team.female.affiliation}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
+                                    className="text-[11px] text-gray-500 whitespace-nowrap"
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className={`${isDef ? 'opacity-50' : ''}`}>
-                              <div>
-                                <EditableCell
-                                  value={team.male.affiliation}
-                                  onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
-                                  className="text-[11px] text-gray-500"
-                                />
-                              </div>
-                              <div>
-                                <EditableCell
-                                  value={team.female.affiliation}
-                                  onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                                  className="text-[11px] text-gray-500"
-                                />
-                              </div>
+                            {/* 操作ボタン */}
+                            <div className="flex items-center gap-1 mt-1 justify-end">
+                              <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} />
+                              <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                             </div>
                           </td>
-                          <td className="px-2 py-1 text-center">
-                            <StatusButton status={st} onClick={() => setTeamStatus(team.teamId, cycleStatus(st))} />
-                          </td>
-                          <td className="px-2 py-1 text-center">
-                            <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        );
+                      })}
+                    </tr>
                   </tbody>
                 </table>
               </div>

@@ -257,35 +257,36 @@ export default function ScoreboardLeague({
   // --- Render helpers ---
   const renderTable = (isFS = false) => {
     const textSize = isFS ? 'text-sm' : 'text-xs sm:text-sm';
-    const cellPad = isFS ? 'px-3 py-3' : 'px-2 py-3';
-    const headerPad = isFS ? 'px-3 py-2' : 'px-1.5 sm:px-3 py-2';
-    const minW = isFS ? 'min-w-[90px]' : 'min-w-[70px] sm:min-w-[100px]';
+    const cellPad = isFS ? 'px-3 py-2' : 'px-1.5 sm:px-2 py-2';
+    const headerPad = isFS ? 'px-3 py-2' : 'px-1.5 sm:px-2 py-2';
+    // 固定幅: 選手名列 + 対戦セル × n + 勝敗 + 順位
+    const nameColW = isFS ? 'w-[180px]' : 'w-[140px] sm:w-[200px]';
+    const matchColW = isFS ? 'w-[90px]' : 'w-[80px] sm:w-[100px]';
+    const statColW = isFS ? 'w-[60px]' : 'w-[50px] sm:w-[65px]';
+    const rankColW = isFS ? 'w-[50px]' : 'w-[40px] sm:w-[55px]';
 
     return (
-      <table className={`border-collapse border-2 border-gray-900 ${textSize}`}>
+      <table className={`border-collapse border-2 border-gray-900 table-fixed ${textSize}`}>
         <thead>
           <tr>
-            <th
-              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[140px]' : 'min-w-[120px] sm:min-w-[200px]'}`}
-            >
+            <th className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${nameColW}`}>
               {leagueName}
             </th>
             {players.map((p, i) => (
-              <th
-                key={`col-${i}`}
-                className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold whitespace-nowrap ${minW}`}
-              >
-                {p.name}
+              <th key={`col-${i}`} className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center ${matchColW}`}>
+                <div className="font-bold truncate">{p.name}</div>
+                {p.affiliation && (
+                  <>
+                    <div className="border-t border-gray-300 my-0.5" />
+                    <div className="text-[10px] text-gray-400 font-normal truncate">{p.affiliation}</div>
+                  </>
+                )}
               </th>
             ))}
-            <th
-              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[60px]' : 'min-w-[50px] sm:min-w-[80px]'}`}
-            >
+            <th className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${statColW}`}>
               勝敗
             </th>
-            <th
-              className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${isFS ? 'min-w-[50px]' : 'min-w-[40px] sm:min-w-[70px]'}`}
-            >
+            <th className={`border-2 border-gray-900 bg-gray-50 ${headerPad} text-center font-bold ${rankColW}`}>
               順位
             </th>
           </tr>
@@ -293,12 +294,17 @@ export default function ScoreboardLeague({
         <tbody>
           {players.map((player, rowIdx) => (
             <tr key={`row-${rowIdx}`}>
-              {/* 選手名セル */}
-              <td className={`border-2 border-gray-900 px-3 ${cellPad} font-medium whitespace-nowrap`}>
-                <span className="text-gray-500 mr-2">{toCircledNum(rowIdx + 1)}</span>
-                {player.name}
+              {/* 選手名セル: 番号＋名前 | 区切り線 | 所属 */}
+              <td className={`border-2 border-gray-900 ${cellPad} ${nameColW}`}>
+                <div className="flex items-center gap-1.5 font-medium truncate">
+                  <span className="text-gray-400 shrink-0">{toCircledNum(rowIdx + 1)}</span>
+                  <span className="truncate">{player.name}</span>
+                </div>
                 {player.affiliation && (
-                  <span className="text-gray-400 ml-1 text-xs">（{player.affiliation}）</span>
+                  <>
+                    <div className="border-t border-gray-300 my-0.5" />
+                    <div className="text-[10px] text-gray-400 truncate">{player.affiliation}</div>
+                  </>
                 )}
               </td>
               {/* 対戦結果セル */}
@@ -307,22 +313,9 @@ export default function ScoreboardLeague({
 
                 if (isSelf) {
                   return (
-                    <td
-                      key={`cell-${rowIdx}-${colIdx}`}
-                      className={`border-2 border-gray-900 bg-gray-200 relative ${minW}`}
-                    >
-                      <svg
-                        className="absolute inset-0 w-full h-full"
-                        preserveAspectRatio="none"
-                      >
-                        <line
-                          x1="0"
-                          y1="0"
-                          x2="100%"
-                          y2="100%"
-                          stroke="#374151"
-                          strokeWidth="1.5"
-                        />
+                    <td key={`cell-${rowIdx}-${colIdx}`} className={`border-2 border-gray-900 bg-gray-200 relative ${matchColW} h-12`}>
+                      <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                        <line x1="0" y1="0" x2="100%" y2="100%" stroke="#374151" strokeWidth="1.5" />
                       </svg>
                     </td>
                   );
@@ -333,7 +326,7 @@ export default function ScoreboardLeague({
                 return (
                   <td
                     key={`cell-${rowIdx}-${colIdx}`}
-                    className={`border-2 border-gray-900 ${cellPad} text-center ${minW} ${cell.className} ${
+                    className={`border-2 border-gray-900 ${cellPad} text-center ${matchColW} ${cell.className} ${
                       cell.selected ? 'ring-2 ring-primary-500 ring-inset' : ''
                     }`}
                     onClick={() => handleCellClick(cell.entryId1, cell.entryId2)}
@@ -343,17 +336,13 @@ export default function ScoreboardLeague({
                 );
               })}
               {/* 勝敗 */}
-              <td
-                className={`border-2 border-gray-900 ${cellPad} text-center font-medium whitespace-nowrap`}
-              >
+              <td className={`border-2 border-gray-900 ${cellPad} text-center font-medium whitespace-nowrap ${statColW}`}>
                 {allMatchesDone || stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0
-                  ? `${stats[rowIdx].wins} - ${stats[rowIdx].losses}`
+                  ? `${stats[rowIdx].wins}-${stats[rowIdx].losses}`
                   : ''}
               </td>
               {/* 順位 */}
-              <td
-                className={`border-2 border-gray-900 ${cellPad} text-center font-bold ${isFS ? 'text-xl' : 'text-lg'}`}
-              >
+              <td className={`border-2 border-gray-900 ${cellPad} text-center font-bold ${isFS ? 'text-xl' : 'text-lg'} ${rankColW}`}>
                 {allMatchesDone || stats[rowIdx].wins > 0 || stats[rowIdx].losses > 0
                   ? rankMap.get(rowIdx)
                   : ''}
