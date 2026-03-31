@@ -8,6 +8,7 @@ import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel } from '../mixed/mixedExcelParser';
+import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -526,6 +527,16 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [sourceReserveDate, setSourceReserveDate] = useState('');
   // 時間割全画面表示
   const [scheduleFullscreen, setScheduleFullscreen] = useState(false);
+  // ミックス大会確認ダイアログ
+  const [mixedPending, setMixedPending] = useState<{
+    info: TournamentInfo;
+    leagues: MixedLeague[];
+    matches: LeagueMatchScore[];
+    fileName: string;
+  } | null>(null);
+  const [mixedEditName, setMixedEditName] = useState('');
+  const [mixedEditDate, setMixedEditDate] = useState('');
+  const [mixedEditVenue, setMixedEditVenue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -569,10 +580,10 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         try {
           const mixedResult = parseMixedExcel(arrayBuffer);
           if (mixedResult.leagues.length > 0) {
-            const mixedStore = useMixedStore.getState();
-            mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
-            mixedStore.setImportFileName(fileName);
-            navigate('/entry');
+            setMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName });
+            setMixedEditName(mixedResult.info.name);
+            setMixedEditDate(mixedResult.info.date);
+            setMixedEditVenue(mixedResult.info.venue);
             return;
           }
         } catch { /* fall through */ }
@@ -676,11 +687,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           try {
             const mixedResult = parseMixedExcel(arrayBuffer);
             if (mixedResult.leagues.length > 0) {
-              // ミックス大会として読み込み成功 → ストアに保存して遷移
-              const mixedStore = useMixedStore.getState();
-              mixedStore.importData(mixedResult.info, mixedResult.leagues, mixedResult.matches);
-              mixedStore.setImportFileName(file.name);
-              navigate('/entry');
+              // ミックス大会として読み込み成功 → 確認ダイアログを表示
+              setMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName: file.name });
+              setMixedEditName(mixedResult.info.name);
+              setMixedEditDate(mixedResult.info.date);
+              setMixedEditVenue(mixedResult.info.venue);
               return;
             }
           } catch {
@@ -2138,6 +2149,119 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                 <Upload className="w-4 h-4" />
                 {isImporting ? 'インポート中...' : 'インポート'}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ミックス大会 確認ダイアログ */}
+      {mixedPending && createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setMixedPending(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[460px] max-w-[95vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  <h3 className="font-bold text-sm">ミックス大会情報の確認</h3>
+                </div>
+                <button onClick={() => setMixedPending(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500">大会情報を確認・修正してから確定してください。</p>
+
+              {/* 大会名 */}
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 block">大会名</label>
+                <input
+                  type="text"
+                  value={mixedEditName}
+                  onChange={e => setMixedEditName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              {/* 日付 */}
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />開催日</label>
+                <input
+                  type="text"
+                  value={mixedEditDate}
+                  onChange={e => setMixedEditDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="例: 2026年4月1日"
+                />
+              </div>
+
+              {/* 会場 */}
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />会場</label>
+                <input
+                  type="text"
+                  value={mixedEditVenue}
+                  onChange={e => setMixedEditVenue(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="例: ヤマタスポーツパーク"
+                />
+              </div>
+
+              {/* 読込概要 */}
+              <div className="flex gap-3 text-center">
+                <div className="flex-1 bg-emerald-50 rounded-lg p-2 border border-emerald-100">
+                  <div className="text-lg font-bold text-emerald-700">{mixedPending.leagues.length}</div>
+                  <div className="text-[10px] text-gray-500">リーグ</div>
+                </div>
+                <div className="flex-1 bg-teal-50 rounded-lg p-2 border border-teal-100">
+                  <div className="text-lg font-bold text-teal-700">{mixedPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
+                  <div className="text-[10px] text-gray-500">ペア</div>
+                </div>
+                <div className="flex-1 bg-cyan-50 rounded-lg p-2 border border-cyan-100">
+                  <div className="text-lg font-bold text-cyan-700">{mixedPending.matches.length}</div>
+                  <div className="text-[10px] text-gray-500">試合</div>
+                </div>
+              </div>
+
+              {/* ルール */}
+              {mixedPending.info.rules.length > 0 && (
+                <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
+                  <div className="text-[11px] text-amber-700">
+                    {mixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
+                  </div>
+                </div>
+              )}
+
+              {/* ボタン */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setMixedPending(null)}
+                  className="flex-shrink-0 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={() => {
+                    const info: TournamentInfo = {
+                      ...mixedPending!.info,
+                      name: mixedEditName,
+                      date: mixedEditDate,
+                      venue: mixedEditVenue,
+                    };
+                    const mixedStore = useMixedStore.getState();
+                    mixedStore.importData(info, mixedPending!.leagues, mixedPending!.matches);
+                    mixedStore.setImportFileName(mixedPending!.fileName);
+                    setMixedPending(null);
+                    navigate('/entry');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-md transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  確定してエントリーへ
+                </button>
+              </div>
             </div>
           </div>
         </div>,
