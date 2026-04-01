@@ -877,6 +877,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                                     <div className="shrink-0" style={{ width: 100 }}>
                                       <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
                                       <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
+                                      <div className="text-[7px] text-gray-400">No.{teamData.pairNumber}</div>
                                     </div>
                                     {/* 区切り線 */}
                                     <div className="w-px h-7 bg-gray-200 shrink-0" />

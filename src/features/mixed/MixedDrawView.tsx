@@ -237,7 +237,10 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                       return (
                         <tr key={team.teamId} className={`border-t border-gray-100 hover:bg-gray-50/50 ${rowIdx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
                           <td className="px-1.5 sm:px-2 py-2">
-                            <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{rowIdx + 1}</span>
+                            <div className="flex flex-col items-center">
+                              <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{rowIdx + 1}</span>
+                              <span className="text-[8px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
+                            </div>
                           </td>
                           <td className="px-1.5 sm:px-2 py-2 w-[130px] sm:w-[150px]">
                             <div className="text-[12px] sm:text-[13px] font-bold text-gray-800 leading-snug"><AlignedName name={team.male.name} /></div>
