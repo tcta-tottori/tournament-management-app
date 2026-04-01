@@ -410,9 +410,9 @@ export const useMixedStore = create<MixedState>()(
       },
 
       regenerateBrackets: () => {
-        const { leagues, leagueMatches, allTeams, brackets: oldBrackets } = get();
+        const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo } = get();
         const standings = calculateLeagueStandings(leagues, leagueMatches);
-        const newBrackets = generateAllBrackets(standings, allTeams, leagues);
+        const newBrackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
 
         // 1位トーナメントは試合が始まっていたら維持
         const old1st = oldBrackets.find(b => b.category === '1st');

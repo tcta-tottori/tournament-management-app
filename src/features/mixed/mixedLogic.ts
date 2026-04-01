@@ -216,9 +216,12 @@ export function generateAllBrackets(
     const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
     let seed = 1;
 
-    // Excelで指定された並び順を使用、なければハードコードのドロー表順
-    const customOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'] || BRACKET_LEAGUE_ORDER[cat];
-    const leagueIds = customOrder || leagues.map(l => l.leagueId);
+    // 並び順の決定: Excel指定 → ハードコード → リーグ順
+    const excelOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
+    const hardcodedOrder = BRACKET_LEAGUE_ORDER[cat];
+    const leagueIds = (excelOrder && excelOrder.length >= 3 ? excelOrder : null)
+      || hardcodedOrder
+      || leagues.map(l => l.leagueId);
 
     if (rank <= 3) {
       for (const lid of leagueIds) {
@@ -232,9 +235,8 @@ export function generateAllBrackets(
         }
       }
     } else {
-      // 4位以降: customOrder がある場合はその順、なければリーグ順
-      const lids4 = customOrder || leagues.map(l => l.leagueId);
-      for (const lid of lids4) {
+      // 4位以降: 同じleagueIds順
+      for (const lid of leagueIds) {
         const normalizedLid = lid.trim();
         const ls = standings.get(normalizedLid) || standings.get(lid);
         if (!ls) continue;
