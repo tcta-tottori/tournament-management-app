@@ -143,7 +143,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           };
 
           const getCellDisplay = (rowTeamId: string, colTeamId: string) => {
-            if (rowTeamId === colTeamId) return { text: '―', color: 'text-gray-300', bg: 'bg-gray-50' };
+            if (rowTeamId === colTeamId) return { text: '__DIAG__', color: '', bg: 'bg-gray-100' };
             const match = scoreMatrix.get(`${rowTeamId}-${colTeamId}`);
             const current = isCellCurrent(rowTeamId, colTeamId);
             if (!match || match.status !== 'finished') {
@@ -250,7 +250,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                             return (
                               <td
                                 key={colIdx}
-                                className={`px-0.5 sm:px-1 py-1.5 text-center text-[9px] sm:text-[11px] ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors whitespace-nowrap`}
+                                className={`px-0.5 sm:px-1 py-1.5 text-center text-[9px] sm:text-[11px] ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors whitespace-nowrap ${cell.text === '__DIAG__' ? 'relative' : ''}`}
                                 onClick={e => {
                                   if (team.teamId === colTeam.teamId) return;
                                   const match = lMatches.find(m =>
@@ -260,7 +260,9 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                                   if (match) onEditMatch(match, e);
                                 }}
                               >
-                                {cell.text || (team.teamId !== colTeam.teamId && <span className="text-gray-300 text-[9px]">-</span>)}
+                                {cell.text === '__DIAG__' ? (
+                                  <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" /></svg>
+                                ) : cell.text || (team.teamId !== colTeam.teamId && <span className="text-gray-300 text-[9px]">-</span>)}
                               </td>
                             );
                           })}

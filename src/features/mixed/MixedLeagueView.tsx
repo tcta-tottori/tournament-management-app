@@ -62,7 +62,7 @@ export default function MixedLeagueView() {
   };
 
   const getCellDisplay = (rowTeamId: string, colTeamId: string): { text: string; color: string; bg: string; isCurrent: boolean } => {
-    if (rowTeamId === colTeamId) return { text: '\u2015', color: 'text-gray-300', bg: 'bg-gray-100', isCurrent: false };
+    if (rowTeamId === colTeamId) return { text: '__DIAG__', color: '', bg: 'bg-gray-100', isCurrent: false };
     const match = getMatchBetween(rowTeamId, colTeamId);
 
     // Check if this cell corresponds to the current match
@@ -141,7 +141,7 @@ export default function MixedLeagueView() {
                   return (
                     <td
                       key={colIdx}
-                      className={`px-2 py-2 text-center text-sm ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors`}
+                      className={`px-2 py-2 text-center text-sm ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors ${cell.text === '__DIAG__' ? 'relative' : ''}`}
                       onClick={() => {
                         if (team.teamId === colTeam.teamId) return;
                         const forwardMatch = leagueMatchList.find(m =>
@@ -151,9 +151,11 @@ export default function MixedLeagueView() {
                         if (forwardMatch) setEditingMatch(forwardMatch);
                       }}
                     >
-                      {cell.text || (team.teamId !== colTeam.teamId && (
+                      {cell.text === '__DIAG__' ? (
+                        <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" /></svg>
+                      ) : (cell.text || (team.teamId !== colTeam.teamId && (
                         <span className="text-gray-300 text-xs">未入力</span>
-                      ))}
+                      )))}
                     </td>
                   );
                 })}
