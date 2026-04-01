@@ -185,6 +185,42 @@ function nextPowerOf2(n: number): number {
 }
 
 /**
+ * ドロー表に記載された順位別トーナメントの配置順序
+ * （リーグID順: 各順位のチームをこの順番でブラケットに配置する）
+ */
+const BRACKET_LEAGUE_ORDER: Record<string, string[]> = {
+  '2nd': ['G', 'E', 'L', 'H', 'C', 'J', 'B', 'F', 'A', 'M', 'I', 'D', 'K'],
+  '3rd': ['D', 'H', 'M', 'F', 'A', 'K', 'I', 'G', 'C', 'E', 'L', 'J', 'B'],
+  '4th': ['A', 'M', 'F', 'J', 'L', 'B', 'D', 'E', 'H', 'K', 'I', 'G', 'C'],
+};
+
+/**
+ * チームをドロー表の配置順序に並べ替える
+ */
+function reorderTeamsByDrawSheet(
+  teams: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[],
+  category: PlacementCategory,
+): { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] {
+  const order = BRACKET_LEAGUE_ORDER[category];
+  if (!order) return teams; // 1st は抽選なのでそのまま
+
+  // ドロー表の順序に従ってソート
+  const sorted = [...teams].sort((a, b) => {
+    const idxA = order.indexOf(a.leagueId.trim());
+    const idxB = order.indexOf(b.leagueId.trim());
+    // 順序表にないリーグは末尾に配置
+    const posA = idxA >= 0 ? idxA : 999;
+    const posB = idxB >= 0 ? idxB : 999;
+    if (posA !== posB) return posA - posB;
+    // 同一リーグ内は順位順（4-5位で同一リーグ4位→5位）
+    return a.seedPosition - b.seedPosition;
+  });
+
+  // seedPositionを振り直す
+  return sorted.map((t, i) => ({ ...t, seedPosition: i + 1 }));
+}
+
+/**
  * 順位別トーナメント生成
  */
 export function generateAllBrackets(
@@ -203,7 +239,7 @@ export function generateAllBrackets(
 
   for (const { cat, label, rank } of categories) {
     // 該当順位のチームを収集
-    const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
+    const teamsRaw: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
     let seed = 1;
 
     const leagueIds = leagues.map(l => l.leagueId);
@@ -214,16 +250,19 @@ export function generateAllBrackets(
       if (rank <= 3) {
         const entry = ls.find(s => s.rank === rank);
         if (entry) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
+          teamsRaw.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
         }
       } else {
         // 4位以降すべて
         const entries = ls.filter(s => s.rank >= 4);
         for (const entry of entries) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
+          teamsRaw.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
         }
       }
     }
+
+    // ドロー表の配置順序に並べ替え（1位は抽選なのでそのまま）
+    const teamsForBracket = reorderTeamsByDrawSheet(teamsRaw, cat);
 
     const drawSize = nextPowerOf2(teamsForBracket.length);
     const matches = generateBracketMatches(cat, drawSize, teamsForBracket);
