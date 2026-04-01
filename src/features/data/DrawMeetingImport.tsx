@@ -499,9 +499,11 @@ interface DataImportProps {
   externalTournamentExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
   /** GDriveからダウンロードされた時間割Excel (DataSyncから渡される) */
   externalScheduleExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
+  /** ウィザードで確認済みの自動インポート情報（設定されている場合はモーダル表示せず直接インポート） */
+  wizardAutoImport?: { name: string; date: string; venue: string; reserveDate: string } | null;
 }
 
-export default function DataImport({ externalTournamentExcel, externalScheduleExcel }: DataImportProps) {
+export default function DataImport({ externalTournamentExcel, externalScheduleExcel, wizardAutoImport }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const persistedImportedSchedule = useAppStore(state => state.importedSchedule);
@@ -632,14 +634,28 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
 
   // GDrive用モーダル表示フラグ
   const [showGDriveModal, setShowGDriveModal] = useState(false);
+  // ウィザードからの自動インポートフラグ
+  const [autoImportPending, setAutoImportPending] = useState(false);
 
-  // GDriveから大会Excelが渡されたら処理してモーダル表示
+  // GDriveから大会Excelが渡されたら処理してモーダル表示（またはウィザード経由で自動インポート）
   useEffect(() => {
     if (externalTournamentExcel) {
-      processExcelArrayBuffer(externalTournamentExcel.arrayBuffer, externalTournamentExcel.fileName);
-      setShowGDriveModal(true);
+      if (wizardAutoImport) {
+        // ウィザードで確認済み → モーダルなしで自動インポート
+        processExcelArrayBuffer(externalTournamentExcel.arrayBuffer, externalTournamentExcel.fileName);
+        // 編集済みの値をセット
+        setEditTournamentName(wizardAutoImport.name);
+        setEditDate(wizardAutoImport.date);
+        setEditVenue(wizardAutoImport.venue);
+        setEditReserveDate(wizardAutoImport.reserveDate);
+        // モーダルを表示せず自動インポートをトリガー
+        setAutoImportPending(true);
+      } else {
+        processExcelArrayBuffer(externalTournamentExcel.arrayBuffer, externalTournamentExcel.fileName);
+        setShowGDriveModal(true);
+      }
     }
-  }, [externalTournamentExcel, processExcelArrayBuffer]);
+  }, [externalTournamentExcel, processExcelArrayBuffer, wizardAutoImport]);
 
   // GDriveから時間割Excelが渡されたら処理
   useEffect(() => {
@@ -1291,6 +1307,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       setIsImporting(false);
     }
   };
+
+  // ウィザードからの自動インポート: parsedExcelが設定されたら自動実行
+  useEffect(() => {
+    if (autoImportPending && parsedExcel && !isImporting) {
+      setAutoImportPending(false);
+      handleExcelImport();
+    }
+  }, [autoImportPending, parsedExcel, isImporting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
     setParsedData(null);

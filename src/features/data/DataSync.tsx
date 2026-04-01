@@ -7,8 +7,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
-  X, Loader2, CalendarClock, ChevronRight, Trophy,
+  X, Loader2, CalendarClock, ChevronRight, Trophy, Dices, Calendar, MapPin, Sparkles,
 } from 'lucide-react';
+import { parseDrawExcel } from './drawExcelParser';
+import type { ParsedDrawFile } from './drawExcelParser';
+import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
+import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
+import { useMixedStore } from '../mixed/mixedStore';
+import { useNavigate } from 'react-router-dom';
 import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
   getSavedToken as gdriveGetSavedToken,
@@ -229,6 +235,20 @@ async function doDownloadAffiliation(token: string): Promise<{ success: boolean;
 // DataSync メインコンポーネント（Google ドライブ連携）
 // ============================================================
 
+/** 大会名から不要な文字列を自動除去 */
+function cleanTournamentName(name: string): string {
+  return name
+    .replace(/[（(]\s*(確定|最終版?|暫定|ドロー|リドロー|re[-\s]?draw|final)\s*[）)]/gi, '')
+    .replace(/[_\-]\s*(ドロー|リドロー|最終版?|確定版?|final|v\d+)\s*/gi, '')
+    .replace(/\s*リドロー\s*/gi, '')
+    .replace(/\s*ドロー\s*/gi, '')
+    .replace(/\s*re[-\s]?draw\s*/gi, '')
+    .replace(/\s*draw\s*/gi, '')
+    .replace(/[（(]\s*[）)]/g, '')
+    .replace(/^[\s_\-]+|[\s_\-]+$/g, '')
+    .trim();
+}
+
 interface DataSyncProps {
   onConnectionChange?: () => void;
   onDataLoaded?: () => void;
@@ -236,9 +256,11 @@ interface DataSyncProps {
   onTournamentExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
   /** GDriveから時間割Excelダウンロード完了時 */
   onScheduleExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
+  /** ウィザードで大会確認後に自動インポート指示 */
+  onWizardTournamentConfirmed?: (arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string }) => void;
 }
 
-export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded }: DataSyncProps) {
+export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded, onWizardTournamentConfirmed }: DataSyncProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
@@ -258,8 +280,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [showScheduleFileList, setShowScheduleFileList] = useState(false);
   const [loadingScheduleFileId, setLoadingScheduleFileId] = useState<string | null>(null);
 
+  const navigate = useNavigate();
+
   // 一括読込ウィザード
-  type WizardPhase = 'loading' | 'select-tournament' | 'select-schedule' | 'done';
+  type WizardPhase = 'loading' | 'select-tournament' | 'confirm-tournament' | 'select-schedule' | 'done';
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardPhase, setWizardPhase] = useState<WizardPhase>('loading');
   const [wizardSteps, setWizardSteps] = useState<LoadingStep[]>([]);
@@ -269,6 +293,30 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardLoadingFileId, setWizardLoadingFileId] = useState<string | null>(null);
   const [wizardResult, setWizardResult] = useState<{ success: boolean; message: string } | null>(null);
   const [wizardDetails, setWizardDetails] = useState<string[]>([]);
+
+  // ウィザード: 大会確認用の状態
+  const [wizardParsedExcel, setWizardParsedExcel] = useState<ParsedDrawFile | null>(null);
+  const [wizardMixedPending, setWizardMixedPending] = useState<{
+    info: TournamentInfo;
+    leagues: MixedLeague[];
+    matches: LeagueMatchScore[];
+    fileName: string;
+    arrayBuffer: ArrayBuffer;
+  } | null>(null);
+  const [wizardTournamentArrayBuffer, setWizardTournamentArrayBuffer] = useState<ArrayBuffer | null>(null);
+  const [wizardTournamentFileName, setWizardTournamentFileName] = useState('');
+  const [wizardEditName, setWizardEditName] = useState('');
+  const [wizardEditDate, setWizardEditDate] = useState('');
+  const [wizardEditVenue, setWizardEditVenue] = useState('');
+  const [wizardEditReserveDate, setWizardEditReserveDate] = useState('');
+  const [wizardSourceDate, setWizardSourceDate] = useState('');
+  const [wizardSourceReserveDate, setWizardSourceReserveDate] = useState('');
+  const [wizardSourceVenue, setWizardSourceVenue] = useState('');
+  const [wizardSourceReserveVenue, setWizardSourceReserveVenue] = useState('');
+  const [wizardDateMode, setWizardDateMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
+  const [wizardVenueMode, setWizardVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
+  const [wizardIsMixedOrTeam, setWizardIsMixedOrTeam] = useState(false);
+  const [wizardIsImporting, setWizardIsImporting] = useState(false);
 
   // DB counts
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
@@ -652,21 +700,112 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setWizardLoadingFileId(file.id);
     try {
       const arrayBuffer = await downloadTournamentExcel(token, file.id);
-      onTournamentExcelLoaded?.(arrayBuffer, file.name);
-      // 大会情報確認ステップをスキップ（事前に大会設定済みのため）→ 直接時間割選択へ
-      if (wizardScheduleFiles.length > 0) {
-        setWizardPhase('select-schedule');
-      } else {
-        setWizardResult({ success: true, message: '一括読込が完了しました' });
-        setWizardPhase('done');
+      setWizardTournamentArrayBuffer(arrayBuffer);
+      setWizardTournamentFileName(file.name);
+
+      // Excelを解析して確認画面用のデータを構築
+      let isMixedOrTeam = false;
+      try {
+        const result = parseDrawExcel(arrayBuffer, file.name);
+        if (!result.events || result.events.length === 0) {
+          // ミックス大会フォーマットを試行
+          try {
+            const mixedResult = parseMixedExcel(arrayBuffer);
+            if (mixedResult.leagues.length > 0) {
+              try {
+                const sheets = extractExcelSheets(arrayBuffer);
+                useMixedStore.getState().setRawExcelSheets(sheets);
+              } catch { /* ignore */ }
+              setWizardMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName: file.name, arrayBuffer });
+              setWizardEditName(mixedResult.info.name);
+              setWizardEditDate(mixedResult.info.date);
+              setWizardEditVenue(mixedResult.info.venue);
+              isMixedOrTeam = true;
+              setWizardParsedExcel(null);
+            }
+          } catch { /* fall through */ }
+        } else {
+          setWizardParsedExcel(result);
+          setWizardMixedPending(null);
+          const rawName = result.tournamentName || file.name.replace(/\.(xlsx?|xls)$/i, '');
+          setWizardEditName(cleanTournamentName(rawName));
+          if (result.date) { setWizardEditDate(result.date); setWizardSourceDate(result.date); }
+          if (result.venue) { setWizardEditVenue(result.venue); setWizardSourceVenue(result.venue); }
+          if (result.reserveDate) { setWizardSourceReserveDate(result.reserveDate); setWizardEditReserveDate(result.reserveDate); }
+          if (result.reserveVenue) setWizardSourceReserveVenue(result.reserveVenue);
+          setWizardDateMode('normal');
+          setWizardVenueMode('normal');
+          // 種目名にミックス/団体が含まれるかチェック
+          const hasSpecialEvent = result.events.some(e =>
+            /ミックス|団体|mixed|team/i.test(e.eventName)
+          );
+          if (hasSpecialEvent) isMixedOrTeam = true;
+        }
+      } catch {
+        // パースに失敗しても確認画面に進む（ファイル名から名前を設定）
+        setWizardParsedExcel(null);
+        setWizardMixedPending(null);
+        setWizardEditName(cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
       }
+      setWizardIsMixedOrTeam(isMixedOrTeam);
+      setWizardPhase('confirm-tournament');
     } catch (err) {
       setWizardResult({ success: false, message: `ファイル読込失敗: ${(err as Error).message}` });
       setWizardPhase('done');
     } finally {
       setWizardLoadingFileId(null);
     }
-  }, [onTournamentExcelLoaded, wizardScheduleFiles]);
+  }, []);
+
+  // ウィザード: 大会確認 → インポート実行
+  const handleWizardConfirmTournament = useCallback(async () => {
+    setWizardIsImporting(true);
+    try {
+      if (wizardMixedPending) {
+        // ミックス大会: mixedStoreにインポート
+        const info: TournamentInfo = {
+          ...wizardMixedPending.info,
+          name: wizardEditName,
+          date: wizardEditDate,
+          venue: wizardEditVenue,
+        };
+        const mixedStore = useMixedStore.getState();
+        mixedStore.importData(info, wizardMixedPending.leagues, wizardMixedPending.matches);
+        mixedStore.setImportFileName(wizardMixedPending.fileName);
+        // ミックス/団体戦は時間割不要 → 完了
+        setWizardResult({ success: true, message: '一括読込が完了しました' });
+        setWizardPhase('done');
+        // ウィザードを閉じてエントリーへ遷移
+        setTimeout(() => {
+          setWizardOpen(false);
+          navigate('/entry');
+        }, 500);
+      } else if (wizardTournamentArrayBuffer) {
+        // 通常大会: DrawMeetingImportに自動インポートを指示
+        onWizardTournamentConfirmed?.(wizardTournamentArrayBuffer, wizardTournamentFileName, {
+          name: wizardEditName,
+          date: wizardEditDate,
+          venue: wizardEditVenue,
+          reserveDate: wizardEditReserveDate,
+        });
+        // ミックス/団体戦の場合は時間割スキップ
+        if (wizardIsMixedOrTeam) {
+          setWizardResult({ success: true, message: '一括読込が完了しました' });
+          setWizardPhase('done');
+        } else if (wizardScheduleFiles.length > 0) {
+          setWizardPhase('select-schedule');
+        } else {
+          setWizardResult({ success: true, message: '一括読込が完了しました' });
+          setWizardPhase('done');
+        }
+      }
+    } catch (err) {
+      setWizardResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
+      setWizardPhase('done');
+    } finally {
+      setWizardIsImporting(false);
+    }
+  }, [wizardMixedPending, wizardTournamentArrayBuffer, wizardTournamentFileName, wizardEditName, wizardEditDate, wizardEditVenue, wizardEditReserveDate, wizardIsMixedOrTeam, wizardScheduleFiles, onWizardTournamentConfirmed, navigate]);
 
   // ウィザード内: 時間割ファイル選択→ダウンロード→完了
   const handleWizardSelectSchedule = useCallback(async (file: GoogleDriveFile) => {
@@ -992,11 +1131,16 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                 <h3 className="font-bold text-gray-800 text-sm">一括読込</h3>
                 {/* ステップインジケーター */}
                 <div className="flex items-center gap-1 mt-1">
-                  {['読込', '大会', '時間割'].map((label, i) => {
-                    const phaseMap: WizardPhase[] = ['loading', 'select-tournament', 'select-schedule'];
-                    const currentIdx = phaseMap.indexOf(wizardPhase);
-                    const isDone = wizardPhase === 'done' || i < currentIdx;
-                    const isCurrent = i === currentIdx;
+                  {(wizardIsMixedOrTeam
+                    ? [{ label: '読込', phases: ['loading'] }, { label: '大会', phases: ['select-tournament', 'confirm-tournament'] }]
+                    : [{ label: '読込', phases: ['loading'] }, { label: '大会', phases: ['select-tournament', 'confirm-tournament'] }, { label: '時間割', phases: ['select-schedule'] }]
+                  ).map((step, i, arr) => {
+                    const allPhases: WizardPhase[] = arr.flatMap(s => s.phases as WizardPhase[]);
+                    const stepFirstPhaseIdx = allPhases.indexOf(step.phases[0] as WizardPhase);
+                    const currentPhaseIdx = allPhases.indexOf(wizardPhase);
+                    const isDone = wizardPhase === 'done' || currentPhaseIdx > allPhases.indexOf(step.phases[step.phases.length - 1] as WizardPhase);
+                    const isCurrent = step.phases.includes(wizardPhase);
+                    const label = step.label;
                     return (
                       <div key={i} className="flex items-center gap-1">
                         {i > 0 && <ChevronRight className="w-2.5 h-2.5 text-gray-300" />}
@@ -1118,6 +1262,173 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       スキップ →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Phase: confirm-tournament */}
+              {wizardPhase === 'confirm-tournament' && (
+                <div className="px-0 py-0">
+                  {/* ヘッダー */}
+                  <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-700 px-5 py-4">
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/[0.06]" />
+                    <div className="flex items-center gap-3 relative">
+                      <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                        <FileSpreadsheet className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">
+                          {wizardMixedPending ? 'ミックス大会情報の確認' : '大会データ読込'}
+                        </h3>
+                        <p className="text-[11px] text-white/60 mt-0.5 truncate max-w-[200px]">{wizardTournamentFileName}</p>
+                      </div>
+                    </div>
+                    {/* 統計バッジ */}
+                    <div className="flex gap-2 mt-3 relative">
+                      {wizardMixedPending ? (
+                        <>
+                          {[
+                            { icon: Trophy, value: wizardMixedPending.leagues.length, label: 'リーグ' },
+                            { icon: Users, value: wizardMixedPending.leagues.reduce((s, l) => s + l.teams.length, 0), label: 'ペア' },
+                            { icon: Dices, value: wizardMixedPending.matches.length, label: '試合' },
+                          ].map(({ icon: Icon, value, label }) => (
+                            <div key={label} className="flex-1 bg-white/10 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center text-white">
+                              <Icon className="w-3.5 h-3.5 mx-auto mb-0.5 text-white/70" />
+                              <p className="text-base font-bold leading-none">{value}</p>
+                              <p className="text-[9px] text-white/50 mt-0.5">{label}</p>
+                            </div>
+                          ))}
+                        </>
+                      ) : wizardParsedExcel ? (
+                        <>
+                          {(() => {
+                            const names = new Set<string>();
+                            for (const ev of wizardParsedExcel.events) {
+                              for (const p of ev.players) {
+                                if (!p.isBye && p.name) names.add(p.name.replace(/\s+/g, ''));
+                                if (p.partnerName) names.add(p.partnerName.replace(/\s+/g, ''));
+                              }
+                            }
+                            const playerCount = names.size;
+                            const drawCount = wizardParsedExcel.events.filter(ev => ev.drawSize > 0).length;
+                            return [
+                              { icon: Users, value: playerCount, label: '選手' },
+                              { icon: Trophy, value: wizardParsedExcel.events.length, label: '種目' },
+                              { icon: Dices, value: drawCount, label: 'ドロー' },
+                            ].map(({ icon: Icon, value, label }) => (
+                              <div key={label} className="flex-1 bg-white/10 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center text-white">
+                                <Icon className="w-3.5 h-3.5 mx-auto mb-0.5 text-white/70" />
+                                <p className="text-base font-bold leading-none">{value}</p>
+                                <p className="text-[9px] text-white/50 mt-0.5">{label}</p>
+                              </div>
+                            ));
+                          })()}
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* フォーム */}
+                  <div className="px-5 py-4 space-y-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-gray-500 block mb-1">大会名</label>
+                      <div className="flex gap-2">
+                        <input type="text" value={wizardEditName} onChange={e => setWizardEditName(e.target.value)}
+                          placeholder="大会名を入力"
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                        <button type="button" onClick={() => {
+                          const raw = wizardTournamentFileName.replace(/\.(xlsx?|xls)$/i, '');
+                          setWizardEditName(cleanTournamentName(raw));
+                        }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all" title="不要な文字を自動除去">
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {wizardMixedPending ? (
+                      /* ミックス: シンプルな日程・会場入力 */
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                            <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />開催日
+                          </label>
+                          <input type="text" value={wizardEditDate} onChange={e => setWizardEditDate(e.target.value)} placeholder="例: 3/15"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                            <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
+                          </label>
+                          <input type="text" value={wizardEditVenue} onChange={e => setWizardEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                        </div>
+                      </div>
+                    ) : (
+                      /* 通常大会: 日程・会場モード選択付き */
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                            <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />日程
+                          </label>
+                          <select value={wizardDateMode} onChange={e => {
+                            const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                            setWizardDateMode(mode);
+                            if (mode === 'normal') setWizardEditDate(wizardSourceDate);
+                            else if (mode === 'reserve') setWizardEditDate(wizardSourceReserveDate);
+                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                            <option value="normal">通常日程{wizardSourceDate ? ` (${wizardSourceDate})` : ''}</option>
+                            <option value="reserve">予備日{wizardSourceReserveDate ? ` (${wizardSourceReserveDate})` : ''}</option>
+                            <option value="custom">その他</option>
+                          </select>
+                          {wizardDateMode === 'custom' && (
+                            <input type="text" value={wizardEditDate} onChange={e => setWizardEditDate(e.target.value)} placeholder="例: 3/15"
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                            <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
+                          </label>
+                          <select value={wizardVenueMode} onChange={e => {
+                            const mode = e.target.value as 'normal' | 'reserve' | 'custom';
+                            setWizardVenueMode(mode);
+                            if (mode === 'normal') setWizardEditVenue(wizardSourceVenue);
+                            else if (mode === 'reserve') setWizardEditVenue(wizardSourceReserveVenue);
+                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                            <option value="normal">通常会場{wizardSourceVenue ? ` (${wizardSourceVenue})` : ''}</option>
+                            <option value="reserve">予備日会場{wizardSourceReserveVenue ? ` (${wizardSourceReserveVenue})` : ''}</option>
+                            <option value="custom">その他</option>
+                          </select>
+                          {wizardVenueMode === 'custom' && (
+                            <input type="text" value={wizardEditVenue} onChange={e => setWizardEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ミックスのルール表示 */}
+                    {wizardMixedPending && wizardMixedPending.info.rules.length > 0 && (
+                      <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
+                        <div className="text-[11px] text-amber-700">
+                          {wizardMixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* アクション */}
+                  <div className="px-5 pb-4 flex items-center gap-2.5">
+                    <button onClick={() => { setWizardPhase('select-tournament'); setWizardParsedExcel(null); setWizardMixedPending(null); }}
+                      className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-all">
+                      戻る
+                    </button>
+                    <button onClick={handleWizardConfirmTournament}
+                      disabled={wizardIsImporting}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all">
+                      <Upload className="w-4 h-4" />
+                      {wizardIsImporting ? 'インポート中...' : wizardMixedPending ? '確定してエントリーへ' : 'インポート'}
                     </button>
                   </div>
                 </div>
