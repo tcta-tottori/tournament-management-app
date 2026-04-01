@@ -102,8 +102,7 @@ export default function MixedLeagueView() {
         <thead>
           <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
             <th className="px-3 py-2 text-left text-xs text-gray-500 w-8">#</th>
-            <th className="px-3 py-2 text-left text-xs text-gray-500 min-w-[180px]">ペア名</th>
-            <th className="px-3 py-2 text-left text-xs text-gray-500 min-w-[100px]">所属</th>
+            <th className="px-3 py-2 text-left text-xs text-gray-500">ペア名 / 所属</th>
             {selectedLeague.teams.map((_, i) => (
               <th key={i} className="px-2 py-2 text-center text-xs text-gray-500 w-20">
                 <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
@@ -129,12 +128,17 @@ export default function MixedLeagueView() {
                   </div>
                 </td>
                 <td className="px-3 py-2">
-                  <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                  <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="text-xs text-gray-500">{team.male.affiliation}</div>
-                  <div className="text-xs text-gray-400">{team.female.affiliation}</div>
+                  <div className="flex items-center">
+                    <div className="shrink-0" style={{ width: 120 }}>
+                      <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                      <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                    </div>
+                    <div className="w-px h-8 bg-gray-200 mx-2 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs text-gray-500 truncate">{team.male.affiliation}</div>
+                      <div className="text-xs text-gray-400 truncate">{team.female.affiliation}</div>
+                    </div>
+                  </div>
                 </td>
                 {selectedLeague.teams.map((colTeam, colIdx) => {
                   const cell = getCellDisplay(team.teamId, colTeam.teamId);
