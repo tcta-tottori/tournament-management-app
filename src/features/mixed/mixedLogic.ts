@@ -1,6 +1,6 @@
 import type {
   MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding,
-  PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry
+  PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry, TournamentInfo
 } from './types';
 
 /** 4チームリーグの対戦順 */
@@ -190,7 +190,8 @@ function nextPowerOf2(n: number): number {
 export function generateAllBrackets(
   standings: Map<string, LeagueStanding[]>,
   _allTeams: MixedTeam[],
-  leagues: MixedLeague[]
+  leagues: MixedLeague[],
+  bracketOrders?: TournamentInfo['bracketOrders']
 ): PlacementBracket[] {
   const categories: { cat: PlacementCategory; label: string; rank: number }[] = [
     { cat: '1st', label: '1位トーナメント', rank: 1 },
@@ -202,25 +203,34 @@ export function generateAllBrackets(
   const brackets: PlacementBracket[] = [];
 
   for (const { cat, label, rank } of categories) {
-    // 該当順位のチームを収集
     const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
     let seed = 1;
 
-    const leagueIds = leagues.map(l => l.leagueId);
-    for (const lid of leagueIds) {
-      const ls = standings.get(lid);
-      if (!ls) continue;
+    // Excelで指定された並び順を使用（2位・3位・4位）
+    const customOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
+    const leagueIds = customOrder || leagues.map(l => l.leagueId);
 
-      if (rank <= 3) {
+    if (rank <= 3) {
+      for (const lid of leagueIds) {
+        // リーグIDの正規化（トリム）
+        const normalizedLid = lid.trim();
+        const ls = standings.get(normalizedLid) || standings.get(lid);
+        if (!ls) continue;
         const entry = ls.find(s => s.rank === rank);
         if (entry) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
+          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid, seedPosition: seed++ });
         }
-      } else {
-        // 4位以降すべて
+      }
+    } else {
+      // 4位以降: customOrder がある場合はその順、なければリーグ順
+      const lids4 = customOrder || leagues.map(l => l.leagueId);
+      for (const lid of lids4) {
+        const normalizedLid = lid.trim();
+        const ls = standings.get(normalizedLid) || standings.get(lid);
+        if (!ls) continue;
         const entries = ls.filter(s => s.rank >= 4);
         for (const entry of entries) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: lid, seedPosition: seed++ });
+          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid, seedPosition: seed++ });
         }
       }
     }

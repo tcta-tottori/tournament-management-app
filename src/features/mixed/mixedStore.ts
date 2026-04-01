@@ -146,9 +146,9 @@ export const useMixedStore = create<MixedState>()(
       },
 
       generateBrackets: () => {
-        const { leagues, leagueMatches, allTeams } = get();
+        const { leagues, leagueMatches, allTeams, tournamentInfo } = get();
         const standings = calculateLeagueStandings(leagues, leagueMatches);
-        const brackets = generateAllBrackets(standings, allTeams, leagues);
+        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
         set({ brackets, currentPhase: 'tournament' });
       },
 
@@ -402,7 +402,7 @@ export const useMixedStore = create<MixedState>()(
         if (!allComplete) return;
 
         const standings = calculateLeagueStandings(leagues, leagueMatches);
-        const brackets = generateAllBrackets(standings, allTeams, leagues);
+        const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
         set({ brackets });
       },
 

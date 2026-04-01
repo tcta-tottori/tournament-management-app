@@ -411,6 +411,59 @@ export function extractExcelSheets(file: ArrayBuffer): { name: string; data: str
   });
 }
 
+/** 決勝Tシートからトーナメント並び順を解析 */
+function parseBracketOrders(rows: any[][]): TournamentInfo['bracketOrders'] {
+  const result: TournamentInfo['bracketOrders'] = {};
+
+  // 各トーナメントセクションを検出
+  // "2位トーナメント" の後の行にリーグIDが並ぶ (例: G2 E2 L2 ...)
+  // "3位トーナメント" の後の行にリーグIDが並ぶ (例: D3 H3 M3 ...)
+  const sections: { key: '2nd' | '3rd' | '4th'; pattern: RegExp }[] = [
+    { key: '2nd', pattern: /[２2]位トーナメント/ },
+    { key: '3rd', pattern: /[３3]位トーナメント/ },
+    { key: '4th', pattern: /[４4].*[５5]?位トーナメント/ },
+  ];
+
+  for (const { key, pattern } of sections) {
+    // セクションヘッダー行を探す
+    let headerRowIdx = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      for (const cell of row) {
+        if (cell != null && pattern.test(String(cell))) {
+          headerRowIdx = i;
+          break;
+        }
+      }
+      if (headerRowIdx >= 0) break;
+    }
+    if (headerRowIdx < 0) continue;
+
+    // ヘッダーの後の行からリーグIDを抽出
+    for (let i = headerRowIdx + 1; i < Math.min(headerRowIdx + 10, rows.length); i++) {
+      const row = rows[i];
+      if (!row) continue;
+      const leagueIds: string[] = [];
+      for (const cell of row) {
+        if (cell == null) continue;
+        const s = String(cell).trim()
+          .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF21 + 0x41))
+          .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
+        // "G2", "E2", "L2" → リーグID "G", "E", "L"
+        const m = s.match(/^([A-Z])\s*[2-5]$/i);
+        if (m) leagueIds.push(m[1].toUpperCase());
+      }
+      if (leagueIds.length >= 3) {
+        result[key] = leagueIds;
+        break;
+      }
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 export function parseMixedExcel(file: ArrayBuffer): {
   info: TournamentInfo;
   leagues: MixedLeague[];
@@ -428,6 +481,14 @@ export function parseMixedExcel(file: ArrayBuffer): {
 
   const ws = wb.Sheets[leagueSheetName];
   const info = parseTournamentInfo(wb, leagueSheetName);
+
+  // 決勝Tシートからトーナメント並び順を解析
+  const bracketSheet = wb.SheetNames.find(n => /決勝T|決勝/.test(n));
+  if (bracketSheet) {
+    const bws = wb.Sheets[bracketSheet];
+    const bdata = XLSX.utils.sheet_to_json<any[]>(bws, { header: 1 });
+    info.bracketOrders = parseBracketOrders(bdata);
+  }
 
   // リーグ行を検出
   const leagueRows = detectLeagueRows(ws);

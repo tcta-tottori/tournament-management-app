@@ -104,6 +104,12 @@ export interface TournamentInfo {
   date: string;
   venue: string;
   rules: string[];
+  /** 順位別トーナメントの並び順（リーグID配列） */
+  bracketOrders?: {
+    '2nd'?: string[];
+    '3rd'?: string[];
+    '4th'?: string[];
+  };
 }
 
 /** Excelシート生データ（ビューア用） */
