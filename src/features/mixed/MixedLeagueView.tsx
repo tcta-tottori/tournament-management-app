@@ -113,6 +113,7 @@ export default function MixedLeagueView() {
             <th className="px-3 py-2 text-center text-xs text-gray-500 w-16">勝敗</th>
             <th className="px-2 py-2 text-center text-xs text-gray-500 w-20">ゲーム率</th>
             <th className="px-3 py-2 text-center text-xs text-gray-500 w-12">順位</th>
+            <th className="px-2 py-2 text-left text-xs text-gray-500">判定</th>
           </tr>
         </thead>
         <tbody>
@@ -170,18 +171,18 @@ export default function MixedLeagueView() {
                 </td>
                 <td className="px-3 py-2 text-center border-l border-gray-200">
                   {standing && standing.rank > 0 && (
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold
-                        ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
-                          standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-                          standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
-                      `}>
-                        {standing.rank}
-                      </span>
-                      {standing.tiebreakReason && (
-                        <span className="text-[9px] text-gray-400 whitespace-nowrap leading-tight">{standing.tiebreakReason}</span>
-                      )}
-                    </div>
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold
+                      ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+                        standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
+                        standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
+                    `}>
+                      {standing.rank}
+                    </span>
+                  )}
+                </td>
+                <td className="px-2 py-2 text-left border-l border-gray-200">
+                  {standing?.tiebreakReason && (
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{standing.tiebreakReason}</span>
                   )}
                 </td>
               </tr>
