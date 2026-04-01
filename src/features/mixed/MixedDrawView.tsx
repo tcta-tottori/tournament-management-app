@@ -211,17 +211,22 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
 
               {/* 対戦マトリックス — scrollbar-thin */}
               <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
-                <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 680 : 540 }}>
+                <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 740 : 580 }}>
                   <thead>
                     <tr className="bg-gray-50">
                       <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-6">#</th>
                       <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-[120px] sm:w-[150px]">ペア名</th>
                       <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-[80px] sm:w-[100px]">所属</th>
-                      {league.teams.map((_, i) => (
-                        <th key={i} className="px-0.5 sm:px-1 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-12 sm:w-[60px]">
-                          <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{i + 1}</span>
-                        </th>
-                      ))}
+                      {league.teams.map((t, i) => {
+                        const maleSei = t.male.name.replace(/[\s\u3000]+/g, '').slice(0, 2);
+                        const femaleSei = t.female.name.replace(/[\s\u3000]+/g, '').slice(0, 2);
+                        return (
+                          <th key={i} className="px-0.5 sm:px-1 py-1.5 text-center text-gray-500 w-14 sm:w-[70px]">
+                            <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{i + 1}</span>
+                            <div className="text-[8px] sm:text-[9px] text-gray-400 leading-tight mt-0.5 truncate">{maleSei}/{femaleSei}</div>
+                          </th>
+                        );
+                      })}
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-10 sm:w-14">勝敗</th>
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-8 sm:w-10">位</th>
                     </tr>
