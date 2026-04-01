@@ -1,6 +1,6 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle, FlaskConical } from 'lucide-react';
+import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import type { MixedTeam } from './types';
 
@@ -149,7 +149,7 @@ const LEAGUE_COLORS = [
 ];
 
 export default function MixedEntryView() {
-  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague, fillAllScoresForTest, leagueMatches } = useMixedStore();
+  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague } = useMixedStore();
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
 
@@ -178,19 +178,6 @@ export default function MixedEntryView() {
               <Users size={15} />
               {allEntry ? '全員Entry解除' : '全員Entry'}
             </button>
-            {leagueMatches.some(m => m.status !== 'finished') && (
-              <button
-                onClick={() => {
-                  if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) {
-                    fillAllScoresForTest();
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium bg-white text-purple-600 border border-purple-200 hover:bg-purple-50 hover:border-purple-300 transition-all active:scale-95"
-              >
-                <FlaskConical size={14} />
-                テスト: 全6-4入力
-              </button>
-            )}
           </div>
           {/* 統計カプセル */}
           <div className="flex items-center gap-2 text-xs">
@@ -349,7 +336,7 @@ export default function MixedEntryView() {
                                 <span className={`w-6 h-6 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow`}>
                                   {idx + 1}
                                 </span>
-                                <span className="text-[8px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
+                                <span className="text-[9px] font-bold text-gray-500 mt-0.5">No.{team.pairNumber}</span>
                               </div>
                               <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40 line-through' : ''}`}>
                                 {/* 男子 */}
@@ -405,7 +392,7 @@ export default function MixedEntryView() {
                           <span className={`w-6 h-6 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow`}>
                             {idx + 1}
                           </span>
-                          <span className="text-[8px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
+                          <span className="text-[9px] font-bold text-gray-500 mt-0.5">No.{team.pairNumber}</span>
                         </div>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40' : ''}`}>
                           <div className="flex gap-0">
@@ -449,29 +436,6 @@ export default function MixedEntryView() {
                 })}
               </div>
 
-              {/* 対戦順 */}
-              {league.matchOrder.length > 0 && (
-                <div className="px-3 py-2 bg-gray-50/50 border-t border-gray-100">
-                  <div className="text-[10px] font-bold text-gray-500 mb-1.5">対戦順</div>
-                  <div className="flex flex-wrap gap-1">
-                    {league.matchOrder.map(mo => {
-                      const match = leagueMatches.find(m => m.leagueId === league.leagueId && m.matchNumber === mo.matchNumber);
-                      const isFinished = match?.status === 'finished';
-                      return (
-                        <span
-                          key={mo.matchNumber}
-                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium
-                            ${isFinished ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-gray-500 border border-gray-200'}
-                          `}
-                        >
-                          {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
-                          {isFinished && match && <span className="text-[9px] ml-0.5">({match.score1}-{match.score2})</span>}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}

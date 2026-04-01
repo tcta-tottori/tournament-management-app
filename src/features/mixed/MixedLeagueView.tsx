@@ -7,6 +7,18 @@ import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 import { GameRatioCell } from './GameRatioCell';
 
+/** リーグバッジカラー (エントリーページと統一) */
+const LEAGUE_COLORS = [
+  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', header: 'from-emerald-500 to-teal-600' },
+  { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', header: 'from-blue-500 to-indigo-600' },
+  { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', header: 'from-purple-500 to-violet-600' },
+  { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700', header: 'from-rose-500 to-pink-600' },
+  { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', header: 'from-amber-500 to-orange-600' },
+  { from: 'from-cyan-600', to: 'to-sky-700', light: 'from-cyan-50 to-sky-50', border: 'border-cyan-200', badge: 'bg-cyan-100 text-cyan-700', header: 'from-cyan-500 to-sky-600' },
+  { from: 'from-lime-600', to: 'to-green-700', light: 'from-lime-50 to-green-50', border: 'border-lime-200', badge: 'bg-lime-100 text-lime-700', header: 'from-lime-500 to-green-600' },
+  { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700', header: 'from-fuchsia-500 to-purple-600' },
+];
+
 export default function MixedLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName, tournamentInfo, fillAllScoresForTest } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
@@ -110,10 +122,10 @@ export default function MixedLeagueView() {
               <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
                 <td className="px-3 py-2">
                   <div className="flex flex-col items-center">
-                    <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                    <span className="inline-flex items-center justify-center w-7 h-7 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
                       {rowIdx + 1}
                     </span>
-                    <span className="text-[9px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
+                    <span className="text-[10px] font-bold text-emerald-600 mt-0.5">No.{team.pairNumber}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -182,16 +194,26 @@ export default function MixedLeagueView() {
 
       {/* Left sidebar: league list */}
       <div className="w-48 flex-shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 overflow-y-auto">
-        <div className="p-3 border-b border-gray-100">
+        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-700">リーグ一覧</h3>
+          {leagueMatches.some(m => m.status !== 'finished') && (
+            <button
+              onClick={() => { if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) fillAllScoresForTest(); }}
+              className="text-[9px] font-medium text-purple-500 hover:text-purple-700 transition-colors"
+              title="テスト: 全6-4入力"
+            >
+              <FlaskConical size={12} />
+            </button>
+          )}
         </div>
         <div className="p-2 space-y-1">
-          {leagues.map(league => {
+          {leagues.map((league, leagueIdx) => {
             const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
             const lFinished = lMatches.filter(m => m.status === 'finished').length;
             const lTotal = lMatches.length;
             const isComplete = lFinished === lTotal && lTotal > 0;
             const isActive = league.leagueId === selectedLeague.leagueId;
+            const colors = LEAGUE_COLORS[leagueIdx % LEAGUE_COLORS.length];
 
             return (
               <button
@@ -200,18 +222,18 @@ export default function MixedLeagueView() {
                 className={`
                   w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all
                   ${isActive
-                    ? 'bg-emerald-600 text-white shadow-md'
+                    ? `bg-gradient-to-r ${colors.from} ${colors.to} text-white shadow-md`
                     : 'hover:bg-gray-100 text-gray-700'
                   }
                 `}
               >
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                  ${isActive ? 'bg-white/20' : isComplete ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}
+                  ${isActive ? 'bg-white/20' : isComplete ? `${colors.badge}` : 'bg-gray-100 text-gray-500'}
                 `}>
                   {isComplete ? <Check size={12} /> : league.leagueId.trim()}
                 </div>
                 <span className="flex-1 text-left font-medium">{league.leagueId.trim()}リーグ</span>
-                <span className={`text-xs ${isActive ? 'text-emerald-200' : 'text-gray-400'}`}>
+                <span className={`text-xs ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
                   {lFinished}/{lTotal}
                 </span>
               </button>
@@ -223,93 +245,71 @@ export default function MixedLeagueView() {
       {/* Main area */}
       <div className="flex-1 overflow-y-auto space-y-4">
         {/* League header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+        {(() => {
+          const _lidx = Math.max(0, leagues.findIndex(l => l.leagueId === selectedLeague.leagueId));
+          const _lc = LEAGUE_COLORS[_lidx % LEAGUE_COLORS.length];
+          return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className={`bg-gradient-to-r ${_lc.header} text-white px-4 py-3`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-lg font-bold">
                   {selectedLeague.leagueId.trim()}
-                </span>
-                {selectedLeague.leagueId.trim()}リーグ
-                {editingCourt ? (
-                  <span className="ml-2 inline-flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={courtNameInput}
-                      onChange={e => setCourtNameInput(e.target.value)}
-                      onBlur={() => {
-                        updateCourtName(selectedLeague.leagueId, courtNameInput);
-                        setEditingCourt(false);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          updateCourtName(selectedLeague.leagueId, courtNameInput);
-                          setEditingCourt(false);
-                        }
-                        if (e.key === 'Escape') setEditingCourt(false);
-                      }}
-                      className="px-2 py-0.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 w-32"
-                      autoFocus
-                    />
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => { setEditingCourt(true); setCourtNameInput(selectedLeague.courtName); }}
-                    className="ml-2 inline-flex items-center gap-1 text-sm text-gray-400 font-normal hover:text-emerald-600 transition-colors"
-                    title="コート名を編集"
-                  >
-                    <MapPin size={14} />
-                    {selectedLeague.courtName || '(未設定)'}
-                    <Pencil size={10} className="opacity-0 group-hover:opacity-100" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{selectedLeague.leagueId.trim()}リーグ</h2>
+                  {editingCourt ? (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <input
+                        type="text"
+                        value={courtNameInput}
+                        onChange={e => setCourtNameInput(e.target.value)}
+                        onBlur={() => { updateCourtName(selectedLeague.leagueId, courtNameInput); setEditingCourt(false); }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { updateCourtName(selectedLeague.leagueId, courtNameInput); setEditingCourt(false); }
+                          if (e.key === 'Escape') setEditingCourt(false);
+                        }}
+                        className="px-2 py-0.5 text-sm border border-white/30 bg-white/20 rounded text-white placeholder-white/50 focus:outline-none focus:bg-white/30 w-32"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingCourt(true); setCourtNameInput(selectedLeague.courtName); }}
+                      className="flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors mt-0.5"
+                    >
+                      <MapPin size={11} />
+                      {selectedLeague.courtName || '(未設定)'}
+                      <Pencil size={9} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {tournamentInfo?.rules && tournamentInfo.rules.length > 0 && (
+                  <button onClick={() => setShowRules(true)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
+                    <BookOpen size={12} />
+                    ルール
                   </button>
                 )}
-              </h2>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Rules button */}
-              {tournamentInfo?.rules && tournamentInfo.rules.length > 0 && (
-                <button
-                  onClick={() => setShowRules(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
-                >
-                  <BookOpen size={14} />
-                  ルール
+                <button onClick={() => setIsFullscreen(true)} className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
+                  <Maximize2 size={12} />
                 </button>
-              )}
-              {/* Fullscreen button (mobile only) */}
-              <button
-                onClick={() => setIsFullscreen(true)}
-                className="sm:hidden flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
-              >
-                <Maximize2 size={14} />
-                全画面
-              </button>
-              {/* Test fill button */}
-              {leagueMatches.some(m => m.status !== 'finished') && (
-                <button
-                  onClick={() => {
-                    if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) {
-                      fillAllScoresForTest();
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all active:scale-95"
-                >
-                  <FlaskConical size={14} />
-                  テスト: 全6-4入力
-                </button>
-              )}
-              <div className="text-sm text-gray-500">
-                {finishedCount}/{totalCount} 試合完了
-              </div>
-              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all"
-                  style={{ width: `${totalCount > 0 ? (finishedCount / totalCount) * 100 : 0}%` }}
-                />
+                <div className="text-right">
+                  <div className="text-sm font-bold">{finishedCount}/{totalCount}</div>
+                  <div className="w-20 h-1.5 bg-white/20 rounded-full overflow-hidden mt-0.5">
+                    <div
+                      className="h-full bg-white rounded-full transition-all"
+                      style={{ width: `${totalCount > 0 ? (finishedCount / totalCount) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+          );
+        })()}
 
         {/* Score matrix table */}
         {scoreMatrixTable}
