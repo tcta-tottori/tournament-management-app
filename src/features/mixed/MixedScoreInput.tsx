@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Save, Trash2, AlertTriangle, Ban } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore, MixedTeam } from './types';
 
-/** 全角数字→半角変換 */
+/** Full-width to half-width number conversion */
 function toHalfWidth(s: string): string {
   return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 }
 
-/** ルール一覧からゲームルールのみ抽出 */
+/** Extract game rule text from rules array */
 function extractGameRule(rules: string[]): string | null {
   for (const r of rules) {
     if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(r)) {
@@ -16,6 +16,17 @@ function extractGameRule(rules: string[]): string | null {
     }
   }
   return null;
+}
+
+/** Extract winning game number from rule text (e.g. "6ゲームマッチ" -> 6) */
+function getWinningGames(gameRule: string | null): number {
+  if (!gameRule) return 6;
+  const m = gameRule.match(/(\d+)\s*ゲーム/);
+  if (m) return parseInt(m[1]);
+  // Full-width number check
+  const m2 = gameRule.match(/([０-９]+)\s*ゲーム/);
+  if (m2) return parseInt(toHalfWidth(m2[1]));
+  return 6;
 }
 
 interface Props {
@@ -31,8 +42,8 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const team1 = teams.find(t => t.teamId === match.team1Id);
   const team2 = teams.find(t => t.teamId === match.team2Id);
 
-  const [score1, setScore1] = useState<string>(match.score1?.toString() ?? '');
-  const [score2, setScore2] = useState<string>(match.score2?.toString() ?? '');
+  const [score1, setScore1] = useState<string>(match.score1 !== null && match.score1 >= 0 ? match.score1.toString() : '');
+  const [score2, setScore2] = useState<string>(match.score2 !== null && match.score2 >= 0 ? match.score2.toString() : '');
   const [tiebreakInput, setTiebreakInput] = useState<string>(match.tiebreakScore?.toString() ?? '');
   const [error, setError] = useState('');
 
@@ -41,6 +52,9 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const tiebreakRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
+
+  const gameRule = useMemo(() => extractGameRule(tournamentInfo?.rules || []), [tournamentInfo]);
+  const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
   useEffect(() => {
     scrollPosRef.current = window.scrollY;
@@ -52,8 +66,8 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   }, []);
 
   useEffect(() => {
-    setScore1(match.score1?.toString() ?? '');
-    setScore2(match.score2?.toString() ?? '');
+    setScore1(match.score1 !== null && match.score1 >= 0 ? match.score1.toString() : '');
+    setScore2(match.score2 !== null && match.score2 >= 0 ? match.score2.toString() : '');
     setTiebreakInput(match.tiebreakScore?.toString() ?? '');
     setError('');
   }, [match]);
@@ -61,21 +75,26 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const isTiebreak = useMemo(() => {
     const s1 = parseInt(score1);
     const s2 = parseInt(score2);
-    return (s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7);
-  }, [score1, score2]);
+    return (s1 === winGames + 1 && s2 === winGames) || (s1 === winGames && s2 === winGames + 1);
+  }, [score1, score2, winGames]);
 
-  // どちらが敗者か (6の方)
   const loserSide = useMemo(() => {
     const s1 = parseInt(score1);
     const s2 = parseInt(score2);
-    if (s1 === 7 && s2 === 6) return 2;
-    if (s1 === 6 && s2 === 7) return 1;
+    if (s1 === winGames + 1 && s2 === winGames) return 2;
+    if (s1 === winGames && s2 === winGames + 1) return 1;
+    return 0;
+  }, [score1, score2, winGames]);
+
+  // Determine winner side for highlighting
+  const winnerSide = useMemo(() => {
+    const s1 = parseInt(score1);
+    const s2 = parseInt(score2);
+    if (isNaN(s1) || isNaN(s2)) return 0;
+    if (s1 > s2) return 1;
+    if (s2 > s1) return 2;
     return 0;
   }, [score1, score2]);
-
-  const gameRule = useMemo(() => {
-    return extractGameRule(tournamentInfo?.rules || []);
-  }, [tournamentInfo]);
 
   const validate = useCallback((): boolean => {
     const s1 = parseInt(score1);
@@ -83,8 +102,8 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     if (isNaN(s1) || isNaN(s2)) { setError('スコアを入力してください'); return false; }
     if (s1 < 0 || s2 < 0) { setError('スコアは0以上で入力してください'); return false; }
     if (s1 === s2) { setError('同点は不可です'); return false; }
-    if (s1 > 7 || s2 > 7) { setError('スコアは0〜7の範囲で入力してください'); return false; }
-    if ((s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7)) {
+    if (s1 > winGames + 1 || s2 > winGames + 1) { setError(`スコアは0〜${winGames + 1}の範囲で入力してください`); return false; }
+    if ((s1 === winGames + 1 && s2 === winGames) || (s1 === winGames && s2 === winGames + 1)) {
       const tb = parseInt(tiebreakInput);
       if (tiebreakInput && !isNaN(tb) && tb < 0) {
         setError('タイブレークスコアは0以上で入力してください');
@@ -93,17 +112,32 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     }
     setError('');
     return true;
-  }, [score1, score2, tiebreakInput]);
+  }, [score1, score2, tiebreakInput, winGames]);
 
   const handleSave = useCallback(() => {
     if (!validate()) return;
     const s1 = parseInt(score1);
     const s2 = parseInt(score2);
-    const isTb = (s1 === 7 && s2 === 6) || (s1 === 6 && s2 === 7);
+    const isTb = (s1 === winGames + 1 && s2 === winGames) || (s1 === winGames && s2 === winGames + 1);
     const tb = isTb && tiebreakInput ? parseInt(tiebreakInput) : null;
     updateLeagueScore(match.matchId, s1, s2, tb);
     onClose();
-  }, [score1, score2, tiebreakInput, match.matchId, updateLeagueScore, onClose, validate]);
+  }, [score1, score2, tiebreakInput, match.matchId, updateLeagueScore, onClose, validate, winGames]);
+
+  const handleDEF = useCallback((winnerTeamId: string) => {
+    const s1 = parseInt(score1);
+    const s2 = parseInt(score2);
+    const finalScore1 = !isNaN(s1) && s1 >= 0 ? s1 : null;
+    const finalScore2 = !isNaN(s2) && s2 >= 0 ? s2 : null;
+    updateLeagueScore(
+      match.matchId,
+      finalScore1 !== null ? finalScore1 : 0,
+      finalScore2 !== null ? finalScore2 : 0,
+      null,
+      winnerTeamId
+    );
+    onClose();
+  }, [score1, score2, match.matchId, updateLeagueScore, onClose]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -121,7 +155,12 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore1(raw);
     setError('');
-    if (raw.length === 1 && /^[0-7]$/.test(raw)) {
+    if (raw.length === 1 && /^[0-9]$/.test(raw)) {
+      // Auto-fill score2 if needed
+      const num = parseInt(raw);
+      if (num !== winGames && num !== winGames + 1 && score2 === '') {
+        setScore2(winGames.toString());
+      }
       setTimeout(() => { score2Ref.current?.focus(); score2Ref.current?.select(); }, 50);
     }
   };
@@ -130,9 +169,13 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore2(raw);
     setError('');
+    const num = parseInt(raw);
+    // Auto-fill score1 if needed
+    if (raw.length === 1 && !isNaN(num) && num !== winGames && num !== winGames + 1 && score1 === '') {
+      setScore1(winGames.toString());
+    }
     const s1 = parseInt(score1);
-    const s2n = parseInt(raw);
-    if (raw.length === 1 && ((s1 === 7 && s2n === 6) || (s1 === 6 && s2n === 7))) {
+    if (raw.length === 1 && ((s1 === winGames + 1 && num === winGames) || (s1 === winGames && num === winGames + 1))) {
       setTimeout(() => { tiebreakRef.current?.focus(); tiebreakRef.current?.select(); }, 50);
     }
   };
@@ -145,7 +188,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const popupStyle: React.CSSProperties = {};
   if (anchorY !== undefined) {
     const vh = window.innerHeight;
-    const popupH = 380;
+    const popupH = 480;
     let top = anchorY - popupH / 2;
     if (top < 10) top = 10;
     if (top + popupH > vh - 10) top = vh - popupH - 10;
@@ -155,7 +198,6 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     popupStyle.transform = 'translateX(-50%)';
   }
 
-  /** タイブレーク入力欄 */
   const tbInput = (
     <input
       ref={tiebreakRef}
@@ -170,6 +212,14 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     />
   );
 
+  // Winner highlight classes
+  const score1HighlightClass = winnerSide === 1
+    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
+    : 'border-emerald-300';
+  const score2HighlightClass = winnerSide === 2
+    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
+    : 'border-emerald-300';
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
       <div
@@ -178,7 +228,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
         style={anchorY ? popupStyle : undefined}
         onClick={e => e.stopPropagation()}
       >
-        {/* ヘッダー */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-5 py-2.5">
           <div className="flex items-center justify-between">
             <div>
@@ -194,29 +244,29 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
         </div>
 
         <div className="p-4">
-          {/* ゲームルールのみ表示 */}
+          {/* Game rule display */}
           {gameRule && (
             <div className="mb-3 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="text-[11px] text-amber-700 font-medium">{gameRule}</div>
             </div>
           )}
 
-          {/* 対戦カード */}
+          {/* Match card */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 text-center p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team1?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team1?.male.name}</div>
               <div className="text-xs text-gray-700">{team1?.female.name}</div>
             </div>
             <div className="text-lg font-bold text-gray-300">VS</div>
-            <div className="flex-1 text-center p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team2?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team2?.male.name}</div>
               <div className="text-xs text-gray-700">{team2?.female.name}</div>
             </div>
           </div>
 
-          {/* スコア入力 — タイブレーク入力は敗者側(6)の外側に配置 */}
+          {/* Score input */}
           <div className="flex items-center justify-center gap-2 mb-3">
             {isTiebreak && loserSide === 1 && (
               <div className="flex flex-col items-center">
@@ -231,7 +281,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               maxLength={1}
               value={score1}
               onChange={handleScore1Change}
-              className="w-16 h-14 text-center text-3xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score1HighlightClass}`}
               placeholder="0"
               autoFocus
             />
@@ -244,7 +294,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               value={score2}
               onChange={handleScore2Change}
               onKeyDown={e => { if (e.key === 'Enter' && !isTiebreak) handleSave(); }}
-              className="w-16 h-14 text-center text-3xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score2HighlightClass}`}
               placeholder="0"
             />
             {isTiebreak && loserSide === 2 && (
@@ -261,17 +311,43 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
             </div>
           )}
 
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98]"
+          >
+            <Save size={14} />エントリー
+          </button>
+
+          {/* DEF buttons */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <button
+              onClick={() => match.team2Id && handleDEF(match.team2Id)}
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+            >
+              <Ban size={14} />
+              <span className="truncate">{team1?.teamName || 'チーム1'}</span>
+              <span className="text-xs">DEF</span>
+            </button>
+            <button
+              onClick={() => match.team1Id && handleDEF(match.team1Id)}
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+            >
+              <Ban size={14} />
+              <span className="truncate">{team2?.teamName || 'チーム2'}</span>
+              <span className="text-xs">DEF</span>
+            </button>
+          </div>
+
+          {/* Clear / Cancel */}
           <div className="flex gap-3">
             {match.status === 'finished' && (
-              <button onClick={handleClear} className="flex items-center gap-1 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm">
+              <button onClick={handleClear} className="flex items-center gap-1 px-4 py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98]">
                 <Trash2 size={14} />クリア
               </button>
             )}
-            <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm">
+            <button onClick={onClose} className="flex-1 px-4 py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98]">
               キャンセル
-            </button>
-            <button onClick={handleSave} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-medium">
-              <Save size={14} />保存
             </button>
           </div>
         </div>

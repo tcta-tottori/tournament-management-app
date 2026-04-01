@@ -82,18 +82,20 @@ export function calculateLeagueStandings(
     }
 
     for (const m of leagueMatches) {
-      if (m.score1 === null || m.score2 === null) continue;
+      if (!m.winnerId) continue;
+      const actualScore1 = m.score1 !== null && m.score1 >= 0 ? m.score1 : 0;
+      const actualScore2 = m.score2 !== null && m.score2 >= 0 ? m.score2 : 0;
       const s1 = statsMap.get(m.team1Id);
       const s2 = statsMap.get(m.team2Id);
       if (s1) {
-        s1.gamesWon += m.score1;
-        s1.gamesLost += m.score2;
-        if (m.score1 > m.score2) s1.wins++; else s1.losses++;
+        s1.gamesWon += actualScore1;
+        s1.gamesLost += actualScore2;
+        if (m.winnerId === m.team1Id) s1.wins++; else s1.losses++;
       }
       if (s2) {
-        s2.gamesWon += m.score2;
-        s2.gamesLost += m.score1;
-        if (m.score2 > m.score1) s2.wins++; else s2.losses++;
+        s2.gamesWon += actualScore2;
+        s2.gamesLost += actualScore1;
+        if (m.winnerId === m.team2Id) s2.wins++; else s2.losses++;
       }
     }
 

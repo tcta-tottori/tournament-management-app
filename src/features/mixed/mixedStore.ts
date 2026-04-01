@@ -29,7 +29,7 @@ interface MixedState {
   resetAll: () => void;
 
   // Actions: League
-  updateLeagueScore: (matchId: string, score1: number, score2: number, tiebreakScore?: number | null) => void;
+  updateLeagueScore: (matchId: string, score1: number, score2: number, tiebreakScore?: number | null, overrideWinnerId?: string | null) => void;
   setLeagueMatchStatus: (matchId: string, status: LeagueMatchScore['status']) => void;
 
   // Actions: Standings & Brackets
@@ -37,7 +37,7 @@ interface MixedState {
   generateBrackets: () => void;
 
   // Actions: Tournament
-  updateBracketScore: (matchId: string, score1: number, score2: number) => void;
+  updateBracketScore: (matchId: string, score1: number, score2: number, overrideWinnerId?: string | null) => void;
   setBracketMatchStatus: (matchId: string, status: BracketMatch['status']) => void;
   advanceWinner: (matchId: string) => void;
 
@@ -112,11 +112,17 @@ export const useMixedStore = create<MixedState>()(
         isImported: false,
       }),
 
-      updateLeagueScore: (matchId, score1, score2, tiebreakScore) => {
+      updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
         set(state => ({
           leagueMatches: state.leagueMatches.map(m => {
             if (m.matchId !== matchId) return m;
-            const winnerId = score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null;
+            // Clear: score1=-1 && score2=-1
+            if (score1 === -1 && score2 === -1) {
+              return { ...m, score1: null, score2: null, tiebreakScore: null, winnerId: null, status: 'waiting' as const };
+            }
+            const winnerId = overrideWinnerId !== undefined && overrideWinnerId !== null
+              ? overrideWinnerId
+              : (score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null);
             const tb = tiebreakScore !== undefined ? tiebreakScore : null;
             return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
           }),
@@ -143,13 +149,15 @@ export const useMixedStore = create<MixedState>()(
         set({ brackets, currentPhase: 'tournament' });
       },
 
-      updateBracketScore: (matchId, score1, score2) => {
+      updateBracketScore: (matchId, score1, score2, overrideWinnerId) => {
         set(state => ({
           brackets: state.brackets.map(b => ({
             ...b,
             matches: b.matches.map(m => {
               if (m.matchId !== matchId) return m;
-              const winnerId = score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null;
+              const winnerId = overrideWinnerId !== undefined && overrideWinnerId !== null
+                ? overrideWinnerId
+                : (score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null);
               return { ...m, score1, score2, winnerId, status: 'finished' as const };
             }),
           })),

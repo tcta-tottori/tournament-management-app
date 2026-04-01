@@ -1,11 +1,25 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket } from './types';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
   return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+}
+
+/** Extract winning game number from rules */
+function getWinningGamesFromRules(rules: string[]): number {
+  for (const r of rules) {
+    if (/ゲームマッチ|ゲーム/.test(r)) {
+      const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+      const m = cleaned.match(/(\d+)\s*ゲーム/);
+      if (m) return parseInt(m[1]);
+      const m2 = cleaned.match(/([０-９]+)\s*ゲーム/);
+      if (m2) return parseInt(toHalfWidth(m2[1]));
+    }
+  }
+  return 6;
 }
 
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
@@ -16,11 +30,13 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
 ];
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
   const score2Ref = useRef<HTMLInputElement>(null);
+
+  const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -44,8 +60,8 @@ export default function MixedBracketView() {
   const openScoreEditor = (match: BracketMatch) => {
     if (!match.team1Id || !match.team2Id || match.isBye) return;
     setEditingMatch(match);
-    setScore1Input(match.score1?.toString() ?? '');
-    setScore2Input(match.score2?.toString() ?? '');
+    setScore1Input(match.score1 !== null && match.score1 >= 0 ? match.score1.toString() : '');
+    setScore2Input(match.score2 !== null && match.score2 >= 0 ? match.score2.toString() : '');
   };
 
   const saveScore = () => {
@@ -58,10 +74,25 @@ export default function MixedBracketView() {
     setEditingMatch(null);
   };
 
+  const handleDEF = (winnerTeamId: string) => {
+    if (!editingMatch) return;
+    const s1 = parseInt(score1Input);
+    const s2 = parseInt(score2Input);
+    const finalScore1 = !isNaN(s1) && s1 >= 0 ? s1 : 0;
+    const finalScore2 = !isNaN(s2) && s2 >= 0 ? s2 : 0;
+    updateBracketScore(editingMatch.matchId, finalScore1, finalScore2, winnerTeamId);
+    setTimeout(() => advanceWinner(editingMatch.matchId), 50);
+    setEditingMatch(null);
+  };
+
   const handleScore1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore1Input(raw);
-    if (raw.length === 1 && /^[0-7]$/.test(raw)) {
+    if (raw.length === 1 && /^[0-9]$/.test(raw)) {
+      const num = parseInt(raw);
+      if (num !== winGames && num !== winGames + 1 && score2Input === '') {
+        setScore2Input(winGames.toString());
+      }
       setTimeout(() => {
         score2Ref.current?.focus();
         score2Ref.current?.select();
@@ -72,7 +103,23 @@ export default function MixedBracketView() {
   const handleScore2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
     setScore2Input(raw);
+    if (raw.length === 1) {
+      const num = parseInt(raw);
+      if (!isNaN(num) && num !== winGames && num !== winGames + 1 && score1Input === '') {
+        setScore1Input(winGames.toString());
+      }
+    }
   };
+
+  // Winner highlight
+  const winnerSide = (() => {
+    const s1 = parseInt(score1Input);
+    const s2 = parseInt(score2Input);
+    if (isNaN(s1) || isNaN(s2)) return 0;
+    if (s1 > s2) return 1;
+    if (s2 > s1) return 2;
+    return 0;
+  })();
 
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
@@ -137,12 +184,12 @@ export default function MixedBracketView() {
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
-              <div className="flex-1 text-center">
+              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'border-transparent'}`}>
                 <div className="font-medium text-sm">{editingMatch.team1Name}</div>
                 <div className="text-xs text-gray-400">{editingMatch.team1League}</div>
               </div>
               <span className="text-gray-300 font-bold">VS</span>
-              <div className="flex-1 text-center">
+              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'border-transparent'}`}>
                 <div className="font-medium text-sm">{editingMatch.team2Name}</div>
                 <div className="text-xs text-gray-400">{editingMatch.team2League}</div>
               </div>
@@ -155,7 +202,7 @@ export default function MixedBracketView() {
                 maxLength={1}
                 value={score1Input}
                 onChange={handleScore1Change}
-                className="w-14 h-12 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${winnerSide === 1 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300' : 'border-emerald-300'}`}
                 autoFocus
               />
               <span className="text-2xl font-bold text-gray-300">-</span>
@@ -167,18 +214,41 @@ export default function MixedBracketView() {
                 value={score2Input}
                 onChange={handleScore2Change}
                 onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
-                className="w-14 h-12 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${winnerSide === 2 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300' : 'border-emerald-300'}`}
               />
             </div>
 
-            <div className="flex gap-3">
-              <button onClick={() => setEditingMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm">
-                キャンセル
+            {/* Save button */}
+            <button
+              onClick={saveScore}
+              className="w-full flex items-center justify-center gap-2 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-medium mb-3 active:scale-[0.98] transition-all shadow-md"
+            >
+              <Save size={14} />保存
+            </button>
+
+            {/* DEF buttons */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                onClick={() => editingMatch.team2Id && handleDEF(editingMatch.team2Id)}
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+              >
+                <Ban size={14} />
+                <span className="truncate">{editingMatch.team1Name}</span>
+                <span className="text-xs">DEF</span>
               </button>
-              <button onClick={saveScore} className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-medium">
-                保存
+              <button
+                onClick={() => editingMatch.team1Id && handleDEF(editingMatch.team1Id)}
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+              >
+                <Ban size={14} />
+                <span className="truncate">{editingMatch.team2Name}</span>
+                <span className="text-xs">DEF</span>
               </button>
             </div>
+
+            <button onClick={() => setEditingMatch(null)} className="w-full py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm active:scale-[0.98] transition-all">
+              キャンセル
+            </button>
           </div>
         </div>
       )}
