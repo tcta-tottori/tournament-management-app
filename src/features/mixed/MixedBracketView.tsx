@@ -503,15 +503,54 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
     return { text: 'BYE' };
   };
 
+  // 接続線を計算
+  const HEADER_HEIGHT = 36;
+  const getMatchCenter = (roundIdx: number, matchIdx: number) => {
+    const spacing = Math.pow(2, roundIdx);
+    let y = HEADER_HEIGHT;
+    for (let i = 0; i < matchIdx; i++) {
+      const topPad = i === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP);
+      y += (i === 0 ? (roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2) : topPad) + MATCH_HEIGHT + MATCH_GAP;
+    }
+    if (matchIdx === 0) {
+      y += roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
+    }
+    return y + MATCH_HEIGHT / 2;
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
-      <div className="flex gap-0" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds }}>
+      <div className="relative flex gap-0" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds }}>
+        {/* 接続線SVG */}
+        <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: '100%' }}>
+          {matchesByRound.slice(0, -1).map((roundMatches, roundIdx) => {
+            const x1 = roundIdx * (MATCH_WIDTH + ROUND_GAP) + MATCH_WIDTH;
+            const x2 = (roundIdx + 1) * (MATCH_WIDTH + ROUND_GAP);
+            const xMid = (x1 + x2) / 2;
+            return roundMatches.map((_, matchIdx) => {
+              if (matchIdx % 2 !== 0) return null;
+              const y1 = getMatchCenter(roundIdx, matchIdx);
+              const y2 = getMatchCenter(roundIdx, matchIdx + 1);
+              const yNext = getMatchCenter(roundIdx + 1, Math.floor(matchIdx / 2));
+              if (matchIdx + 1 >= roundMatches.length) return null;
+              return (
+                <g key={`line-${roundIdx}-${matchIdx}`}>
+                  <line x1={x1} y1={y1} x2={xMid} y2={y1} stroke="#d1d5db" strokeWidth="1.5" />
+                  <line x1={x1} y1={y2} x2={xMid} y2={y2} stroke="#d1d5db" strokeWidth="1.5" />
+                  <line x1={xMid} y1={y1} x2={xMid} y2={y2} stroke="#d1d5db" strokeWidth="1.5" />
+                  <line x1={xMid} y1={yNext} x2={x2} y2={yNext} stroke="#d1d5db" strokeWidth="1.5" />
+                </g>
+              );
+            });
+          })}
+        </svg>
+
         {matchesByRound.map((roundMatches, roundIdx) => {
           const round = roundIdx + 1;
           const spacing = Math.pow(2, roundIdx);
 
           return (
-            <div key={round} className="flex-shrink-0" style={{ width: MATCH_WIDTH + ROUND_GAP }}>
+            <div key={round} className="flex-shrink-0 relative" style={{ width: MATCH_WIDTH + ROUND_GAP }}>
               <div className="text-center mb-3">
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
                   ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :

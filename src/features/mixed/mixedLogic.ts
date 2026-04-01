@@ -277,9 +277,11 @@ function generateBracketMatches(
     }
   }
 
-  // 1回戦にチームを配置
+  // 1回戦にチームを配置（1位トーナメントは抽選で決めるため初期配置しない）
   const r1Matches = matches.filter(m => m.round === 1);
+  const skipInitialPlacement = category === '1st';
   for (let i = 0; i < r1Matches.length; i++) {
+    if (skipInitialPlacement) continue;
     const t1Idx = i * 2;
     const t2Idx = i * 2 + 1;
 
@@ -294,7 +296,8 @@ function generateBracketMatches(
       r1Matches[i].team2League = teams[t2Idx].leagueId;
     }
 
-    // BYE処理
+    // BYE処理（1位トーナメントは初期配置しないためスキップ）
+    if (skipInitialPlacement) continue;
     if (r1Matches[i].team1Id && !r1Matches[i].team2Id) {
       r1Matches[i].isBye = true;
       r1Matches[i].status = 'bye';
@@ -310,7 +313,8 @@ function generateBracketMatches(
     }
   }
 
-  // BYE勝者を2回戦に自動進出
+  // BYE勝者を2回戦に自動進出（1位トーナメントは抽選後に処理）
+  if (skipInitialPlacement) return matches;
   for (const m of r1Matches) {
     if (m.isBye && m.winnerId && m.nextMatchId) {
       const nextMatch = matches.find(nm => nm.matchId === m.nextMatchId);

@@ -448,6 +448,30 @@ export default function MixedEntryView() {
                   );
                 })}
               </div>
+
+              {/* 対戦順 */}
+              {league.matchOrder.length > 0 && (
+                <div className="px-3 py-2 bg-gray-50/50 border-t border-gray-100">
+                  <div className="text-[10px] font-bold text-gray-500 mb-1.5">対戦順</div>
+                  <div className="flex flex-wrap gap-1">
+                    {league.matchOrder.map(mo => {
+                      const match = leagueMatches.find(m => m.leagueId === league.leagueId && m.matchNumber === mo.matchNumber);
+                      const isFinished = match?.status === 'finished';
+                      return (
+                        <span
+                          key={mo.matchNumber}
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium
+                            ${isFinished ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-gray-500 border border-gray-200'}
+                          `}
+                        >
+                          {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
+                          {isFinished && match && <span className="text-[9px] ml-0.5">({match.score1}-{match.score2})</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
