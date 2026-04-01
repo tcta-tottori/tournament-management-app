@@ -859,13 +859,18 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                               {/* チーム情報 */}
                               <div className="flex-1 min-w-0">
                                 {teamData ? (
-                                  <div className="flex items-center gap-0">
-                                    <div className="flex-1 min-w-0">
+                                  <div className="flex items-center">
+                                    {/* ペア番号 */}
+                                    <span className="text-[9px] text-gray-400 font-mono w-4 shrink-0 text-center">{teamData.pairNumber}</span>
+                                    {/* 選手名 - 固定幅 */}
+                                    <div className="shrink-0" style={{ width: 100 }}>
                                       <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
                                       <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
                                     </div>
-                                    <div className="w-px h-6 bg-gray-200 mx-1 shrink-0" />
-                                    <div className="min-w-0 max-w-[60px]">
+                                    {/* 区切り線 */}
+                                    <div className="w-px h-7 bg-gray-200 shrink-0" />
+                                    {/* 所属 - 残り幅で中央揃え */}
+                                    <div className="flex-1 min-w-0 text-center">
                                       <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.male.affiliation}</div>
                                       <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.female.affiliation}</div>
                                     </div>
