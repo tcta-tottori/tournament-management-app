@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
@@ -8,7 +8,7 @@ import MixedScoreInput from './MixedScoreInput';
 import { GameRatioCell } from './GameRatioCell';
 
 export default function MixedLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName, tournamentInfo } = useMixedStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName, tournamentInfo, fillAllScoresForTest } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
   const [editingCourt, setEditingCourt] = useState(false);
   const [courtNameInput, setCourtNameInput] = useState('');
@@ -281,6 +281,20 @@ export default function MixedLeagueView() {
                 <Maximize2 size={14} />
                 全画面
               </button>
+              {/* Test fill button */}
+              {leagueMatches.some(m => m.status !== 'finished') && (
+                <button
+                  onClick={() => {
+                    if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) {
+                      fillAllScoresForTest();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all active:scale-95"
+                >
+                  <FlaskConical size={14} />
+                  テスト: 全6-4入力
+                </button>
+              )}
               <div className="text-sm text-gray-500">
                 {finishedCount}/{totalCount} 試合完了
               </div>
