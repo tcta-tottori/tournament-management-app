@@ -1,6 +1,6 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users } from 'lucide-react';
+import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, FlaskConical } from 'lucide-react';
 import { useState } from 'react';
 import type { MixedTeam } from './types';
 
@@ -130,7 +130,7 @@ function rowBg(status: 'none' | 'entry' | 'def'): string {
 }
 
 export default function MixedEntryView() {
-  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague } = useMixedStore();
+  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague, fillAllScoresForTest, leagueMatches } = useMixedStore();
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
 
@@ -143,7 +143,7 @@ export default function MixedEntryView() {
   return (
     <div className="p-2 sm:p-4 space-y-3">
       {/* 一括操作 */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setAllTeamsStatus(allEntry ? 'none' : 'entry')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -155,6 +155,20 @@ export default function MixedEntryView() {
           <Users size={13} />
           {allEntry ? '全員Entry解除' : '全員Entry'}
         </button>
+        {/* テスト用: 予選リーグ全試合を6-4で入力 */}
+        {leagueMatches.some(m => m.status !== 'finished') && (
+          <button
+            onClick={() => {
+              if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) {
+                fillAllScoresForTest();
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-colors"
+          >
+            <FlaskConical size={13} />
+            テスト: 全6-4入力
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -317,7 +331,7 @@ export default function MixedEntryView() {
                 </table>
               </div>
 
-              {/* スマホ: リスト表示 */}
+              {/* スマホ: リスト表示 — 名前と所属の間にラインを統一配置 */}
               <div className="sm:hidden divide-y divide-gray-100">
                 {league.teams.map((team, idx) => {
                   const st = team.status || 'none';
@@ -329,35 +343,49 @@ export default function MixedEntryView() {
                           {idx + 1}
                         </span>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-50' : ''}`}>
-                          <div className="flex items-baseline gap-1">
-                            <EditableCell
-                              value={team.male.name}
-                              onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                              className="text-sm font-medium text-gray-800"
-                            />
-                            <EditableCell
-                              value={team.male.affiliation}
-                              onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
-                              className="text-[11px] text-gray-500"
-                            />
-                          </div>
-                          <div className="flex items-baseline gap-1">
-                            <EditableCell
-                              value={team.female.name}
-                              onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                              className="text-sm font-medium text-gray-800"
-                            />
-                            <EditableCell
-                              value={team.female.affiliation}
-                              onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                              className="text-[11px] text-gray-500"
-                            />
-                          </div>
+                          {/* 名前 | 所属 を固定幅テーブルで揃える */}
+                          <table className="w-full border-collapse">
+                            <tbody>
+                              <tr>
+                                <td className="w-[5.5em] pr-1 border-r border-gray-200 align-baseline">
+                                  <EditableCell
+                                    value={team.male.name}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
+                                    className="text-sm font-medium text-gray-800 block truncate"
+                                  />
+                                </td>
+                                <td className="pl-1.5 align-baseline">
+                                  <EditableCell
+                                    value={team.male.affiliation}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
+                                    className="text-[11px] text-gray-500 block truncate"
+                                  />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="w-[5.5em] pr-1 border-r border-gray-200 align-baseline">
+                                  <EditableCell
+                                    value={team.female.name}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
+                                    className="text-sm font-medium text-gray-800 block truncate"
+                                  />
+                                </td>
+                                <td className="pl-1.5 align-baseline">
+                                  <EditableCell
+                                    value={team.female.affiliation}
+                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
+                                    className="text-[11px] text-gray-500 block truncate"
+                                  />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <EntryDefButtons status={st} onSetStatus={s => setTeamStatus(team.teamId, s)} size="small" />
-                          <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
-                        </div>
+                      </div>
+                      {/* 操作ボタン行 */}
+                      <div className="flex items-center justify-end gap-1 mt-1.5 pl-7">
+                        <EntryDefButtons status={st} onSetStatus={s => setTeamStatus(team.teamId, s)} size="small" />
+                        <MoveToLeagueSelect team={team} leagues={leagues} onMove={moveTeamToLeague} />
                       </div>
                     </div>
                   );

@@ -477,9 +477,28 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
   }
 
   const MATCH_HEIGHT = 72;
-  const MATCH_WIDTH = 200;
+  const MATCH_WIDTH = 220;
   const ROUND_GAP = 40;
   const MATCH_GAP = 8;
+
+  // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
+  const is1stBracket = bracket.category === '1st';
+
+  // 未配置スロットに配置予定のリーグ情報を表示
+  const getPlaceholderText = (match: BracketMatch, slot: 'team1' | 'team2') => {
+    if (is1stBracket) return '―';
+    const id = slot === 'team1' ? match.team1Id : match.team2Id;
+    if (id) return null; // 既に配置済み
+    // 1回戦のみプレースホルダー表示
+    if (match.round !== 1) return null;
+    const pos = match.position;
+    const slotIdx = slot === 'team1' ? (pos - 1) * 2 : (pos - 1) * 2 + 1;
+    if (slotIdx < bracket.teams.length) {
+      const t = bracket.teams[slotIdx];
+      return `${t.leagueId}リーグ ${bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4'}位`;
+    }
+    return 'BYE';
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
@@ -503,6 +522,9 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                   const topPadding = roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
                   const bottomPadding = (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP);
 
+                  const ph1 = getPlaceholderText(match, 'team1');
+                  const ph2 = getPlaceholderText(match, 'team2');
+
                   return (
                     <div key={match.matchId} style={{ paddingTop: matchIdx === 0 ? topPadding : bottomPadding }}>
                       <div
@@ -520,7 +542,9 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                           ${match.winnerId === match.team1Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                         `}>
                           <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team1League}</span>
-                          <span className="flex-1 truncate">{match.team1Name || (match.team1Id ? '' : '―')}</span>
+                          <span className="flex-1 truncate">
+                            {match.team1Name || (ph1 ? <span className="text-[10px] text-blue-400 italic">{ph1}</span> : '―')}
+                          </span>
                           {match.score1 !== null && (
                             <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team1Id ? 'text-emerald-600' : 'text-gray-500'}`}>
                               {match.score1}
@@ -531,7 +555,9 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                           ${match.winnerId === match.team2Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                         `}>
                           <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team2League}</span>
-                          <span className="flex-1 truncate">{match.team2Name || (match.team2Id ? '' : '―')}</span>
+                          <span className="flex-1 truncate">
+                            {match.team2Name || (ph2 ? <span className="text-[10px] text-blue-400 italic">{ph2}</span> : '―')}
+                          </span>
                           {match.score2 !== null && (
                             <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team2Id ? 'text-emerald-600' : 'text-gray-500'}`}>
                               {match.score2}

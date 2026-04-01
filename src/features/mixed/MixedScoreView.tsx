@@ -38,10 +38,10 @@ export default function MixedScoreView() {
     return lm.length > 0 && lm.every(m => m.status === 'finished');
   });
 
-  // ブラケット生成済み
+  // ブラケット生成済み: ブラケット表示 + プレビュー
   if (brackets.length > 0) {
     return (
-      <div className="p-2 sm:p-4">
+      <div className="p-2 sm:p-4 space-y-4">
         <MixedBracketView />
       </div>
     );
@@ -59,49 +59,60 @@ export default function MixedScoreView() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {CATEGORIES.map(({ cat, label, desc, color }) => {
-            // 完了リーグから該当順位のチームを収集
-            const teamsForCat: { teamName: string; league: string }[] = [];
+            // 完了リーグから該当順位のチームを収集、未完了リーグもプレースホルダー表示
+            const teamsForCat: { teamName: string; league: string; confirmed: boolean }[] = [];
             const rank = cat === '1st' ? 1 : cat === '2nd' ? 2 : cat === '3rd' ? 3 : 4;
-            for (const league of completedLeagues) {
+
+            for (const league of leagues) {
+              const isComplete = completedLeagues.some(cl => cl.leagueId === league.leagueId);
               const standings = allStandings.get(league.leagueId) || [];
+
               if (rank <= 3) {
-                const entry = standings.find(s => s.rank === rank);
-                if (entry) teamsForCat.push({ teamName: entry.teamName, league: league.leagueId.trim() });
+                if (isComplete) {
+                  const entry = standings.find(s => s.rank === rank);
+                  if (entry) teamsForCat.push({ teamName: entry.teamName, league: league.leagueId.trim(), confirmed: true });
+                } else {
+                  teamsForCat.push({ teamName: `${league.leagueId.trim()}リーグ ${rank}位`, league: league.leagueId.trim(), confirmed: false });
+                }
               } else {
-                const entries = standings.filter(s => s.rank >= 4);
-                for (const e of entries) teamsForCat.push({ teamName: e.teamName, league: league.leagueId.trim() });
+                if (isComplete) {
+                  const entries = standings.filter(s => s.rank >= 4);
+                  for (const e of entries) teamsForCat.push({ teamName: e.teamName, league: league.leagueId.trim(), confirmed: true });
+                } else {
+                  teamsForCat.push({ teamName: `${league.leagueId.trim()}リーグ 4位以下`, league: league.leagueId.trim(), confirmed: false });
+                }
               }
             }
-            const pendingLeagues = leagues.length - completedLeagues.length;
+
+            const confirmedCount = teamsForCat.filter(t => t.confirmed).length;
+            const bgClass = color === 'yellow' ? 'bg-yellow-50 border-yellow-200'
+              : color === 'gray' ? 'bg-gray-50 border-gray-200'
+              : color === 'orange' ? 'bg-orange-50 border-orange-200'
+              : 'bg-slate-50 border-slate-200';
 
             return (
-              <div key={cat} className={`rounded-lg border p-3 bg-${color}-50 border-${color}-200`}>
+              <div key={cat} className={`rounded-lg border p-3 ${bgClass}`}>
                 <div className="text-xs font-bold text-gray-700 mb-1">{label}</div>
                 <div className="text-[10px] text-gray-500 mb-2">{desc}</div>
 
-                {teamsForCat.length > 0 && (
-                  <div className="space-y-0.5 mb-2">
-                    {teamsForCat.map((t, i) => (
-                      <div key={i} className="flex items-center justify-between text-[10px]">
-                        <span className="flex items-center gap-1">
+                <div className="space-y-0.5 mb-2">
+                  {teamsForCat.map((t, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px]">
+                      <span className="flex items-center gap-1">
+                        {t.confirmed ? (
                           <CheckCircle size={9} className="text-emerald-500" />
-                          <span className="text-gray-700">{t.teamName}</span>
-                        </span>
-                        <span className="text-gray-400">{t.league}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {pendingLeagues > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                    <Clock size={9} />
-                    残り{pendingLeagues}リーグ待ち
-                  </div>
-                )}
+                        ) : (
+                          <Clock size={9} className="text-gray-300" />
+                        )}
+                        <span className={t.confirmed ? 'text-gray-700' : 'text-gray-400 italic'}>{t.teamName}</span>
+                      </span>
+                      <span className="text-gray-400">{t.league}</span>
+                    </div>
+                  ))}
+                </div>
 
                 <div className="text-[10px] text-gray-400 mt-1">
-                  確定: {teamsForCat.length} / 見込み: {cat === '4th' ? '多数' : leagues.length}チーム
+                  確定: {confirmedCount} / {teamsForCat.length}チーム
                 </div>
               </div>
             );

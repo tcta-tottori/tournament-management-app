@@ -65,6 +65,9 @@ interface MixedState {
   setSelectedLeagueId: (id: string | null) => void;
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
   setImportFileName: (name: string) => void;
+
+  // Test helpers
+  fillAllScoresForTest: () => void;
 }
 
 export const useMixedStore = create<MixedState>()(
@@ -407,6 +410,16 @@ export const useMixedStore = create<MixedState>()(
       setSelectedLeagueId: (id) => set({ selectedLeagueId: id }),
       setSelectedBracketCategory: (cat) => set({ selectedBracketCategory: cat }),
       setImportFileName: (name) => set({ importFileName: name }),
+
+      fillAllScoresForTest: () => {
+        set(state => ({
+          leagueMatches: state.leagueMatches.map(m => {
+            if (m.status === 'finished') return m;
+            // team1が6-4で勝利（テスト用）
+            return { ...m, score1: 6, score2: 4, tiebreakScore: null, winnerId: m.team1Id, status: 'finished' as const };
+          }),
+        }));
+      },
     }),
     { name: 'mixed-tournament-storage' }
   )

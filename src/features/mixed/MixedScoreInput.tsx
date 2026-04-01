@@ -316,7 +316,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
             onClick={handleSave}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98]"
           >
-            <Save size={14} />エントリー
+            <Save size={14} />決定
           </button>
 
           {/* DEF buttons */}
