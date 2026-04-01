@@ -333,10 +333,10 @@ export default function MixedEntryView() {
                             {/* 番号バッジ */}
                             <div className="flex items-start gap-2">
                               <div className="flex flex-col items-center shrink-0 mt-0.5">
-                                <span className={`w-6 h-6 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow`}>
-                                  {idx + 1}
+                                <span className={`w-7 h-7 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-xs font-bold rounded-full flex items-center justify-center shadow`}>
+                                  {team.pairNumber}
                                 </span>
-                                <span className="text-[9px] font-bold text-gray-500 mt-0.5">No.{team.pairNumber}</span>
+                                <span className="text-[9px] text-gray-400 mt-0.5">{String.fromCodePoint(0x2460 + idx)}</span>
                               </div>
                               <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40 line-through' : ''}`}>
                                 {/* 男子 */}
@@ -389,10 +389,10 @@ export default function MixedEntryView() {
                     <div key={team.teamId} className={`px-3 py-2.5 ${rowBg(st)}`}>
                       <div className="flex items-start gap-2.5">
                         <div className="flex flex-col items-center shrink-0 mt-0.5">
-                          <span className={`w-6 h-6 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow`}>
-                            {idx + 1}
+                          <span className={`w-7 h-7 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-xs font-bold rounded-full flex items-center justify-center shadow`}>
+                            {team.pairNumber}
                           </span>
-                          <span className="text-[9px] font-bold text-gray-500 mt-0.5">No.{team.pairNumber}</span>
+                          <span className="text-[9px] text-gray-400 mt-0.5">{String.fromCodePoint(0x2460 + idx)}</span>
                         </div>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40' : ''}`}>
                           <div className="flex gap-0">

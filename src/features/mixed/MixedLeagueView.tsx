@@ -194,17 +194,8 @@ export default function MixedLeagueView() {
 
       {/* Left sidebar: league list */}
       <div className="w-48 flex-shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 overflow-y-auto">
-        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-3 border-b border-gray-100">
           <h3 className="text-sm font-bold text-gray-700">リーグ一覧</h3>
-          {leagueMatches.some(m => m.status !== 'finished') && (
-            <button
-              onClick={() => { if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) fillAllScoresForTest(); }}
-              className="text-[9px] font-medium text-purple-500 hover:text-purple-700 transition-colors"
-              title="テスト: 全6-4入力"
-            >
-              <FlaskConical size={12} />
-            </button>
-          )}
         </div>
         <div className="p-2 space-y-1">
           {leagues.map((league, leagueIdx) => {
@@ -292,8 +283,18 @@ export default function MixedLeagueView() {
                     ルール
                   </button>
                 )}
-                <button onClick={() => setIsFullscreen(true)} className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
+                {leagueMatches.some(m => m.status !== 'finished') && (
+                  <button
+                    onClick={() => { if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) fillAllScoresForTest(); }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors"
+                  >
+                    <FlaskConical size={12} />
+                    テスト6-4
+                  </button>
+                )}
+                <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
                   <Maximize2 size={12} />
+                  全画面
                 </button>
                 <div className="text-right">
                   <div className="text-sm font-bold">{finishedCount}/{totalCount}</div>
