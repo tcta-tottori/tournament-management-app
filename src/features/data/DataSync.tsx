@@ -1136,7 +1136,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     : [{ label: '読込', phases: ['loading'] }, { label: '大会', phases: ['select-tournament', 'confirm-tournament'] }, { label: '時間割', phases: ['select-schedule'] }]
                   ).map((step, i, arr) => {
                     const allPhases: WizardPhase[] = arr.flatMap(s => s.phases as WizardPhase[]);
-                    const stepFirstPhaseIdx = allPhases.indexOf(step.phases[0] as WizardPhase);
                     const currentPhaseIdx = allPhases.indexOf(wizardPhase);
                     const isDone = wizardPhase === 'done' || currentPhaseIdx > allPhases.indexOf(step.phases[step.phases.length - 1] as WizardPhase);
                     const isCurrent = step.phases.includes(wizardPhase);
