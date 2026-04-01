@@ -1406,15 +1406,6 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       </div>
                     )}
 
-                    {/* ミックスのルール表示 */}
-                    {wizardMixedPending && wizardMixedPending.info.rules.length > 0 && (
-                      <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
-                        <div className="text-[11px] text-amber-700">
-                          {wizardMixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* アクション */}
