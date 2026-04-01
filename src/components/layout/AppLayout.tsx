@@ -298,13 +298,13 @@ export default function AppLayout() {
         {/* 右側: リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href="https://tcta-tottori.github.io/tottori-tennis-draw/"
+            href="https://www.tottori-tenis.net/"
             target="_blank"
             rel="noopener noreferrer"
             className="header-link"
-            title="ドロー会議システムを開く"
+            title="鳥取県テニス協会HPを開く"
           >
-            <span className="hidden sm:inline">ドロー会議</span>
+            <span className="hidden sm:inline">テニス協会HP</span>
             <ExternalLink className="w-3 h-3" />
           </a>
 
