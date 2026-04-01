@@ -109,9 +109,12 @@ export default function MixedLeagueView() {
             return (
               <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
                 <td className="px-3 py-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                    {rowIdx + 1}
-                  </span>
+                  <div className="flex flex-col items-center">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                      {rowIdx + 1}
+                    </span>
+                    <span className="text-[9px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
+                  </div>
                 </td>
                 <td className="px-3 py-2">
                   <div className="text-sm font-medium text-gray-800">{team.male.name}</div>

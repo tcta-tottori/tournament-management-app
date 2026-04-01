@@ -62,14 +62,18 @@ export default function MixedLiveCourtView() {
   }, []);
   const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  // 全体進捗
-  const totalFinished = leagueMatches.filter(m => m.status === 'finished').length;
-  const totalMatches = leagueMatches.length;
-  const progressPct = totalMatches > 0 ? Math.round((totalFinished / totalMatches) * 100) : 0;
+  // 予選リーグ進捗
+  const leagueFinished = leagueMatches.filter(m => m.status === 'finished').length;
+  const leagueTotal = leagueMatches.length;
 
   // ブラケット進捗
   const bracketFinished = brackets.reduce((s, b) => s + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
   const bracketTotal = brackets.reduce((s, b) => s + b.matches.length, 0);
+
+  // 全体進捗（予選+決勝合算）
+  const totalFinished = leagueFinished + bracketFinished;
+  const totalMatches = leagueTotal + bracketTotal;
+  const progressPct = totalMatches > 0 ? Math.round((totalFinished / totalMatches) * 100) : 0;
 
   const leagueCompletedCount = leagues.filter(l => {
     const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
@@ -115,7 +119,7 @@ export default function MixedLiveCourtView() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
           {[
             { icon: Users, label: '全試合数', value: totalMatches, color: 'text-gray-600 bg-gray-50 border-gray-200' },
-            { icon: Play, label: '予選リーグ', value: `${totalFinished}/${totalMatches}`, color: 'text-green-700 bg-green-50 border-green-200' },
+            { icon: Play, label: '予選リーグ', value: `${leagueFinished}/${leagueTotal}`, color: 'text-green-700 bg-green-50 border-green-200' },
             { icon: CheckCircle, label: 'リーグ完了', value: `${leagueCompletedCount}/${leagues.length}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
             { icon: Trophy, label: '決勝T', value: brackets.length > 0 ? `${bracketFinished}/${bracketTotal}` : '―', color: 'text-amber-700 bg-amber-50 border-amber-200' },
           ].map(({ icon: Icon, label, value, color }) => (

@@ -155,6 +155,20 @@ export function calculateLeagueStandings(
     });
 
     standings.forEach((s, i) => { s.rank = i + 1; });
+
+    // タイブレーク理由が未設定の同率チームにゲーム率を表示
+    for (let i = 0; i < standings.length; i++) {
+      const tied = standings.filter(s => s.wins === standings[i].wins && s.wins > 0);
+      if (tied.length >= 2) {
+        for (const s of tied) {
+          if (!s.tiebreakReason) {
+            const ratio = s.gamesLost === 0 ? Infinity : s.gamesWon / s.gamesLost;
+            s.tiebreakReason = `ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}`;
+          }
+        }
+      }
+    }
+
     result.set(league.leagueId, standings);
   }
 

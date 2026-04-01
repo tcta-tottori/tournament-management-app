@@ -174,6 +174,7 @@ export default function MixedBracketView() {
           bracket={currentBracket}
           onMatchClick={openScoreEditor}
           getRoundLabel={getRoundLabel}
+          allTeams={useMixedStore.getState().allTeams}
         />
       )}
 
@@ -465,10 +466,11 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
+function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
   getRoundLabel: (round: number, total: number) => string;
+  allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
 }) {
   const totalRounds = Math.log2(bracket.drawSize);
   const matchesByRound: BracketMatch[][] = [];
@@ -476,8 +478,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 72;
-  const MATCH_WIDTH = 220;
+  const MATCH_HEIGHT = 88;
+  const MATCH_WIDTH = 260;
   const ROUND_GAP = 40;
   const MATCH_GAP = 8;
 
@@ -539,46 +541,55 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                         `}
                         style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
                       >
-                        <div className={`flex items-center px-2 h-[34px] text-xs border-b border-gray-100
-                          ${match.winnerId === match.team1Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
-                        `}>
-                          <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team1League}</span>
-                          <span className="flex-1 truncate">
-                            {match.team1Name || (ph1 ? (
-                              ph1.leagueId ? (
-                                <span className="inline-flex items-center gap-1">
-                                  <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{ph1.leagueId}</span>
-                                  <span className="text-[10px] text-blue-400">{ph1.rank}位</span>
+                        {[
+                          { teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true },
+                          { teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false },
+                        ].map(slot => {
+                          const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+                          return (
+                            <div key={slot.isTop ? 'top' : 'bot'} className={`flex items-center px-1.5 h-[42px] text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
+                              ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
+                            `}>
+                              {/* リーグバッジ */}
+                              {slot.league ? (
+                                <span className="w-5 h-5 rounded bg-gray-100 text-[9px] font-bold text-gray-600 flex items-center justify-center shrink-0 mr-1">
+                                  {slot.league}
                                 </span>
-                              ) : <span className="text-[10px] text-gray-400 italic">{ph1.text}</span>
-                            ) : '―')}
-                          </span>
-                          {match.score1 !== null && (
-                            <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team1Id ? 'text-emerald-600' : 'text-gray-500'}`}>
-                              {match.score1}
-                            </span>
-                          )}
-                        </div>
-                        <div className={`flex items-center px-2 h-[34px] text-xs
-                          ${match.winnerId === match.team2Id ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
-                        `}>
-                          <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team2League}</span>
-                          <span className="flex-1 truncate">
-                            {match.team2Name || (ph2 ? (
-                              ph2.leagueId ? (
-                                <span className="inline-flex items-center gap-1">
-                                  <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{ph2.leagueId}</span>
-                                  <span className="text-[10px] text-blue-400">{ph2.rank}位</span>
+                              ) : <span className="w-5 shrink-0 mr-1" />}
+                              {/* チーム情報 */}
+                              <div className="flex-1 min-w-0">
+                                {teamData ? (
+                                  <div className="flex items-center gap-0">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
+                                      <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
+                                    </div>
+                                    <div className="w-px h-6 bg-gray-200 mx-1 shrink-0" />
+                                    <div className="min-w-0 max-w-[60px]">
+                                      <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.male.affiliation}</div>
+                                      <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.female.affiliation}</div>
+                                    </div>
+                                  </div>
+                                ) : slot.name ? (
+                                  <span className="truncate text-[10px]">{slot.name}</span>
+                                ) : slot.ph ? (
+                                  slot.ph.leagueId ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
+                                      <span className="text-[10px] text-blue-400">{slot.ph.rank}位</span>
+                                    </span>
+                                  ) : <span className="text-[10px] text-gray-400 italic">{slot.ph.text}</span>
+                                ) : <span className="text-[10px] text-gray-400">―</span>}
+                              </div>
+                              {/* スコア */}
+                              {slot.score !== null && (
+                                <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
+                                  {slot.score}
                                 </span>
-                              ) : <span className="text-[10px] text-gray-400 italic">{ph2.text}</span>
-                            ) : '―')}
-                          </span>
-                          {match.score2 !== null && (
-                            <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team2Id ? 'text-emerald-600' : 'text-gray-500'}`}>
-                              {match.score2}
-                            </span>
-                          )}
-                        </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
