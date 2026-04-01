@@ -321,7 +321,7 @@ export default function MixedEntryView() {
                         </button>
                       </td>
                       {/* チーム列 */}
-                      {league.teams.map((team, idx) => {
+                      {league.teams.map((team) => {
                         const st = team.status || 'none';
                         const isDef = st === 'def';
                         return (
@@ -332,11 +332,10 @@ export default function MixedEntryView() {
                           >
                             {/* 番号バッジ */}
                             <div className="flex items-start gap-2">
-                              <div className="flex flex-col items-center shrink-0 mt-0.5">
+                              <div className="shrink-0 mt-0.5">
                                 <span className={`w-7 h-7 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-xs font-bold rounded-full flex items-center justify-center shadow`}>
                                   {team.pairNumber}
                                 </span>
-                                <span className="text-[9px] text-gray-400 mt-0.5">{String.fromCodePoint(0x2460 + idx)}</span>
                               </div>
                               <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40 line-through' : ''}`}>
                                 {/* 男子 */}
@@ -382,17 +381,16 @@ export default function MixedEntryView() {
 
               {/* スマホ: リスト表示 */}
               <div className="sm:hidden divide-y divide-gray-100">
-                {league.teams.map((team, idx) => {
+                {league.teams.map((team) => {
                   const st = team.status || 'none';
                   const isDef = st === 'def';
                   return (
                     <div key={team.teamId} className={`px-3 py-2.5 ${rowBg(st)}`}>
                       <div className="flex items-start gap-2.5">
-                        <div className="flex flex-col items-center shrink-0 mt-0.5">
+                        <div className="shrink-0 mt-0.5">
                           <span className={`w-7 h-7 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-xs font-bold rounded-full flex items-center justify-center shadow`}>
                             {team.pairNumber}
                           </span>
-                          <span className="text-[9px] text-gray-400 mt-0.5">{String.fromCodePoint(0x2460 + idx)}</span>
                         </div>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40' : ''}`}>
                           <div className="flex gap-0">

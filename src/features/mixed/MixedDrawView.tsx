@@ -6,6 +6,18 @@ import MixedScoreInput from './MixedScoreInput';
 import type { LeagueMatchScore } from './types';
 import { GameRatioCell } from './GameRatioCell';
 
+/** リーグバッジカラー (エントリーページと統一) */
+const LEAGUE_COLORS = [
+  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
+  { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
+  { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
+  { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700' },
+  { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
+  { from: 'from-cyan-600', to: 'to-sky-700', light: 'from-cyan-50 to-sky-50', border: 'border-cyan-200', badge: 'bg-cyan-100 text-cyan-700' },
+  { from: 'from-lime-600', to: 'to-green-700', light: 'from-lime-50 to-green-50', border: 'border-lime-200', badge: 'bg-lime-100 text-lime-700' },
+  { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700' },
+];
+
 export default function MixedDrawView() {
   const { leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
@@ -59,12 +71,13 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
 
   return (
     <div className="space-y-3">
-      {leagues.map(league => {
+      {leagues.map((league, leagueIdx) => {
         const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
         const finishedCount = lMatches.filter(m => m.status === 'finished').length;
         const totalCount = lMatches.length;
         const standings = allStandings.get(league.leagueId) || [];
         const isComplete = finishedCount === totalCount && totalCount > 0;
+        const colors = LEAGUE_COLORS[leagueIdx % LEAGUE_COLORS.length];
 
         // タイブレーク（同率順位）があるか判定
         const hasTiebreak = standings.some(s => s.tiebreakReason);
@@ -90,10 +103,10 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
         };
 
         return (
-          <div key={league.leagueId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div key={league.leagueId} className={`bg-white rounded-xl shadow-sm border ${colors.border} overflow-hidden`}>
             {/* リーグヘッダー */}
-            <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
-              <span className="w-8 h-8 bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-sm font-bold rounded-lg flex items-center justify-center shadow shrink-0">
+            <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r ${colors.light} border-b ${colors.border}`}>
+              <span className={`w-8 h-8 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-sm font-bold rounded-lg flex items-center justify-center shadow shrink-0`}>
                 {league.leagueId.trim()}
               </span>
               <div className="min-w-0 flex-1">
@@ -133,7 +146,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                 {isComplete && <Check size={14} className="text-emerald-500" />}
                 <div className="w-12 sm:w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all"
+                    className={`h-full bg-gradient-to-r ${colors.from} ${colors.to} rounded-full transition-all`}
                     style={{ width: `${totalCount > 0 ? (finishedCount / totalCount) * 100 : 0}%` }}
                   />
                 </div>
@@ -150,7 +163,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                     <th className="px-1.5 sm:px-2 py-1 text-left text-[10px] sm:text-xs text-gray-500 min-w-[60px] sm:min-w-[80px]">所属</th>
                     {league.teams.map((_, i) => (
                       <th key={i} className="px-0.5 sm:px-1 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-14 sm:w-[70px]">
-                        <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] sm:text-[10px] font-bold">{i + 1}</span>
+                        <span className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 ${colors.badge} rounded-full text-[9px] sm:text-[10px] font-bold`}>{i + 1}</span>
                       </th>
                     ))}
                     <th className="px-1 sm:px-2 py-1 text-center text-[10px] sm:text-xs text-gray-500 w-10 sm:w-14">勝敗</th>
@@ -166,7 +179,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                     return (
                       <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
                         <td className="px-1.5 sm:px-2 py-1">
-                          <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] sm:text-[10px] font-bold">{rowIdx + 1}</span>
+                          <span className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 ${colors.badge} rounded-full text-[9px] sm:text-[10px] font-bold`}>{rowIdx + 1}</span>
                         </td>
                         <td className="px-1.5 sm:px-2 py-1">
                           <div className="text-[11px] sm:text-xs font-medium text-gray-800 leading-tight truncate">{team.male.name}</div>
@@ -232,6 +245,30 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                 </tbody>
               </table>
             </div>
+
+            {/* 対戦順 */}
+            {league.matchOrder.length > 0 && (
+              <div className={`px-3 py-2 bg-gradient-to-r ${colors.light} border-t ${colors.border}`}>
+                <div className="text-[10px] font-bold text-gray-500 mb-1">対戦順</div>
+                <div className="flex flex-wrap gap-1">
+                  {league.matchOrder.map(mo => {
+                    const match = lMatches.find(m => m.matchNumber === mo.matchNumber);
+                    const isFinished = match?.status === 'finished';
+                    return (
+                      <span
+                        key={mo.matchNumber}
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium
+                          ${isFinished ? `${colors.badge}` : 'bg-white text-gray-400 border border-gray-200'}
+                        `}
+                      >
+                        {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
+                        {isFinished && match && <span className="text-[9px] ml-0.5 opacity-70">({match.score1}-{match.score2})</span>}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
