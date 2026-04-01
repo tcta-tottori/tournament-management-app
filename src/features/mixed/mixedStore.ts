@@ -60,6 +60,9 @@ interface MixedState {
   // Auto-populate non-1st brackets from league standings
   autoPopulateBrackets: () => void;
 
+  // Re-generate brackets with correct draw sheet ordering (preserves 1st bracket if matches started)
+  regenerateBrackets: () => void;
+
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
   setSelectedLeagueId: (id: string | null) => void;
@@ -404,6 +407,24 @@ export const useMixedStore = create<MixedState>()(
         const standings = calculateLeagueStandings(leagues, leagueMatches);
         const brackets = generateAllBrackets(standings, allTeams, leagues);
         set({ brackets });
+      },
+
+      regenerateBrackets: () => {
+        const { leagues, leagueMatches, allTeams, brackets: oldBrackets } = get();
+        const standings = calculateLeagueStandings(leagues, leagueMatches);
+        const newBrackets = generateAllBrackets(standings, allTeams, leagues);
+
+        // 1位トーナメントは試合が始まっていたら維持
+        const old1st = oldBrackets.find(b => b.category === '1st');
+        if (old1st) {
+          const hasStarted = old1st.matches.some(m => m.status === 'finished' || m.status === 'playing' || m.status === 'ready');
+          if (hasStarted) {
+            const idx = newBrackets.findIndex(b => b.category === '1st');
+            if (idx >= 0) newBrackets[idx] = old1st;
+          }
+        }
+
+        set({ brackets: newBrackets });
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
