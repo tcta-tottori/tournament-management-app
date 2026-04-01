@@ -8,11 +8,30 @@ function toHalfWidth(s: string): string {
   return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 }
 
-/** Extract game rule text from rules array */
-function extractGameRule(rules: string[]): string | null {
+/** Extract game rule text from rules array, considering team count */
+function extractGameRule(rules: string[], teamCount?: number): string | null {
+  // チーム数に対応するルールを優先検索
+  if (teamCount) {
+    for (const r of rules) {
+      const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+      if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(cleaned) && cleaned.includes(`${teamCount}チーム`)) {
+        return cleaned;
+      }
+    }
+    // 全角数字もチェック
+    const fullWidthCount = String(teamCount).replace(/[0-9]/g, c => String.fromCharCode(c.charCodeAt(0) + 0xFEE0));
+    for (const r of rules) {
+      const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+      if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(cleaned) && cleaned.includes(`${fullWidthCount}チーム`)) {
+        return cleaned;
+      }
+    }
+  }
+  // フォールバック: 最初のゲームルール
   for (const r of rules) {
-    if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(r)) {
-      return r.replace(/^（[０-９\d]+）\s*/, '').trim();
+    const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+    if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム/.test(cleaned)) {
+      return cleaned;
     }
   }
   return null;
@@ -53,15 +72,22 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const popupRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
 
-  const gameRule = useMemo(() => extractGameRule(tournamentInfo?.rules || []), [tournamentInfo]);
+  const gameRule = useMemo(() => {
+    // リーグ内のチーム数を取得してルールを特定
+    const teamCount = teams.length;
+    return extractGameRule(tournamentInfo?.rules || [], teamCount);
+  }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
   useEffect(() => {
+    // ポップアップ表示時のスクロール位置を保存し、閉じる時に復元
     scrollPosRef.current = window.scrollY;
+    // スクロールを防止
+    document.body.style.overflow = 'hidden';
     return () => {
-      requestAnimationFrame(() => {
-        window.scrollTo(0, scrollPosRef.current);
-      });
+      document.body.style.overflow = '';
+      // 元のスクロール位置に復元
+      window.scrollTo(0, scrollPosRef.current);
     };
   }, []);
 
