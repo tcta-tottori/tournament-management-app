@@ -400,7 +400,7 @@ export default function MixedBracketView() {
 }
 
 /** 音声コールモーダル */
-function CallModal({ match, bracket, leagues, allTeams, tournamentName, getRoundLabel, callCourt, setCallCourt, callTime, setCallTime, onClose }: {
+function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournamentName, getRoundLabel, callCourt, setCallCourt, callTime, setCallTime, onClose }: {
   match: BracketMatch;
   bracket: PlacementBracket;
   leagues: { leagueId: string; courtName: string }[];
@@ -750,9 +750,9 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 114; // 88 + 26 for action buttons
+  const MATCH_HEIGHT = 100;
   const MATCH_WIDTH = 260;
-  const ROUND_GAP = 40;
+  const ROUND_GAP = 48;
   const MATCH_GAP = 8;
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
@@ -775,45 +775,43 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
     return { text: 'BYE' };
   };
 
-  // 接続線を計算
-  const HEADER_HEIGHT = 36;
-  const getMatchCenter = (roundIdx: number, matchIdx: number) => {
+  // 接続線: 各マッチの中心Y座標を計算
+  const getMatchY = (roundIdx: number, matchIdx: number) => {
     const spacing = Math.pow(2, roundIdx);
-    let y = HEADER_HEIGHT;
-    for (let i = 0; i < matchIdx; i++) {
-      const topPad = i === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP);
-      y += (i === 0 ? (roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2) : topPad) + MATCH_HEIGHT + MATCH_GAP;
-    }
-    if (matchIdx === 0) {
-      y += roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
-    }
-    return y + MATCH_HEIGHT / 2;
+    const matchBlockH = MATCH_HEIGHT + MATCH_GAP;
+    const offset = (spacing - 1) * matchBlockH / 2;
+    return 36 + matchIdx * spacing * matchBlockH + offset + MATCH_HEIGHT / 2;
   };
+
+  // SVG全体の高さ
+  const r1count = matchesByRound[0]?.length || 0;
+  const svgHeight = r1count * (MATCH_HEIGHT + MATCH_GAP) + 36;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
       <div className="relative flex gap-0" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds }}>
         {/* 接続線SVG */}
-        <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: '100%' }}>
+        <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
           {matchesByRound.slice(0, -1).map((roundMatches, roundIdx) => {
             const x1 = roundIdx * (MATCH_WIDTH + ROUND_GAP) + MATCH_WIDTH;
             const x2 = (roundIdx + 1) * (MATCH_WIDTH + ROUND_GAP);
             const xMid = (x1 + x2) / 2;
-            return roundMatches.map((_, matchIdx) => {
-              if (matchIdx % 2 !== 0) return null;
-              const y1 = getMatchCenter(roundIdx, matchIdx);
-              const y2 = getMatchCenter(roundIdx, matchIdx + 1);
-              const yNext = getMatchCenter(roundIdx + 1, Math.floor(matchIdx / 2));
-              if (matchIdx + 1 >= roundMatches.length) return null;
-              return (
-                <g key={`line-${roundIdx}-${matchIdx}`}>
-                  <line x1={x1} y1={y1} x2={xMid} y2={y1} stroke="#d1d5db" strokeWidth="1.5" />
-                  <line x1={x1} y1={y2} x2={xMid} y2={y2} stroke="#d1d5db" strokeWidth="1.5" />
-                  <line x1={xMid} y1={y1} x2={xMid} y2={y2} stroke="#d1d5db" strokeWidth="1.5" />
-                  <line x1={xMid} y1={yNext} x2={x2} y2={yNext} stroke="#d1d5db" strokeWidth="1.5" />
+            const pairs: React.ReactNode[] = [];
+            for (let i = 0; i < roundMatches.length; i += 2) {
+              if (i + 1 >= roundMatches.length) break;
+              const y1 = getMatchY(roundIdx, i);
+              const y2 = getMatchY(roundIdx, i + 1);
+              const yNext = getMatchY(roundIdx + 1, Math.floor(i / 2));
+              pairs.push(
+                <g key={`line-${roundIdx}-${i}`}>
+                  <line x1={x1} y1={y1} x2={xMid} y2={y1} stroke="#c9cdd3" strokeWidth="1.5" />
+                  <line x1={x1} y1={y2} x2={xMid} y2={y2} stroke="#c9cdd3" strokeWidth="1.5" />
+                  <line x1={xMid} y1={y1} x2={xMid} y2={y2} stroke="#c9cdd3" strokeWidth="1.5" />
+                  <line x1={xMid} y1={yNext} x2={x2} y2={yNext} stroke="#c9cdd3" strokeWidth="1.5" />
                 </g>
               );
-            });
+            }
+            return pairs;
           })}
         </svg>
 
@@ -833,14 +831,16 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
 
               <div className="space-y-0">
                 {roundMatches.map((match, matchIdx) => {
-                  const topPadding = roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
-                  const bottomPadding = (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP);
+                  const matchBlockH = MATCH_HEIGHT + MATCH_GAP;
+                  const topOffset = matchIdx === 0
+                    ? (spacing - 1) * matchBlockH / 2
+                    : (spacing - 1) * matchBlockH;
 
                   const ph1 = getPlaceholderInfo(match, 'team1');
                   const ph2 = getPlaceholderInfo(match, 'team2');
 
                   return (
-                    <div key={match.matchId} style={{ paddingTop: matchIdx === 0 ? topPadding : bottomPadding }}>
+                    <div key={match.matchId} style={{ paddingTop: topOffset }}>
                       <div
                         onClick={() => onMatchClick(match)}
                         className={`
@@ -850,7 +850,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                             match.status === 'bye' ? 'border-gray-200 opacity-60' :
                             'border-gray-200 hover:border-gray-300'}
                         `}
-                        style={{ width: MATCH_WIDTH, height: 88 }}
+                        style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
                       >
                         {[
                           { teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true },
