@@ -18,19 +18,13 @@ const LEAGUE_COLORS = [
   { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700' },
 ];
 
-/** 名前を5文字幅基準でスペース調整して表示 */
-function AlignedName({ name }: { name: string }) {
-  // 姓と名の間のスペースを調整して全体を5文字幅程度に揃える
-  const parts = name.split(/[\s\u3000]+/);
-  if (parts.length >= 2) {
-    const sei = parts[0];
-    const mei = parts.slice(1).join('');
-    const totalLen = sei.length + mei.length;
-    // 5文字基準: 合計が少ないほどスペースを広げる
-    const gapClass = totalLen <= 3 ? 'gap-[1em]' : totalLen <= 4 ? 'gap-[0.5em]' : 'gap-[0.25em]';
-    return <span className={`inline-flex ${gapClass}`}><span>{sei}</span><span>{mei}</span></span>;
-  }
-  return <span>{name}</span>;
+/** 名前を均等割り付けで表示（5文字幅基準） */
+function AlignedName({ name, className = '' }: { name: string; className?: string }) {
+  return (
+    <span className={`inline-block w-[5em] text-justify ${className}`} style={{ textAlignLast: 'justify' }}>
+      {name.replace(/[\s\u3000]+/g, '')}
+    </span>
+  );
 }
 
 export default function MixedDrawView() {
@@ -239,17 +233,17 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                     {league.teams.map((team, rowIdx) => {
                       const standing = standings.find(s => s.teamId === team.teamId);
                       return (
-                        <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
-                          <td className="px-1.5 sm:px-2 py-1.5">
+                        <tr key={team.teamId} className={`border-t border-gray-100 hover:bg-gray-50/50 ${rowIdx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
+                          <td className="px-1.5 sm:px-2 py-2">
                             <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{rowIdx + 1}</span>
                           </td>
-                          <td className="px-1.5 sm:px-2 py-1.5 w-[120px] sm:w-[150px]">
-                            <div className="text-[11px] sm:text-xs font-bold text-gray-800 leading-tight"><AlignedName name={team.male.name} /></div>
-                            <div className="text-[11px] sm:text-xs font-bold text-gray-800 leading-tight"><AlignedName name={team.female.name} /></div>
+                          <td className="px-1.5 sm:px-2 py-2 w-[130px] sm:w-[150px]">
+                            <div className="text-[12px] sm:text-[13px] font-bold text-gray-800 leading-snug"><AlignedName name={team.male.name} /></div>
+                            <div className="text-[12px] sm:text-[13px] font-bold text-gray-800 leading-snug"><AlignedName name={team.female.name} /></div>
                           </td>
-                          <td className="px-1.5 sm:px-2 py-1.5 w-[80px] sm:w-[100px]">
-                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-tight truncate">{team.male.affiliation}</div>
-                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-tight truncate">{team.female.affiliation}</div>
+                          <td className="px-1.5 sm:px-2 py-2 w-[80px] sm:w-[100px]">
+                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-snug truncate">{team.male.affiliation}</div>
+                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-snug truncate">{team.female.affiliation}</div>
                           </td>
                           {league.teams.map((colTeam, colIdx) => {
                             const cell = getCellDisplay(team.teamId, colTeam.teamId);
@@ -327,7 +321,6 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                           `}
                         >
                           {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
-                          {isFinished && match && <span className="text-[9px] ml-0.5 opacity-70">({match.score1}-{match.score2})</span>}
                         </span>
                       );
                     })}

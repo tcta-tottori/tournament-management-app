@@ -129,8 +129,8 @@ export default function MixedLeagueView() {
                   </div>
                 </td>
                 <td className="px-3 py-2">
-                  <div className="text-sm font-medium text-gray-800">{team.male.name}</div>
-                  <div className="text-sm text-gray-500">{team.female.name}</div>
+                  <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                  <div className="text-sm font-bold text-gray-800"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{team.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
                 </td>
                 <td className="px-3 py-2">
                   <div className="text-xs text-gray-500">{team.male.affiliation}</div>
