@@ -402,42 +402,36 @@ export default function MixedEntryView() {
                           {idx + 1}
                         </span>
                         <div className={`flex-1 min-w-0 ${isDef ? 'opacity-40' : ''}`}>
-                          <table className="w-full border-collapse">
-                            <tbody>
-                              <tr>
-                                <td className="w-[5.5em] pr-1.5 border-r border-gray-200 align-baseline">
-                                  <EditableCell
-                                    value={team.male.name}
-                                    onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
-                                    className="text-sm font-bold text-gray-800 block truncate"
-                                  />
-                                </td>
-                                <td className="pl-2 align-baseline">
-                                  <EditableCell
-                                    value={team.male.affiliation}
-                                    onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
-                                    className="text-[11px] text-gray-400 block truncate"
-                                  />
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="w-[5.5em] pr-1.5 border-r border-gray-200 align-baseline">
-                                  <EditableCell
-                                    value={team.female.name}
-                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
-                                    className="text-sm font-bold text-gray-800 block truncate"
-                                  />
-                                </td>
-                                <td className="pl-2 align-baseline">
-                                  <EditableCell
-                                    value={team.female.affiliation}
-                                    onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
-                                    className="text-[11px] text-gray-400 block truncate"
-                                  />
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                          <div className="flex gap-0">
+                            {/* 名前列: 固定幅 */}
+                            <div className="w-[88px] shrink-0 pr-1.5 space-y-0.5">
+                              <EditableCell
+                                value={team.male.name}
+                                onSave={v => updateTeamPlayer(team.teamId, 'maleName', v)}
+                                className="text-sm font-bold text-gray-800 block truncate"
+                              />
+                              <EditableCell
+                                value={team.female.name}
+                                onSave={v => updateTeamPlayer(team.teamId, 'femaleName', v)}
+                                className="text-sm font-bold text-gray-800 block truncate"
+                              />
+                            </div>
+                            {/* 区切り線 */}
+                            <div className="w-px bg-gray-200 shrink-0 self-stretch" />
+                            {/* 所属列 */}
+                            <div className="flex-1 min-w-0 pl-2 space-y-0.5">
+                              <EditableCell
+                                value={team.male.affiliation}
+                                onSave={v => updateTeamPlayer(team.teamId, 'maleAffiliation', v)}
+                                className="text-[11px] text-gray-400 block truncate leading-[1.6rem]"
+                              />
+                              <EditableCell
+                                value={team.female.affiliation}
+                                onSave={v => updateTeamPlayer(team.teamId, 'femaleAffiliation', v)}
+                                className="text-[11px] text-gray-400 block truncate leading-[1.6rem]"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center justify-end gap-1.5 mt-2 pl-8">

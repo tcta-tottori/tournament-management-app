@@ -485,8 +485,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
   const is1stBracket = bracket.category === '1st';
 
   // 未配置スロットに配置予定のリーグ情報を表示
-  const getPlaceholderText = (match: BracketMatch, slot: 'team1' | 'team2') => {
-    if (is1stBracket) return '―';
+  const getPlaceholderInfo = (match: BracketMatch, slot: 'team1' | 'team2'): { text: string; leagueId?: string; rank?: string } | null => {
+    if (is1stBracket) return { text: '―' };
     const id = slot === 'team1' ? match.team1Id : match.team2Id;
     if (id) return null; // 既に配置済み
     // 1回戦のみプレースホルダー表示
@@ -495,9 +495,10 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
     const slotIdx = slot === 'team1' ? (pos - 1) * 2 : (pos - 1) * 2 + 1;
     if (slotIdx < bracket.teams.length) {
       const t = bracket.teams[slotIdx];
-      return `${t.leagueId}リーグ ${bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4'}位`;
+      const rank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
+      return { text: `${t.leagueId}リーグ ${rank}位`, leagueId: t.leagueId, rank };
     }
-    return 'BYE';
+    return { text: 'BYE' };
   };
 
   return (
@@ -522,8 +523,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                   const topPadding = roundIdx === 0 ? 0 : (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP) / 2;
                   const bottomPadding = (spacing - 1) * (MATCH_HEIGHT + MATCH_GAP);
 
-                  const ph1 = getPlaceholderText(match, 'team1');
-                  const ph2 = getPlaceholderText(match, 'team2');
+                  const ph1 = getPlaceholderInfo(match, 'team1');
+                  const ph2 = getPlaceholderInfo(match, 'team2');
 
                   return (
                     <div key={match.matchId} style={{ paddingTop: matchIdx === 0 ? topPadding : bottomPadding }}>
@@ -543,7 +544,14 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                         `}>
                           <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team1League}</span>
                           <span className="flex-1 truncate">
-                            {match.team1Name || (ph1 ? <span className="text-[10px] text-blue-400 italic">{ph1}</span> : '―')}
+                            {match.team1Name || (ph1 ? (
+                              ph1.leagueId ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{ph1.leagueId}</span>
+                                  <span className="text-[10px] text-blue-400">{ph1.rank}位</span>
+                                </span>
+                              ) : <span className="text-[10px] text-gray-400 italic">{ph1.text}</span>
+                            ) : '―')}
                           </span>
                           {match.score1 !== null && (
                             <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team1Id ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -556,7 +564,14 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel }: {
                         `}>
                           <span className="text-[10px] text-gray-400 w-5 flex-shrink-0">{match.team2League}</span>
                           <span className="flex-1 truncate">
-                            {match.team2Name || (ph2 ? <span className="text-[10px] text-blue-400 italic">{ph2}</span> : '―')}
+                            {match.team2Name || (ph2 ? (
+                              ph2.leagueId ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{ph2.leagueId}</span>
+                                  <span className="text-[10px] text-blue-400">{ph2.rank}位</span>
+                                </span>
+                              ) : <span className="text-[10px] text-gray-400 italic">{ph2.text}</span>
+                            ) : '―')}
                           </span>
                           {match.score2 !== null && (
                             <span className={`font-mono font-bold ml-1 ${match.winnerId === match.team2Id ? 'text-emerald-600' : 'text-gray-500'}`}>
