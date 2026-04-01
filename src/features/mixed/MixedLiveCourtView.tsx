@@ -1,30 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
-import type { LeagueMatchScore } from './types';
+import type { LeagueMatchScore, MixedLeague } from './types';
 
-/** タイブレークスコアの表示テキスト */
-function formatScore(match: LeagueMatchScore, teamId: string): string {
-  const isTeam1 = match.team1Id === teamId;
-  const my = isTeam1 ? match.score1 : match.score2;
-  const opp = isTeam1 ? match.score2 : match.score1;
-  const won = match.winnerId === teamId;
-  if (match.tiebreakScore != null && ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
-    return won ? `${my}-${opp}(${match.tiebreakScore})` : `(${match.tiebreakScore})${my}-${opp}`;
-  }
-  return `${my}-${opp}`;
-}
-
-/** SVG コートライン（水平レイアウト） */
-function CourtLines({ status }: { status: 'playing' | 'complete' | 'idle' }) {
-  const color = status === 'playing' ? 'rgba(22,163,74,0.12)' : status === 'complete' ? 'rgba(16,185,129,0.08)' : 'rgba(0,0,0,0.04)';
+/** SVG コートライン（縦向き） */
+function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.15)'
+    : status === 'ready' ? 'rgba(59,130,246,0.1)'
+    : status === 'complete' ? 'rgba(16,185,129,0.08)'
+    : 'rgba(0,0,0,0.04)';
   return (
-    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 120" preserveAspectRatio="none">
-      <rect x="8" y="8" width="184" height="104" fill="none" stroke={color} strokeWidth="2" />
-      <line x1="100" y1="8" x2="100" y2="112" stroke={color} strokeWidth="1.5" />
-      <line x1="8" y1="60" x2="192" y2="60" stroke={color} strokeWidth="1" />
-      <rect x="50" y="8" width="100" height="104" fill="none" stroke={color} strokeWidth="1" />
+    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 160" preserveAspectRatio="none">
+      <rect x="5" y="5" width="90" height="150" fill="none" stroke={color} strokeWidth="1.5" />
+      <line x1="5" y1="80" x2="95" y2="80" stroke={color} strokeWidth="1" />
+      <line x1="50" y1="5" x2="50" y2="155" stroke={color} strokeWidth="1" />
+      <rect x="20" y="5" width="60" height="150" fill="none" stroke={color} strokeWidth="0.8" />
     </svg>
   );
 }
@@ -35,7 +26,6 @@ function DonutChart({ percent, finished, total }: { percent: number; finished: n
   const stroke = 8;
   const circumference = 2 * Math.PI * radius;
   const finishedArc = (percent / 100) * circumference;
-
   return (
     <div className="relative">
       <svg width={radius * 2 + stroke + 4} height={radius * 2 + stroke + 4} className="transform -rotate-90">
@@ -51,6 +41,23 @@ function DonutChart({ percent, finished, total }: { percent: number; finished: n
   );
 }
 
+/** リーグのコート状態を判定 */
+function getLeagueCourtStatus(_league: MixedLeague, lMatches: LeagueMatchScore[]) {
+  const finished = lMatches.filter(m => m.status === 'finished').length;
+  const total = lMatches.length;
+  const isComplete = finished === total && total > 0;
+  const nextMatch = lMatches
+    .filter(m => m.status !== 'finished')
+    .sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
+
+  const status = isComplete ? 'complete' as const
+    : (finished > 0) ? 'playing' as const
+    : nextMatch ? 'ready' as const
+    : 'empty' as const;
+
+  return { finished, total, isComplete, nextMatch, status };
+}
+
 export default function MixedLiveCourtView() {
   const { leagues, leagueMatches, allTeams, brackets, tournamentInfo } = useMixedStore();
   const allStandings = calculateLeagueStandings(leagues, leagueMatches);
@@ -62,23 +69,39 @@ export default function MixedLiveCourtView() {
   }, []);
   const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  // 予選リーグ進捗
+  // 全体進捗（予選+決勝合算）
   const leagueFinished = leagueMatches.filter(m => m.status === 'finished').length;
   const leagueTotal = leagueMatches.length;
-
-  // ブラケット進捗
   const bracketFinished = brackets.reduce((s, b) => s + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
   const bracketTotal = brackets.reduce((s, b) => s + b.matches.length, 0);
-
-  // 全体進捗（予選+決勝合算）
   const totalFinished = leagueFinished + bracketFinished;
   const totalMatches = leagueTotal + bracketTotal;
   const progressPct = totalMatches > 0 ? Math.round((totalFinished / totalMatches) * 100) : 0;
 
-  const leagueCompletedCount = leagues.filter(l => {
-    const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-    return lm.length > 0 && lm.every(m => m.status === 'finished');
-  }).length;
+  // コート状態集計
+  const courtStats = useMemo(() => {
+    let playing = 0, ready = 0, complete = 0, empty = 0;
+    for (const league of leagues) {
+      const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
+      const s = getLeagueCourtStatus(league, lm);
+      if (s.status === 'playing') playing++;
+      else if (s.status === 'ready') ready++;
+      else if (s.status === 'complete') complete++;
+      else empty++;
+    }
+    return { playing, ready, complete, empty };
+  }, [leagues, leagueMatches]);
+
+  // コートブロック: 4コートずつグループ化
+  const courtBlocks = useMemo(() => {
+    const blocks: MixedLeague[][] = [];
+    for (let i = 0; i < leagues.length; i += 4) {
+      blocks.push(leagues.slice(i, i + 4));
+    }
+    return blocks;
+  }, [leagues]);
+
+  const getTeamName = (id: string) => allTeams.find(t => t.teamId === id)?.teamName || '';
 
   return (
     <div className="p-3 sm:p-6 space-y-4 max-w-7xl mx-auto">
@@ -105,7 +128,6 @@ export default function MixedLiveCourtView() {
 
       {/* ===== TOP ROW: Donut + Stats ===== */}
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 items-stretch">
-        {/* ドーナツチャート */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 flex flex-col items-center justify-center min-w-[180px]">
           <DonutChart percent={progressPct} finished={totalFinished} total={totalMatches} />
           <div className="flex gap-4 mt-3 text-[10px] font-medium">
@@ -114,13 +136,11 @@ export default function MixedLiveCourtView() {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-200" />待機</span>
           </div>
         </div>
-
-        {/* 統計カード */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
           {[
             { icon: Users, label: '全試合数', value: totalMatches, color: 'text-gray-600 bg-gray-50 border-gray-200' },
             { icon: Play, label: '予選リーグ', value: `${leagueFinished}/${leagueTotal}`, color: 'text-green-700 bg-green-50 border-green-200' },
-            { icon: CheckCircle, label: 'リーグ完了', value: `${leagueCompletedCount}/${leagues.length}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
+            { icon: CheckCircle, label: 'リーグ完了', value: `${courtStats.complete}/${leagues.length}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
             { icon: Trophy, label: '決勝T', value: brackets.length > 0 ? `${bracketFinished}/${bracketTotal}` : '―', color: 'text-amber-700 bg-amber-50 border-amber-200' },
           ].map(({ icon: Icon, label, value, color }) => (
             <div key={label} className={`rounded-xl border p-3 ${color}`}>
@@ -137,121 +157,109 @@ export default function MixedLiveCourtView() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-emerald-500" />
-            コート配置
+            コートマップ
           </h2>
           <div className="flex gap-3 text-[10px] flex-wrap">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-400" />試合中</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" />完了</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200" />待機</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" />試合中 {courtStats.playing}</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" />完了 {courtStats.complete}</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-100 border border-blue-200" />準備 {courtStats.ready}</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200" />待機 {courtStats.empty}</span>
           </div>
         </div>
 
-        {/* コートブロック: PC横並び / モバイル2列 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {leagues.map(league => {
-            const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
-            const finished = lMatches.filter(m => m.status === 'finished').length;
-            const total = lMatches.length;
-            const isComplete = finished === total && total > 0;
-            const pct = total > 0 ? Math.round((finished / total) * 100) : 0;
-            const standings = allStandings.get(league.leagueId) || [];
+        {/* モバイル: ブロックごとに4コート */}
+        <div className="flex flex-col gap-3 items-center">
+          {courtBlocks.map((block, blockIdx) => (
+            <div key={blockIdx} className="contents">
+              <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
+                {/* ブロックラベル */}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    {block[0]?.courtName?.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}〜{block[block.length - 1]?.courtName?.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}
+                  </span>
+                </div>
+                {/* コートブロック: 4列グリッド */}
+                <div className="grid grid-cols-4 gap-2">
+                  {block.map(league => {
+                    const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
+                    const cs = getLeagueCourtStatus(league, lMatches);
+                    const courtNum = league.courtName?.replace(/[^\d]/g, '') || league.leagueId;
 
-            const nextMatch = lMatches
-              .filter(m => m.status !== 'finished')
-              .sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
+                    const statusStyles = {
+                      playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' },
+                      ready: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' },
+                      complete: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700' },
+                      empty: { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-600' },
+                    };
+                    const style = statusStyles[cs.status];
 
-            const lastFinished = lMatches
-              .filter(m => m.status === 'finished')
-              .sort((a, b) => b.matchNumber - a.matchNumber)[0] || null;
-
-            const getTeamName = (id: string) => allTeams.find(t => t.teamId === id)?.teamName || '';
-
-            const status = isComplete ? 'complete' : (finished > 0 || nextMatch) ? 'playing' : 'idle';
-
-            return (
-              <div
-                key={league.leagueId}
-                className={`relative rounded-xl border-2 overflow-hidden transition-all
-                  ${isComplete ? 'border-emerald-300 bg-emerald-50/30' :
-                    finished > 0 ? 'border-green-400 bg-green-50/30 shadow-[0_0_10px_rgba(22,163,74,0.15)]' :
-                    'border-gray-200 bg-white/80'}
-                `}
-                style={{ aspectRatio: '1.5 / 1', minHeight: 140 }}
-              >
-                <CourtLines status={status} />
-                <div className="relative z-10 flex flex-col h-full p-2.5">
-                  {/* 上部: コート番号 + リーグID + バッジ */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5">
-                      {!isComplete && finished > 0 && (
-                        <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                          <Play className="w-2 h-2 fill-white" /> LIVE
-                        </span>
-                      )}
-                      {isComplete && (
-                        <span className="flex items-center gap-0.5 bg-blue-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                          <CheckCircle className="w-2.5 h-2.5" /> 完了
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-gray-400 font-mono">{finished}/{total}</span>
-                  </div>
-
-                  {/* コート名 + リーグID */}
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="text-2xl font-black text-gray-800 leading-none">{league.leagueId}</span>
-                    <div className="min-w-0">
-                      <div className="text-[9px] text-gray-400 font-medium flex items-center gap-0.5 truncate">
-                        <MapPin className="w-2.5 h-2.5 shrink-0" />
-                        {league.courtName || '(コート未設定)'}
-                      </div>
-                      <div className="text-[9px] text-gray-400">{league.teams.length}ペア</div>
-                    </div>
-                  </div>
-
-                  {/* プログレスバー */}
-                  <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden mb-1.5">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${isComplete ? 'bg-emerald-400' : 'bg-green-400'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-
-                  {/* 中央: 対戦情報 or 順位 */}
-                  <div className="flex-1 flex flex-col justify-center min-w-0">
-                    {isComplete && standings.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {standings.slice(0, 3).map(s => (
-                          <div key={s.teamId} className="flex items-center gap-1 text-[9px]">
-                            <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold shrink-0
-                              ${s.rank === 1 ? 'bg-yellow-400 text-white' : s.rank === 2 ? 'bg-gray-400 text-white' : 'bg-orange-300 text-white'}
-                            `}>{s.rank}</span>
-                            <span className="truncate text-gray-700 font-medium">{s.teamName}</span>
+                    return (
+                      <div
+                        key={league.leagueId}
+                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${style.bg} ${style.border}`}
+                        style={{ aspectRatio: '1 / 1.6' }}
+                      >
+                        <VerticalCourtLines status={cs.status} />
+                        <div className="relative z-10 flex flex-col h-full p-1.5">
+                          {/* 上: コート番号 + バッジ */}
+                          <div className="flex items-center justify-between mb-0.5">
+                            <div className={`text-xl font-black ${style.text} leading-none`}>{courtNum}</div>
+                            {cs.status === 'playing' && (
+                              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[6px] font-bold px-1 py-0.5 rounded-full leading-none">
+                                <Play className="w-1.5 h-1.5 fill-white" /> LIVE
+                              </span>
+                            )}
+                            {cs.status === 'complete' && (
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                            )}
                           </div>
-                        ))}
+
+                          {/* リーグID */}
+                          <div className="text-[9px] font-bold text-gray-500 mb-0.5">{league.leagueId}リーグ</div>
+
+                          {/* 進捗 */}
+                          <div className="text-[8px] text-gray-400 mb-1">{cs.finished}/{cs.total}試合</div>
+
+                          {/* 中央: 対戦情報 */}
+                          <div className="flex-1 flex flex-col justify-center min-w-0">
+                            {cs.isComplete ? (
+                              <div className="space-y-0.5">
+                                {(allStandings.get(league.leagueId) || []).slice(0, 3).map(s => (
+                                  <div key={s.teamId} className="flex items-center gap-0.5 text-[7px]">
+                                    <span className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold shrink-0
+                                      ${s.rank === 1 ? 'bg-yellow-400 text-white' : s.rank === 2 ? 'bg-gray-400 text-white' : 'bg-orange-300 text-white'}
+                                    `}>{s.rank}</span>
+                                    <span className="truncate text-gray-700">{s.teamName}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : cs.nextMatch ? (
+                              <div className="space-y-0">
+                                <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{cs.nextMatch.matchNumber}試合</p>
+                                <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team1Id)}</p>
+                                <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
+                                <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team2Id)}</p>
+                              </div>
+                            ) : (
+                              <p className="text-[8px] text-gray-400 text-center">待機中</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    ) : nextMatch ? (
-                      <div className="space-y-0">
-                        <p className="text-[8px] font-bold text-green-600/80 mb-0.5">第{nextMatch.matchNumber}試合</p>
-                        <p className="text-[10px] font-bold text-gray-800 truncate">{getTeamName(nextMatch.team1Id)}</p>
-                        <p className="text-[7px] font-medium text-gray-400 leading-none">vs</p>
-                        <p className="text-[10px] font-bold text-gray-800 truncate">{getTeamName(nextMatch.team2Id)}</p>
-                      </div>
-                    ) : lastFinished ? (
-                      <div className="space-y-0">
-                        <p className="text-[8px] text-gray-400 mb-0.5">直近結果</p>
-                        <p className="text-[10px] font-medium text-gray-600 truncate">{getTeamName(lastFinished.team1Id)}</p>
-                        <p className="text-[9px] font-mono text-gray-500 text-center">{formatScore(lastFinished, lastFinished.team1Id)}</p>
-                        <p className="text-[10px] font-medium text-gray-600 truncate">{getTeamName(lastFinished.team2Id)}</p>
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-gray-400 text-center">待機中</p>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
+              {/* 通路 */}
+              {blockIdx < courtBlocks.length - 1 && (
+                <div className="flex items-center gap-2 w-full max-w-lg">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-[9px] text-gray-400">通路</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
