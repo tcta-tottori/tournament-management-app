@@ -132,7 +132,7 @@ function buildMixedCallText(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues, regenerateBrackets } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -263,6 +263,17 @@ export default function MixedBracketView() {
             </button>
           );
         })}
+      </div>
+
+      {/* トーナメント再生成ボタン */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => { if (window.confirm('ドロー表の並び順でトーナメントを再生成しますか？\n（1位トーナメントで試合が開始済みの場合は維持されます）')) regenerateBrackets(); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+        >
+          <RotateCcw size={12} />
+          並び順を再生成
+        </button>
       </div>
 
       {/* 1位トーナメント: ルーレット抽選 */}
