@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Printer, Volume2, VolumeX } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
-import type { PlacementCategory, BracketMatch, PlacementBracket } from './types';
+import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
+import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -29,12 +30,116 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
   { id: '4th', label: '4-5位', icon: Users, color: 'from-slate-400 to-slate-500' },
 ];
 
+/** 審判用紙を印刷 */
+function printRefereeSheet(
+  match: BracketMatch,
+  allTeams: MixedTeam[],
+  tournamentName: string,
+  bracketLabel: string,
+  roundLabel: string,
+) {
+  const team1 = allTeams.find(t => t.teamId === match.team1Id);
+  const team2 = allTeams.find(t => t.teamId === match.team2Id);
+  if (!team1 || !team2) return;
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>審判用紙</title>
+<style>
+  @page { size: A5 landscape; margin: 10mm; }
+  body { font-family: 'Yu Gothic', 'Hiragino Sans', sans-serif; margin: 0; padding: 15px; }
+  .header { text-align: center; margin-bottom: 12px; }
+  .header h2 { margin: 0; font-size: 16px; }
+  .header .sub { font-size: 12px; color: #666; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  th, td { border: 1px solid #333; padding: 6px 10px; font-size: 13px; }
+  th { background: #f0f0f0; width: 80px; text-align: center; }
+  .player-name { font-size: 16px; font-weight: bold; }
+  .score-area { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+  .score-box { width: 50px; height: 50px; border: 2px solid #333; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; }
+  .dash { font-size: 28px; font-weight: bold; display: inline-flex; align-items: center; }
+  .court-line { margin-top: 12px; font-size: 13px; }
+  .court-line span { display: inline-block; border-bottom: 1px solid #333; width: 100px; margin: 0 4px; }
+  .notes { margin-top: 12px; border: 1px solid #ccc; min-height: 50px; padding: 6px; font-size: 11px; color: #999; }
+</style>
+</head><body>
+<div class="header">
+  <h2>${tournamentName}</h2>
+  <div class="sub">${bracketLabel}　${roundLabel}</div>
+</div>
+<table>
+  <tr><th rowspan="2">チーム1</th><td class="player-name">${team1.male.name}</td><td>${team1.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team1League}リーグ</td></tr>
+  <tr><td class="player-name">${team1.female.name}</td><td>${team1.female.affiliation}</td></tr>
+  <tr><th rowspan="2">チーム2</th><td class="player-name">${team2.male.name}</td><td>${team2.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team2League}リーグ</td></tr>
+  <tr><td class="player-name">${team2.female.name}</td><td>${team2.female.affiliation}</td></tr>
+</table>
+<div style="text-align:center;">
+  <div class="score-area">
+    <div class="score-box"></div>
+    <div class="dash">−</div>
+    <div class="score-box"></div>
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:#888;">
+    <span style="margin-right:40px;">チーム1</span>
+    <span>チーム2</span>
+  </div>
+</div>
+<div class="court-line">コート：<span></span>　　時間：<span></span></div>
+<div class="notes">備考：</div>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=600');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 300);
+  }
+}
+
+/** ミックスダブルス用コールテキスト生成 */
+function buildMixedCallText(
+  match: BracketMatch,
+  allTeams: MixedTeam[],
+  bracketLabel: string,
+  roundLabel: string,
+  courtName: string,
+  startTime: string,
+): string {
+  const team1 = allTeams.find(t => t.teamId === match.team1Id);
+  const team2 = allTeams.find(t => t.teamId === match.team2Id);
+  if (!team1 || !team2) return '';
+
+  const familyName = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+
+  const parts: string[] = [];
+  parts.push('試合のコールをします。');
+  parts.push(`ミックスダブルス、${bracketLabel}、${roundLabel}。`);
+  parts.push(`${match.team1League}リーグ、${familyName(team1.male.name)}さん、${familyName(team1.female.name)}さん ペア。`);
+  parts.push(`${match.team2League}リーグ、${familyName(team2.male.name)}さん、${familyName(team2.female.name)}さん ペア。`);
+
+  let courtText = `この試合を、${courtName}で`;
+  if (startTime) {
+    const [h, m] = startTime.split(':');
+    const minutes = parseInt(m);
+    courtText += minutes === 0
+      ? `、${parseInt(h)}時より`
+      : `、${parseInt(h)}時${minutes}分より`;
+  }
+  courtText += '、おこなってください。';
+  parts.push(courtText);
+
+  return parts.join(' ');
+}
+
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
   const score2Ref = useRef<HTMLInputElement>(null);
+  const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
+  const [callCourt, setCallCourt] = useState('');
+  const [callTime, setCallTime] = useState('');
 
   const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
 
@@ -173,6 +278,15 @@ export default function MixedBracketView() {
         <BracketDisplay
           bracket={currentBracket}
           onMatchClick={openScoreEditor}
+          onPrint={(match, roundLabel) => {
+            const allTeams = useMixedStore.getState().allTeams;
+            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel);
+          }}
+          onCall={(match) => {
+            setCallMatch(match);
+            setCallCourt('');
+            setCallTime('');
+          }}
           getRoundLabel={getRoundLabel}
           allTeams={useMixedStore.getState().allTeams}
         />
@@ -253,6 +367,151 @@ export default function MixedBracketView() {
           </div>
         </div>
       )}
+
+      {/* 音声コールモーダル */}
+      {callMatch && currentBracket && (
+        <CallModal
+          match={callMatch}
+          bracket={currentBracket}
+          leagues={leagues}
+          allTeams={useMixedStore.getState().allTeams}
+          tournamentName={tournamentInfo?.name || ''}
+          getRoundLabel={getRoundLabel}
+          callCourt={callCourt}
+          setCallCourt={setCallCourt}
+          callTime={callTime}
+          setCallTime={setCallTime}
+          onClose={() => setCallMatch(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 音声コールモーダル */
+function CallModal({ match, bracket, leagues, allTeams, tournamentName, getRoundLabel, callCourt, setCallCourt, callTime, setCallTime, onClose }: {
+  match: BracketMatch;
+  bracket: PlacementBracket;
+  leagues: { leagueId: string; courtName: string }[];
+  allTeams: MixedTeam[];
+  tournamentName: string;
+  getRoundLabel: (round: number, total: number) => string;
+  callCourt: string;
+  setCallCourt: (v: string) => void;
+  callTime: string;
+  setCallTime: (v: string) => void;
+  onClose: () => void;
+}) {
+  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const totalRounds = Math.log2(bracket.drawSize);
+  const roundLabel = getRoundLabel(match.round, totalRounds);
+
+  // コート候補: リーグのコート名一覧
+  const courtOptions = useMemo(() => {
+    const courts = leagues.map(l => l.courtName).filter(Boolean);
+    return [...new Set(courts)].sort();
+  }, [leagues]);
+
+  const handleSpeak = () => {
+    if (!callCourt) return;
+    const text = buildMixedCallText(match, allTeams, bracket.label, roundLabel, callCourt, callTime);
+    if (!text) return;
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 2 });
+  };
+
+  const team1 = allTeams.find(t => t.teamId === match.team1Id);
+  const team2 = allTeams.find(t => t.teamId === match.team2Id);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Volume2 size={16} className="text-blue-600" />
+          音声コール
+        </h3>
+
+        {/* 対戦情報 */}
+        <div className="bg-gray-50 rounded-xl p-3 mb-4 text-xs">
+          <div className="text-gray-500 mb-1">{bracket.label}　{roundLabel}</div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-bold mr-1">{match.team1League}</span>
+              {team1 ? `${team1.male.name} / ${team1.female.name}` : match.team1Name}
+            </div>
+            <span className="text-gray-400 font-bold">vs</span>
+            <div className="flex-1 text-right">
+              <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-bold mr-1">{match.team2League}</span>
+              {team2 ? `${team2.male.name} / ${team2.female.name}` : match.team2Name}
+            </div>
+          </div>
+        </div>
+
+        {/* コート選択 */}
+        <div className="mb-3">
+          <label className="text-xs font-bold text-gray-600 block mb-1">コート指定 *</label>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {courtOptions.map(court => (
+              <button
+                key={court}
+                onClick={() => setCallCourt(court)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  callCourt === court
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {court}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={callCourt}
+            onChange={e => setCallCourt(e.target.value)}
+            placeholder="コート名を入力（例: 1コート）"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* 時間指定 */}
+        <div className="mb-4">
+          <label className="text-xs font-bold text-gray-600 block mb-1">開始時間（任意）</label>
+          <input
+            type="time"
+            value={callTime}
+            onChange={e => setCallTime(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* コールボタン */}
+        <button
+          onClick={handleSpeak}
+          disabled={!callCourt || isSpeaking}
+          className={`w-full flex items-center justify-center gap-2 py-3 min-h-[48px] rounded-xl text-sm font-medium mb-2 active:scale-[0.98] transition-all shadow-md ${
+            !callCourt
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : isSpeaking
+              ? 'bg-red-500 text-white'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+          }`}
+        >
+          {isSpeaking ? <><VolumeX size={14} />再生中...</> : <><Volume2 size={14} />コール開始</>}
+        </button>
+
+        {isSpeaking && (
+          <button
+            onClick={stop}
+            className="w-full flex items-center justify-center gap-2 py-2.5 min-h-[44px] bg-red-50 border-2 border-red-300 text-red-600 rounded-xl hover:bg-red-100 text-sm font-medium mb-2 active:scale-[0.98] transition-all"
+          >
+            <VolumeX size={14} />停止
+          </button>
+        )}
+
+        <button onClick={onClose} className="w-full py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm active:scale-[0.98] transition-all">
+          閉じる
+        </button>
+      </div>
     </div>
   );
 }
@@ -466,9 +725,11 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
+function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel, allTeams }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
+  onPrint: (match: BracketMatch, roundLabel: string) => void;
+  onCall: (match: BracketMatch) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
 }) {
@@ -478,7 +739,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 88;
+  const MATCH_HEIGHT = 114; // 88 + 26 for action buttons
   const MATCH_WIDTH = 260;
   const ROUND_GAP = 40;
   const MATCH_GAP = 8;
@@ -578,7 +839,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
                             match.status === 'bye' ? 'border-gray-200 opacity-60' :
                             'border-gray-200 hover:border-gray-300'}
                         `}
-                        style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
+                        style={{ width: MATCH_WIDTH, height: 88 }}
                       >
                         {[
                           { teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true },
@@ -630,6 +891,25 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams }: {
                           );
                         })}
                       </div>
+                      {/* アクションボタン（印刷・コール） */}
+                      {match.team1Id && match.team2Id && !match.isBye && (
+                        <div className="flex gap-1 mt-0.5" style={{ width: MATCH_WIDTH }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onPrint(match, getRoundLabel(match.round, totalRounds)); }}
+                            className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-700 text-[10px] transition-colors"
+                            title="審判用紙を印刷"
+                          >
+                            <Printer size={10} />印刷
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onCall(match); }}
+                            className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-500 hover:text-blue-700 text-[10px] transition-colors"
+                            title="音声コール"
+                          >
+                            <Volume2 size={10} />コール
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

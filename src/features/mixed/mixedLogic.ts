@@ -185,6 +185,16 @@ function nextPowerOf2(n: number): number {
 }
 
 /**
+ * ドロー表に記載された順位別トーナメントの配置順序
+ * （リーグID順: 各順位のチームをこの順番でブラケットに配置する）
+ */
+const BRACKET_LEAGUE_ORDER: Record<string, string[]> = {
+  '2nd': ['G', 'E', 'L', 'H', 'C', 'J', 'B', 'F', 'A', 'M', 'I', 'D', 'K'],
+  '3rd': ['D', 'H', 'M', 'F', 'A', 'K', 'I', 'G', 'C', 'E', 'L', 'J', 'B'],
+  '4th': ['A', 'M', 'F', 'J', 'L', 'B', 'D', 'E', 'H', 'K', 'I', 'G', 'C'],
+};
+
+/**
  * 順位別トーナメント生成
  */
 export function generateAllBrackets(
@@ -206,8 +216,8 @@ export function generateAllBrackets(
     const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
     let seed = 1;
 
-    // Excelで指定された並び順を使用（2位・3位・4位）
-    const customOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
+    // Excelで指定された並び順を使用、なければハードコードのドロー表順
+    const customOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'] || BRACKET_LEAGUE_ORDER[cat];
     const leagueIds = customOrder || leagues.map(l => l.leagueId);
 
     if (rank <= 3) {
