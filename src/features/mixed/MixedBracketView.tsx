@@ -257,6 +257,13 @@ export default function MixedBracketView() {
   const handleCourtAssignConfirm = () => {
     if (!courtAssignMatch || !courtAssignValue) return;
     assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignValue);
+    // コール確認: コート決定後にコールするか聞く
+    const doCalling = window.confirm(`${courtAssignValue}でコールしますか？`);
+    if (doCalling) {
+      setCallMatch(courtAssignMatch);
+      setCallCourt(courtAssignValue);
+      setCallTime('');
+    }
     setCourtAssignMatch(null);
   };
 
@@ -467,7 +474,7 @@ export default function MixedBracketView() {
         return (
           <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setCourtAssignMatch(null)}>
             <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[380px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
-              <h3 className="text-sm font-bold text-gray-800 mb-3">コートに入れる</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
                   {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
@@ -498,7 +505,7 @@ export default function MixedBracketView() {
                 <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
                 <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue}
                   className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >コートに入れる</button>
+                >決定</button>
               </div>
               <button onClick={() => {
                 // スキップしてスコア入力へ
@@ -649,18 +656,27 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
   onClose: () => void;
 }) {
   const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const bracketCourtAssignments = useMixedStore(s => s.bracketCourtAssignments);
   const totalRounds = Math.log2(bracket.drawSize);
   const roundLabel = getRoundLabel(match.round, totalRounds);
+
+  // 使用中コート
+  const usedCourts = useMemo(() => {
+    const set = new Set<string>();
+    for (const ca of Object.values(bracketCourtAssignments)) {
+      set.add(ca.courtName);
+    }
+    return set;
+  }, [bracketCourtAssignments]);
 
   // コート候補: リーグのコート名を個別コートに分解
   const courtOptions = useMemo(() => {
     const courtSet = new Set<string>();
     for (const l of leagues) {
       if (!l.courtName) continue;
-      // "6・7コート" → "6コート", "7コート" / "10・11コート" → "10コート", "11コート"
       const nums = l.courtName.match(/\d+/g);
       if (nums) {
-        for (const n of nums) courtSet.add(`${n} コート`);
+        for (const n of nums) courtSet.add(`${n}コート`);
       } else {
         courtSet.add(l.courtName);
       }
@@ -710,19 +726,24 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
         <div className="mb-3">
           <label className="text-xs font-bold text-gray-600 block mb-1">コート指定 *</label>
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {courtOptions.map(court => (
-              <button
-                key={court}
-                onClick={() => setCallCourt(court)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  callCourt === court
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {court}
-              </button>
-            ))}
+            {courtOptions.map(court => {
+              const isUsed = usedCourts.has(court);
+              return (
+                <button
+                  key={court}
+                  onClick={() => !isUsed && setCallCourt(court)}
+                  disabled={isUsed}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isUsed ? 'bg-gray-50 text-gray-300 cursor-not-allowed' :
+                    callCourt === court
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {court}{isUsed && <span className="text-[8px] block text-gray-300">使用中</span>}
+                </button>
+              );
+            })}
           </div>
           <input
             type="text"

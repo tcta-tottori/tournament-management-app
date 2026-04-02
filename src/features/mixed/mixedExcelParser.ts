@@ -85,6 +85,8 @@ function detectLeagueRows(ws: XLSX.WorkSheet): LeagueRow[] {
           break;
         }
       }
+      // 全角数字→半角数字に統一
+      courtName = courtName.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       results.push({
         leagueId: m[1],
         row: r + 1,       // 1-based
