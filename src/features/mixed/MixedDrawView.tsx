@@ -424,12 +424,12 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                             </div>
                           </td>
                           <td className="px-1.5 sm:px-2 py-2 w-[130px] sm:w-[150px]">
-                            <div className="text-[12px] sm:text-[13px] font-bold text-gray-800 leading-snug"><AlignedName name={team.male.name} /></div>
-                            <div className="text-[12px] sm:text-[13px] font-bold text-gray-800 leading-snug"><AlignedName name={team.female.name} /></div>
+                            <div className="text-sm font-bold text-gray-800 leading-snug"><AlignedName name={team.male.name} /></div>
+                            <div className="text-sm font-bold text-gray-800 leading-snug"><AlignedName name={team.female.name} /></div>
                           </td>
                           <td className="px-1.5 sm:px-2 py-2 w-[80px] sm:w-[100px] border-l border-gray-200">
-                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-snug truncate">{team.male.affiliation}</div>
-                            <div className="text-[10px] sm:text-[11px] text-gray-400 leading-snug truncate">{team.female.affiliation}</div>
+                            <div className="text-[11px] text-gray-400 leading-snug truncate">{team.male.affiliation}</div>
+                            <div className="text-[11px] text-gray-400 leading-snug truncate">{team.female.affiliation}</div>
                           </td>
                           {league.teams.map((colTeam, colIdx) => {
                             const cell = getCellDisplay(team.teamId, colTeam.teamId);

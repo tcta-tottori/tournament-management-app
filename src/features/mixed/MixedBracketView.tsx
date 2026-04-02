@@ -1184,9 +1184,9 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = compact ? 84 : 120;
-  const BYE_HEIGHT = compact ? 36 : 50;
-  const MATCH_WIDTH = compact ? 220 : 280;
+  const MATCH_HEIGHT = compact ? 84 : 130;
+  const BYE_HEIGHT = compact ? 36 : 56;
+  const MATCH_WIDTH = compact ? 220 : 300;
   const ROUND_GAP = compact ? 36 : 52;
   const MATCH_GAP = compact ? 12 : 24; // ボタン分の余白を確保
 
@@ -1307,13 +1307,13 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                           <div className="flex items-center gap-1 flex-1 min-w-0">
                             <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{winnerData.pairNumber}</span>
                             <div className="shrink-0" style={{ width: 95 }}>
-                              <div className="text-[11px] font-bold leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                              <div className="text-[11px] leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
                             </div>
                             <div className="w-px h-7 bg-gray-200 shrink-0" />
                             <div className="flex-1 min-w-0 text-center">
-                              <div className="text-[8px] text-gray-400 truncate">{winnerData.male.affiliation}</div>
-                              <div className="text-[8px] text-gray-400 truncate">{winnerData.female.affiliation}</div>
+                              <div className="text-[11px] text-gray-400 truncate">{winnerData.male.affiliation}</div>
+                              <div className="text-[11px] text-gray-400 truncate">{winnerData.female.affiliation}</div>
                             </div>
                           </div>
                         ) : (
@@ -1345,13 +1345,13 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{teamData.pairNumber}</span>
                             <div className="shrink-0" style={{ width: 95 }}>
-                              <div className="text-[11px] font-bold leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                              <div className="text-[11px] leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
                             </div>
                             <div className="w-px h-7 bg-gray-200 shrink-0" />
                             <div className="flex-1 min-w-0 text-center">
-                              <div className="text-[8px] text-gray-400 truncate">{teamData.male.affiliation}</div>
-                              <div className="text-[8px] text-gray-400 truncate">{teamData.female.affiliation}</div>
+                              <div className="text-[11px] text-gray-400 truncate">{teamData.male.affiliation}</div>
+                              <div className="text-[11px] text-gray-400 truncate">{teamData.female.affiliation}</div>
                             </div>
                           </div>
                         ) : slot.ph?.leagueId ? (

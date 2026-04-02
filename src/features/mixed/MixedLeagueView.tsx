@@ -182,8 +182,8 @@ export default function MixedLeagueView() {
                     </div>
                     <div className="w-px h-8 bg-gray-200 mx-2 shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-xs text-gray-500 truncate">{team.male.affiliation}</div>
-                      <div className="text-xs text-gray-400 truncate">{team.female.affiliation}</div>
+                      <div className="text-[11px] text-gray-400 truncate">{team.male.affiliation}</div>
+                      <div className="text-[11px] text-gray-400 truncate">{team.female.affiliation}</div>
                     </div>
                   </div>
                 </td>
