@@ -34,6 +34,9 @@ export default function MixedLeagueView() {
 
   const leagueMatchList = leagueMatches.filter(m => m.leagueId === selectedLeague.leagueId);
   const finishedCount = leagueMatchList.filter(m => m.status === 'finished').length;
+
+  // エントリーが全員完了しているか（全員 'entry' または 'def'）
+  const allEntryDone = selectedLeague.teams.every(t => t.status === 'entry' || t.status === 'def');
   const totalCount = leagueMatchList.length;
   const standings = allStandings.get(selectedLeague.leagueId) || [];
 
@@ -150,6 +153,7 @@ export default function MixedLeagueView() {
                       className={`px-2 py-2 text-center text-sm ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors ${cell.text === '__DIAG__' ? 'relative' : ''}`}
                       onClick={() => {
                         if (team.teamId === colTeam.teamId) return;
+                        if (!allEntryDone) return; // エントリー未完了は入力不可
                         const forwardMatch = leagueMatchList.find(m =>
                           (m.team1Id === team.teamId && m.team2Id === colTeam.teamId) ||
                           (m.team1Id === colTeam.teamId && m.team2Id === team.teamId)
@@ -327,6 +331,17 @@ export default function MixedLeagueView() {
         </div>
           );
         })()}
+
+        {/* エントリー未完了警告 */}
+        {!allEntryDone && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-orange-700 flex items-center gap-2">
+            <span className="text-lg">⚠</span>
+            <div>
+              <div className="font-bold">エントリーが完了していません</div>
+              <div className="text-xs text-orange-500 mt-0.5">エントリーページで全選手の参加確認を完了してからスコア入力してください</div>
+            </div>
+          </div>
+        )}
 
         {/* Score matrix table */}
         {scoreMatrixTable}

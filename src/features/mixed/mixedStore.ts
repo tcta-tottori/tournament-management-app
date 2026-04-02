@@ -238,9 +238,36 @@ export const useMixedStore = create<MixedState>()(
         set(state => {
           const updateTeam = (team: MixedTeam): MixedTeam =>
             team.teamId === teamId ? { ...team, status } : team;
+
+          // DEFの場合: そのチームの全予選試合を相手勝利(0-0, DEF)にする
+          let newLeagueMatches = state.leagueMatches;
+          if (status === 'def') {
+            newLeagueMatches = state.leagueMatches.map(m => {
+              if (m.status === 'finished') return m; // 既に完了済みはそのまま
+              if (m.team1Id === teamId) {
+                return { ...m, score1: 0, score2: 0, winnerId: m.team2Id, status: 'finished' as const };
+              }
+              if (m.team2Id === teamId) {
+                return { ...m, score1: 0, score2: 0, winnerId: m.team1Id, status: 'finished' as const };
+              }
+              return m;
+            });
+          }
+          // DEF解除の場合: DEFで自動処理した試合をリセット
+          if (status !== 'def') {
+            newLeagueMatches = state.leagueMatches.map(m => {
+              if ((m.team1Id === teamId || m.team2Id === teamId) &&
+                  m.status === 'finished' && m.score1 === 0 && m.score2 === 0) {
+                return { ...m, score1: null, score2: null, winnerId: null, status: 'waiting' as const };
+              }
+              return m;
+            });
+          }
+
           return {
             leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateTeam) })),
             allTeams: state.allTeams.map(updateTeam),
+            leagueMatches: newLeagueMatches,
           };
         });
       },
