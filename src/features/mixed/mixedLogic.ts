@@ -212,7 +212,7 @@ export function generateAllBrackets(
   standings: Map<string, LeagueStanding[]>,
   _allTeams: MixedTeam[],
   leagues: MixedLeague[],
-  bracketOrders?: TournamentInfo['bracketOrders']
+  _bracketOrders?: TournamentInfo['bracketOrders']
 ): PlacementBracket[] {
   const categories: { cat: PlacementCategory; label: string; rank: number }[] = [
     { cat: '1st', label: '1位トーナメント', rank: 1 },

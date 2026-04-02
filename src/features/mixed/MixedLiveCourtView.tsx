@@ -77,28 +77,43 @@ export default function MixedLiveCourtView() {
   const totalMatches = leagueTotal + bracketTotal;
   const progressPct = totalMatches > 0 ? Math.round((totalFinished / totalMatches) * 100) : 0;
 
-  // コート状態集計
-  const courtStats = useMemo(() => {
-    let playing = 0, ready = 0, complete = 0, empty = 0;
+  // 物理コート(1〜16)の固定配置マップを構築
+  // 各リーグのコート名から番号を抽出してマッピング
+  const courtMap = useMemo(() => {
+    const map = new Map<number, { league: MixedLeague; status: ReturnType<typeof getLeagueCourtStatus>; nextMatch: LeagueMatchScore | null } | null>();
+    // 1〜16の物理コートを用意
+    for (let i = 1; i <= 16; i++) map.set(i, null);
+
     for (const league of leagues) {
       const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
-      const s = getLeagueCourtStatus(league, lm);
-      if (s.status === 'playing') playing++;
-      else if (s.status === 'ready') ready++;
-      else if (s.status === 'complete') complete++;
-      else empty++;
+      const cs = getLeagueCourtStatus(league, lm);
+      const nextMatch = lm.filter(m => m.status !== 'finished').sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
+      // コート名から番号を抽出 (例: "6・7コート" → [6,7], "1コート" → [1])
+      const nums = league.courtName?.match(/\d+/g);
+      if (nums) {
+        for (const n of nums) {
+          map.set(parseInt(n), { league, status: cs, nextMatch });
+        }
+      }
     }
-    return { playing, ready, complete, empty };
+    return map;
   }, [leagues, leagueMatches]);
 
-  // コートブロック: 4コートずつグループ化
-  const courtBlocks = useMemo(() => {
-    const blocks: MixedLeague[][] = [];
-    for (let i = 0; i < leagues.length; i += 4) {
-      blocks.push(leagues.slice(i, i + 4));
+  // 4コートごとのブロック: 1-4, 5-8, 9-12, 13-16
+  const physicalBlocks = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]];
+
+  // コート状態集計
+  const courtStats = useMemo(() => {
+    let playing = 0, occupied = 0, empty = 0;
+    for (const [, info] of courtMap) {
+      if (!info) { empty++; continue; }
+      if (info.status.status === 'playing') playing++;
+      else if (info.status.isComplete) occupied++;
+      else if (info.nextMatch) playing++;
+      else empty++;
     }
-    return blocks;
-  }, [leagues]);
+    return { playing, occupied, empty };
+  }, [courtMap]);
 
   const getTeamName = (id: string) => allTeams.find(t => t.teamId === id)?.teamName || '';
 
@@ -139,7 +154,7 @@ export default function MixedLiveCourtView() {
           {[
             { icon: Users, label: '全試合数', value: totalMatches, color: 'text-gray-600 bg-gray-50 border-gray-200' },
             { icon: Play, label: '予選リーグ', value: `${leagueFinished}/${leagueTotal}`, color: 'text-green-700 bg-green-50 border-green-200' },
-            { icon: CheckCircle, label: 'リーグ完了', value: `${courtStats.complete}/${leagues.length}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
+            { icon: CheckCircle, label: '使用中', value: `${courtStats.occupied}`, color: 'text-blue-700 bg-blue-50 border-blue-200' },
             { icon: Trophy, label: '決勝T', value: brackets.length > 0 ? `${bracketFinished}/${bracketTotal}` : '―', color: 'text-amber-700 bg-amber-50 border-amber-200' },
           ].map(({ icon: Icon, label, value, color }) => (
             <div key={label} className={`rounded-xl border p-3 ${color}`}>
@@ -160,78 +175,78 @@ export default function MixedLiveCourtView() {
           </h2>
           <div className="flex gap-3 text-[10px] flex-wrap">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" />試合中 {courtStats.playing}</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" />完了 {courtStats.complete}</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-100 border border-blue-200" />準備 {courtStats.ready}</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200" />待機 {courtStats.empty}</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" />使用中 {courtStats.occupied}</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-100 border border-green-200" />空き {courtStats.empty}</span>
           </div>
         </div>
 
-        {/* モバイル: ブロックごとに4コート */}
+        {/* 物理コート配置: 4コートごとのブロック */}
         <div className="flex flex-col gap-3 items-center">
-          {courtBlocks.map((block, blockIdx) => (
+          {physicalBlocks.map((block, blockIdx) => (
             <div key={blockIdx} className="contents">
               <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
-                {/* ブロックラベル */}
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {block[0]?.courtName?.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}〜{block[block.length - 1]?.courtName?.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}
+                    {block[0]}〜{block[block.length - 1]}
                   </span>
                 </div>
-                {/* コートブロック: 4列グリッド */}
                 <div className="grid grid-cols-4 gap-2">
-                  {block.map(league => {
-                    const lMatches = leagueMatches.filter(m => m.leagueId === league.leagueId);
-                    const cs = getLeagueCourtStatus(league, lMatches);
-                    const courtNum = league.courtName?.replace(/[^\d]/g, '') || league.leagueId;
+                  {block.map(courtNum => {
+                    const info = courtMap.get(courtNum);
+                    const isOccupied = !!info;
+                    const isPlaying = info && !info.status.isComplete && info.nextMatch;
+                    const isComplete = info?.status.isComplete;
 
-                    const statusStyles = {
-                      playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' },
-                      ready: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' },
-                      complete: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700' },
-                      empty: { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-600' },
-                    };
-                    const style = statusStyles[cs.status];
+                    const statusStyle = isPlaying
+                      ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' }
+                      : isComplete
+                        ? { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700' }
+                        : isOccupied
+                          ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' }
+                          : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500' };
 
                     return (
                       <div
-                        key={league.leagueId}
-                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${style.bg} ${style.border}`}
+                        key={courtNum}
+                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
-                        <VerticalCourtLines status={cs.status} />
+                        <VerticalCourtLines status={isPlaying ? 'playing' : isComplete ? 'complete' : isOccupied ? 'ready' : 'empty'} />
                         <div className="relative z-10 flex flex-col h-full p-1.5">
-                          {/* 上: コート番号 + バッジ */}
+                          {/* コート番号 + ステータス */}
                           <div className="flex items-center justify-between mb-0.5">
-                            <div className={`text-xl font-black ${style.text} leading-none`}>{courtNum}</div>
-                            {cs.status === 'playing' && (
+                            <div className={`text-xl font-black ${statusStyle.text} leading-none`}>{courtNum}</div>
+                            {isPlaying && (
                               <span className="flex items-center gap-0.5 bg-green-500 text-white text-[6px] font-bold px-1 py-0.5 rounded-full leading-none">
                                 <Play className="w-1.5 h-1.5 fill-white" /> LIVE
                               </span>
                             )}
-                            {cs.status === 'complete' && (
-                              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                            )}
+                            {isComplete && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
                           </div>
 
-                          {/* リーグID */}
-                          <div className="text-[9px] font-bold text-gray-500 mb-0.5">{league.leagueId}リーグ</div>
-
-                          {/* 進捗 */}
-                          <div className="text-[8px] text-gray-400 mb-1">{cs.finished}/{cs.total}試合</div>
-
-                          {/* 中央: 対戦情報（現在試合中のペアを表示） */}
+                          {/* 中央: コート使用状況 */}
                           <div className="flex-1 flex flex-col justify-center min-w-0">
-                            {cs.nextMatch ? (
-                              <div className="space-y-0">
-                                <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{cs.nextMatch.matchNumber}試合</p>
-                                <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team1Id)}</p>
-                                <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
-                                <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team2Id)}</p>
-                              </div>
-                            ) : cs.isComplete ? (
-                              <p className="text-[8px] text-emerald-600 text-center font-bold">全試合完了</p>
+                            {info ? (
+                              <>
+                                <div className="text-[9px] font-bold text-gray-500 mb-0.5">{info.league.leagueId}リーグ</div>
+                                <div className="text-[7px] text-gray-400 mb-1">{info.status.finished}/{info.status.total}試合</div>
+                                {info.nextMatch ? (
+                                  <div className="space-y-0">
+                                    <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{info.nextMatch.matchNumber}試合</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team1Id)}</p>
+                                    <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
+                                  </div>
+                                ) : info.status.isComplete ? (
+                                  <p className="text-[8px] text-emerald-600 text-center font-bold">完了</p>
+                                ) : (
+                                  <p className="text-[8px] text-gray-400 text-center">待機中</p>
+                                )}
+                              </>
                             ) : (
-                              <p className="text-[8px] text-gray-400 text-center">待機中</p>
+                              <div className="flex flex-col items-center justify-center flex-1">
+                                <p className="text-[10px] text-gray-400 font-medium">空き</p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -241,7 +256,7 @@ export default function MixedLiveCourtView() {
                 </div>
               </div>
               {/* 通路 */}
-              {blockIdx < courtBlocks.length - 1 && (
+              {blockIdx < physicalBlocks.length - 1 && (
                 <div className="flex items-center gap-2 w-full max-w-lg">
                   <div className="flex-1 h-px bg-gray-200" />
                   <span className="text-[9px] text-gray-400">通路</span>

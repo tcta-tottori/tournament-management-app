@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ClipboardList, Printer, Volume2, VolumeX, Play, CheckCircle } from 'lucide-react';
+import { ClipboardList, Printer, Volume2, VolumeX, Play } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
