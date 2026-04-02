@@ -205,7 +205,7 @@ function buildMixedCallText(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues, regenerateBrackets } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -358,6 +358,7 @@ export default function MixedBracketView() {
   }, [brackets]);
 
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting' | 'all'>('bracket');
+  const [drawEditMode, setDrawEditMode] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -464,16 +465,23 @@ export default function MixedBracketView() {
         })}
       </div>
 
-      {/* トーナメント再生成ボタン */}
+      {/* ドロー編集ボタン */}
       <div className="flex justify-end">
         <button
-          onClick={() => { if (window.confirm('ドロー表の並び順でトーナメントを再生成しますか？\n（1位トーナメントで試合が開始済みの場合は維持されます）')) regenerateBrackets(); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+          onClick={() => setDrawEditMode(!drawEditMode)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+            drawEditMode ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200'
+          }`}
         >
           <RotateCcw size={12} />
-          並び順を再生成
+          {drawEditMode ? 'ドロー編集を終了' : 'ドロー編集'}
         </button>
       </div>
+
+      {/* ドロー編集パネル */}
+      {drawEditMode && currentBracket && (
+        <DrawEditPanel bracket={currentBracket} />
+      )}
 
       {/* 1位トーナメント: ルーレット抽選 */}
       {is1stBracket && noMatchesStarted && currentBracket && (
@@ -831,6 +839,116 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
         <button onClick={onClose} className="w-full py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm active:scale-[0.98] transition-all">
           閉じる
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** ドロー編集パネル: 1回戦の対戦順を手動で修正 */
+function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
+  const { shuffleBracketSeeds } = useMixedStore();
+  const allTeams = useMixedStore(s => s.allTeams);
+
+  // 1回戦のスロット順を取得（上から順に team1, team2, team1, team2...）
+  const r1Matches = bracket.matches.filter(m => m.round === 1).sort((a, b) => a.position - b.position);
+  const slots: { teamId: string | null; teamName: string; league: string; isBye: boolean; matchIdx: number; slotIdx: 'team1' | 'team2' }[] = [];
+  for (let i = 0; i < r1Matches.length; i++) {
+    const m = r1Matches[i];
+    slots.push({ teamId: m.team1Id, teamName: m.team1Name, league: m.team1League, isBye: !m.team1Id && m.team2Name === 'BYE' ? false : !m.team1Id, matchIdx: i, slotIdx: 'team1' });
+    slots.push({ teamId: m.team2Id, teamName: m.team2Name, league: m.team2League, isBye: m.team2Name === 'BYE' || (!m.team2Id && !!m.team1Id), matchIdx: i, slotIdx: 'team2' });
+  }
+
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  const swapSlots = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    // 新しい順序を構築
+    const newSlots = [...slots];
+    const temp = newSlots[fromIdx];
+    newSlots[fromIdx] = newSlots[toIdx];
+    newSlots[toIdx] = temp;
+    // teamId順序を構築してshuffleBracketSeedsに渡す
+    const newOrder = newSlots.filter(s => s.teamId).map(s => s.teamId!);
+    shuffleBracketSeeds(bracket.category, newOrder);
+  };
+
+  const hasStartedMatches = r1Matches.some(m => m.status === 'finished' || m.status === 'playing');
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
+        <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2">
+          <RotateCcw size={16} className="text-blue-600" />
+          ドロー編集
+          <span className="text-[10px] font-normal text-blue-500">（スロットをタップして入れ替え）</span>
+        </h3>
+      </div>
+      <div className="p-4">
+        {hasStartedMatches && (
+          <div className="mb-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
+            試合が開始済みのため編集できません。
+          </div>
+        )}
+        <div className="space-y-0.5">
+          {slots.map((slot, idx) => {
+            const isMatchBoundary = idx % 2 === 0 && idx > 0;
+            const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+            const isSelected = dragIdx === idx;
+            const matchNum = Math.floor(idx / 2) + 1;
+
+            return (
+              <div key={idx}>
+                {isMatchBoundary && <div className="h-2" />}
+                {idx % 2 === 0 && (
+                  <div className="text-[9px] text-gray-400 font-bold mb-0.5 ml-1">第{matchNum}試合</div>
+                )}
+                <button
+                  disabled={hasStartedMatches}
+                  onClick={() => {
+                    if (hasStartedMatches) return;
+                    if (dragIdx === null) {
+                      setDragIdx(idx);
+                    } else {
+                      swapSlots(dragIdx, idx);
+                      setDragIdx(null);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
+                    isSelected ? 'bg-blue-100 border-2 border-blue-400 ring-2 ring-blue-200' :
+                    dragIdx !== null ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 cursor-pointer' :
+                    slot.isBye || slot.teamName === 'BYE' ? 'bg-gray-50 border border-gray-200 text-gray-400' :
+                    'bg-white border border-gray-200 hover:bg-gray-50'
+                  } ${hasStartedMatches ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className="w-5 text-center text-[10px] text-gray-400 font-mono shrink-0">{idx + 1}</span>
+                  {slot.teamId && slot.league ? (
+                    <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                      {slot.league}
+                    </span>
+                  ) : <span className="w-5 shrink-0" />}
+                  {teamData ? (
+                    <span className="font-bold text-gray-800">{teamData.teamName}</span>
+                  ) : slot.teamName === 'BYE' || slot.isBye ? (
+                    <span className="text-gray-400 italic">BYE</span>
+                  ) : (
+                    <span className="text-gray-400">―</span>
+                  )}
+                  {teamData && <span className="text-[10px] text-gray-400 ml-auto">No.{teamData.pairNumber}</span>}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {dragIdx !== null && (
+          <div className="mt-3 text-center text-xs text-blue-600 font-medium animate-pulse">
+            入れ替え先のスロットをタップしてください
+          </div>
+        )}
+        {dragIdx !== null && (
+          <button onClick={() => setDragIdx(null)} className="mt-2 w-full py-2 bg-gray-100 text-gray-500 rounded-lg text-xs hover:bg-gray-200">
+            選択を取り消し
+          </button>
+        )}
       </div>
     </div>
   );
