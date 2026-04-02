@@ -365,13 +365,11 @@ export const useMixedStore = create<MixedState>()(
           if (bracketIdx === -1) return state;
 
           const bracket = state.brackets[bracketIdx];
-          // Reorder teams based on newOrder
           const reorderedTeams = newOrder.map((teamId, i) => {
             const existing = bracket.teams.find(t => t.teamId === teamId);
             return existing ? { ...existing, seedPosition: i + 1 } : null;
           }).filter((t): t is NonNullable<typeof t> => t !== null);
 
-          // Regenerate matches with new team order
           const drawSize = bracket.drawSize;
           const totalRounds = Math.log2(drawSize);
           const matches: BracketMatch[] = [];
@@ -395,13 +393,24 @@ export const useMixedStore = create<MixedState>()(
             }
           }
 
-          // Place teams in round 1
+          // 16スロット配列を構築（BYE位置: slot2,slot8,slot16 = index 1,7,15）
+          const BYE_POSITIONS = new Set([1, 7, 15]);
+          const slots: (typeof reorderedTeams[0] | null)[] = Array(drawSize).fill(null);
+          let teamIdx = 0;
+          for (let i = 0; i < drawSize; i++) {
+            if (BYE_POSITIONS.has(i)) continue; // BYEスロットはnullのまま
+            if (teamIdx < reorderedTeams.length) {
+              slots[i] = reorderedTeams[teamIdx++];
+            }
+          }
+
+          // R1マッチにスロットから配置
           const r1 = matches.filter(m => m.round === 1);
           for (let i = 0; i < r1.length; i++) {
-            const t1 = i * 2 < reorderedTeams.length ? reorderedTeams[i * 2] : null;
-            const t2 = i * 2 + 1 < reorderedTeams.length ? reorderedTeams[i * 2 + 1] : null;
-            if (t1) { r1[i].team1Id = t1.teamId; r1[i].team1Name = t1.teamName; r1[i].team1League = t1.leagueId; }
-            if (t2) { r1[i].team2Id = t2.teamId; r1[i].team2Name = t2.teamName; r1[i].team2League = t2.leagueId; }
+            const s1 = slots[i * 2];
+            const s2 = slots[i * 2 + 1];
+            if (s1) { r1[i].team1Id = s1.teamId; r1[i].team1Name = s1.teamName; r1[i].team1League = s1.leagueId; }
+            if (s2) { r1[i].team2Id = s2.teamId; r1[i].team2Name = s2.teamName; r1[i].team2League = s2.leagueId; }
             if (r1[i].team1Id && !r1[i].team2Id) {
               r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team1Id; r1[i].team2Name = 'BYE';
             } else if (!r1[i].team1Id && r1[i].team2Id) {
