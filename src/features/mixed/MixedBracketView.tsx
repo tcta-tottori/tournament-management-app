@@ -45,10 +45,11 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
 function printRefereeSheet(
   match: BracketMatch,
   allTeams: MixedTeam[],
-  tournamentName: string,
+  _tournamentName: string,
   bracketLabel: string,
   roundLabel: string,
   gameRule: string,
+  tournamentInfo?: { date?: string } | null,
 ) {
   const team1 = allTeams.find(t => t.teamId === match.team1Id);
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
@@ -58,117 +59,98 @@ function printRefereeSheet(
 <html><head><meta charset="utf-8">
 <title>審判用紙 - ${bracketLabel}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm; }
+  @page { size: B5 landscape; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', monospace; color: #000; }
-  .page { width: 190mm; border: 2px solid #000; }
-  /* タイトル */
-  .title { text-align: center; font-size: 22pt; font-weight: bold; letter-spacing: 1em; padding: 5mm 0; border-bottom: 2px solid #000; background: #e8f4e8; }
-  /* 大会名 */
-  .tourney { display: flex; justify-content: center; align-items: baseline; gap: 20mm; padding: 3mm 5mm; border-bottom: 1px solid #000; }
-  .tourney-name { font-size: 12pt; font-weight: bold; }
-  /* 種目・回戦 */
-  .info-row { display: flex; border-bottom: 1px solid #000; min-height: 12mm; }
-  .info-cell { display: flex; align-items: center; justify-content: center; padding: 2mm 3mm; border-right: 1px solid #000; font-size: 10pt; }
-  .info-cell:last-child { border-right: none; }
-  .info-label { background: #f5f5f5; font-weight: bold; min-width: 28mm; justify-content: center; }
-  .info-value { flex: 1; font-size: 13pt; font-weight: bold; }
-  /* 選手 */
-  .players-row { display: flex; border-bottom: 1px solid #000; min-height: 28mm; }
-  .player-label { width: 28mm; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; border-right: 1px solid #000; background: #f5f5f5; }
-  .player-side { flex: 1; display: flex; border-right: 1px solid #000; }
-  .player-side:last-child { border-right: none; }
-  .player-no { width: 16mm; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #000; }
-  .player-no-num { font-size: 18pt; font-weight: bold; }
-  .player-names { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2mm 4mm; }
-  .player-name { font-size: 13pt; font-weight: bold; line-height: 1.6; }
-  .player-aff { display: flex; flex-direction: column; justify-content: center; padding: 2mm 3mm; min-width: 30mm; }
-  .player-aff span { font-size: 8pt; line-height: 1.6; }
-  /* スコア */
-  .score-section { display: flex; align-items: center; justify-content: center; padding: 8mm 0; border-bottom: 1px solid #000; gap: 5mm; }
-  .score-box { width: 20mm; height: 20mm; border: 2px solid #000; }
-  .score-dash { font-size: 24pt; font-weight: bold; }
-  .score-group { text-align: center; }
-  .score-label { font-size: 8pt; margin-bottom: 2mm; }
-  .tb-group { margin-left: 8mm; text-align: center; }
-  .tb-box { width: 14mm; height: 14mm; border: 1.5px solid #000; }
-  /* 下段 */
-  .bottom-row { display: flex; border-bottom: 1px solid #000; min-height: 10mm; }
-  .bottom-cell { flex: 1; display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; }
-  .bottom-cell:last-child { border-right: none; }
-  .uline { display: inline-block; border-bottom: 1px solid #000; min-width: 28mm; margin-left: 2mm; }
-  .notes { min-height: 15mm; padding: 2mm 3mm; font-size: 8pt; color: #999; }
+  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', monospace; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 232mm; margin: auto; }
+  .title { text-align: center; font-size: 22pt; font-weight: bold; letter-spacing: 1.5em; padding: 3mm 0 1mm; }
+  .subtitle { display: flex; justify-content: center; gap: 40mm; font-size: 9pt; padding: 0 0 3mm; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1.5px solid #000; padding: 2mm 3mm; font-size: 10pt; vertical-align: middle; }
+  th { background: #f5f5f5; font-weight: bold; text-align: center; }
+  .row-label { width: 24mm; text-align: center; font-weight: bold; font-size: 9pt; letter-spacing: 0.3em; }
+  .val { font-size: 12pt; font-weight: bold; text-align: center; }
+  .val-lg { font-size: 16pt; font-weight: bold; text-align: center; }
+  .name-cell { font-size: 14pt; font-weight: bold; padding: 3mm 5mm; line-height: 1.6; }
+  .aff-cell { font-size: 8pt; padding: 2mm 3mm; line-height: 1.6; white-space: nowrap; }
+  .score-row td { height: 28mm; text-align: center; vertical-align: top; padding-top: 3mm; }
+  .score-label { font-size: 9pt; font-weight: bold; letter-spacing: 0.2em; }
+  .score-box-area { display: flex; align-items: center; justify-content: center; gap: 4mm; margin-top: 3mm; }
+  .score-box { width: 18mm; height: 18mm; border: 2px solid #000; display: inline-block; }
+  .score-dash { font-size: 22pt; font-weight: bold; }
+  .tb-area { margin-top: 1mm; }
+  .tb-label { font-size: 8pt; }
+  .tb-box { width: 14mm; height: 14mm; border: 1.5px solid #000; display: inline-block; margin-top: 1mm; }
+  .footer-row td { height: 10mm; font-size: 9pt; }
+  .uline { display: inline-block; border-bottom: 1px solid #000; min-width: 30mm; margin-left: 1mm; }
+  .notes td { height: 12mm; font-size: 8pt; color: #999; }
+  .credit { text-align: right; font-size: 8pt; padding: 1mm 2mm 0; }
 </style>
 </head><body>
 <div class="page">
-  <div class="title">審 判 用 紙</div>
-  <div class="tourney">
-    <span class="tourney-name">${tournamentName}</span>
+  <div class="title">審　判　用　紙</div>
+  <div class="subtitle">
+    <span>&nbsp;</span>
+    <span>${(tournamentInfo as any)?.date || ''}</span>
   </div>
-  <div class="info-row">
-    <div class="info-cell info-label">種　目</div>
-    <div class="info-cell info-value">${bracketLabel}</div>
-    <div class="info-cell info-label">回　戦</div>
-    <div class="info-cell info-value">${roundLabel}</div>
-  </div>
-  <div class="info-row">
-    <div class="info-cell info-label">コートNo.</div>
-    <div class="info-cell info-value" style="flex:0.5;">&nbsp;</div>
-    <div class="info-cell info-label">試合方法</div>
-    <div class="info-cell info-value" style="font-size:9pt;">${gameRule}</div>
-    <div class="info-cell info-label">開始時間</div>
-    <div class="info-cell info-value" style="flex:0.5;">&nbsp;</div>
-  </div>
-  <div class="info-row" style="min-height:8mm;">
-    <div class="info-cell info-label">エントリーNo.</div>
-    <div class="info-cell" style="flex:1;justify-content:center;"><b style="font-size:9pt;">No.</b> <b style="font-size:16pt;margin-left:3mm;">${team1.pairNumber}</b></div>
-    <div class="info-cell" style="flex:1;justify-content:center;"><b style="font-size:9pt;">No.</b> <b style="font-size:16pt;margin-left:3mm;">${team2.pairNumber}</b></div>
-  </div>
-  <div class="players-row">
-    <div class="player-label">選手氏名</div>
-    <div class="player-side">
-      <div class="player-names">
-        <div class="player-name">${team1.male.name}</div>
-        <div class="player-name">${team1.female.name}</div>
-      </div>
-      <div class="player-aff">
-        <span>（ ${team1.male.affiliation} ）</span>
-        <span>（ ${team1.female.affiliation} ）</span>
-      </div>
-    </div>
-    <div class="player-side">
-      <div class="player-names">
-        <div class="player-name">${team2.male.name}</div>
-        <div class="player-name">${team2.female.name}</div>
-      </div>
-      <div class="player-aff">
-        <span>（ ${team2.male.affiliation} ）</span>
-        <span>（ ${team2.female.affiliation} ）</span>
-      </div>
-    </div>
-  </div>
-  <div class="score-section">
-    <div class="score-group">
-      <div class="score-label">No.${team1.pairNumber}</div>
-      <div class="score-box"></div>
-    </div>
-    <div class="score-dash">ー</div>
-    <div class="score-group">
-      <div class="score-label">No.${team2.pairNumber}</div>
-      <div class="score-box"></div>
-    </div>
-    <div class="tb-group">
-      <div class="score-label">（ＴＢ）</div>
-      <div class="tb-box"></div>
-    </div>
-  </div>
-  <div class="bottom-row">
-    <div class="bottom-cell">コー<br>ト：<span class="uline"></span></div>
-    <div class="bottom-cell">開始時<br>刻：<span class="uline"></span></div>
-    <div class="bottom-cell">終了時<br>刻：<span class="uline"></span></div>
-    <div class="bottom-cell">審判：<span class="uline"></span></div>
-  </div>
-  <div class="notes">備考：</div>
+  <table>
+    <tr>
+      <th class="row-label">種　目</th>
+      <td class="val" colspan="2">${bracketLabel}</td>
+      <th class="row-label">回　戦</th>
+      <td class="val" colspan="2">${roundLabel}</td>
+    </tr>
+    <tr>
+      <th class="row-label">コートNo.</th>
+      <td style="width:14%;">&nbsp;</td>
+      <th style="width:12%;">試合方法</th>
+      <td style="font-size:9pt;text-align:center;">${gameRule.replace(/\n/g, '<br>')}</td>
+      <th style="width:12%;">開始時間</th>
+      <td style="width:14%;">&nbsp;</td>
+    </tr>
+    <tr>
+      <th class="row-label">エントリーNo.</th>
+      <td class="val-lg" colspan="2">No.　${team1.pairNumber}</td>
+      <td class="val-lg" colspan="3">No.　${team2.pairNumber}</td>
+    </tr>
+    <tr>
+      <th class="row-label">選手氏名</th>
+      <td class="name-cell" colspan="1">${team1.male.name}<br>${team1.female.name}</td>
+      <td class="aff-cell">（ ${team1.male.affiliation} ）<br>（ ${team1.female.affiliation} ）</td>
+      <td class="name-cell" colspan="2">${team2.male.name}<br>${team2.female.name}</td>
+      <td class="aff-cell">（ ${team2.male.affiliation} ）<br>（ ${team2.female.affiliation} ）</td>
+    </tr>
+    <tr class="score-row">
+      <td>
+        <div class="score-label">ス　コ　ア</div>
+        <div class="tb-area"><span class="tb-label">（ＴＢ）</span></div>
+      </td>
+      <td colspan="2">
+        <div class="score-box-area">
+          <div class="score-box"></div>
+        </div>
+      </td>
+      <td style="border-left:none;border-right:none;">
+        <div class="score-dash">ー</div>
+        <div class="tb-area">（　　　）</div>
+      </td>
+      <td colspan="2">
+        <div class="score-box-area">
+          <div class="score-box"></div>
+        </div>
+      </td>
+    </tr>
+    <tr class="footer-row">
+      <td colspan="2">コート：<span class="uline"></span></td>
+      <td>開始時刻：<span class="uline"></span></td>
+      <td>終了時刻：<span class="uline"></span></td>
+      <td colspan="2">審判：<span class="uline"></span></td>
+    </tr>
+    <tr class="notes">
+      <td colspan="6">備考：</td>
+    </tr>
+  </table>
+  <div class="credit">鳥取市テニス協会</div>
 </div>
 </body></html>`;
 
@@ -432,7 +414,7 @@ export default function MixedBracketView() {
             const allTeams = useMixedStore.getState().allTeams;
             const rules = tournamentInfo?.rules || [];
             const gameRule = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || 'ノーアド・6ゲームマッチ';
-            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel, gameRule);
+            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel, gameRule, tournamentInfo);
           }}
           onCall={(match) => {
             setCallMatch(match);
