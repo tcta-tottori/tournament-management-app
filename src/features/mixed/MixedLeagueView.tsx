@@ -101,7 +101,7 @@ export default function MixedLeagueView() {
   };
 
   const scoreMatrixTable = (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${!allEntryDone ? 'opacity-50 pointer-events-none' : ''}`}>
       <table className="w-full">
         <thead>
           <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -348,7 +348,7 @@ export default function MixedLeagueView() {
         {scoreMatrixTable}
 
         {/* Match order */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 ${!allEntryDone ? 'opacity-50 pointer-events-none' : ''}`}>
           <h3 className="text-sm font-bold text-gray-700 mb-3">対戦順</h3>
           <div className="flex flex-wrap gap-2">
             {selectedLeague.matchOrder.map(mo => {
