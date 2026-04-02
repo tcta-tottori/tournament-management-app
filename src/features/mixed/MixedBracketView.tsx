@@ -458,8 +458,8 @@ export default function MixedBracketView() {
           }
         }
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onClick={() => setCourtAssignMatch(null)}>
-            <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[380px] max-w-[95vw] p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setCourtAssignMatch(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[380px] p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <h3 className="text-sm font-bold text-gray-800 mb-3">コートに入れる</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
@@ -509,8 +509,8 @@ export default function MixedBracketView() {
 
       {/* スコア入力モーダル */}
       {editingMatch && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[420px] max-w-[95vw] p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4" onClick={() => setEditingMatch(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
@@ -1177,17 +1177,23 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false })}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
-                        <div className={`flex items-center justify-center gap-1.5 h-[30px] text-[10px] font-medium border-t border-gray-100
+                        <div className={`flex items-center h-[30px] text-[10px] font-medium border-t border-gray-100 px-2
                           ${isPlaying ? 'bg-green-50 text-green-700' :
-                            match.status === 'finished' ? 'bg-emerald-50 text-emerald-600' :
-                            'bg-amber-50 text-amber-600'}
+                            match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
+                            'bg-amber-50/50 text-amber-600'}
                         `}>
                           {isPlaying ? (
-                            <><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />{ca.courtName} {elapsedStr}</>
+                            <>
+                              <span className="flex items-center gap-1 shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                <span className="font-bold text-green-700">{ca.courtName.replace('コート', '')}コート</span>
+                              </span>
+                              <span className="ml-auto font-mono text-green-600">{elapsedStr}</span>
+                            </>
                           ) : match.status === 'finished' ? (
-                            <span>完了</span>
+                            <span className="mx-auto text-gray-400">完了</span>
                           ) : (
-                            <><span className="w-2 h-2 rounded-full bg-amber-400" />控え中</>
+                            <span className="mx-auto flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />控え中</span>
                           )}
                         </div>
                       )}

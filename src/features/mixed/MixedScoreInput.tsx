@@ -247,10 +247,10 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     : 'border-emerald-300';
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
         ref={popupRef}
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[440px] max-w-[95vw] max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] max-h-[80vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
