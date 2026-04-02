@@ -1077,25 +1077,48 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
               </div>
             </div>
 
-            {/* スロット（タップで手動配置） */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
-              {Array.from({ length: totalSlots }, (_, i) => {
-                const aid = assignedSlots.get(i);
-                const at = aid ? teams.find(t => t.teamId === aid) : null;
-                const hl = currentHighlight === i && spinning;
-                const canPlace = !assignedSlots.has(i) && activeTeam && !spinning;
+            {/* トーナメント表形式のスロット（対戦ペアで表示） */}
+            <div className="space-y-1 mb-4">
+              {Array.from({ length: totalSlots / 2 }, (_, matchIdx) => {
+                const circled = (n: number) => String.fromCodePoint(0x2460 + n); // ①②③...
+                const slot1 = matchIdx * 2;
+                const slot2 = matchIdx * 2 + 1;
+                const renderSlotRow = (slotIdx: number) => {
+                  const aid = assignedSlots.get(slotIdx);
+                  const at = aid ? teams.find(t => t.teamId === aid) : null;
+                  const hl = currentHighlight === slotIdx && spinning;
+                  const canPlace = !assignedSlots.has(slotIdx) && activeTeam && !spinning;
+                  return (
+                    <div key={slotIdx} onClick={() => canPlace && manualAssign(slotIdx)}
+                      className={`flex items-center gap-2 px-3 py-2 transition-all ${
+                        hl ? 'bg-yellow-200' :
+                        at ? 'bg-emerald-50' :
+                        canPlace ? 'bg-yellow-50 cursor-pointer hover:bg-yellow-100' : 'bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-sm font-bold text-gray-400 w-5 text-center shrink-0">{circled(slotIdx)}</span>
+                      {at ? (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[at.leagueId.trim()] || 'bg-gray-100 text-gray-600'}`}>{at.leagueId}</span>
+                          <span className="text-xs font-bold text-gray-800 truncate">{at.teamName}</span>
+                          <span className="text-[10px] text-gray-400 ml-auto shrink-0">No.{at.pairNumber}</span>
+                        </div>
+                      ) : canPlace ? (
+                        <span className="text-[10px] text-yellow-500 flex-1">← タップで配置</span>
+                      ) : (
+                        <span className="text-[10px] text-gray-300 flex-1">―</span>
+                      )}
+                    </div>
+                  );
+                };
                 return (
-                  <div key={i} onClick={() => canPlace && manualAssign(i)}
-                    className={`relative p-2 rounded-lg border-2 text-center transition-all min-h-[56px] flex flex-col items-center justify-center
-                      ${hl ? 'border-yellow-400 bg-yellow-100 scale-105 shadow-lg' :
-                        at ? 'border-emerald-300 bg-emerald-50' :
-                        canPlace ? 'border-yellow-200 bg-yellow-50 cursor-pointer hover:border-yellow-300' :
-                        'border-gray-200 bg-gray-50'}`}
-                  >
-                    <div className="text-[10px] text-gray-400 font-mono">#{i + 1}</div>
-                    {at ? (<><div className="text-[10px] font-bold text-emerald-700 truncate w-full">{at.teamName}</div><div className="text-[8px] text-emerald-500">{at.leagueId}</div></>)
-                     : canPlace ? <div className="text-[10px] text-yellow-500">タップ</div>
-                     : <div className="text-[10px] text-gray-300">―</div>}
+                  <div key={matchIdx} className={`rounded-lg border overflow-hidden ${
+                    (assignedSlots.has(slot1) && assignedSlots.has(slot2)) ? 'border-emerald-200' : 'border-gray-200'
+                  }`}>
+                    <div className="text-[9px] font-bold text-gray-400 px-3 py-0.5 bg-gray-100">第{matchIdx + 1}試合</div>
+                    {renderSlotRow(slot1)}
+                    <div className="border-t border-gray-200" />
+                    {renderSlotRow(slot2)}
                   </div>
                 );
               })}
@@ -1264,11 +1287,17 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 // BYEマッチ: 勝者を通常マッチと同じスタイルで表示
                 if (isBye) {
                   const winnerId = match.winnerId;
-                  const winnerData = winnerId ? allTeams.find(t => t.teamId === winnerId) : null;
+                  let winnerData = winnerId ? allTeams.find(t => t.teamId === winnerId) : null;
+                  if (!winnerData) {
+                    const wName = match.team1Name || match.team2Name;
+                    const wLeague = match.team1League || match.team2League;
+                    if (wName && wLeague) winnerData = allTeams.find(t => t.teamName === wName && t.leagueId === wLeague.trim()) || null;
+                  }
                   const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
+                  const byeBoxH = winnerData ? (compact ? 50 : 70) : BYE_HEIGHT;
                   return (
-                    <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - BYE_HEIGHT / 2, width: MATCH_WIDTH }}>
-                      <div className="flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 bg-white" style={{ height: BYE_HEIGHT }}>
+                    <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
+                      <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white" style={{ height: byeBoxH }}>
                         {winnerLeague && (
                           <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
                             {winnerLeague}
@@ -1277,11 +1306,20 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                         {winnerData ? (
                           <div className="flex items-center gap-1 flex-1 min-w-0">
                             <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{winnerData.pairNumber}</span>
-                            <span className="text-[11px] font-bold text-gray-800 truncate">{winnerData.teamName}</span>
+                            <div className="shrink-0" style={{ width: 95 }}>
+                              <div className="text-[11px] font-bold leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-[11px] leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{winnerData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                            </div>
+                            <div className="w-px h-7 bg-gray-200 shrink-0" />
+                            <div className="flex-1 min-w-0 text-center">
+                              <div className="text-[8px] text-gray-400 truncate">{winnerData.male.affiliation}</div>
+                              <div className="text-[8px] text-gray-400 truncate">{winnerData.female.affiliation}</div>
+                            </div>
                           </div>
                         ) : (
-                          <span className="text-[11px] font-bold text-gray-700 truncate">{match.team1Name || match.team2Name}</span>
+                          <span className="text-[11px] font-bold text-gray-700 truncate flex-1">{match.team1Name || match.team2Name}</span>
                         )}
+                        <span className="text-[9px] text-gray-400 shrink-0 ml-1">BYE</span>
                       </div>
                     </div>
                   );
