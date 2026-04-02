@@ -24,6 +24,8 @@ interface MixedState {
   isImported: boolean;
   /** 抽選で決定した順位オーバーライド: leagueId -> { teamId -> rank } */
   rankOverrides: Record<string, Record<string, number>>;
+  /** ブラケット試合のコート割当: matchId -> { courtName, startedAt } */
+  bracketCourtAssignments: Record<string, { courtName: string; startedAt: number }>;
 
   // Actions: Import
   importData: (info: TournamentInfo, leagues: MixedLeague[], matches: LeagueMatchScore[]) => void;
@@ -68,6 +70,8 @@ interface MixedState {
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
   setRankOverride: (leagueId: string, teamId: string, rank: number) => void;
+  assignBracketMatchToCourt: (matchId: string, courtName: string) => void;
+  removeBracketMatchFromCourt: (matchId: string) => void;
   setSelectedLeagueId: (id: string | null) => void;
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
   setImportFileName: (name: string) => void;
@@ -91,6 +95,7 @@ export const useMixedStore = create<MixedState>()(
       importFileName: '',
       isImported: false,
       rankOverrides: {},
+      bracketCourtAssignments: {},
 
       importData: (info, leagues, matches) => {
         const allTeams = leagues.flatMap(l => l.teams);
@@ -121,6 +126,7 @@ export const useMixedStore = create<MixedState>()(
         importFileName: '',
         isImported: false,
         rankOverrides: {},
+        bracketCourtAssignments: {},
       }),
 
       updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
@@ -463,6 +469,21 @@ export const useMixedStore = create<MixedState>()(
       setRankOverride: (leagueId, teamId, rank) => set(state => ({
         rankOverrides: { ...state.rankOverrides, [leagueId]: { ...state.rankOverrides[leagueId], [teamId]: rank } },
       })),
+      assignBracketMatchToCourt: (matchId, courtName) => set(state => {
+        // ステータスをplayingに更新
+        const brackets = state.brackets.map(b => ({
+          ...b,
+          matches: b.matches.map(m => m.matchId === matchId ? { ...m, status: 'playing' as const } : m),
+        }));
+        return {
+          brackets,
+          bracketCourtAssignments: { ...state.bracketCourtAssignments, [matchId]: { courtName, startedAt: Date.now() } },
+        };
+      }),
+      removeBracketMatchFromCourt: (matchId) => set(state => {
+        const { [matchId]: _, ...rest } = state.bracketCourtAssignments;
+        return { bracketCourtAssignments: rest };
+      }),
       setSelectedLeagueId: (id) => set({ selectedLeagueId: id }),
       setSelectedBracketCategory: (cat) => set({ selectedBracketCategory: cat }),
       setImportFileName: (name) => set({ importFileName: name }),

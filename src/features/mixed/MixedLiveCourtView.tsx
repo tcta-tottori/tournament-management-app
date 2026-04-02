@@ -224,22 +224,16 @@ export default function MixedLiveCourtView() {
 
                           {/* 中央: コート使用状況 */}
                           <div className="flex-1 flex flex-col justify-center min-w-0">
-                            {info ? (
+                            {info && !info.status.isComplete && info.nextMatch ? (
                               <>
                                 <div className="text-[9px] font-bold text-gray-500 mb-0.5">{info.league.leagueId}リーグ</div>
                                 <div className="text-[7px] text-gray-400 mb-1">{info.status.finished}/{info.status.total}試合</div>
-                                {info.nextMatch ? (
-                                  <div className="space-y-0">
-                                    <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{info.nextMatch.matchNumber}試合</p>
-                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team1Id)}</p>
-                                    <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
-                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
-                                  </div>
-                                ) : info.status.isComplete ? (
-                                  <p className="text-[10px] text-gray-400 text-center font-medium">空き</p>
-                                ) : (
-                                  <p className="text-[8px] text-gray-400 text-center">待機中</p>
-                                )}
+                                <div className="space-y-0">
+                                  <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{info.nextMatch.matchNumber}試合</p>
+                                  <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team1Id)}</p>
+                                  <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
+                                  <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
+                                </div>
                               </>
                             ) : (
                               <div className="flex flex-col items-center justify-center flex-1">

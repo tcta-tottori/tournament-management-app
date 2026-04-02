@@ -439,8 +439,10 @@ export default function MixedBracketView() {
             setCallCourt('');
             setCallTime('');
           }}
+          onAssignCourt={(matchId, courtName) => useMixedStore.getState().assignBracketMatchToCourt(matchId, courtName)}
           getRoundLabel={getRoundLabel}
           allTeams={useMixedStore.getState().allTeams}
+          courtAssignments={useMixedStore.getState().bracketCourtAssignments}
         />
       )}
 
@@ -893,14 +895,18 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel, allTeams }: {
+function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, onAssignCourt: _onAssignCourt, getRoundLabel, allTeams, courtAssignments }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
   onPrint: (match: BracketMatch, roundLabel: string) => void;
   onCall: (match: BracketMatch) => void;
+  onAssignCourt: (matchId: string, courtName: string) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
+  courtAssignments: Record<string, { courtName: string; startedAt: number }>;
 }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
   const totalRounds = Math.log2(bracket.drawSize);
   const matchesByRound: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) {
@@ -1087,6 +1093,29 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                           );
                         })}
                       </div>
+                      {/* コート状況バー */}
+                      {match.team1Id && match.team2Id && !match.isBye && (() => {
+                        const ca = courtAssignments[match.matchId];
+                        if (ca) {
+                          const elapsed = Math.floor((now - ca.startedAt) / 60000);
+                          return (
+                            <div className="flex items-center gap-1.5 mt-0.5 px-2 py-1 bg-green-50 border border-green-200 rounded text-[9px]" style={{ width: MATCH_WIDTH }}>
+                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                              <span className="font-bold text-green-700">{ca.courtName}</span>
+                              <span className="text-green-600">{elapsed}分経過</span>
+                            </div>
+                          );
+                        }
+                        if (match.status === 'ready' || match.status === 'waiting') {
+                          return (
+                            <div className="flex items-center gap-1 mt-0.5 text-[9px] text-amber-600" style={{ width: MATCH_WIDTH }}>
+                              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                              控え中
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       {/* アクションボタン（印刷・コール） */}
                       {match.team1Id && match.team2Id && !match.isBye && (
                         <div className="flex gap-1 mt-0.5" style={{ width: MATCH_WIDTH }}>
@@ -1123,6 +1152,8 @@ function WaitingList({ waitingMatches, leagues }: {
   leagues: { leagueId: string; courtName: string }[];
 }) {
   const allTeams = useMixedStore(s => s.allTeams);
+  const { assignBracketMatchToCourt } = useMixedStore();
+  const [selectedCourts, setSelectedCourts] = useState<Record<string, string>>({});
 
   const courtOptions = useMemo(() => {
     const courtSet = new Set<string>();
@@ -1136,6 +1167,13 @@ function WaitingList({ waitingMatches, leagues }: {
   }, [leagues]);
 
   const catLabel = (cat: PlacementCategory) => cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4-5位';
+
+  const handleAssign = (matchId: string) => {
+    const court = selectedCourts[matchId];
+    if (!court) return;
+    assignBracketMatchToCourt(matchId, court);
+    setSelectedCourts(prev => { const { [matchId]: _, ...rest } = prev; return rest; });
+  };
 
   if (waitingMatches.length === 0) {
     return (
@@ -1154,6 +1192,7 @@ function WaitingList({ waitingMatches, leagues }: {
       {waitingMatches.map(({ match, bracket, roundLabel }) => {
         const team1 = allTeams.find(t => t.teamId === match.team1Id);
         const team2 = allTeams.find(t => t.teamId === match.team2Id);
+        const selectedCourt = selectedCourts[match.matchId] || '';
         return (
           <div key={match.matchId} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3">
             <div className="shrink-0 text-center">
@@ -1175,11 +1214,23 @@ function WaitingList({ waitingMatches, leagues }: {
                 <span className="font-bold text-gray-800 truncate">{team2?.teamName || match.team2Name}</span>
               </div>
             </div>
-            <div className="shrink-0">
-              <select className="text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" defaultValue="">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <select
+                className="text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                value={selectedCourt}
+                onChange={e => setSelectedCourts(prev => ({ ...prev, [match.matchId]: e.target.value }))}
+              >
                 <option value="">コート</option>
                 {courtOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              {selectedCourt && (
+                <button
+                  onClick={() => handleAssign(match.matchId)}
+                  className="px-2.5 py-1.5 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all"
+                >
+                  OK
+                </button>
+              )}
             </div>
           </div>
         );
