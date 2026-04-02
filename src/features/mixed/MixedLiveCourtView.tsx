@@ -58,7 +58,7 @@ function getLeagueCourtStatus(_league: MixedLeague, lMatches: LeagueMatchScore[]
 }
 
 export default function MixedLiveCourtView() {
-  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo } = useMixedStore();
+  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments } = useMixedStore();
 
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -235,11 +235,32 @@ export default function MixedLiveCourtView() {
                                   <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
                                 </div>
                               </>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center flex-1">
-                                <p className="text-[10px] text-gray-400 font-medium">空き</p>
-                              </div>
-                            )}
+                            ) : (() => {
+                              // ブラケット試合がこのコートに割り当てられているか確認
+                              const courtStr = `${courtNum}コート`;
+                              const bracketMatch = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
+                              if (bracketMatch) {
+                                const [matchId, ca] = bracketMatch;
+                                const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
+                                if (bm) {
+                                  const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
+                                  return (
+                                    <div className="space-y-0">
+                                      <p className="text-[7px] font-bold text-green-600/80 mb-0.5">決勝T</p>
+                                      <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team1Name}</p>
+                                      <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
+                                      <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team2Name}</p>
+                                      <p className="text-[7px] text-green-600 mt-0.5">{elapsed}分</p>
+                                    </div>
+                                  );
+                                }
+                              }
+                              return (
+                                <div className="flex flex-col items-center justify-center flex-1">
+                                  <p className="text-[10px] text-gray-400 font-medium">空き</p>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

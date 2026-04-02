@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Printer, Volume2, VolumeX, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -228,11 +228,29 @@ export default function MixedBracketView() {
     return `${round}回戦`;
   };
 
+  const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
+  const [courtAssignValue, setCourtAssignValue] = useState('');
+  const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
+
   const openScoreEditor = (match: BracketMatch) => {
     if (!match.team1Id || !match.team2Id || match.isBye) return;
+    // 控え中 → コート割当ポップアップ
+    const ca = bracketCourtAssignments[match.matchId];
+    if (!ca && match.status !== 'finished' && match.status !== 'playing') {
+      setCourtAssignMatch(match);
+      setCourtAssignValue('');
+      return;
+    }
+    // 試合中/完了 → スコア入力
     setEditingMatch(match);
     setScore1Input(match.score1 !== null && match.score1 >= 0 ? match.score1.toString() : '');
     setScore2Input(match.score2 !== null && match.score2 >= 0 ? match.score2.toString() : '');
+  };
+
+  const handleCourtAssignConfirm = () => {
+    if (!courtAssignMatch || !courtAssignValue) return;
+    assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignValue);
+    setCourtAssignMatch(null);
   };
 
   const saveScore = () => {
@@ -410,23 +428,64 @@ export default function MixedBracketView() {
         <BracketDisplay
           bracket={currentBracket}
           onMatchClick={openScoreEditor}
-          onPrint={(match, roundLabel) => {
-            const allTeams = useMixedStore.getState().allTeams;
-            const rules = tournamentInfo?.rules || [];
-            const gameRule = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || 'ノーアド・6ゲームマッチ';
-            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel, gameRule, tournamentInfo);
-          }}
-          onCall={(match) => {
-            setCallMatch(match);
-            setCallCourt('');
-            setCallTime('');
-          }}
-          onAssignCourt={(matchId, courtName) => useMixedStore.getState().assignBracketMatchToCourt(matchId, courtName)}
           getRoundLabel={getRoundLabel}
           allTeams={useMixedStore.getState().allTeams}
-          courtAssignments={useMixedStore.getState().bracketCourtAssignments}
+          courtAssignments={bracketCourtAssignments}
         />
       )}
+
+      {/* コート割当ポップアップ */}
+      {courtAssignMatch && (() => {
+        const allTeamsData = useMixedStore.getState().allTeams;
+        const t1 = allTeamsData.find(t => t.teamId === courtAssignMatch.team1Id);
+        const t2 = allTeamsData.find(t => t.teamId === courtAssignMatch.team2Id);
+        const courtOpts = (() => {
+          const s = new Set<string>();
+          for (const l of leagues) { const nums = l.courtName?.match(/\d+/g); if (nums) for (const n of nums) s.add(`${n}コート`); }
+          return [...s].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+        })();
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCourtAssignMatch(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">コートに入れる</h3>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
+                  <span className="font-bold">{t1?.teamName || courtAssignMatch.team1Name}</span>
+                </div>
+                <div className="text-gray-400 text-[9px] my-0.5">vs</div>
+                <div className="flex items-center gap-2">
+                  {courtAssignMatch.team2League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team2League}</span>}
+                  <span className="font-bold">{t2?.teamName || courtAssignMatch.team2Name}</span>
+                </div>
+              </div>
+              <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択</label>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {courtOpts.map(c => (
+                  <button key={c} onClick={() => setCourtAssignValue(c)}
+                    className={`py-2 text-xs font-bold rounded-lg border-2 transition-all ${courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                  >{c.replace('コート', '')}</button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
+                <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue}
+                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >コートに入れる</button>
+              </div>
+              <button onClick={() => {
+                // スキップしてスコア入力へ
+                setCourtAssignMatch(null);
+                setEditingMatch(courtAssignMatch);
+                setScore1Input(courtAssignMatch.score1 !== null && courtAssignMatch.score1 >= 0 ? courtAssignMatch.score1.toString() : '');
+                setScore2Input(courtAssignMatch.score2 !== null && courtAssignMatch.score2 >= 0 ? courtAssignMatch.score2.toString() : '');
+              }} className="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                スキップしてスコア入力 →
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* スコア入力モーダル */}
       {editingMatch && (
@@ -494,6 +553,22 @@ export default function MixedBracketView() {
                 <Ban size={14} />
                 <span className="truncate">{editingMatch.team2Name}</span>
                 <span className="text-xs">DEF</span>
+              </button>
+            </div>
+
+            {/* 印刷・コールボタン */}
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => {
+                const at = useMixedStore.getState().allTeams;
+                const rules = tournamentInfo?.rules || [];
+                const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
+                printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, tournamentInfo);
+              }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
+                印刷
+              </button>
+              <button onClick={() => { setEditingMatch(null); setCallMatch(editingMatch); setCallCourt(''); setCallTime(''); }}
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 text-xs hover:bg-blue-100 active:scale-[0.98] transition-all">
+                <Volume2 size={12} />コール
               </button>
             </div>
 
@@ -877,12 +952,9 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, onAssignCourt: _onAssignCourt, getRoundLabel, allTeams, courtAssignments }: {
+function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
-  onPrint: (match: BracketMatch, roundLabel: string) => void;
-  onCall: (match: BracketMatch) => void;
-  onAssignCourt: (matchId: string, courtName: string) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
   courtAssignments: Record<string, { courtName: string; startedAt: number }>;
@@ -895,8 +967,8 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, onAssignCourt:
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 100;
-  const BYE_HEIGHT = 32;
+  const MATCH_HEIGHT = 110;
+  const BYE_HEIGHT = 36;
   const MATCH_WIDTH = 260;
   const ROUND_GAP = 48;
   const MATCH_GAP = 24; // ボタン分の余白を確保
@@ -987,143 +1059,121 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, onAssignCourt:
                 const ph1 = getPlaceholderInfo(match, 'team1');
                 const ph2 = getPlaceholderInfo(match, 'team2');
                 const isBye = match.isBye;
+                const ca = courtAssignments[match.matchId];
+                const isPlaying = !!ca;
+                const elapsedMs = ca ? now - ca.startedAt : 0;
+                const elapsedMin = Math.floor(elapsedMs / 60000);
+                const elapsedH = Math.floor(elapsedMin / 60);
+                const elapsedM = elapsedMin % 60;
+                const elapsedStr = `${elapsedH}:${String(elapsedM).padStart(2, '0')}`;
 
-                // BYEマッチ: 小さく表示
+                // BYEマッチ: 勝者のみコンパクト表示（BYE文字なし）
                 if (isBye) {
-                  const winnerTeamData = match.winnerId ? allTeams.find(t => t.teamId === match.winnerId) : null;
-                  const winnerLeague = match.winnerId === match.team1Id ? match.team1League : match.team2League;
+                  const winnerId = match.winnerId;
+                  const winnerData = winnerId ? allTeams.find(t => t.teamId === winnerId) : null;
+                  const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
                   return (
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - BYE_HEIGHT / 2, width: MATCH_WIDTH }}>
-                      <div className="flex items-center gap-1 px-2 rounded border border-dashed border-gray-200 bg-gray-50/50" style={{ height: BYE_HEIGHT }}>
+                      <div className="flex items-center gap-1.5 px-2 rounded border border-gray-200 bg-white" style={{ height: BYE_HEIGHT }}>
                         {winnerLeague && (
                           <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
                             {winnerLeague}
                           </span>
                         )}
-                        <span className="text-[10px] text-gray-500 truncate">{winnerTeamData?.teamName || match.team1Name || match.team2Name}</span>
-                        <span className="text-[9px] text-gray-400 ml-auto shrink-0">BYE</span>
+                        {winnerData && <span className="text-[9px] text-gray-400 font-mono shrink-0">{winnerData.pairNumber}</span>}
+                        <span className="text-[10px] font-bold text-gray-700 truncate">{winnerData?.teamName || match.team1Name || match.team2Name}</span>
                       </div>
                     </div>
                   );
                 }
 
+                // 通常マッチ
+                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
+                  const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+                  return (
+                    <div className={`flex items-center px-1.5 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
+                      ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
+                    `} style={{ height: 40 }}>
+                      {slot.league ? (
+                        <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 mr-1 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{slot.league}</span>
+                      ) : <span className="w-4 shrink-0 mr-1" />}
+                      <div className="flex-1 min-w-0">
+                        {teamData ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[8px] text-gray-400 font-mono shrink-0">{teamData.pairNumber}</span>
+                            <div className="min-w-0" style={{ width: 90 }}>
+                              <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
+                              <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
+                            </div>
+                            <div className="w-px h-6 bg-gray-200 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[7px] text-gray-400 truncate">{teamData.male.affiliation}</div>
+                              <div className="text-[7px] text-gray-400 truncate">{teamData.female.affiliation}</div>
+                            </div>
+                          </div>
+                        ) : slot.ph?.leagueId ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="inline-block px-1 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-bold">{slot.ph.leagueId}</span>
+                            <span className="text-[9px] text-blue-400">{slot.ph.rank}位</span>
+                          </span>
+                        ) : slot.ph ? <span className="text-[9px] text-gray-400">{slot.ph.text}</span>
+                        : slot.name ? <span className="text-[10px] truncate">{slot.name}</span>
+                        : <span className="text-[9px] text-gray-400">―</span>}
+                      </div>
+                      {slot.score !== null && (
+                        <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>{slot.score}</span>
+                      )}
+                    </div>
+                  );
+                };
+
                 return (
                   <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
                     <div
                       onClick={() => onMatchClick(match)}
-                      className={`
-                        rounded-lg border-2 overflow-hidden transition-all cursor-pointer
-                        ${match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
-                          match.status === 'ready' ? 'border-blue-300 shadow-sm hover:shadow-md' :
+                      className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all
+                        ${isPlaying ? 'border-green-400 shadow-md bracket-playing-blink' :
+                          match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
+                          match.team1Id && match.team2Id ? 'border-blue-300 hover:shadow-md' :
                           'border-gray-200 hover:border-gray-300'}
                       `}
                       style={{ height: MATCH_HEIGHT }}
                     >
-                        {[
-                          { teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true },
-                          { teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false },
-                        ].map(slot => {
-                          const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
-                          return (
-                            <div key={slot.isTop ? 'top' : 'bot'} className={`flex items-center px-1.5 h-[42px] text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
-                              ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
-                            `}>
-                              {/* リーグバッジ */}
-                              {slot.league ? (
-                                <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mr-1 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>
-                                  {slot.league}
-                                </span>
-                              ) : <span className="w-5 shrink-0 mr-1" />}
-                              {/* チーム情報 */}
-                              <div className="flex-1 min-w-0">
-                                {teamData ? (
-                                  <div className="flex items-center">
-                                    {/* ペア番号 */}
-                                    <span className="text-[9px] text-gray-400 font-mono w-4 shrink-0 text-center">{teamData.pairNumber}</span>
-                                    {/* 選手名 - 固定幅 */}
-                                    <div className="shrink-0" style={{ width: 100 }}>
-                                      <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
-                                      <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
-                                      <div className="text-[7px] text-gray-400">No.{teamData.pairNumber}</div>
-                                    </div>
-                                    {/* 区切り線 */}
-                                    <div className="w-px h-7 bg-gray-200 shrink-0" />
-                                    {/* 所属 - 残り幅で中央揃え */}
-                                    <div className="flex-1 min-w-0 text-center">
-                                      <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.male.affiliation}</div>
-                                      <div className="text-[8px] text-gray-400 truncate leading-tight">{teamData.female.affiliation}</div>
-                                    </div>
-                                  </div>
-                                ) : slot.name ? (
-                                  <span className="truncate text-[10px]">{slot.name}</span>
-                                ) : slot.ph ? (
-                                  slot.ph.leagueId ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
-                                      <span className="text-[10px] text-blue-400">{slot.ph.rank}位</span>
-                                    </span>
-                                  ) : <span className="text-[10px] text-gray-400 italic">{slot.ph.text}</span>
-                                ) : <span className="text-[10px] text-gray-400">―</span>}
-                              </div>
-                              {/* スコア */}
-                              {slot.score !== null && (
-                                <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
-                                  {slot.score}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {/* コート状況バー */}
-                      {match.team1Id && match.team2Id && !match.isBye && (() => {
-                        const ca = courtAssignments[match.matchId];
-                        if (ca) {
-                          const elapsed = Math.floor((now - ca.startedAt) / 60000);
-                          return (
-                            <div className="flex items-center gap-1.5 mt-0.5 px-2 py-1 bg-green-50 border border-green-200 rounded text-[9px]" style={{ width: MATCH_WIDTH }}>
-                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                              <span className="font-bold text-green-700">{ca.courtName}</span>
-                              <span className="text-green-600">{elapsed}分経過</span>
-                            </div>
-                          );
-                        }
-                        if (match.status === 'ready' || match.status === 'waiting') {
-                          return (
-                            <div className="flex items-center gap-1 mt-0.5 text-[9px] text-amber-600" style={{ width: MATCH_WIDTH }}>
-                              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                              控え中
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {/* アクションボタン（印刷・コール） */}
-                      {match.team1Id && match.team2Id && !match.isBye && (
-                        <div className="flex gap-1 mt-0.5" style={{ width: MATCH_WIDTH }}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onPrint(match, getRoundLabel(match.round, totalRounds)); }}
-                            className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-700 text-[10px] transition-colors"
-                            title="審判用紙を印刷"
-                          >
-                            <Printer size={10} />印刷
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onCall(match); }}
-                            className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-500 hover:text-blue-700 text-[10px] transition-colors"
-                            title="音声コール"
-                          >
-                            <Volume2 size={10} />コール
-                          </button>
+                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true })}
+                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false })}
+                      {/* 枠内ステータスバー */}
+                      {match.team1Id && match.team2Id && (
+                        <div className={`flex items-center justify-center gap-1.5 h-[26px] text-[9px] font-medium border-t border-gray-100
+                          ${isPlaying ? 'bg-green-50 text-green-700' :
+                            match.status === 'finished' ? 'bg-emerald-50 text-emerald-600' :
+                            'bg-amber-50 text-amber-600'}
+                        `}>
+                          {isPlaying ? (
+                            <><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />{ca.courtName} {elapsedStr}</>
+                          ) : match.status === 'finished' ? (
+                            <span>完了</span>
+                          ) : (
+                            <><span className="w-2 h-2 rounded-full bg-amber-400" />控え中</>
+                          )}
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
       </div>
+
+      {/* 点滅アニメーション */}
+      <style>{`
+        @keyframes bracket-playing {
+          0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+          50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.3); }
+        }
+        .bracket-playing-blink { animation: bracket-playing 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
