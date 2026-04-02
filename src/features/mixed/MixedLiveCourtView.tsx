@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
-import { calculateLeagueStandings } from './mixedLogic';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { LeagueMatchScore, MixedLeague } from './types';
 
@@ -60,7 +59,7 @@ function getLeagueCourtStatus(_league: MixedLeague, lMatches: LeagueMatchScore[]
 
 export default function MixedLiveCourtView() {
   const { leagues, leagueMatches, allTeams, brackets, tournamentInfo } = useMixedStore();
-  const allStandings = calculateLeagueStandings(leagues, leagueMatches);
+
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -220,26 +219,17 @@ export default function MixedLiveCourtView() {
                           {/* 進捗 */}
                           <div className="text-[8px] text-gray-400 mb-1">{cs.finished}/{cs.total}試合</div>
 
-                          {/* 中央: 対戦情報 */}
+                          {/* 中央: 対戦情報（現在試合中のペアを表示） */}
                           <div className="flex-1 flex flex-col justify-center min-w-0">
-                            {cs.isComplete ? (
-                              <div className="space-y-0.5">
-                                {(allStandings.get(league.leagueId) || []).slice(0, 3).map(s => (
-                                  <div key={s.teamId} className="flex items-center gap-0.5 text-[7px]">
-                                    <span className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold shrink-0
-                                      ${s.rank === 1 ? 'bg-yellow-400 text-white' : s.rank === 2 ? 'bg-gray-400 text-white' : 'bg-orange-300 text-white'}
-                                    `}>{s.rank}</span>
-                                    <span className="truncate text-gray-700">{s.teamName}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : cs.nextMatch ? (
+                            {cs.nextMatch ? (
                               <div className="space-y-0">
                                 <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{cs.nextMatch.matchNumber}試合</p>
                                 <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team1Id)}</p>
                                 <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
                                 <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(cs.nextMatch.team2Id)}</p>
                               </div>
+                            ) : cs.isComplete ? (
+                              <p className="text-[8px] text-emerald-600 text-center font-bold">全試合完了</p>
                             ) : (
                               <p className="text-[8px] text-gray-400 text-center">待機中</p>
                             )}
