@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, MapPin, Pencil, FlaskConical, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
-import type { LeagueMatchScore } from './types';
+import type { LeagueMatchScore, LeagueStanding } from './types';
 import { GameRatioCell } from './GameRatioCell';
 
 
@@ -86,10 +87,103 @@ function formatScoreText(match: LeagueMatchScore, rowTeamId: string): string {
   return `${myScore}-${oppScore}`;
 }
 
+/** 抽選ボタン — 同率ゲーム率のチームの順位を手動で決定 */
+function TiebreakLotteryButton({ standing, standings, leagueId }: {
+  standing: LeagueStanding;
+  standings: LeagueStanding[];
+  leagueId: string;
+}) {
+  const { setRankOverride } = useMixedStore();
+  const [showPicker, setShowPicker] = useState(false);
+
+  // 同じゲーム率のチーム群を特定
+  const sameRatioTeams = standings.filter(s => {
+    if (s.wins !== standing.wins) return false;
+    const r1 = s.gamesLost === 0 ? (s.gamesWon > 0 ? Infinity : 0) : s.gamesWon / s.gamesLost;
+    const r2 = standing.gamesLost === 0 ? (standing.gamesWon > 0 ? Infinity : 0) : standing.gamesWon / standing.gamesLost;
+    return Math.abs(r1 - r2) < 0.0001 || (r1 === Infinity && r2 === Infinity);
+  });
+
+  const handleSetRank = (rank: number) => {
+    setRankOverride(leagueId, standing.teamId, rank);
+    setShowPicker(false);
+  };
+
+  const handleLottery = () => {
+    // ルーレット: 同率チームをランダムに順位決定
+    const shuffled = [...sameRatioTeams].sort(() => Math.random() - 0.5);
+    const baseRank = Math.min(...sameRatioTeams.map(s => s.rank));
+    shuffled.forEach((s, i) => {
+      setRankOverride(leagueId, s.teamId, baseRank + i);
+    });
+    setShowPicker(false);
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-amber-100 transition-colors"
+      >
+        🎲 抽選
+      </button>
+      {showPicker && createPortal(
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowPicker(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[340px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">順位決定（抽選）</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              ゲーム取得率が同率のため、抽選で順位を決定してください。
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <div className="text-[10px] font-bold text-gray-500 mb-2">同率チーム</div>
+              {sameRatioTeams.map(s => (
+                <div key={s.teamId} className="flex items-center gap-2 text-xs py-1">
+                  <span className="font-bold text-gray-800">{s.teamName}</span>
+                  <span className="text-gray-400">ゲーム率 {s.gameRatio === Infinity ? '∞' : s.gameRatio.toFixed(3)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ルーレットで一括決定 */}
+            <button
+              onClick={handleLottery}
+              className="w-full py-3 mb-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
+            >
+              🎲 ルーレットで決定
+            </button>
+
+            {/* 手動で順位指定 */}
+            <div className="text-[10px] font-bold text-gray-500 mb-2">手動で {standing.teamName} の順位を指定:</div>
+            <div className="flex gap-2 mb-4">
+              {sameRatioTeams.map((_, i) => {
+                const rank = Math.min(...sameRatioTeams.map(s => s.rank)) + i;
+                return (
+                  <button
+                    key={rank}
+                    onClick={() => handleSetRank(rank)}
+                    className="flex-1 py-2 rounded-lg border-2 border-gray-200 text-sm font-bold text-gray-700 hover:border-amber-400 hover:bg-amber-50 transition-all active:scale-95"
+                  >
+                    {rank}位
+                  </button>
+                );
+              })}
+            </div>
+
+            <button onClick={() => setShowPicker(false)} className="w-full py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition-all">
+              閉じる
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 /** 全リーグ一覧表示 */
 function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?: React.MouseEvent) => void }) {
-  const { leagues, leagueMatches, updateCourtName } = useMixedStore();
-  const allStandings = calculateLeagueStandings(leagues, leagueMatches);
+  const { leagues, leagueMatches, updateCourtName, rankOverrides } = useMixedStore();
+  const allStandings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
 
@@ -295,8 +389,30 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                                 standing.tiebreakReason.startsWith('ゲーム率') ? (
                                   <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     <Info size={9} className="shrink-0" />
-                                    <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} className="text-[9px] sm:text-[10px]" />
+                                    <GameRatioCell
+                                      gamesWon={standing.gamesWon}
+                                      gamesLost={standing.gamesLost}
+                                      className="text-[9px] sm:text-[10px]"
+                                      teamName={standing.teamName}
+                                      matchDetails={lMatches.filter(m => m.status === 'finished' && (m.team1Id === standing.teamId || m.team2Id === standing.teamId)).map(m => {
+                                        const isT1 = m.team1Id === standing.teamId;
+                                        const oppId = isT1 ? m.team2Id : m.team1Id;
+                                        const oppTeam = league.teams.find(t => t.teamId === oppId);
+                                        return {
+                                          opponentName: oppTeam?.teamName || '?',
+                                          won: (isT1 ? m.score1 : m.score2) ?? 0,
+                                          lost: (isT1 ? m.score2 : m.score1) ?? 0,
+                                          isWin: m.winnerId === standing.teamId,
+                                        };
+                                      })}
+                                    />
                                   </span>
+                                ) : standing.tiebreakReason?.startsWith('抽選') ? (
+                                  <TiebreakLotteryButton
+                                    standing={standing}
+                                    standings={standings}
+                                    leagueId={league.leagueId}
+                                  />
                                 ) : (
                                   <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     <Info size={9} className="shrink-0" />

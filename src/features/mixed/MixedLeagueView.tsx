@@ -28,7 +28,8 @@ export default function MixedLeagueView() {
   const [showRules, setShowRules] = useState(false);
 
   const selectedLeague = leagues.find(l => l.leagueId === selectedLeagueId) || leagues[0];
-  const allStandings = calculateLeagueStandings(leagues, leagueMatches);
+  const { rankOverrides } = useMixedStore();
+  const allStandings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
 
   if (!selectedLeague) return <div className="text-center text-gray-400 py-12">データがありません</div>;
 
@@ -424,7 +425,22 @@ export default function MixedLeagueView() {
                     <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
                     <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
                     <td className="py-2 px-2 text-center font-mono text-gray-600">
-                      <GameRatioCell gamesWon={s.gamesWon} gamesLost={s.gamesLost} />
+                      <GameRatioCell
+                        gamesWon={s.gamesWon}
+                        gamesLost={s.gamesLost}
+                        teamName={s.teamName}
+                        matchDetails={leagueMatchList.filter(m => m.status === 'finished' && (m.team1Id === s.teamId || m.team2Id === s.teamId)).map(m => {
+                          const isT1 = m.team1Id === s.teamId;
+                          const oppId = isT1 ? m.team2Id : m.team1Id;
+                          const oppTeam = selectedLeague.teams.find(t => t.teamId === oppId);
+                          return {
+                            opponentName: oppTeam?.teamName || '?',
+                            won: (isT1 ? m.score1 : m.score2) ?? 0,
+                            lost: (isT1 ? m.score2 : m.score1) ?? 0,
+                            isWin: m.winnerId === s.teamId,
+                          };
+                        })}
+                      />
                     </td>
                     <td className="py-2 px-2 text-xs text-gray-400">
                       {s.tiebreakReason || ''}

@@ -68,7 +68,8 @@ export function regenerateLeagueMatches(league: MixedLeague): LeagueMatchScore[]
  */
 export function calculateLeagueStandings(
   leagues: MixedLeague[],
-  matches: LeagueMatchScore[]
+  matches: LeagueMatchScore[],
+  rankOverrides?: Record<string, Record<string, number>>
 ): Map<string, LeagueStanding[]> {
   const result = new Map<string, LeagueStanding[]>();
 
@@ -156,14 +157,41 @@ export function calculateLeagueStandings(
 
     standings.forEach((s, i) => { s.rank = i + 1; });
 
+    // 手動順位オーバーライドを適用
+    const overrides = rankOverrides?.[league.leagueId];
+    if (overrides) {
+      for (const s of standings) {
+        if (overrides[s.teamId] !== undefined) {
+          s.rank = overrides[s.teamId];
+          s.tiebreakReason = '抽選確定';
+        }
+      }
+      // オーバーライド適用後にランク順で再ソート
+      standings.sort((a, b) => a.rank - b.rank);
+    }
+
     // タイブレーク理由が未設定の同率チームにゲーム率を表示
+    // ゲーム率も同率の場合は「抽選」を表示
     for (let i = 0; i < standings.length; i++) {
       const tied = standings.filter(s => s.wins === standings[i].wins && s.wins > 0);
       if (tied.length >= 2) {
+        // ゲーム率が完全に同率のチーム群を検出
+        const ratioGroups = new Map<string, LeagueStanding[]>();
+        for (const s of tied) {
+          const ratioKey = s.gamesLost === 0 ? (s.gamesWon > 0 ? 'inf' : '0') : (s.gamesWon / s.gamesLost).toFixed(6);
+          if (!ratioGroups.has(ratioKey)) ratioGroups.set(ratioKey, []);
+          ratioGroups.get(ratioKey)!.push(s);
+        }
         for (const s of tied) {
           if (!s.tiebreakReason) {
             const ratio = s.gamesLost === 0 ? Infinity : s.gamesWon / s.gamesLost;
-            s.tiebreakReason = `ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}`;
+            const ratioKey = s.gamesLost === 0 ? (s.gamesWon > 0 ? 'inf' : '0') : ratio.toFixed(6);
+            const sameRatioTeams = ratioGroups.get(ratioKey) || [];
+            if (sameRatioTeams.length >= 2) {
+              s.tiebreakReason = `抽選（ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}）`;
+            } else {
+              s.tiebreakReason = `ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}`;
+            }
           }
         }
       }

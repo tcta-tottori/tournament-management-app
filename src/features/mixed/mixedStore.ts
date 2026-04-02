@@ -22,6 +22,8 @@ interface MixedState {
   selectedBracketCategory: PlacementCategory;
   importFileName: string;
   isImported: boolean;
+  /** 抽選で決定した順位オーバーライド: leagueId -> { teamId -> rank } */
+  rankOverrides: Record<string, Record<string, number>>;
 
   // Actions: Import
   importData: (info: TournamentInfo, leagues: MixedLeague[], matches: LeagueMatchScore[]) => void;
@@ -65,6 +67,7 @@ interface MixedState {
 
   // Navigation
   setCurrentPhase: (phase: MixedPhase) => void;
+  setRankOverride: (leagueId: string, teamId: string, rank: number) => void;
   setSelectedLeagueId: (id: string | null) => void;
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
   setImportFileName: (name: string) => void;
@@ -87,6 +90,7 @@ export const useMixedStore = create<MixedState>()(
       selectedBracketCategory: '1st',
       importFileName: '',
       isImported: false,
+      rankOverrides: {},
 
       importData: (info, leagues, matches) => {
         const allTeams = leagues.flatMap(l => l.teams);
@@ -116,6 +120,7 @@ export const useMixedStore = create<MixedState>()(
         selectedBracketCategory: '1st',
         importFileName: '',
         isImported: false,
+        rankOverrides: {},
       }),
 
       updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
@@ -144,13 +149,13 @@ export const useMixedStore = create<MixedState>()(
       },
 
       getStandings: () => {
-        const { leagues, leagueMatches } = get();
-        return calculateLeagueStandings(leagues, leagueMatches);
+        const { leagues, leagueMatches, rankOverrides } = get();
+        return calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
       },
 
       generateBrackets: () => {
-        const { leagues, leagueMatches, allTeams, tournamentInfo } = get();
-        const standings = calculateLeagueStandings(leagues, leagueMatches);
+        const { leagues, leagueMatches, allTeams, tournamentInfo, rankOverrides } = get();
+        const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
         set({ brackets, currentPhase: 'tournament' });
       },
@@ -431,14 +436,14 @@ export const useMixedStore = create<MixedState>()(
         });
         if (!allComplete) return;
 
-        const standings = calculateLeagueStandings(leagues, leagueMatches);
+        const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
         set({ brackets });
       },
 
       regenerateBrackets: () => {
-        const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo } = get();
-        const standings = calculateLeagueStandings(leagues, leagueMatches);
+        const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo, rankOverrides } = get();
+        const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
         const newBrackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
 
         // 1位トーナメントは試合が始まっていたら維持
@@ -455,6 +460,9 @@ export const useMixedStore = create<MixedState>()(
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
+      setRankOverride: (leagueId, teamId, rank) => set(state => ({
+        rankOverrides: { ...state.rankOverrides, [leagueId]: { ...state.rankOverrides[leagueId], [teamId]: rank } },
+      })),
       setSelectedLeagueId: (id) => set({ selectedLeagueId: id }),
       setSelectedBracketCategory: (cat) => set({ selectedBracketCategory: cat }),
       setImportFileName: (name) => set({ importFileName: name }),
