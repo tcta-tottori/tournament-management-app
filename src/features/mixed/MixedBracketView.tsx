@@ -162,29 +162,62 @@ function printRefereeSheet(
   }
 }
 
-/** ミックスダブルス用コールテキスト生成 */
-function buildMixedCallText(
+/** 苗字を取得（スペースで分割して最初の部分） */
+function familyName(name: string): string {
+  return name.trim().split(/[\s　]+/)[0] || name;
+}
+
+/** ふりがな辞書から苗字の読みを取得（非同期） */
+async function getFamilyNameReading(name: string): Promise<string> {
+  try {
+    const { db } = await import('../../db/database');
+    const key = name.replace(/[\s　]+/g, '');
+    const entry = await db.furiganaDict.get(key);
+    if (entry?.furigana) {
+      // ふりがなからスペースで分割して苗字部分を取得
+      // または元の名前のスペース位置から苗字の文字数を推定
+      const nameParts = name.trim().split(/[\s　]+/);
+      if (nameParts.length >= 2) {
+        const seiLen = nameParts[0].length;
+        // ふりがなの先頭seiLen文字相当を取得（カタカナの場合文字数が異なる場合あり）
+        // フルふりがなを返してスピーチエンジンに任せる方が安全
+        return entry.furigana;
+      }
+      return entry.furigana;
+    }
+  } catch { /* ignore */ }
+  return familyName(name);
+}
+
+/** ミックスダブルス用コールテキスト生成（非同期） */
+async function buildMixedCallText(
   match: BracketMatch,
   allTeams: MixedTeam[],
   bracketLabel: string,
   roundLabel: string,
   courtName: string,
   startTime: string,
-): string {
+): Promise<string> {
   const team1 = allTeams.find(t => t.teamId === match.team1Id);
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
   if (!team1 || !team2) return '';
 
-  const familyName = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+  // ふりがなを取得（なければ苗字をそのまま使用）
+  const [m1Read, f1Read, m2Read, f2Read] = await Promise.all([
+    getFamilyNameReading(team1.male.name),
+    getFamilyNameReading(team1.female.name),
+    getFamilyNameReading(team2.male.name),
+    getFamilyNameReading(team2.female.name),
+  ]);
 
   const parts: string[] = [];
   parts.push('試合のコールをします。');
   parts.push(`${bracketLabel}${roundLabel}、`);
 
-  // チーム1: 番号＋苗字（所属）
-  parts.push(`${team1.pairNumber}番、${familyName(team1.male.name)}さん（${team1.male.affiliation}）、${familyName(team1.female.name)}さん（${team1.female.affiliation}）。`);
+  // チーム1: 番号＋苗字の読み
+  parts.push(`${team1.pairNumber}番、${m1Read}さん、${f1Read}さん。`);
   // チーム2
-  parts.push(`${team2.pairNumber}番、${familyName(team2.male.name)}さん（${team2.male.affiliation}）、${familyName(team2.female.name)}さん（${team2.female.affiliation}）。`);
+  parts.push(`${team2.pairNumber}番、${m2Read}さん、${f2Read}さん。`);
 
   // コート＋時間
   let courtText = `こちらの試合を${courtName}で`;
@@ -198,8 +231,8 @@ function buildMixedCallText(
   courtText += '、おこなってください。';
   parts.push(courtText);
 
-  // ボール係
-  parts.push(`ボールは${team1.pairNumber}番、${familyName(team1.male.name)}さん、${familyName(team1.female.name)}さんが本部まで取りに来てください。`);
+  // ボール係（苗字の読み）
+  parts.push(`ボールは${team1.pairNumber}番、${m1Read}さん、${f1Read}さんが本部まで取りに来てください。`);
 
   return parts.join(' ');
 }
@@ -739,9 +772,9 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
     });
   }, [leagues]);
 
-  const handleSpeak = () => {
+  const handleSpeak = async () => {
     if (!callCourt) return;
-    const text = buildMixedCallText(match, allTeams, bracket.label, roundLabel, callCourt, callTime);
+    const text = await buildMixedCallText(match, allTeams, bracket.label, roundLabel, callCourt, callTime);
     if (!text) return;
     speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 2 });
   };

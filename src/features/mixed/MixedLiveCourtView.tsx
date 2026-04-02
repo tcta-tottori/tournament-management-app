@@ -106,20 +106,30 @@ export default function MixedLiveCourtView() {
   // コート状態集計
   const courtStats = useMemo(() => {
     let playing = 0, occupied = 0, empty = 0;
-    for (const [, info] of courtMap) {
-      if (!info) { empty++; continue; }
-      if (info.status.status === 'playing') playing++;
-      else if (info.status.isComplete) occupied++;
-      else if (info.nextMatch) playing++;
+    for (let i = 1; i <= 16; i++) {
+      const info = courtMap.get(i);
+      const courtStr = `${i}コート`;
+      const hasBracketMatch = Object.values(bracketCourtAssignments).some(ca => ca.courtName === courtStr);
+      if (hasBracketMatch) { playing++; continue; }
+      if (!info || info.status.isComplete) { empty++; continue; }
+      if (info.nextMatch) playing++;
+      else if (info.status.status === 'playing' || info.status.finished > 0) occupied++;
       else empty++;
     }
     return { playing, occupied, empty };
-  }, [courtMap]);
+  }, [courtMap, bracketCourtAssignments]);
 
   const getTeamName = (id: string) => allTeams.find(t => t.teamId === id)?.teamName || '';
 
   return (
     <div className="p-3 sm:p-6 space-y-4 max-w-7xl mx-auto">
+      <style>{`
+        @keyframes court-blink {
+          0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+          50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 6px 1px rgba(34, 197, 94, 0.25); }
+        }
+        .court-playing-blink { animation: court-blink 2s ease-in-out infinite; }
+      `}</style>
       {/* ===== HEADER ===== */}
       <header className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
         <div className="flex items-center justify-between">
@@ -194,22 +204,27 @@ export default function MixedLiveCourtView() {
                 <div className="grid grid-cols-4 gap-2">
                   {block.map(courtNum => {
                     const info = courtMap.get(courtNum);
-                    const isOccupied = !!info;
                     const hasActiveMatch = info && !info.status.isComplete;
-                    const isPlaying = hasActiveMatch && info.nextMatch;
-                    const isComplete = info?.status.isComplete;
+                    const isLeaguePlaying = hasActiveMatch && info.nextMatch;
 
-                    // 進行中リーグ = 緑, 未開始リーグ = 青, それ以外 = 空き
+                    // ブラケット試合がこのコートに入っているか
+                    const courtStr = `${courtNum}コート`;
+                    const bracketEntry = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
+                    const isBracketPlaying = !!bracketEntry;
+
+                    const isPlaying = isLeaguePlaying || isBracketPlaying;
+
+                    // 進行中 = 緑(点滅), リーグ待機 = 青, 空き = グレー
                     const statusStyle = isPlaying
-                      ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' }
+                      ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', blink: true }
                       : hasActiveMatch
-                        ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' }
-                        : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500' };
+                        ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', blink: false }
+                        : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500', blink: false };
 
                     return (
                       <div
                         key={courtNum}
-                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border}`}
+                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
                         <VerticalCourtLines status={isPlaying ? 'playing' : hasActiveMatch ? 'ready' : 'empty'} />
@@ -218,9 +233,7 @@ export default function MixedLiveCourtView() {
                           <div className="flex items-center justify-between mb-0.5">
                             <div className={`text-xl font-black ${statusStyle.text} leading-none`}>{courtNum}</div>
                             {isPlaying && (
-                              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[6px] font-bold px-1 py-0.5 rounded-full leading-none">
-                                <Play className="w-1.5 h-1.5 fill-white" /> LIVE
-                              </span>
+                              <Play className="w-3.5 h-3.5 text-green-500 fill-green-500" />
                             )}
                           </div>
 
@@ -242,17 +255,17 @@ export default function MixedLiveCourtView() {
                                 )}
                               </>
                             ) : (() => {
-                              // ブラケット試合がこのコートに割り当てられているか確認
-                              const courtStr = `${courtNum}コート`;
-                              const bracketMatch = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
-                              if (bracketMatch) {
-                                const [matchId, ca] = bracketMatch;
+                              // ブラケット試合がこのコートに入っているか（既に上で計算済み）
+                              if (bracketEntry) {
+                                const [matchId, ca] = bracketEntry;
                                 const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
+                                const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
+                                const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4-5位T';
                                 if (bm) {
                                   const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
                                   return (
                                     <div className="space-y-0">
-                                      <p className="text-[7px] font-bold text-green-600/80 mb-0.5">決勝T</p>
+                                      <p className="text-[7px] font-bold text-green-600 mb-0.5">{catLabel}</p>
                                       <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team1Name}</p>
                                       <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
                                       <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team2Name}</p>
