@@ -1319,7 +1319,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                         ) : (
                           <span className="text-[11px] font-bold text-gray-700 truncate flex-1">{match.team1Name || match.team2Name}</span>
                         )}
-                        <span className="text-[9px] text-gray-400 shrink-0 ml-1">BYE</span>
                       </div>
                     </div>
                   );
