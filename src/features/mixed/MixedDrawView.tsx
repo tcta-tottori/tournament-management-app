@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Check, MapPin, Pencil, FlaskConical } from 'lucide-react';
+import { Check, MapPin, Pencil, FlaskConical, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 import type { LeagueMatchScore } from './types';
+import { GameRatioCell } from './GameRatioCell';
 
 
 /** リーグバッジカラー (エントリーページと統一) */
@@ -116,7 +117,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           const standings = allStandings.get(league.leagueId) || [];
           const isComplete = finishedCount === totalCount && totalCount > 0;
           const colors = LEAGUE_COLORS[leagueIdx % LEAGUE_COLORS.length];
-
+          const hasTiebreak = finishedCount > 0 && standings.some(s => s.tiebreakReason);
 
           // 現在の対戦を特定
           const currentMatchNumber = (() => {
@@ -229,6 +230,9 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                       })}
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-10 sm:w-14">勝敗</th>
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-8 sm:w-10">位</th>
+                      {hasTiebreak && (
+                        <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-20 sm:w-28">判定</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -285,6 +289,23 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                               </span>
                             )}
                           </td>
+                          {hasTiebreak && (
+                            <td className="px-1 sm:px-2 py-1.5 text-center border-l border-gray-200">
+                              {standing?.tiebreakReason && (
+                                standing.tiebreakReason.startsWith('ゲーム率') ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    <Info size={9} className="shrink-0" />
+                                    <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} className="text-[9px] sm:text-[10px]" />
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    <Info size={9} className="shrink-0" />
+                                    {standing.tiebreakReason}
+                                  </span>
+                                )
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
