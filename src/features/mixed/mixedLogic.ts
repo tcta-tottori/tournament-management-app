@@ -187,14 +187,21 @@ function nextPowerOf2(n: number): number {
 /**
  * ドロー表に記載された順位別トーナメントのスロット配置
  * drawSize=16 のスロット1~16にリーグIDを配置。null=BYE。
- * ドロー表の画像を元に正確に転記。
+ * ドロー表のトーナメント線を正確に転記。
+ *
+ * 2位 (13チーム, 3BYE):
+ *   R1: G(bye) | E-L | H-C | J(bye) | B-F | A-M | I-D | K(bye)
+ *   R2: G vs E/L勝者 | H/C勝者 vs J | B/F勝者 vs A/M勝者 | I/D勝者 vs K
+ *
+ * 3位 (13チーム, 3BYE):
+ *   R1: D(bye) | H-M | F-A | K(bye) | I-G | C-E | L-J | B(bye)
+ *
+ * 4-5位 (14チーム, 2BYE):
+ *   R1: A-M | F-J | L-B | D(bye) | E-H | K-I | G-C | (bye)M5
  */
 const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
-  // 2位トーナメント (13チーム, 3BYE): G2,E2,L2,H2,C2,J2,B2,BYE,F2,A2,M2,BYE,I2,D2,K2,BYE
-  '2nd': ['G','E','L','H','C','J','B',null,'F','A','M',null,'I','D','K',null],
-  // 3位トーナメント (13チーム, 3BYE): D3,H3,M3,F3,A3,K3,I3,BYE,G3,C3,E3,BYE,L3,J3,B3,BYE
-  '3rd': ['D','H','M','F','A','K','I',null,'G','C','E',null,'L','J','B',null],
-  // 4-5位トーナメント (14チーム, 2BYE): A4,M4,F4,J4,L4,B4,D4,BYE,E4,H4,K4,I4,G4,C4,BYE,M5
+  '2nd': ['G',null,'E','L','H','C','J',null,'B','F','A','M','I','D','K',null],
+  '3rd': ['D',null,'H','M','F','A','K',null,'I','G','C','E','L','J','B',null],
   '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
 };
 
