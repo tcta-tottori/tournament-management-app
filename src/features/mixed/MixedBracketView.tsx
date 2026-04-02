@@ -458,8 +458,8 @@ export default function MixedBracketView() {
           }
         }
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setCourtAssignMatch(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[380px] p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setCourtAssignMatch(null)}>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[380px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
               <h3 className="text-sm font-bold text-gray-800 mb-3">コートに入れる</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
@@ -509,8 +509,8 @@ export default function MixedBracketView() {
 
       {/* スコア入力モーダル */}
       {editingMatch && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4" onClick={() => setEditingMatch(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[420px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
@@ -670,8 +670,8 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={onClose}>
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
           <Volume2 size={16} className="text-blue-600" />
           音声コール
