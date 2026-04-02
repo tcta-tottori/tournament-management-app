@@ -179,11 +179,15 @@ function buildMixedCallText(
 
   const parts: string[] = [];
   parts.push('試合のコールをします。');
-  parts.push(`ミックスダブルス、${bracketLabel}、${roundLabel}。`);
-  parts.push(`${match.team1League}リーグ、${familyName(team1.male.name)}さん、${familyName(team1.female.name)}さん ペア。`);
-  parts.push(`${match.team2League}リーグ、${familyName(team2.male.name)}さん、${familyName(team2.female.name)}さん ペア。`);
+  parts.push(`${bracketLabel}${roundLabel}、`);
 
-  let courtText = `この試合を、${courtName}で`;
+  // チーム1: 番号＋苗字（所属）
+  parts.push(`${team1.pairNumber}番、${familyName(team1.male.name)}さん（${team1.male.affiliation}）、${familyName(team1.female.name)}さん（${team1.female.affiliation}）。`);
+  // チーム2
+  parts.push(`${team2.pairNumber}番、${familyName(team2.male.name)}さん（${team2.male.affiliation}）、${familyName(team2.female.name)}さん（${team2.female.affiliation}）。`);
+
+  // コート＋時間
+  let courtText = `こちらの試合を${courtName}で`;
   if (startTime) {
     const [h, m] = startTime.split(':');
     const minutes = parseInt(m);
@@ -193,6 +197,9 @@ function buildMixedCallText(
   }
   courtText += '、おこなってください。';
   parts.push(courtText);
+
+  // ボール係
+  parts.push(`ボールは${team1.pairNumber}番、${familyName(team1.male.name)}さん、${familyName(team1.female.name)}さんが本部まで取りに来てください。`);
 
   return parts.join(' ');
 }
@@ -586,7 +593,13 @@ export default function MixedBracketView() {
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
               </button>
-              <button onClick={() => { setEditingMatch(null); setCallMatch(editingMatch); setCallCourt(''); setCallTime(''); }}
+              <button onClick={() => {
+                const ca = bracketCourtAssignments[editingMatch.matchId];
+                setEditingMatch(null);
+                setCallMatch(editingMatch);
+                setCallCourt(ca ? ca.courtName : '');
+                setCallTime('');
+              }}
                 className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 text-xs hover:bg-blue-100 active:scale-[0.98] transition-all">
                 <Volume2 size={12} />コール
               </button>
