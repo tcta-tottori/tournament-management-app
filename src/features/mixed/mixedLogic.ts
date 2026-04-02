@@ -185,13 +185,17 @@ function nextPowerOf2(n: number): number {
 }
 
 /**
- * ドロー表に記載された順位別トーナメントの配置順序
- * （リーグID順: 各順位のチームをこの順番でブラケットに配置する）
+ * ドロー表に記載された順位別トーナメントのスロット配置
+ * drawSize=16 のスロット1~16にリーグIDを配置。null=BYE。
+ * ドロー表の画像を元に正確に転記。
  */
-const BRACKET_LEAGUE_ORDER: Record<string, string[]> = {
-  '2nd': ['G', 'E', 'L', 'H', 'C', 'J', 'B', 'F', 'A', 'M', 'I', 'D', 'K'],
-  '3rd': ['D', 'H', 'M', 'F', 'A', 'K', 'I', 'G', 'C', 'E', 'L', 'J', 'B'],
-  '4th': ['A', 'M', 'F', 'J', 'L', 'B', 'D', 'E', 'H', 'K', 'I', 'G', 'C'],
+const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
+  // 2位トーナメント (13チーム, 3BYE): G2,E2,L2,H2,C2,J2,B2,BYE,F2,A2,M2,BYE,I2,D2,K2,BYE
+  '2nd': ['G','E','L','H','C','J','B',null,'F','A','M',null,'I','D','K',null],
+  // 3位トーナメント (13チーム, 3BYE): D3,H3,M3,F3,A3,K3,I3,BYE,G3,C3,E3,BYE,L3,J3,B3,BYE
+  '3rd': ['D','H','M','F','A','K','I',null,'G','C','E',null,'L','J','B',null],
+  // 4-5位トーナメント (14チーム, 2BYE): A4,M4,F4,J4,L4,B4,D4,BYE,E4,H4,K4,I4,G4,C4,BYE,M5
+  '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
 };
 
 /**
@@ -213,51 +217,131 @@ export function generateAllBrackets(
   const brackets: PlacementBracket[] = [];
 
   for (const { cat, label, rank } of categories) {
-    const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
-    let seed = 1;
-
-    // 並び順の決定: Excel指定 → ハードコード → リーグ順
-    const excelOrder = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
-    const hardcodedOrder = BRACKET_LEAGUE_ORDER[cat];
-    const leagueIds = (excelOrder && excelOrder.length >= 3 ? excelOrder : null)
-      || hardcodedOrder
-      || leagues.map(l => l.leagueId);
-
-    if (rank <= 3) {
-      for (const lid of leagueIds) {
-        // リーグIDの正規化（トリム）
-        const normalizedLid = lid.trim();
-        const ls = standings.get(normalizedLid) || standings.get(lid);
-        if (!ls) continue;
+    // 全チームをリーグID→チーム情報のマップとして収集
+    const teamByLeague = new Map<string, { teamId: string; teamName: string; leagueId: string }[]>();
+    for (const lid of leagues.map(l => l.leagueId)) {
+      const normalizedLid = lid.trim();
+      const ls = standings.get(normalizedLid) || standings.get(lid);
+      if (!ls) continue;
+      if (rank <= 3) {
         const entry = ls.find(s => s.rank === rank);
-        if (entry) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid, seedPosition: seed++ });
-        }
-      }
-    } else {
-      // 4位以降: 同じleagueIds順
-      for (const lid of leagueIds) {
-        const normalizedLid = lid.trim();
-        const ls = standings.get(normalizedLid) || standings.get(lid);
-        if (!ls) continue;
-        const entries = ls.filter(s => s.rank >= 4);
-        for (const entry of entries) {
-          teamsForBracket.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid, seedPosition: seed++ });
-        }
+        if (entry) teamByLeague.set(normalizedLid, [{ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid }]);
+      } else {
+        const entries = ls.filter(s => s.rank >= 4).map(entry => ({ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid }));
+        if (entries.length > 0) teamByLeague.set(normalizedLid, entries);
       }
     }
 
-    const drawSize = nextPowerOf2(teamsForBracket.length);
-    const matches = generateBracketMatches(cat, drawSize, teamsForBracket);
-
-    brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+    // スロットマップからdrawSize=16のスロット配列を構築
+    const slotMap = BRACKET_SLOT_MAP[cat];
+    if (slotMap) {
+      // スロットマップ使用: BYE位置を明示的に含む
+      const drawSize = slotMap.length; // 16
+      const slots: ({ teamId: string; teamName: string; leagueId: string } | null)[] = [];
+      for (const lid of slotMap) {
+        if (lid === null) {
+          slots.push(null); // BYE
+        } else {
+          const teamList = teamByLeague.get(lid);
+          if (teamList && teamList.length > 0) {
+            slots.push(teamList.shift()!);
+          } else {
+            slots.push(null); // チームが見つからない場合もBYE
+          }
+        }
+      }
+      const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
+        .map((t, i) => ({ ...t, seedPosition: i + 1 }));
+      const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
+      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+    } else {
+      // 1位トーナメント: 抽選なのでリーグ順で収集
+      const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
+      let seed = 1;
+      for (const [, teamList] of teamByLeague) {
+        for (const t of teamList) {
+          teamsForBracket.push({ ...t, seedPosition: seed++ });
+        }
+      }
+      const drawSize = nextPowerOf2(teamsForBracket.length);
+      const matches = generateBracketMatches(cat, drawSize, teamsForBracket);
+      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+    }
   }
 
   return brackets;
 }
 
 /**
- * トーナメント試合生成
+ * スロットマップ（BYE位置明示）を使ったトーナメント試合生成
+ */
+function generateBracketMatchesWithSlots(
+  category: PlacementCategory,
+  drawSize: number,
+  slots: ({ teamId: string; teamName: string; leagueId: string } | null)[]
+): BracketMatch[] {
+  const matches: BracketMatch[] = [];
+  const totalRounds = Math.log2(drawSize);
+
+  // 全ラウンドの試合を生成
+  for (let round = 1; round <= totalRounds; round++) {
+    const matchesInRound = drawSize / Math.pow(2, round);
+    for (let pos = 1; pos <= matchesInRound; pos++) {
+      const matchId = `bracket-${category}-R${round}-${pos}`;
+      const nextRound = round + 1;
+      const nextPos = Math.ceil(pos / 2);
+      const nextMatchId = round < totalRounds ? `bracket-${category}-R${nextRound}-${nextPos}` : null;
+      const nextSlot = pos % 2 === 1 ? 'team1' as const : 'team2' as const;
+      matches.push({
+        matchId, category, round, position: pos,
+        team1Id: null, team2Id: null, team1Name: '', team2Name: '',
+        team1League: '', team2League: '',
+        score1: null, score2: null, winnerId: null,
+        status: 'waiting', isBye: false,
+        nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
+      });
+    }
+  }
+
+  // 1回戦にスロットマップからチーム/BYEを配置
+  const r1Matches = matches.filter(m => m.round === 1);
+  for (let i = 0; i < r1Matches.length; i++) {
+    const s1 = slots[i * 2] || null;
+    const s2 = slots[i * 2 + 1] || null;
+
+    if (s1) { r1Matches[i].team1Id = s1.teamId; r1Matches[i].team1Name = s1.teamName; r1Matches[i].team1League = s1.leagueId; }
+    if (s2) { r1Matches[i].team2Id = s2.teamId; r1Matches[i].team2Name = s2.teamName; r1Matches[i].team2League = s2.leagueId; }
+
+    if (r1Matches[i].team1Id && !r1Matches[i].team2Id) {
+      r1Matches[i].isBye = true; r1Matches[i].status = 'bye'; r1Matches[i].winnerId = r1Matches[i].team1Id; r1Matches[i].team2Name = 'BYE';
+    } else if (!r1Matches[i].team1Id && r1Matches[i].team2Id) {
+      r1Matches[i].isBye = true; r1Matches[i].status = 'bye'; r1Matches[i].winnerId = r1Matches[i].team2Id; r1Matches[i].team1Name = 'BYE';
+    } else if (r1Matches[i].team1Id && r1Matches[i].team2Id) {
+      r1Matches[i].status = 'ready';
+    }
+  }
+
+  // BYE勝者を2回戦に自動進出
+  for (const m of r1Matches) {
+    if (m.isBye && m.winnerId && m.nextMatchId) {
+      const nextMatch = matches.find(nm => nm.matchId === m.nextMatchId);
+      if (nextMatch) {
+        const team = slots.find(s => s && s.teamId === m.winnerId);
+        if (m.nextSlot === 'team1') {
+          nextMatch.team1Id = m.winnerId; nextMatch.team1Name = team?.teamName || ''; nextMatch.team1League = team?.leagueId || '';
+        } else {
+          nextMatch.team2Id = m.winnerId; nextMatch.team2Name = team?.teamName || ''; nextMatch.team2League = team?.leagueId || '';
+        }
+        if (nextMatch.team1Id && nextMatch.team2Id) nextMatch.status = 'ready';
+      }
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * トーナメント試合生成（1位トーナメント用）
  */
 function generateBracketMatches(
   category: PlacementCategory,

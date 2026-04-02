@@ -96,7 +96,7 @@ export interface PlacementBracket {
 }
 
 /** フェーズ */
-export type MixedPhase = 'import' | 'league' | 'standings' | 'tournament' | 'results';
+export type MixedPhase = 'import' | 'league' | 'standings' | 'tournament' | 'waiting' | 'results';
 
 /** 大会情報 */
 export interface TournamentInfo {

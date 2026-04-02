@@ -23,6 +23,17 @@ function getWinningGamesFromRules(rules: string[]): number {
   return 6;
 }
 
+/** リーグバッジの色（エントリーページと統一） */
+const LEAGUE_BADGE_COLORS: Record<string, string> = {
+  'A': 'bg-emerald-100 text-emerald-700', 'B': 'bg-blue-100 text-blue-700',
+  'C': 'bg-purple-100 text-purple-700', 'D': 'bg-rose-100 text-rose-700',
+  'E': 'bg-amber-100 text-amber-700', 'F': 'bg-cyan-100 text-cyan-700',
+  'G': 'bg-lime-100 text-lime-700', 'H': 'bg-fuchsia-100 text-fuchsia-700',
+  'I': 'bg-emerald-100 text-emerald-700', 'J': 'bg-blue-100 text-blue-700',
+  'K': 'bg-purple-100 text-purple-700', 'L': 'bg-rose-100 text-rose-700',
+  'M': 'bg-amber-100 text-amber-700',
+};
+
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
   { id: '1st', label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
   { id: '2nd', label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
@@ -877,7 +888,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                             `}>
                               {/* リーグバッジ */}
                               {slot.league ? (
-                                <span className="w-5 h-5 rounded bg-gray-100 text-[9px] font-bold text-gray-600 flex items-center justify-center shrink-0 mr-1">
+                                <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mr-1 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>
                                   {slot.league}
                                 </span>
                               ) : <span className="w-5 shrink-0 mr-1" />}
