@@ -1,11 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 import { GameRatioCell } from './GameRatioCell';
+
+/** コートオーバーライド: matchId -> courtName を localStorage に保存 */
+const COURT_OVERRIDE_KEY = 'mixed-court-overrides';
+
+function loadCourtOverrides(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(COURT_OVERRIDE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveCourtOverrides(overrides: Record<string, string>) {
+  localStorage.setItem(COURT_OVERRIDE_KEY, JSON.stringify(overrides));
+}
 
 /** リーグバッジカラー (エントリーページと統一) */
 const LEAGUE_COLORS = [
@@ -26,6 +40,32 @@ export default function MixedLeagueView() {
   const [courtNameInput, setCourtNameInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRules, setShowRules] = useState(false);
+
+  // Court override state
+  const [courtOverrides, setCourtOverrides] = useState<Record<string, string>>(loadCourtOverrides);
+  const [courtPopupMatchId, setCourtPopupMatchId] = useState<string | null>(null);
+
+  const persistCourtOverride = useCallback((matchId: string, courtName: string | null) => {
+    setCourtOverrides(prev => {
+      const next = { ...prev };
+      if (courtName) { next[matchId] = courtName; } else { delete next[matchId]; }
+      saveCourtOverrides(next);
+      return next;
+    });
+  }, []);
+
+  // Compute free courts: courts of leagues where all matches are finished
+  const freeCourts = useMemo(() => {
+    const result: { leagueId: string; courtName: string }[] = [];
+    for (const league of leagues) {
+      if (!league.courtName) continue;
+      const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
+      if (lm.length > 0 && lm.every(m => m.status === 'finished')) {
+        result.push({ leagueId: league.leagueId, courtName: league.courtName });
+      }
+    }
+    return result;
+  }, [leagues, leagueMatches]);
 
   const selectedLeague = leagues.find(l => l.leagueId === selectedLeagueId) || leagues[0];
   const { rankOverrides } = useMixedStore();
@@ -356,32 +396,58 @@ export default function MixedLeagueView() {
               const isFinished = match?.status === 'finished';
               const isPlaying = match?.status === 'playing';
               const isCurrent = mo.matchNumber === currentMatchNumber;
+              const overrideCourt = match ? courtOverrides[match.matchId] : undefined;
               return (
-                <button
-                  key={mo.matchNumber}
-                  onClick={() => match && setEditingMatch(match)}
-                  className={`
-                    flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
-                    ${isFinished
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                      : isPlaying
-                        ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
-                        : isCurrent
-                          ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300 league-match-blink'
-                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                    }
-                  `}
-                >
-                  {isCurrent && !isFinished && <span className="text-yellow-700">▶</span>}
-                  <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
-                  <span className="font-bold">
-                    {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
-                  </span>
-                  {isFinished && match && (
-                    <span className="text-xs ml-1">({match.score1}-{match.score2})</span>
+                <div key={mo.matchNumber} className="relative flex flex-col items-center">
+                  <button
+                    onClick={() => match && setEditingMatch(match)}
+                    className={`
+                      flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
+                      ${isFinished
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : isPlaying
+                          ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
+                          : isCurrent
+                            ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300 league-match-blink'
+                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                      }
+                    `}
+                  >
+                    {isCurrent && !isFinished && <span className="text-yellow-700">▶</span>}
+                    <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
+                    <span className="font-bold">
+                      {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
+                    </span>
+                    {isFinished && match && (
+                      <span className="text-xs ml-1">({match.score1}-{match.score2})</span>
+                    )}
+                    {isFinished ? <Check size={14} /> : isPlaying ? <Play size={14} /> : <Circle size={14} />}
+                  </button>
+                  {/* Court override badge */}
+                  {overrideCourt && (
+                    <span className="mt-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                      <MapPin size={9} />{overrideCourt}
+                      {!isFinished && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); match && persistCourtOverride(match.matchId, null); }}
+                          className="ml-0.5 text-blue-400 hover:text-red-500"
+                        >
+                          <X size={9} />
+                        </button>
+                      )}
+                    </span>
                   )}
-                  {isFinished ? <Check size={14} /> : isPlaying ? <Play size={14} /> : <Circle size={14} />}
-                </button>
+                  {/* Free court assign button: only for unfinished matches when free courts exist */}
+                  {match && !isFinished && !overrideCourt && freeCourts.length > 0 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCourtPopupMatchId(match.matchId); }}
+                      className="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 flex items-center gap-0.5 hover:bg-indigo-50 rounded px-1 py-0.5 transition-colors"
+                      title="空きコートで実施"
+                    >
+                      <ArrowRightLeft size={9} />空きコート
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -452,6 +518,45 @@ export default function MixedLeagueView() {
           </div>
         )}
       </div>
+
+      {/* Court override popup */}
+      {courtPopupMatchId && createPortal(
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setCourtPopupMatchId(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-72 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-4 py-2.5 flex items-center justify-between">
+              <h4 className="text-sm font-bold flex items-center gap-1.5"><ArrowRightLeft size={14} />空きコートで実施</h4>
+              <button onClick={() => setCourtPopupMatchId(null)} className="p-1 hover:bg-white/20 rounded-lg"><X size={16} /></button>
+            </div>
+            <div className="p-3 space-y-1.5">
+              <p className="text-xs text-gray-500 mb-2">全試合完了済みリーグのコートを選択:</p>
+              {freeCourts.filter(fc => {
+                // Exclude the current league's own court
+                return fc.leagueId !== selectedLeague.leagueId;
+              }).length === 0 ? (
+                <p className="text-xs text-gray-400 py-2 text-center">他リーグの空きコートがありません</p>
+              ) : (
+                freeCourts
+                  .filter(fc => fc.leagueId !== selectedLeague.leagueId)
+                  .map(fc => (
+                    <button
+                      key={fc.leagueId}
+                      onClick={() => {
+                        persistCourtOverride(courtPopupMatchId, fc.courtName);
+                        setCourtPopupMatchId(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 transition-all text-sm"
+                    >
+                      <MapPin size={14} className="text-indigo-500 flex-shrink-0" />
+                      <span className="font-medium text-gray-800">{fc.courtName}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{fc.leagueId.trim()}リーグ</span>
+                    </button>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Score input dialog */}
       {editingMatch && (
