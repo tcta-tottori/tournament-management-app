@@ -152,7 +152,7 @@ function printRefereeSheet(
       <div class="score-label">No.${team1.pairNumber}</div>
       <div class="score-box"></div>
     </div>
-    <div class="score-dash">−</div>
+    <div class="score-dash">ー</div>
     <div class="score-group">
       <div class="score-label">No.${team2.pairNumber}</div>
       <div class="score-box"></div>
@@ -163,9 +163,9 @@ function printRefereeSheet(
     </div>
   </div>
   <div class="bottom-row">
-    <div class="bottom-cell">コート：<span class="uline"></span></div>
-    <div class="bottom-cell">開始時刻：<span class="uline"></span></div>
-    <div class="bottom-cell">終了時刻：<span class="uline"></span></div>
+    <div class="bottom-cell">コー<br>ト：<span class="uline"></span></div>
+    <div class="bottom-cell">開始時<br>刻：<span class="uline"></span></div>
+    <div class="bottom-cell">終了時<br>刻：<span class="uline"></span></div>
     <div class="bottom-cell">審判：<span class="uline"></span></div>
   </div>
   <div class="notes">備考：</div>
@@ -911,7 +911,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
   const BYE_HEIGHT = 32;
   const MATCH_WIDTH = 260;
   const ROUND_GAP = 48;
-  const MATCH_GAP = 8;
+  const MATCH_GAP = 24; // ボタン分の余白を確保
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
   const is1stBracket = bracket.category === '1st';
@@ -1020,7 +1020,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                 }
 
                 return (
-                  <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH }}>
+                  <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
                     <div
                       onClick={() => onMatchClick(match)}
                       className={`
