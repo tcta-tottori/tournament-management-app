@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList, LayoutGrid } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -357,7 +357,7 @@ export default function MixedBracketView() {
     return matches;
   }, [brackets]);
 
-  const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
+  const [viewMode, setViewMode] = useState<'bracket' | 'waiting' | 'all'>('bracket');
 
   return (
     <div className="space-y-4">
@@ -371,6 +371,15 @@ export default function MixedBracketView() {
         >
           <Trophy size={14} />
           トーナメント
+        </button>
+        <button
+          onClick={() => setViewMode('all')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
+            viewMode === 'all' ? 'bg-white border border-b-white border-gray-200 text-gray-800 -mb-[1px]' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <LayoutGrid size={14} />
+          全表示
         </button>
         <button
           onClick={() => setViewMode('waiting')}
@@ -389,6 +398,36 @@ export default function MixedBracketView() {
       {/* 控えリスト表示 */}
       {viewMode === 'waiting' && (
         <WaitingList waitingMatches={waitingMatches} leagues={leagues} />
+      )}
+
+      {/* 全トーナメント表示 */}
+      {viewMode === 'all' && (
+        <div className="space-y-6">
+          {CATEGORY_TABS.map(tab => {
+            const bracket = brackets.find(b => b.category === tab.id);
+            if (!bracket) return null;
+            const Icon = tab.icon;
+            const finished = bracket.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
+            const total = bracket.matches.length;
+            return (
+              <div key={tab.id}>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-t-xl bg-gradient-to-r ${tab.color} text-white`}>
+                  <Icon size={16} />
+                  <span className="font-bold text-sm">{tab.label}トーナメント</span>
+                  <span className="text-white/70 text-xs ml-1">({finished}/{total})</span>
+                </div>
+                <BracketDisplay
+                  bracket={bracket}
+                  onMatchClick={openScoreEditor}
+                  getRoundLabel={getRoundLabel}
+                  allTeams={useMixedStore.getState().allTeams}
+                  courtAssignments={bracketCourtAssignments}
+                  compact
+                />
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {viewMode === 'bracket' && (<>
@@ -797,7 +836,7 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
   );
 }
 
-/** ルーレット抽選パネル */
+/** ルーレット抽選パネル（改善版: 全ペア表示・個別選択・手動配置） */
 function RouletteDrawPanel({ bracket, onShuffle }: {
   bracket: PlacementBracket;
   onShuffle: (category: PlacementCategory, newOrder: string[]) => void;
@@ -805,7 +844,7 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   const [spinning, setSpinning] = useState(false);
   const [currentHighlight, setCurrentHighlight] = useState(-1);
   const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(new Map());
-  const [currentTeamIdx, setCurrentTeamIdx] = useState(0);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [drawComplete, setDrawComplete] = useState(false);
   const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -814,84 +853,66 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   const totalSlots = round1Matches.length * 2;
   const teams = bracket.teams;
 
-  // 未割当のスロット番号リスト
-  const getAvailableSlots = useCallback(() => {
-    const all = Array.from({ length: totalSlots }, (_, i) => i);
-    return all.filter(i => !assignedSlots.has(i));
-  }, [totalSlots, assignedSlots]);
+  // 割当済みチームID
+  const assignedTeamIds = useMemo(() => new Set(assignedSlots.values()), [assignedSlots]);
+  const availableSlots = useMemo(() => Array.from({ length: totalSlots }, (_, i) => i).filter(i => !assignedSlots.has(i)), [totalSlots, assignedSlots]);
+  const unassignedTeams = useMemo(() => teams.filter(t => !assignedTeamIds.has(t.teamId)), [teams, assignedTeamIds]);
+  const activeTeam = selectedTeamId ? teams.find(t => t.teamId === selectedTeamId) : unassignedTeams[0];
 
-  // ルーレット回転
+  // ルーレット（選択中チームをランダムスロットに配置）
   const spinRoulette = useCallback(() => {
-    if (currentTeamIdx >= teams.length) return;
-    const available = getAvailableSlots();
-    if (available.length === 0) return;
-
+    if (!activeTeam || availableSlots.length === 0) return;
     setSpinning(true);
     let count = 0;
-    const totalSpins = 15 + Math.floor(Math.random() * 10);
-
+    const totalSpins = 12 + Math.floor(Math.random() * 8);
     const spin = () => {
-      const idx = available[Math.floor(Math.random() * available.length)];
-      setCurrentHighlight(idx);
+      setCurrentHighlight(availableSlots[Math.floor(Math.random() * availableSlots.length)]);
       count++;
-
       if (count < totalSpins) {
-        const delay = 50 + count * 15; // 徐々に遅くなる
-        spinTimerRef.current = setTimeout(spin, delay);
+        spinTimerRef.current = setTimeout(spin, 50 + count * 18);
       } else {
-        // 停止 - このスロットに割り当て
-        const finalSlot = available[Math.floor(Math.random() * available.length)];
+        const finalSlot = availableSlots[Math.floor(Math.random() * availableSlots.length)];
         setCurrentHighlight(finalSlot);
-        setAssignedSlots(prev => {
-          const next = new Map(prev);
-          next.set(finalSlot, teams[currentTeamIdx].teamId);
-          return next;
-        });
+        setAssignedSlots(prev => { const next = new Map(prev); next.set(finalSlot, activeTeam.teamId); return next; });
         setSpinning(false);
-        setCurrentTeamIdx(prev => prev + 1);
+        setSelectedTeamId(null);
       }
     };
     spin();
-  }, [currentTeamIdx, teams, getAvailableSlots]);
+  }, [activeTeam, availableSlots]);
 
-  // 全自動抽選
+  // 手動配置
+  const manualAssign = (slotIdx: number) => {
+    if (!activeTeam || assignedSlots.has(slotIdx)) return;
+    setAssignedSlots(prev => { const next = new Map(prev); next.set(slotIdx, activeTeam.teamId); return next; });
+    setSelectedTeamId(null);
+  };
+
   const autoDrawAll = useCallback(() => {
     const shuffled = [...teams].sort(() => Math.random() - 0.5);
-    const newOrder = shuffled.map(t => t.teamId);
-    onShuffle(bracket.category, newOrder);
+    onShuffle(bracket.category, shuffled.map(t => t.teamId));
     setDrawComplete(true);
   }, [teams, bracket.category, onShuffle]);
 
-  // 手動割当確定
-  const confirmManualDraw = useCallback(() => {
-    // assignedSlots を元に順序を決定
+  const confirmDraw = useCallback(() => {
     const ordered: string[] = new Array(totalSlots).fill('');
     assignedSlots.forEach((teamId, slot) => { ordered[slot] = teamId; });
     const newOrder = ordered.filter(id => id !== '');
-    // 未割当のチームも末尾に追加
-    const assignedIds = new Set(newOrder);
-    for (const t of teams) {
-      if (!assignedIds.has(t.teamId)) newOrder.push(t.teamId);
-    }
+    const ids = new Set(newOrder);
+    for (const t of teams) { if (!ids.has(t.teamId)) newOrder.push(t.teamId); }
     onShuffle(bracket.category, newOrder);
     setDrawComplete(true);
   }, [assignedSlots, totalSlots, teams, bracket.category, onShuffle]);
 
-  // リセット
   const resetDraw = () => {
     setAssignedSlots(new Map());
-    setCurrentTeamIdx(0);
+    setSelectedTeamId(null);
     setCurrentHighlight(-1);
     setDrawComplete(false);
     if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
   };
 
-  useEffect(() => {
-    return () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); };
-  }, []);
-
-  // 全チーム割当済みかチェック
-  const allAssigned = currentTeamIdx >= teams.length;
+  useEffect(() => () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-yellow-200 overflow-hidden">
@@ -916,80 +937,80 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
       <div className="p-4">
         {!drawComplete ? (
           <>
-            {/* 抽選スロット表示 */}
+            {/* 全ペア一覧（タップで選択） */}
+            <div className="mb-4">
+              <div className="text-[10px] font-bold text-gray-500 mb-2">ペアを選択してスロットに配置（タップまたはルーレット）</div>
+              <div className="flex flex-wrap gap-1.5">
+                {teams.map(t => {
+                  const isAssigned = assignedTeamIds.has(t.teamId);
+                  const isSelected = activeTeam?.teamId === t.teamId;
+                  return (
+                    <button key={t.teamId} onClick={() => !isAssigned && setSelectedTeamId(t.teamId)}
+                      disabled={isAssigned || spinning}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border transition-all ${
+                        isAssigned ? 'bg-emerald-50 border-emerald-200 text-emerald-600 opacity-60' :
+                        isSelected ? 'bg-yellow-100 border-yellow-400 text-yellow-800 ring-2 ring-yellow-300' :
+                        'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                    >
+                      <span className="font-bold">{t.leagueId}</span> {t.teamName}{isAssigned && ' ✓'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* スロット（タップで手動配置） */}
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
               {Array.from({ length: totalSlots }, (_, i) => {
-                const assignedTeamId = assignedSlots.get(i);
-                const assignedTeam = assignedTeamId ? teams.find(t => t.teamId === assignedTeamId) : null;
-                const isHighlighted = currentHighlight === i && spinning;
-                const isAvailable = !assignedSlots.has(i);
-
+                const aid = assignedSlots.get(i);
+                const at = aid ? teams.find(t => t.teamId === aid) : null;
+                const hl = currentHighlight === i && spinning;
+                const canPlace = !assignedSlots.has(i) && activeTeam && !spinning;
                 return (
-                  <div
-                    key={i}
-                    className={`
-                      relative p-2 rounded-lg border-2 text-center transition-all min-h-[56px] flex flex-col items-center justify-center
-                      ${isHighlighted ? 'border-yellow-400 bg-yellow-100 scale-105 shadow-lg' :
-                        assignedTeam ? 'border-emerald-300 bg-emerald-50' :
-                        isAvailable ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-gray-100'}
-                    `}
+                  <div key={i} onClick={() => canPlace && manualAssign(i)}
+                    className={`relative p-2 rounded-lg border-2 text-center transition-all min-h-[56px] flex flex-col items-center justify-center
+                      ${hl ? 'border-yellow-400 bg-yellow-100 scale-105 shadow-lg' :
+                        at ? 'border-emerald-300 bg-emerald-50' :
+                        canPlace ? 'border-yellow-200 bg-yellow-50 cursor-pointer hover:border-yellow-300' :
+                        'border-gray-200 bg-gray-50'}`}
                   >
                     <div className="text-[10px] text-gray-400 font-mono">#{i + 1}</div>
-                    {assignedTeam ? (
-                      <>
-                        <div className="text-[10px] font-bold text-emerald-700 truncate w-full">{assignedTeam.teamName}</div>
-                        <div className="text-[8px] text-emerald-500">{assignedTeam.leagueId}リーグ</div>
-                      </>
-                    ) : (
-                      <div className="text-[10px] text-gray-300">―</div>
-                    )}
+                    {at ? (<><div className="text-[10px] font-bold text-emerald-700 truncate w-full">{at.teamName}</div><div className="text-[8px] text-emerald-500">{at.leagueId}</div></>)
+                     : canPlace ? <div className="text-[10px] text-yellow-500">タップ</div>
+                     : <div className="text-[10px] text-gray-300">―</div>}
                   </div>
                 );
               })}
             </div>
 
-            {/* 次の抽選チーム */}
-            {!allAssigned && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="text-xs text-yellow-600 mb-1">次の抽選</div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-bold text-yellow-800">{teams[currentTeamIdx]?.teamName}</span>
-                    <span className="text-xs text-yellow-600 ml-2">({teams[currentTeamIdx]?.leagueId}リーグ)</span>
-                  </div>
-                  <button
-                    onClick={spinRoulette}
-                    disabled={spinning}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all
-                      ${spinning
-                        ? 'bg-yellow-200 text-yellow-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white hover:from-yellow-600 hover:to-amber-600 shadow-md'
-                      }
-                    `}
-                  >
-                    <Shuffle size={14} className={spinning ? 'animate-spin' : ''} />
-                    {spinning ? '抽選中...' : 'ルーレット'}
-                  </button>
+            {/* アクティブチーム + ルーレットボタン */}
+            {activeTeam && !spinning && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-yellow-600 mb-0.5">配置するペア</div>
+                  <span className="text-sm font-bold text-yellow-800">{activeTeam.teamName}</span>
+                  <span className="text-xs text-yellow-600 ml-2">({activeTeam.leagueId}リーグ)</span>
                 </div>
+                <button onClick={spinRoulette}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-yellow-500 to-amber-500 text-white hover:from-yellow-600 hover:to-amber-600 shadow-md">
+                  <Shuffle size={14} />ルーレット
+                </button>
               </div>
+            )}
+            {spinning && (
+              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-center text-sm font-bold text-yellow-700 animate-pulse">抽選中...</div>
             )}
 
             {/* ボタン群 */}
             <div className="flex gap-3">
-              <button
-                onClick={autoDrawAll}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-xl hover:from-yellow-600 hover:to-amber-600 text-sm font-medium shadow-md transition-all"
-              >
-                <Shuffle size={14} />
-                全自動抽選
+              <button onClick={autoDrawAll}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-xl hover:from-yellow-600 hover:to-amber-600 text-sm font-medium shadow-md">
+                <Shuffle size={14} />全自動抽選
               </button>
-              {allAssigned && (
-                <button
-                  onClick={confirmManualDraw}
-                  className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-medium shadow-md transition-all"
-                >
-                  <Hand size={14} />
-                  この配置で確定
+              {unassignedTeams.length === 0 && (
+                <button onClick={confirmDraw}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-medium shadow-md">
+                  <Hand size={14} />この配置で確定
                 </button>
               )}
             </div>
@@ -1006,12 +1027,13 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments }: {
+function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments, compact = false }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
   courtAssignments: Record<string, { courtName: string; startedAt: number }>;
+  compact?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
@@ -1021,11 +1043,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 120;
-  const BYE_HEIGHT = 50;
-  const MATCH_WIDTH = 280;
-  const ROUND_GAP = 52;
-  const MATCH_GAP = 24; // ボタン分の余白を確保
+  const MATCH_HEIGHT = compact ? 84 : 120;
+  const BYE_HEIGHT = compact ? 36 : 50;
+  const MATCH_WIDTH = compact ? 220 : 280;
+  const ROUND_GAP = compact ? 36 : 52;
+  const MATCH_GAP = compact ? 12 : 24; // ボタン分の余白を確保
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
   const is1stBracket = bracket.category === '1st';
@@ -1063,7 +1085,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
   const svgHeight = r1count * GRID_UNIT + 36;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
+    <div className={`bg-white shadow-sm border border-gray-200 p-4 overflow-x-auto ${compact ? 'rounded-b-xl' : 'rounded-xl'}`}>
       <div className="relative" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
         {/* 接続線SVG */}
         <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
@@ -1148,12 +1170,14 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 }
 
                 // 通常マッチ
+                const SLOT_HEIGHT = compact ? 28 : 42;
+                const STATUS_HEIGHT = compact ? 22 : 30;
                 const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
                   const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
                   return (
                     <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
-                    `} style={{ height: 42 }}>
+                    `} style={{ height: SLOT_HEIGHT }}>
                       {slot.league ? (
                         <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mr-1.5 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{slot.league}</span>
                       ) : <span className="w-5 shrink-0 mr-1.5" />}
@@ -1203,11 +1227,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false })}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
-                        <div className={`flex items-center h-[30px] text-[10px] font-medium border-t border-gray-100 px-2
+                        <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
                           ${isPlaying ? 'bg-green-50 text-green-700' :
                             match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
                             'bg-amber-50/50 text-amber-600'}
-                        `}>
+                        `} style={{ height: STATUS_HEIGHT }}>
                           {isPlaying ? (
                             <>
                               <span className="flex items-center gap-1 shrink-0">
