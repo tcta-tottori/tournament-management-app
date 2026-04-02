@@ -417,10 +417,24 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
   const totalRounds = Math.log2(bracket.drawSize);
   const roundLabel = getRoundLabel(match.round, totalRounds);
 
-  // コート候補: リーグのコート名一覧
+  // コート候補: リーグのコート名を個別コートに分解
   const courtOptions = useMemo(() => {
-    const courts = leagues.map(l => l.courtName).filter(Boolean);
-    return [...new Set(courts)].sort();
+    const courtSet = new Set<string>();
+    for (const l of leagues) {
+      if (!l.courtName) continue;
+      // "6・7コート" → "6コート", "7コート" / "10・11コート" → "10コート", "11コート"
+      const nums = l.courtName.match(/\d+/g);
+      if (nums) {
+        for (const n of nums) courtSet.add(`${n} コート`);
+      } else {
+        courtSet.add(l.courtName);
+      }
+    }
+    return [...courtSet].sort((a, b) => {
+      const na = parseInt(a) || 0;
+      const nb = parseInt(b) || 0;
+      return na - nb;
+    });
   }, [leagues]);
 
   const handleSpeak = () => {
