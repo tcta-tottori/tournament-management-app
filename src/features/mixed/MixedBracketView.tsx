@@ -1135,17 +1135,9 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                           </span>
                         )}
                         {winnerData ? (
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{winnerData.pairNumber}</span>
-                            <div className="min-w-0">
-                              <div className="text-[12px] font-bold text-gray-800 truncate leading-tight">{winnerData.male.name}</div>
-                              <div className="text-[12px] text-gray-700 truncate leading-tight">{winnerData.female.name}</div>
-                            </div>
-                            <div className="w-px h-7 bg-gray-200 shrink-0" />
-                            <div className="min-w-0">
-                              <div className="text-[9px] text-gray-400 truncate">{winnerData.male.affiliation}</div>
-                              <div className="text-[9px] text-gray-400 truncate">{winnerData.female.affiliation}</div>
-                            </div>
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{winnerData.pairNumber}</span>
+                            <span className="text-[11px] font-bold text-gray-800 truncate">{winnerData.teamName}</span>
                           </div>
                         ) : (
                           <span className="text-[11px] font-bold text-gray-700 truncate">{match.team1Name || match.team2Name}</span>
@@ -1167,16 +1159,16 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       ) : <span className="w-5 shrink-0 mr-1.5" />}
                       <div className="flex-1 min-w-0">
                         {teamData ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{teamData.pairNumber}</span>
-                            <div className="min-w-0" style={{ width: 100 }}>
-                              <div className="text-[12px] font-bold truncate leading-tight">{teamData.male.name}</div>
-                              <div className="text-[12px] truncate leading-tight">{teamData.female.name}</div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{teamData.pairNumber}</span>
+                            <div className="shrink-0" style={{ width: 95 }}>
+                              <div className="text-[11px] font-bold leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                              <div className="text-[11px] leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
                             </div>
                             <div className="w-px h-7 bg-gray-200 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[9px] text-gray-400 truncate">{teamData.male.affiliation}</div>
-                              <div className="text-[9px] text-gray-400 truncate">{teamData.female.affiliation}</div>
+                            <div className="flex-1 min-w-0 text-center">
+                              <div className="text-[8px] text-gray-400 truncate">{teamData.male.affiliation}</div>
+                              <div className="text-[8px] text-gray-400 truncate">{teamData.female.affiliation}</div>
                             </div>
                           </div>
                         ) : slot.ph?.leagueId ? (
