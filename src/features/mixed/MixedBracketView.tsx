@@ -440,9 +440,8 @@ export default function MixedBracketView() {
         const t1 = allTeamsData.find(t => t.teamId === courtAssignMatch.team1Id);
         const t2 = allTeamsData.find(t => t.teamId === courtAssignMatch.team2Id);
         const courtOpts = (() => {
-          const s = new Set<string>();
-          for (const l of leagues) { const nums = l.courtName?.match(/\d+/g); if (nums) for (const n of nums) s.add(`${n}コート`); }
-          return [...s].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+          // 1〜16の全コートを候補にする
+          return Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
         })();
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCourtAssignMatch(null)}>
@@ -967,10 +966,10 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = 110;
-  const BYE_HEIGHT = 36;
-  const MATCH_WIDTH = 260;
-  const ROUND_GAP = 48;
+  const MATCH_HEIGHT = 120;
+  const BYE_HEIGHT = 50;
+  const MATCH_WIDTH = 280;
+  const ROUND_GAP = 52;
   const MATCH_GAP = 24; // ボタン分の余白を確保
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
@@ -1067,21 +1066,35 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 const elapsedM = elapsedMin % 60;
                 const elapsedStr = `${elapsedH}:${String(elapsedM).padStart(2, '0')}`;
 
-                // BYEマッチ: 勝者のみコンパクト表示（BYE文字なし）
+                // BYEマッチ: 勝者を通常マッチと同じスタイルで表示
                 if (isBye) {
                   const winnerId = match.winnerId;
                   const winnerData = winnerId ? allTeams.find(t => t.teamId === winnerId) : null;
                   const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
                   return (
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - BYE_HEIGHT / 2, width: MATCH_WIDTH }}>
-                      <div className="flex items-center gap-1.5 px-2 rounded border border-gray-200 bg-white" style={{ height: BYE_HEIGHT }}>
+                      <div className="flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 bg-white" style={{ height: BYE_HEIGHT }}>
                         {winnerLeague && (
-                          <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                          <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
                             {winnerLeague}
                           </span>
                         )}
-                        {winnerData && <span className="text-[9px] text-gray-400 font-mono shrink-0">{winnerData.pairNumber}</span>}
-                        <span className="text-[10px] font-bold text-gray-700 truncate">{winnerData?.teamName || match.team1Name || match.team2Name}</span>
+                        {winnerData ? (
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{winnerData.pairNumber}</span>
+                            <div className="min-w-0">
+                              <div className="text-[12px] font-bold text-gray-800 truncate leading-tight">{winnerData.male.name}</div>
+                              <div className="text-[12px] text-gray-700 truncate leading-tight">{winnerData.female.name}</div>
+                            </div>
+                            <div className="w-px h-7 bg-gray-200 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-[9px] text-gray-400 truncate">{winnerData.male.affiliation}</div>
+                              <div className="text-[9px] text-gray-400 truncate">{winnerData.female.affiliation}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-bold text-gray-700 truncate">{match.team1Name || match.team2Name}</span>
+                        )}
                       </div>
                     </div>
                   );
@@ -1091,37 +1104,37 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
                   const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
                   return (
-                    <div className={`flex items-center px-1.5 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
+                    <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
-                    `} style={{ height: 40 }}>
+                    `} style={{ height: 42 }}>
                       {slot.league ? (
-                        <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 mr-1 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{slot.league}</span>
-                      ) : <span className="w-4 shrink-0 mr-1" />}
+                        <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mr-1.5 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{slot.league}</span>
+                      ) : <span className="w-5 shrink-0 mr-1.5" />}
                       <div className="flex-1 min-w-0">
                         {teamData ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-[8px] text-gray-400 font-mono shrink-0">{teamData.pairNumber}</span>
-                            <div className="min-w-0" style={{ width: 90 }}>
-                              <div className="text-[10px] font-bold truncate leading-tight">{teamData.male.name}</div>
-                              <div className="text-[10px] truncate leading-tight">{teamData.female.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{teamData.pairNumber}</span>
+                            <div className="min-w-0" style={{ width: 100 }}>
+                              <div className="text-[12px] font-bold truncate leading-tight">{teamData.male.name}</div>
+                              <div className="text-[12px] truncate leading-tight">{teamData.female.name}</div>
                             </div>
-                            <div className="w-px h-6 bg-gray-200 shrink-0" />
+                            <div className="w-px h-7 bg-gray-200 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="text-[7px] text-gray-400 truncate">{teamData.male.affiliation}</div>
-                              <div className="text-[7px] text-gray-400 truncate">{teamData.female.affiliation}</div>
+                              <div className="text-[9px] text-gray-400 truncate">{teamData.male.affiliation}</div>
+                              <div className="text-[9px] text-gray-400 truncate">{teamData.female.affiliation}</div>
                             </div>
                           </div>
                         ) : slot.ph?.leagueId ? (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="inline-block px-1 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-bold">{slot.ph.leagueId}</span>
-                            <span className="text-[9px] text-blue-400">{slot.ph.rank}位</span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
+                            <span className="text-[10px] text-blue-400">{slot.ph.rank}位</span>
                           </span>
-                        ) : slot.ph ? <span className="text-[9px] text-gray-400">{slot.ph.text}</span>
-                        : slot.name ? <span className="text-[10px] truncate">{slot.name}</span>
-                        : <span className="text-[9px] text-gray-400">―</span>}
+                        ) : slot.ph ? <span className="text-[10px] text-gray-400">{slot.ph.text}</span>
+                        : slot.name ? <span className="text-[11px] truncate">{slot.name}</span>
+                        : <span className="text-[10px] text-gray-400">―</span>}
                       </div>
                       {slot.score !== null && (
-                        <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>{slot.score}</span>
+                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>{slot.score}</span>
                       )}
                     </div>
                   );
@@ -1143,7 +1156,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false })}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
-                        <div className={`flex items-center justify-center gap-1.5 h-[26px] text-[9px] font-medium border-t border-gray-100
+                        <div className={`flex items-center justify-center gap-1.5 h-[30px] text-[10px] font-medium border-t border-gray-100
                           ${isPlaying ? 'bg-green-50 text-green-700' :
                             match.status === 'finished' ? 'bg-emerald-50 text-emerald-600' :
                             'bg-amber-50 text-amber-600'}
@@ -1188,13 +1201,9 @@ function WaitingList({ waitingMatches, leagues }: {
   const [selectedCourts, setSelectedCourts] = useState<Record<string, string>>({});
 
   const courtOptions = useMemo(() => {
+    // 1〜16の全コートを候補
     const courtSet = new Set<string>();
-    for (const l of leagues) {
-      if (!l.courtName) continue;
-      const nums = l.courtName.match(/\d+/g);
-      if (nums) for (const n of nums) courtSet.add(`${n}コート`);
-      else courtSet.add(l.courtName);
-    }
+    for (let i = 1; i <= 16; i++) courtSet.add(`${i}コート`);
     return [...courtSet].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
   }, [leagues]);
 
