@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, MapPin, Pencil, FlaskConical, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
@@ -98,6 +98,10 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
   const [lotteryResult, setLotteryResult] = useState<{ teamId: string; teamName: string; rank: number }[] | null>(null);
   const [manualRanks, setManualRanks] = useState<Map<string, number>>(new Map());
 
+  const [spinning, setSpinning] = useState(false);
+  const [spinDisplay, setSpinDisplay] = useState<{ teamId: string; teamName: string; rank: number }[] | null>(null);
+  const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 同じゲーム率のチーム群を特定
   const sameRatioTeams = standings.filter(s => {
     if (s.wins !== standing.wins) return false;
@@ -115,13 +119,44 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
     setShowPicker(false);
     setLotteryResult(null);
     setManualRanks(new Map());
+    setSpinDisplay(null);
   };
 
   const handleLottery = () => {
-    const shuffled = [...sameRatioTeams].sort(() => Math.random() - 0.5);
-    const result = shuffled.map((s, i) => ({ teamId: s.teamId, teamName: s.teamName, rank: baseRank + i }));
-    setLotteryResult(result);
+    // 最終結果を先に決定
+    const finalShuffled = [...sameRatioTeams].sort(() => Math.random() - 0.5);
+    const finalResult = finalShuffled.map((s, i) => ({ teamId: s.teamId, teamName: s.teamName, rank: baseRank + i }));
+
+    // スピンアニメーション
+    setSpinning(true);
+    setLotteryResult(null);
+    let count = 0;
+    const totalSpins = 12;
+
+    const spin = () => {
+      const shuffled = [...sameRatioTeams].sort(() => Math.random() - 0.5);
+      setSpinDisplay(shuffled.map((s, i) => ({ teamId: s.teamId, teamName: s.teamName, rank: baseRank + i })));
+      count++;
+
+      if (count < totalSpins) {
+        const delay = 80 + count * 40; // 徐々に遅くなる
+        spinTimerRef.current = setTimeout(spin, delay);
+      } else {
+        // 最終結果を表示
+        setTimeout(() => {
+          setSpinDisplay(null);
+          setSpinning(false);
+          setLotteryResult(finalResult);
+        }, 300);
+      }
+    };
+    spin();
   };
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); };
+  }, []);
 
   const handleManualSet = (teamId: string, rank: number) => {
     setManualRanks(prev => {
@@ -164,10 +199,30 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
               ))}
             </div>
 
+            {/* スピンアニメーション */}
+            {spinning && spinDisplay && (
+              <div className="mb-4">
+                <div className="text-center mb-3">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full">
+                    <span className="text-lg animate-spin">🎲</span>
+                    <span className="text-sm font-bold text-amber-700">抽選中...</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {spinDisplay.sort((a, b) => a.rank - b.rank).map(r => (
+                    <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-amber-200 transition-all duration-75">
+                      <span className="w-7 h-7 rounded-full bg-amber-400 text-white flex items-center justify-center text-xs font-bold animate-pulse">{r.rank}</span>
+                      <span className="font-bold text-gray-800 text-sm">{r.teamName}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* ルーレット結果表示 */}
-            {lotteryResult && (
+            {!spinning && lotteryResult && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                <div className="text-xs font-bold text-amber-700 mb-2 text-center">抽選結果</div>
+                <div className="text-xs font-bold text-amber-700 mb-2 text-center">🎊 抽選結果</div>
                 <div className="space-y-2">
                   {lotteryResult.sort((a, b) => a.rank - b.rank).map(r => (
                     <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg">
@@ -200,9 +255,10 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
               <>
                 <button
                   onClick={handleLottery}
-                  className="w-full py-3 mb-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
+                  disabled={spinning}
+                  className="w-full py-3 mb-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                 >
-                  🎲 ルーレットで決定
+                  {spinning ? '🎲 抽選中...' : '🎲 ルーレットで決定'}
                 </button>
 
                 {/* 手動で全員の順位を指定 */}
