@@ -197,13 +197,12 @@ export default function MixedLiveCourtView() {
                     const isPlaying = info && !info.status.isComplete && info.nextMatch;
                     const isComplete = info?.status.isComplete;
 
+                    // リーグ完了 = 空きコート扱い
                     const statusStyle = isPlaying
                       ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' }
-                      : isComplete
-                        ? { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700' }
-                        : isOccupied
-                          ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' }
-                          : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500' };
+                      : isOccupied && !isComplete
+                        ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' }
+                        : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500' };
 
                     return (
                       <div
@@ -211,7 +210,7 @@ export default function MixedLiveCourtView() {
                         className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
-                        <VerticalCourtLines status={isPlaying ? 'playing' : isComplete ? 'complete' : isOccupied ? 'ready' : 'empty'} />
+                        <VerticalCourtLines status={isPlaying ? 'playing' : (isOccupied && !isComplete) ? 'ready' : 'empty'} />
                         <div className="relative z-10 flex flex-col h-full p-1.5">
                           {/* コート番号 + ステータス */}
                           <div className="flex items-center justify-between mb-0.5">
@@ -221,7 +220,6 @@ export default function MixedLiveCourtView() {
                                 <Play className="w-1.5 h-1.5 fill-white" /> LIVE
                               </span>
                             )}
-                            {isComplete && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
                           </div>
 
                           {/* 中央: コート使用状況 */}
@@ -238,7 +236,7 @@ export default function MixedLiveCourtView() {
                                     <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
                                   </div>
                                 ) : info.status.isComplete ? (
-                                  <p className="text-[8px] text-emerald-600 text-center font-bold">完了</p>
+                                  <p className="text-[10px] text-gray-400 text-center font-medium">空き</p>
                                 ) : (
                                   <p className="text-[8px] text-gray-400 text-center">待機中</p>
                                 )}
