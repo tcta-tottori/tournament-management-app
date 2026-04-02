@@ -79,6 +79,7 @@ export default function MixedLeagueView() {
   // エントリーが全員完了しているか（全員 'entry' または 'def'）
   const allEntryDone = selectedLeague.teams.every(t => t.status === 'entry' || t.status === 'def');
   const totalCount = leagueMatchList.length;
+  const leagueComplete = finishedCount === totalCount && totalCount > 0;
   const standings = allStandings.get(selectedLeague.leagueId) || [];
 
   // Determine current match: first unfinished match in matchOrder
@@ -157,7 +158,7 @@ export default function MixedLeagueView() {
             <th className="px-3 py-2 text-center text-xs text-gray-500 w-16">勝敗</th>
             <th className="px-2 py-2 text-center text-xs text-gray-500 w-20">ゲーム率</th>
             <th className="px-3 py-2 text-center text-xs text-gray-500 w-12">順位</th>
-            <th className="px-2 py-2 text-left text-xs text-gray-500">判定</th>
+            {leagueComplete && <th className="px-2 py-2 text-left text-xs text-gray-500">判定</th>}
           </tr>
         </thead>
         <tbody>
@@ -227,11 +228,13 @@ export default function MixedLeagueView() {
                     </span>
                   )}
                 </td>
-                <td className="px-2 py-2 text-left border-l border-gray-200">
-                  {standing?.tiebreakReason && (
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{standing.tiebreakReason}</span>
-                  )}
-                </td>
+                {leagueComplete && (
+                  <td className="px-2 py-2 text-left border-l border-gray-200">
+                    {standing?.tiebreakReason && (
+                      <span className="text-[10px] text-gray-400 whitespace-nowrap">{standing.tiebreakReason}</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

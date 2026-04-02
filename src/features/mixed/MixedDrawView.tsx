@@ -95,6 +95,8 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
 }) {
   const { setRankOverride } = useMixedStore();
   const [showPicker, setShowPicker] = useState(false);
+  const [lotteryResult, setLotteryResult] = useState<{ teamId: string; teamName: string; rank: number }[] | null>(null);
+  const [manualRanks, setManualRanks] = useState<Map<string, number>>(new Map());
 
   // 同じゲーム率のチーム群を特定
   const sameRatioTeams = standings.filter(s => {
@@ -104,38 +106,56 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
     return Math.abs(r1 - r2) < 0.0001 || (r1 === Infinity && r2 === Infinity);
   });
 
-  const handleSetRank = (rank: number) => {
-    setRankOverride(leagueId, standing.teamId, rank);
+  const baseRank = Math.min(...sameRatioTeams.map(s => s.rank));
+
+  const applyResult = (result: { teamId: string; rank: number }[]) => {
+    for (const r of result) {
+      setRankOverride(leagueId, r.teamId, r.rank);
+    }
     setShowPicker(false);
+    setLotteryResult(null);
+    setManualRanks(new Map());
   };
 
   const handleLottery = () => {
-    // ルーレット: 同率チームをランダムに順位決定
     const shuffled = [...sameRatioTeams].sort(() => Math.random() - 0.5);
-    const baseRank = Math.min(...sameRatioTeams.map(s => s.rank));
-    shuffled.forEach((s, i) => {
-      setRankOverride(leagueId, s.teamId, baseRank + i);
-    });
-    setShowPicker(false);
+    const result = shuffled.map((s, i) => ({ teamId: s.teamId, teamName: s.teamName, rank: baseRank + i }));
+    setLotteryResult(result);
   };
+
+  const handleManualSet = (teamId: string, rank: number) => {
+    setManualRanks(prev => {
+      const next = new Map(prev);
+      // 既にこのrankが割り当てられているチームがあれば解除
+      for (const [tid, r] of next) {
+        if (r === rank && tid !== teamId) next.delete(tid);
+      }
+      next.set(teamId, rank);
+      return next;
+    });
+  };
+
+  const allManualAssigned = manualRanks.size === sameRatioTeams.length;
 
   return (
     <>
       <button
-        onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+        onClick={(e) => { e.stopPropagation(); setShowPicker(true); setLotteryResult(null); setManualRanks(new Map()); }}
         className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-amber-100 transition-colors"
       >
         🎲 抽選
       </button>
       {showPicker && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowPicker(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[340px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-[95vw] p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-3">順位決定（抽選）</h3>
             <p className="text-xs text-gray-500 mb-3">
-              ゲーム取得率が同率のため、抽選で順位を決定してください。
+              ゲーム取得率が同率のため、抽選または手動で順位を決定してください。
             </p>
+
+            {/* 同率チーム一覧 */}
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
-              <div className="text-[10px] font-bold text-gray-500 mb-2">同率チーム</div>
+              <div className="text-[10px] font-bold text-gray-500 mb-2">同率チーム（{sameRatioTeams.length}チーム）</div>
               {sameRatioTeams.map(s => (
                 <div key={s.teamId} className="flex items-center gap-2 text-xs py-1">
                   <span className="font-bold text-gray-800">{s.teamName}</span>
@@ -144,32 +164,88 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
               ))}
             </div>
 
-            {/* ルーレットで一括決定 */}
-            <button
-              onClick={handleLottery}
-              className="w-full py-3 mb-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
-            >
-              🎲 ルーレットで決定
-            </button>
+            {/* ルーレット結果表示 */}
+            {lotteryResult && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <div className="text-xs font-bold text-amber-700 mb-2 text-center">抽選結果</div>
+                <div className="space-y-2">
+                  {lotteryResult.sort((a, b) => a.rank - b.rank).map(r => (
+                    <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        r.rank === baseRank ? 'bg-yellow-400 text-white' :
+                        r.rank === baseRank + 1 ? 'bg-gray-400 text-white' :
+                        'bg-gray-200 text-gray-600'
+                      }`}>{r.rank}</span>
+                      <span className="font-bold text-gray-800 text-sm">{r.teamName}</span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => applyResult(lotteryResult)}
+                  className="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold text-sm hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-[0.98]"
+                >
+                  この結果で確定
+                </button>
+                <button
+                  onClick={handleLottery}
+                  className="w-full mt-2 py-2 text-xs text-amber-600 hover:text-amber-700 transition-colors"
+                >
+                  もう一度ルーレット
+                </button>
+              </div>
+            )}
 
-            {/* 手動で順位指定 */}
-            <div className="text-[10px] font-bold text-gray-500 mb-2">手動で {standing.teamName} の順位を指定:</div>
-            <div className="flex gap-2 mb-4">
-              {sameRatioTeams.map((_, i) => {
-                const rank = Math.min(...sameRatioTeams.map(s => s.rank)) + i;
-                return (
-                  <button
-                    key={rank}
-                    onClick={() => handleSetRank(rank)}
-                    className="flex-1 py-2 rounded-lg border-2 border-gray-200 text-sm font-bold text-gray-700 hover:border-amber-400 hover:bg-amber-50 transition-all active:scale-95"
-                  >
-                    {rank}位
-                  </button>
-                );
-              })}
-            </div>
+            {/* ルーレット結果がない場合のアクション */}
+            {!lotteryResult && (
+              <>
+                <button
+                  onClick={handleLottery}
+                  className="w-full py-3 mb-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
+                >
+                  🎲 ルーレットで決定
+                </button>
 
-            <button onClick={() => setShowPicker(false)} className="w-full py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition-all">
+                {/* 手動で全員の順位を指定 */}
+                <div className="border-t border-gray-100 pt-4">
+                  <div className="text-xs font-bold text-gray-600 mb-3">手動で順位を指定</div>
+                  {sameRatioTeams.map(s => {
+                    const assigned = manualRanks.get(s.teamId);
+                    return (
+                      <div key={s.teamId} className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-gray-800 flex-1 truncate">{s.teamName}</span>
+                        <div className="flex gap-1">
+                          {sameRatioTeams.map((_, i) => {
+                            const rank = baseRank + i;
+                            const isSelected = assigned === rank;
+                            const isTaken = !isSelected && [...manualRanks.values()].includes(rank);
+                            return (
+                              <button key={rank} onClick={() => handleManualSet(s.teamId, rank)}
+                                disabled={isTaken}
+                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                  isSelected ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' :
+                                  isTaken ? 'bg-gray-100 text-gray-300 cursor-not-allowed' :
+                                  'bg-gray-50 border border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50'
+                                }`}
+                              >{rank}位</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {allManualAssigned && (
+                    <button
+                      onClick={() => applyResult([...manualRanks.entries()].map(([teamId, rank]) => ({ teamId, teamName: '', rank })))}
+                      className="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold text-sm hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-[0.98]"
+                    >
+                      この順位で確定
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            <button onClick={() => setShowPicker(false)} className="w-full mt-3 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition-all">
               閉じる
             </button>
           </div>
