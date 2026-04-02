@@ -212,6 +212,8 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           const isComplete = finishedCount === totalCount && totalCount > 0;
           const colors = LEAGUE_COLORS[leagueIdx % LEAGUE_COLORS.length];
           const hasTiebreak = finishedCount > 0 && standings.some(s => s.tiebreakReason);
+          // エントリーが全チーム完了しているか（entry or def）
+          const allEntryDone = league.teams.every(t => t.status === 'entry' || t.status === 'def');
 
           // 現在の対戦を特定
           const currentMatchNumber = (() => {
@@ -254,7 +256,12 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           };
 
           return (
-            <div key={league.leagueId} className={`bg-white rounded-xl shadow-sm border ${colors.border} overflow-hidden`}>
+            <div key={league.leagueId} className={`relative bg-white rounded-xl shadow-sm border ${colors.border} overflow-hidden ${!allEntryDone ? 'opacity-50' : ''}`}>
+              {!allEntryDone && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 pointer-events-none">
+                  <span className="px-4 py-2 bg-gray-800/70 text-white text-xs font-bold rounded-full">エントリー未完了</span>
+                </div>
+              )}
               {/* リーグヘッダー */}
               <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r ${colors.light} border-b ${colors.border}`}>
                 <span className={`w-8 h-8 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-sm font-bold rounded-lg flex items-center justify-center shadow shrink-0`}>
