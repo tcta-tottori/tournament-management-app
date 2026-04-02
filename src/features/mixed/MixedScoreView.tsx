@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
-import { calculateLeagueStandings } from './mixedLogic';
+import { calculateLeagueStandings, BRACKET_SLOT_MAP } from './mixedLogic';
 import MixedBracketView from './MixedBracketView';
 import MixedStandingsView from './MixedStandingsView';
 import { Trophy, CheckCircle, Clock } from 'lucide-react';
@@ -59,27 +59,49 @@ export default function MixedScoreView() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {CATEGORIES.map(({ cat, label, desc, color }) => {
-            // 完了リーグから該当順位のチームを収集、未完了リーグもプレースホルダー表示
-            const teamsForCat: { teamName: string; league: string; confirmed: boolean }[] = [];
+            // ドロー表のスロットマップ順でチームを収集（確定済み+未確定プレースホルダー）
+            const teamsForCat: { teamName: string; league: string; confirmed: boolean; slotIdx: number }[] = [];
             const rank = cat === '1st' ? 1 : cat === '2nd' ? 2 : cat === '3rd' ? 3 : 4;
+            const slotMap = BRACKET_SLOT_MAP[cat];
 
-            for (const league of leagues) {
-              const isComplete = completedLeagues.some(cl => cl.leagueId === league.leagueId);
-              const standings = allStandings.get(league.leagueId) || [];
+            if (slotMap) {
+              // ドロー表順で表示（2位/3位/4-5位）
+              const seen = new Set<string>();
+              slotMap.forEach((lid, idx) => {
+                if (!lid || seen.has(lid)) return;
+                seen.add(lid);
+                const normalizedLid = lid.trim();
+                const league = leagues.find(l => l.leagueId.trim() === normalizedLid);
+                if (!league) return;
+                const isComplete = completedLeagues.some(cl => cl.leagueId.trim() === normalizedLid);
+                const standings = allStandings.get(league.leagueId) || [];
 
-              if (rank <= 3) {
-                if (isComplete) {
-                  const entry = standings.find(s => s.rank === rank);
-                  if (entry) teamsForCat.push({ teamName: entry.teamName, league: league.leagueId.trim(), confirmed: true });
+                if (rank <= 3) {
+                  if (isComplete) {
+                    const entry = standings.find(s => s.rank === rank);
+                    if (entry) teamsForCat.push({ teamName: entry.teamName, league: normalizedLid, confirmed: true, slotIdx: idx });
+                  } else {
+                    teamsForCat.push({ teamName: `${normalizedLid}リーグ ${rank}位`, league: normalizedLid, confirmed: false, slotIdx: idx });
+                  }
                 } else {
-                  teamsForCat.push({ teamName: `${league.leagueId.trim()}リーグ ${rank}位`, league: league.leagueId.trim(), confirmed: false });
+                  if (isComplete) {
+                    const entries = standings.filter(s => s.rank >= 4);
+                    for (const e of entries) teamsForCat.push({ teamName: e.teamName, league: normalizedLid, confirmed: true, slotIdx: idx });
+                  } else {
+                    teamsForCat.push({ teamName: `${normalizedLid}リーグ 4位以下`, league: normalizedLid, confirmed: false, slotIdx: idx });
+                  }
                 }
-              } else {
+              });
+            } else {
+              // 1位トーナメント: リーグ順（抽選で決まるため）
+              for (const league of leagues) {
+                const isComplete = completedLeagues.some(cl => cl.leagueId === league.leagueId);
+                const standings = allStandings.get(league.leagueId) || [];
                 if (isComplete) {
-                  const entries = standings.filter(s => s.rank >= 4);
-                  for (const e of entries) teamsForCat.push({ teamName: e.teamName, league: league.leagueId.trim(), confirmed: true });
+                  const entry = standings.find(s => s.rank === 1);
+                  if (entry) teamsForCat.push({ teamName: entry.teamName, league: league.leagueId.trim(), confirmed: true, slotIdx: 0 });
                 } else {
-                  teamsForCat.push({ teamName: `${league.leagueId.trim()}リーグ 4位以下`, league: league.leagueId.trim(), confirmed: false });
+                  teamsForCat.push({ teamName: `${league.leagueId.trim()}リーグ 1位`, league: league.leagueId.trim(), confirmed: false, slotIdx: 0 });
                 }
               }
             }
