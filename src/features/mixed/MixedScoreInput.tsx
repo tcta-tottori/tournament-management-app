@@ -81,12 +81,22 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
 
   useEffect(() => {
     // ポップアップ表示時のスクロール位置を保存し、閉じる時に復元
-    scrollPosRef.current = window.scrollY;
-    // スクロールを防止
-    document.body.style.overflow = 'hidden';
+    const savedScrollY = window.scrollY;
+    scrollPosRef.current = savedScrollY;
+    // スクロールを防止（position: fixedでページ全体を固定）
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
     return () => {
-      document.body.style.overflow = '';
-      // 元のスクロール位置に復元
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.paddingRight = '';
+      // 元のスクロール位置に確実に復元
       window.scrollTo(0, scrollPosRef.current);
     };
   }, []);
@@ -232,6 +242,10 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
       maxLength={2}
       value={tiebreakInput}
       onChange={handleTiebreakChange}
+      autoComplete="off"
+      autoCorrect="off"
+      data-lpignore="true"
+      data-form-type="other"
       onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
       className="w-9 h-14 text-center text-lg font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
       placeholder="?"
@@ -250,7 +264,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
       <div
         ref={popupRef}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[80vh] overflow-y-auto z-50"
+        className="fixed top-[10%] sm:top-1/2 left-1/2 -translate-x-1/2 sm:-translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[80vh] overflow-y-auto z-50"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -306,6 +320,10 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               maxLength={1}
               value={score1}
               onChange={handleScore1Change}
+              autoComplete="off"
+              autoCorrect="off"
+              data-lpignore="true"
+              data-form-type="other"
               className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score1HighlightClass}`}
               placeholder="0"
               autoFocus
@@ -319,6 +337,10 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
               value={score2}
               onChange={handleScore2Change}
               onKeyDown={e => { if (e.key === 'Enter' && !isTiebreak) handleSave(); }}
+              autoComplete="off"
+              autoCorrect="off"
+              data-lpignore="true"
+              data-form-type="other"
               className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score2HighlightClass}`}
               placeholder="0"
             />
