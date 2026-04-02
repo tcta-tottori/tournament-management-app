@@ -88,8 +88,9 @@ export default function MixedLiveCourtView() {
       const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
       const cs = getLeagueCourtStatus(league, lm);
       const nextMatch = lm.filter(m => m.status !== 'finished').sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
-      // コート名から番号を抽出 (例: "6・7コート" → [6,7], "1コート" → [1])
-      const nums = league.courtName?.match(/\d+/g);
+      // コート名から番号を抽出 (例: "6・7コート" → [6,7], "2 コート" → [2], "10・11 コート" → [10,11])
+      const courtStr = (league.courtName || '').replace(/[\s\u3000]+/g, '');
+      const nums = courtStr.match(/\d+/g);
       if (nums) {
         for (const n of nums) {
           map.set(parseInt(n), { league, status: cs, nextMatch });
@@ -194,13 +195,14 @@ export default function MixedLiveCourtView() {
                   {block.map(courtNum => {
                     const info = courtMap.get(courtNum);
                     const isOccupied = !!info;
-                    const isPlaying = info && !info.status.isComplete && info.nextMatch;
+                    const hasActiveMatch = info && !info.status.isComplete;
+                    const isPlaying = hasActiveMatch && info.nextMatch;
                     const isComplete = info?.status.isComplete;
 
-                    // リーグ完了 = 空きコート扱い
+                    // 進行中リーグ = 緑, 未開始リーグ = 青, それ以外 = 空き
                     const statusStyle = isPlaying
                       ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800' }
-                      : isOccupied && !isComplete
+                      : hasActiveMatch
                         ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' }
                         : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500' };
 
@@ -210,7 +212,7 @@ export default function MixedLiveCourtView() {
                         className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
-                        <VerticalCourtLines status={isPlaying ? 'playing' : (isOccupied && !isComplete) ? 'ready' : 'empty'} />
+                        <VerticalCourtLines status={isPlaying ? 'playing' : hasActiveMatch ? 'ready' : 'empty'} />
                         <div className="relative z-10 flex flex-col h-full p-1.5">
                           {/* コート番号 + ステータス */}
                           <div className="flex items-center justify-between mb-0.5">
@@ -224,16 +226,20 @@ export default function MixedLiveCourtView() {
 
                           {/* 中央: コート使用状況 */}
                           <div className="flex-1 flex flex-col justify-center min-w-0">
-                            {info && !info.status.isComplete && info.nextMatch ? (
+                            {hasActiveMatch ? (
                               <>
-                                <div className="text-[9px] font-bold text-gray-500 mb-0.5">{info.league.leagueId}リーグ</div>
-                                <div className="text-[7px] text-gray-400 mb-1">{info.status.finished}/{info.status.total}試合</div>
-                                <div className="space-y-0">
-                                  <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{info.nextMatch.matchNumber}試合</p>
-                                  <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team1Id)}</p>
-                                  <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
-                                  <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info.nextMatch.team2Id)}</p>
-                                </div>
+                                <div className="text-[9px] font-bold text-gray-500 mb-0.5">{info!.league.leagueId}リーグ</div>
+                                <div className="text-[7px] text-gray-400 mb-1">{info!.status.finished}/{info!.status.total}試合</div>
+                                {info!.nextMatch ? (
+                                  <div className="space-y-0">
+                                    <p className="text-[7px] font-bold text-green-600/80 mb-0.5">第{info!.nextMatch.matchNumber}試合</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team1Id)}</p>
+                                    <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team2Id)}</p>
+                                  </div>
+                                ) : (
+                                  <p className="text-[8px] text-gray-400 text-center">待機中</p>
+                                )}
                               </>
                             ) : (() => {
                               // ブラケット試合がこのコートに割り当てられているか確認
