@@ -519,8 +519,9 @@ export default function MixedBracketView() {
           }
         }
         return (
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setCourtAssignMatch(null)}>
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[380px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={() => setCourtAssignMatch(null)}>
+            <div className="min-h-full flex items-start justify-center py-[10vh] px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
               <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
@@ -565,13 +566,15 @@ export default function MixedBracketView() {
               </button>
             </div>
           </div>
+          </div>
         );
       })()}
 
       {/* スコア入力モーダル */}
       {editingMatch && (
-        <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[420px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm overflow-y-auto" onClick={() => setEditingMatch(null)}>
+          <div className="min-h-full flex items-start justify-center py-[8vh] px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
@@ -663,6 +666,7 @@ export default function MixedBracketView() {
               キャンセル
             </button>
           </div>
+          </div>
         </div>
       )}
 
@@ -746,8 +750,9 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={onClose}>
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] p-5 max-h-[80vh] overflow-y-auto z-50" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="min-h-full flex items-start justify-center py-[8vh] px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
           <Volume2 size={16} className="text-blue-600" />
           音声コール
@@ -839,6 +844,7 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
         <button onClick={onClose} className="w-full py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm active:scale-[0.98] transition-all">
           閉じる
         </button>
+      </div>
       </div>
     </div>
   );
