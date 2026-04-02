@@ -41,13 +41,14 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
   { id: '4th', label: '4-5位', icon: Users, color: 'from-slate-400 to-slate-500' },
 ];
 
-/** 審判用紙を印刷 */
+/** 審判用紙を印刷（B5横・シングルス同様の形式） */
 function printRefereeSheet(
   match: BracketMatch,
   allTeams: MixedTeam[],
   tournamentName: string,
   bracketLabel: string,
   roundLabel: string,
+  gameRule: string,
 ) {
   const team1 = allTeams.find(t => t.teamId === match.team1Id);
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
@@ -55,51 +56,101 @@ function printRefereeSheet(
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<title>審判用紙</title>
+<title>審判用紙 - ${bracketLabel}</title>
 <style>
-  @page { size: A5 landscape; margin: 10mm; }
-  body { font-family: 'Yu Gothic', 'Hiragino Sans', sans-serif; margin: 0; padding: 15px; }
-  .header { text-align: center; margin-bottom: 12px; }
-  .header h2 { margin: 0; font-size: 16px; }
-  .header .sub { font-size: 12px; color: #666; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  th, td { border: 1px solid #333; padding: 6px 10px; font-size: 13px; }
-  th { background: #f0f0f0; width: 80px; text-align: center; }
-  .player-name { font-size: 16px; font-weight: bold; }
-  .score-area { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
-  .score-box { width: 50px; height: 50px; border: 2px solid #333; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; }
-  .dash { font-size: 28px; font-weight: bold; display: inline-flex; align-items: center; }
-  .court-line { margin-top: 12px; font-size: 13px; }
-  .court-line span { display: inline-block; border-bottom: 1px solid #333; width: 100px; margin: 0 4px; }
-  .notes { margin-top: 12px; border: 1px solid #ccc; min-height: 50px; padding: 6px; font-size: 11px; color: #999; }
+  @page { size: B5 landscape; margin: 5mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', 'Hiragino Sans', monospace; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 240mm; height: 166mm; position: relative; border: 1px solid #000; }
+  .header { display: flex; align-items: center; border-bottom: 2px solid #000; height: 16mm; }
+  .header-title { flex: 1; text-align: center; font-size: 14pt; font-weight: bold; }
+  .header-sub { font-size: 9pt; padding: 0 4mm; }
+  .match-info { display: flex; border-bottom: 1px solid #000; height: 10mm; }
+  .match-info > div { display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; }
+  .match-info > div:last-child { border-right: none; }
+  .players { border-bottom: 1px solid #000; }
+  .player-row { display: flex; min-height: 20mm; border-bottom: 1px solid #ccc; }
+  .player-row:last-child { border-bottom: none; }
+  .player-label { width: 18mm; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; border-right: 1px solid #000; background: #f5f5f5; }
+  .player-league { width: 12mm; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: bold; border-right: 1px solid #000; }
+  .player-names { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2mm 4mm; }
+  .player-name { font-size: 14pt; font-weight: bold; line-height: 1.5; }
+  .player-aff { width: 45mm; display: flex; flex-direction: column; justify-content: center; padding: 2mm 3mm; border-left: 1px solid #ccc; }
+  .player-aff-text { font-size: 9pt; line-height: 1.5; }
+  .score-section { display: flex; align-items: center; justify-content: center; height: 36mm; border-bottom: 1px solid #000; }
+  .score-box { width: 18mm; height: 18mm; border: 2px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 24pt; font-weight: bold; margin: 0 3mm; }
+  .score-dash { font-size: 24pt; font-weight: bold; margin: 0 2mm; }
+  .tb-label { font-size: 8pt; margin-left: 6mm; }
+  .tb-box { width: 12mm; height: 12mm; border: 1.5px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 14pt; margin-left: 2mm; }
+  .bottom { display: flex; height: 12mm; }
+  .bottom > div { flex: 1; display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; border-top: 1px solid #000; }
+  .bottom > div:last-child { border-right: none; }
+  .underline { display: inline-block; border-bottom: 1px solid #000; min-width: 30mm; margin-left: 2mm; }
+  .notes { height: 20mm; border-top: 1px solid #000; padding: 2mm 3mm; font-size: 8pt; color: #999; }
 </style>
 </head><body>
-<div class="header">
-  <h2>${tournamentName}</h2>
-  <div class="sub">${bracketLabel}　${roundLabel}</div>
-</div>
-<table>
-  <tr><th rowspan="2">チーム1</th><td class="player-name">${team1.male.name}</td><td>${team1.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team1League}リーグ</td></tr>
-  <tr><td class="player-name">${team1.female.name}</td><td>${team1.female.affiliation}</td></tr>
-  <tr><th rowspan="2">チーム2</th><td class="player-name">${team2.male.name}</td><td>${team2.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team2League}リーグ</td></tr>
-  <tr><td class="player-name">${team2.female.name}</td><td>${team2.female.affiliation}</td></tr>
-</table>
-<div style="text-align:center;">
-  <div class="score-area">
-    <div class="score-box"></div>
-    <div class="dash">−</div>
-    <div class="score-box"></div>
+<div class="page">
+  <div class="header">
+    <div class="header-sub">${bracketLabel}</div>
+    <div class="header-title">${tournamentName}</div>
+    <div class="header-sub">${roundLabel}</div>
   </div>
-  <div style="margin-top:8px;font-size:11px;color:#888;">
-    <span style="margin-right:40px;">チーム1</span>
-    <span>チーム2</span>
+  <div class="match-info">
+    <div style="flex:1;">種目：ミックスダブルス</div>
+    <div>${gameRule}</div>
   </div>
+  <div class="players">
+    <div class="player-row">
+      <div class="player-label">チーム1</div>
+      <div class="player-league">${match.team1League}</div>
+      <div class="player-names">
+        <div class="player-name">${team1.male.name}</div>
+        <div class="player-name">${team1.female.name}</div>
+      </div>
+      <div class="player-aff">
+        <div class="player-aff-text">${team1.male.affiliation}</div>
+        <div class="player-aff-text">${team1.female.affiliation}</div>
+      </div>
+    </div>
+    <div class="player-row">
+      <div class="player-label">チーム2</div>
+      <div class="player-league">${match.team2League}</div>
+      <div class="player-names">
+        <div class="player-name">${team2.male.name}</div>
+        <div class="player-name">${team2.female.name}</div>
+      </div>
+      <div class="player-aff">
+        <div class="player-aff-text">${team2.male.affiliation}</div>
+        <div class="player-aff-text">${team2.female.affiliation}</div>
+      </div>
+    </div>
+  </div>
+  <div class="score-section">
+    <div style="text-align:center;">
+      <div style="font-size:8pt;margin-bottom:2mm;">チーム1</div>
+      <div class="score-box"></div>
+    </div>
+    <div class="score-dash">−</div>
+    <div style="text-align:center;">
+      <div style="font-size:8pt;margin-bottom:2mm;">チーム2</div>
+      <div class="score-box"></div>
+    </div>
+    <div style="margin-left:8mm;text-align:center;">
+      <div class="tb-label">タイブレーク</div>
+      <div class="tb-box"></div>
+    </div>
+  </div>
+  <div class="bottom">
+    <div>コート：<span class="underline"></span></div>
+    <div>開始時刻：<span class="underline"></span></div>
+    <div>終了時刻：<span class="underline"></span></div>
+    <div>審判：<span class="underline"></span></div>
+  </div>
+  <div class="notes">備考：</div>
 </div>
-<div class="court-line">コート：<span></span>　　時間：<span></span></div>
-<div class="notes">備考：</div>
 </body></html>`;
 
-  const win = window.open('', '_blank', 'width=800,height=600');
+  const win = window.open('', '_blank', 'width=900,height=650');
   if (win) {
     win.document.write(html);
     win.document.close();
@@ -302,7 +353,9 @@ export default function MixedBracketView() {
           onMatchClick={openScoreEditor}
           onPrint={(match, roundLabel) => {
             const allTeams = useMixedStore.getState().allTeams;
-            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel);
+            const rules = tournamentInfo?.rules || [];
+            const gameRule = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || 'ノーアド・6ゲームマッチ';
+            printRefereeSheet(match, allTeams, tournamentInfo?.name || '', currentBracket.label, roundLabel, gameRule);
           }}
           onCall={(match) => {
             setCallMatch(match);
@@ -776,12 +829,14 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
   }
 
   const MATCH_HEIGHT = 100;
+  const BYE_HEIGHT = 32;
   const MATCH_WIDTH = 260;
   const ROUND_GAP = 48;
   const MATCH_GAP = 8;
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
   const is1stBracket = bracket.category === '1st';
+
 
   // 未配置スロットに配置予定のリーグ情報を表示
   const getPlaceholderInfo = (match: BracketMatch, slot: 'team1' | 'team2'): { text: string; leagueId?: string; rank?: string } | null => {
@@ -800,17 +855,19 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
     return { text: 'BYE' };
   };
 
-  // 接続線: 各マッチの中心Y座標を計算
+  // グリッドの基本単位（BYEも通常マッチと同じグリッド位置を占める）
+  const GRID_UNIT = MATCH_HEIGHT + MATCH_GAP;
+
+  // 接続線: 各マッチの中心Y座標を計算（グリッド基準）
   const getMatchY = (roundIdx: number, matchIdx: number) => {
     const spacing = Math.pow(2, roundIdx);
-    const matchBlockH = MATCH_HEIGHT + MATCH_GAP;
-    const offset = (spacing - 1) * matchBlockH / 2;
-    return 36 + matchIdx * spacing * matchBlockH + offset + MATCH_HEIGHT / 2;
+    const offset = (spacing - 1) * GRID_UNIT / 2;
+    return 36 + matchIdx * spacing * GRID_UNIT + offset + MATCH_HEIGHT / 2;
   };
 
   // SVG全体の高さ
   const r1count = matchesByRound[0]?.length || 0;
-  const svgHeight = r1count * (MATCH_HEIGHT + MATCH_GAP) + 36;
+  const svgHeight = r1count * GRID_UNIT + 36;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
@@ -856,13 +913,32 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
 
               <div className="space-y-0">
                 {roundMatches.map((match, matchIdx) => {
-                  const matchBlockH = MATCH_HEIGHT + MATCH_GAP;
                   const topOffset = matchIdx === 0
-                    ? (spacing - 1) * matchBlockH / 2
-                    : (spacing - 1) * matchBlockH;
+                    ? (spacing - 1) * GRID_UNIT / 2
+                    : (spacing - 1) * GRID_UNIT;
 
                   const ph1 = getPlaceholderInfo(match, 'team1');
                   const ph2 = getPlaceholderInfo(match, 'team2');
+                  const isBye = match.isBye;
+
+                  // BYEマッチ: 小さく表示（勝者のみ）
+                  if (isBye) {
+                    const winnerTeamData = match.winnerId ? allTeams.find(t => t.teamId === match.winnerId) : null;
+                    const winnerLeague = match.winnerId === match.team1Id ? match.team1League : match.team2League;
+                    return (
+                      <div key={match.matchId} style={{ paddingTop: topOffset + (MATCH_HEIGHT - BYE_HEIGHT) / 2, height: GRID_UNIT - topOffset + (topOffset > 0 ? topOffset : 0) }}>
+                        <div className="flex items-center gap-1 px-2 rounded border border-dashed border-gray-200 bg-gray-50/50" style={{ width: MATCH_WIDTH, height: BYE_HEIGHT }}>
+                          {winnerLeague && (
+                            <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                              {winnerLeague}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-500 truncate">{winnerTeamData?.teamName || match.team1Name || match.team2Name}</span>
+                          <span className="text-[9px] text-gray-400 ml-auto shrink-0">BYE</span>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div key={match.matchId} style={{ paddingTop: topOffset }}>
@@ -872,7 +948,6 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                           rounded-lg border-2 overflow-hidden transition-all cursor-pointer
                           ${match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
                             match.status === 'ready' ? 'border-blue-300 shadow-sm hover:shadow-md' :
-                            match.status === 'bye' ? 'border-gray-200 opacity-60' :
                             'border-gray-200 hover:border-gray-300'}
                         `}
                         style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
