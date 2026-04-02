@@ -1291,7 +1291,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 const SLOT_HEIGHT = compact ? 28 : 42;
                 const STATUS_HEIGHT = compact ? 22 : 30;
                 const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
-                  const teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+                  // teamIdから探す。なければnameから逆引き
+                  let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+                  if (!teamData && slot.name && slot.league) {
+                    teamData = allTeams.find(t => t.teamName === slot.name && t.leagueId === slot.league.trim()) || null;
+                  }
                   return (
                     <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
