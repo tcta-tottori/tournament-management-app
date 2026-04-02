@@ -58,93 +58,115 @@ function printRefereeSheet(
 <html><head><meta charset="utf-8">
 <title>審判用紙 - ${bracketLabel}</title>
 <style>
-  @page { size: B5 landscape; margin: 5mm; }
+  @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', 'Hiragino Sans', monospace; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 240mm; height: 166mm; position: relative; border: 1px solid #000; }
-  .header { display: flex; align-items: center; border-bottom: 2px solid #000; height: 16mm; }
-  .header-title { flex: 1; text-align: center; font-size: 14pt; font-weight: bold; }
-  .header-sub { font-size: 9pt; padding: 0 4mm; }
-  .match-info { display: flex; border-bottom: 1px solid #000; height: 10mm; }
-  .match-info > div { display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; }
-  .match-info > div:last-child { border-right: none; }
-  .players { border-bottom: 1px solid #000; }
-  .player-row { display: flex; min-height: 20mm; border-bottom: 1px solid #ccc; }
-  .player-row:last-child { border-bottom: none; }
-  .player-label { width: 18mm; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; border-right: 1px solid #000; background: #f5f5f5; }
-  .player-league { width: 12mm; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: bold; border-right: 1px solid #000; }
+  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', monospace; color: #000; }
+  .page { width: 190mm; border: 2px solid #000; }
+  /* タイトル */
+  .title { text-align: center; font-size: 22pt; font-weight: bold; letter-spacing: 1em; padding: 5mm 0; border-bottom: 2px solid #000; background: #e8f4e8; }
+  /* 大会名 */
+  .tourney { display: flex; justify-content: center; align-items: baseline; gap: 20mm; padding: 3mm 5mm; border-bottom: 1px solid #000; }
+  .tourney-name { font-size: 12pt; font-weight: bold; }
+  /* 種目・回戦 */
+  .info-row { display: flex; border-bottom: 1px solid #000; min-height: 12mm; }
+  .info-cell { display: flex; align-items: center; justify-content: center; padding: 2mm 3mm; border-right: 1px solid #000; font-size: 10pt; }
+  .info-cell:last-child { border-right: none; }
+  .info-label { background: #f5f5f5; font-weight: bold; min-width: 28mm; justify-content: center; }
+  .info-value { flex: 1; font-size: 13pt; font-weight: bold; }
+  /* 選手 */
+  .players-row { display: flex; border-bottom: 1px solid #000; min-height: 28mm; }
+  .player-label { width: 28mm; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; border-right: 1px solid #000; background: #f5f5f5; }
+  .player-side { flex: 1; display: flex; border-right: 1px solid #000; }
+  .player-side:last-child { border-right: none; }
+  .player-no { width: 16mm; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #000; }
+  .player-no-num { font-size: 18pt; font-weight: bold; }
   .player-names { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2mm 4mm; }
-  .player-name { font-size: 14pt; font-weight: bold; line-height: 1.5; }
-  .player-aff { width: 45mm; display: flex; flex-direction: column; justify-content: center; padding: 2mm 3mm; border-left: 1px solid #ccc; }
-  .player-aff-text { font-size: 9pt; line-height: 1.5; }
-  .score-section { display: flex; align-items: center; justify-content: center; height: 36mm; border-bottom: 1px solid #000; }
-  .score-box { width: 18mm; height: 18mm; border: 2px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 24pt; font-weight: bold; margin: 0 3mm; }
-  .score-dash { font-size: 24pt; font-weight: bold; margin: 0 2mm; }
-  .tb-label { font-size: 8pt; margin-left: 6mm; }
-  .tb-box { width: 12mm; height: 12mm; border: 1.5px solid #000; display: inline-flex; align-items: center; justify-content: center; font-size: 14pt; margin-left: 2mm; }
-  .bottom { display: flex; height: 12mm; }
-  .bottom > div { flex: 1; display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; border-top: 1px solid #000; }
-  .bottom > div:last-child { border-right: none; }
-  .underline { display: inline-block; border-bottom: 1px solid #000; min-width: 30mm; margin-left: 2mm; }
-  .notes { height: 20mm; border-top: 1px solid #000; padding: 2mm 3mm; font-size: 8pt; color: #999; }
+  .player-name { font-size: 13pt; font-weight: bold; line-height: 1.6; }
+  .player-aff { display: flex; flex-direction: column; justify-content: center; padding: 2mm 3mm; min-width: 30mm; }
+  .player-aff span { font-size: 8pt; line-height: 1.6; }
+  /* スコア */
+  .score-section { display: flex; align-items: center; justify-content: center; padding: 8mm 0; border-bottom: 1px solid #000; gap: 5mm; }
+  .score-box { width: 20mm; height: 20mm; border: 2px solid #000; }
+  .score-dash { font-size: 24pt; font-weight: bold; }
+  .score-group { text-align: center; }
+  .score-label { font-size: 8pt; margin-bottom: 2mm; }
+  .tb-group { margin-left: 8mm; text-align: center; }
+  .tb-box { width: 14mm; height: 14mm; border: 1.5px solid #000; }
+  /* 下段 */
+  .bottom-row { display: flex; border-bottom: 1px solid #000; min-height: 10mm; }
+  .bottom-cell { flex: 1; display: flex; align-items: center; padding: 0 3mm; font-size: 9pt; border-right: 1px solid #000; }
+  .bottom-cell:last-child { border-right: none; }
+  .uline { display: inline-block; border-bottom: 1px solid #000; min-width: 28mm; margin-left: 2mm; }
+  .notes { min-height: 15mm; padding: 2mm 3mm; font-size: 8pt; color: #999; }
 </style>
 </head><body>
 <div class="page">
-  <div class="header">
-    <div class="header-sub">${bracketLabel}</div>
-    <div class="header-title">${tournamentName}</div>
-    <div class="header-sub">${roundLabel}</div>
+  <div class="title">審 判 用 紙</div>
+  <div class="tourney">
+    <span class="tourney-name">${tournamentName}</span>
   </div>
-  <div class="match-info">
-    <div style="flex:1;">種目：ミックスダブルス</div>
-    <div>${gameRule}</div>
+  <div class="info-row">
+    <div class="info-cell info-label">種　目</div>
+    <div class="info-cell info-value">${bracketLabel}</div>
+    <div class="info-cell info-label">回　戦</div>
+    <div class="info-cell info-value">${roundLabel}</div>
   </div>
-  <div class="players">
-    <div class="player-row">
-      <div class="player-label">チーム1</div>
-      <div class="player-league">${match.team1League}</div>
+  <div class="info-row">
+    <div class="info-cell info-label">コートNo.</div>
+    <div class="info-cell info-value" style="flex:0.5;">&nbsp;</div>
+    <div class="info-cell info-label">試合方法</div>
+    <div class="info-cell info-value" style="font-size:9pt;">${gameRule}</div>
+    <div class="info-cell info-label">開始時間</div>
+    <div class="info-cell info-value" style="flex:0.5;">&nbsp;</div>
+  </div>
+  <div class="info-row" style="min-height:8mm;">
+    <div class="info-cell info-label">エントリーNo.</div>
+    <div class="info-cell" style="flex:1;justify-content:center;"><b style="font-size:9pt;">No.</b> <b style="font-size:16pt;margin-left:3mm;">${team1.pairNumber}</b></div>
+    <div class="info-cell" style="flex:1;justify-content:center;"><b style="font-size:9pt;">No.</b> <b style="font-size:16pt;margin-left:3mm;">${team2.pairNumber}</b></div>
+  </div>
+  <div class="players-row">
+    <div class="player-label">選手氏名</div>
+    <div class="player-side">
       <div class="player-names">
         <div class="player-name">${team1.male.name}</div>
         <div class="player-name">${team1.female.name}</div>
       </div>
       <div class="player-aff">
-        <div class="player-aff-text">${team1.male.affiliation}</div>
-        <div class="player-aff-text">${team1.female.affiliation}</div>
+        <span>（ ${team1.male.affiliation} ）</span>
+        <span>（ ${team1.female.affiliation} ）</span>
       </div>
     </div>
-    <div class="player-row">
-      <div class="player-label">チーム2</div>
-      <div class="player-league">${match.team2League}</div>
+    <div class="player-side">
       <div class="player-names">
         <div class="player-name">${team2.male.name}</div>
         <div class="player-name">${team2.female.name}</div>
       </div>
       <div class="player-aff">
-        <div class="player-aff-text">${team2.male.affiliation}</div>
-        <div class="player-aff-text">${team2.female.affiliation}</div>
+        <span>（ ${team2.male.affiliation} ）</span>
+        <span>（ ${team2.female.affiliation} ）</span>
       </div>
     </div>
   </div>
   <div class="score-section">
-    <div style="text-align:center;">
-      <div style="font-size:8pt;margin-bottom:2mm;">チーム1</div>
+    <div class="score-group">
+      <div class="score-label">No.${team1.pairNumber}</div>
       <div class="score-box"></div>
     </div>
     <div class="score-dash">−</div>
-    <div style="text-align:center;">
-      <div style="font-size:8pt;margin-bottom:2mm;">チーム2</div>
+    <div class="score-group">
+      <div class="score-label">No.${team2.pairNumber}</div>
       <div class="score-box"></div>
     </div>
-    <div style="margin-left:8mm;text-align:center;">
-      <div class="tb-label">タイブレーク</div>
+    <div class="tb-group">
+      <div class="score-label">（ＴＢ）</div>
       <div class="tb-box"></div>
     </div>
   </div>
-  <div class="bottom">
-    <div>コート：<span class="underline"></span></div>
-    <div>開始時刻：<span class="underline"></span></div>
-    <div>終了時刻：<span class="underline"></span></div>
-    <div>審判：<span class="underline"></span></div>
+  <div class="bottom-row">
+    <div class="bottom-cell">コート：<span class="uline"></span></div>
+    <div class="bottom-cell">開始時刻：<span class="uline"></span></div>
+    <div class="bottom-cell">終了時刻：<span class="uline"></span></div>
+    <div class="bottom-cell">審判：<span class="uline"></span></div>
   </div>
   <div class="notes">備考：</div>
 </div>
@@ -871,7 +893,7 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 overflow-x-auto">
-      <div className="relative flex gap-0" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds }}>
+      <div className="relative" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
         {/* 接続線SVG */}
         <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
           {matchesByRound.slice(0, -1).map((roundMatches, roundIdx) => {
@@ -897,61 +919,61 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
           })}
         </svg>
 
+        {/* 各マッチをabsolute配置（接続線の中心と正確に一致） */}
         {matchesByRound.map((roundMatches, roundIdx) => {
           const round = roundIdx + 1;
-          const spacing = Math.pow(2, roundIdx);
+          const colX = roundIdx * (MATCH_WIDTH + ROUND_GAP);
 
           return (
-            <div key={round} className="flex-shrink-0 relative" style={{ width: MATCH_WIDTH + ROUND_GAP }}>
-              <div className="text-center mb-3">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
-                  ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :
-                    round === totalRounds - 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
-                  {getRoundLabel(round, totalRounds)}
-                </span>
+            <div key={round}>
+              {/* ラウンドラベル */}
+              <div className="absolute" style={{ left: colX, top: 4, width: MATCH_WIDTH }}>
+                <div className="text-center">
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
+                    ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :
+                      round === totalRounds - 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {getRoundLabel(round, totalRounds)}
+                  </span>
+                </div>
               </div>
 
-              <div className="space-y-0">
-                {roundMatches.map((match, matchIdx) => {
-                  const topOffset = matchIdx === 0
-                    ? (spacing - 1) * GRID_UNIT / 2
-                    : (spacing - 1) * GRID_UNIT;
+              {roundMatches.map((match, matchIdx) => {
+                const centerY = getMatchY(roundIdx, matchIdx);
+                const ph1 = getPlaceholderInfo(match, 'team1');
+                const ph2 = getPlaceholderInfo(match, 'team2');
+                const isBye = match.isBye;
 
-                  const ph1 = getPlaceholderInfo(match, 'team1');
-                  const ph2 = getPlaceholderInfo(match, 'team2');
-                  const isBye = match.isBye;
-
-                  // BYEマッチ: 小さく表示（勝者のみ）
-                  if (isBye) {
-                    const winnerTeamData = match.winnerId ? allTeams.find(t => t.teamId === match.winnerId) : null;
-                    const winnerLeague = match.winnerId === match.team1Id ? match.team1League : match.team2League;
-                    return (
-                      <div key={match.matchId} style={{ paddingTop: topOffset + (MATCH_HEIGHT - BYE_HEIGHT) / 2, height: GRID_UNIT - topOffset + (topOffset > 0 ? topOffset : 0) }}>
-                        <div className="flex items-center gap-1 px-2 rounded border border-dashed border-gray-200 bg-gray-50/50" style={{ width: MATCH_WIDTH, height: BYE_HEIGHT }}>
-                          {winnerLeague && (
-                            <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
-                              {winnerLeague}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-gray-500 truncate">{winnerTeamData?.teamName || match.team1Name || match.team2Name}</span>
-                          <span className="text-[9px] text-gray-400 ml-auto shrink-0">BYE</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
+                // BYEマッチ: 小さく表示
+                if (isBye) {
+                  const winnerTeamData = match.winnerId ? allTeams.find(t => t.teamId === match.winnerId) : null;
+                  const winnerLeague = match.winnerId === match.team1Id ? match.team1League : match.team2League;
                   return (
-                    <div key={match.matchId} style={{ paddingTop: topOffset }}>
-                      <div
-                        onClick={() => onMatchClick(match)}
-                        className={`
-                          rounded-lg border-2 overflow-hidden transition-all cursor-pointer
-                          ${match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
-                            match.status === 'ready' ? 'border-blue-300 shadow-sm hover:shadow-md' :
-                            'border-gray-200 hover:border-gray-300'}
-                        `}
-                        style={{ width: MATCH_WIDTH, height: MATCH_HEIGHT }}
-                      >
+                    <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - BYE_HEIGHT / 2, width: MATCH_WIDTH }}>
+                      <div className="flex items-center gap-1 px-2 rounded border border-dashed border-gray-200 bg-gray-50/50" style={{ height: BYE_HEIGHT }}>
+                        {winnerLeague && (
+                          <span className={`w-4 h-4 rounded text-[8px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                            {winnerLeague}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-500 truncate">{winnerTeamData?.teamName || match.team1Name || match.team2Name}</span>
+                        <span className="text-[9px] text-gray-400 ml-auto shrink-0">BYE</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH }}>
+                    <div
+                      onClick={() => onMatchClick(match)}
+                      className={`
+                        rounded-lg border-2 overflow-hidden transition-all cursor-pointer
+                        ${match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
+                          match.status === 'ready' ? 'border-blue-300 shadow-sm hover:shadow-md' :
+                          'border-gray-200 hover:border-gray-300'}
+                      `}
+                      style={{ height: MATCH_HEIGHT }}
+                    >
                         {[
                           { teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true },
                           { teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false },
@@ -1030,7 +1052,6 @@ function BracketDisplay({ bracket, onMatchClick, onPrint, onCall, getRoundLabel,
                     </div>
                   );
                 })}
-              </div>
             </div>
           );
         })}
