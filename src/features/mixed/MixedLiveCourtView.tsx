@@ -66,7 +66,7 @@ export default function MixedLiveCourtView() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timeStr = currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
   // 全体進捗（予選+決勝合算）
   const leagueFinished = leagueMatches.filter(m => m.status === 'finished').length;

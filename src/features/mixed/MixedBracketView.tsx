@@ -260,6 +260,10 @@ export default function MixedBracketView() {
     if (isNaN(s1) || isNaN(s2) || s1 === s2) return;
     updateBracketScore(editingMatch.matchId, s1, s2);
     setTimeout(() => advanceWinner(editingMatch.matchId), 50);
+    // コートから解放
+    if (bracketCourtAssignments[editingMatch.matchId]) {
+      useMixedStore.getState().removeBracketMatchFromCourt(editingMatch.matchId);
+    }
     setEditingMatch(null);
   };
 
@@ -271,6 +275,9 @@ export default function MixedBracketView() {
     const finalScore2 = !isNaN(s2) && s2 >= 0 ? s2 : 0;
     updateBracketScore(editingMatch.matchId, finalScore1, finalScore2, winnerTeamId);
     setTimeout(() => advanceWinner(editingMatch.matchId), 50);
+    if (bracketCourtAssignments[editingMatch.matchId]) {
+      useMixedStore.getState().removeBracketMatchFromCourt(editingMatch.matchId);
+    }
     setEditingMatch(null);
   };
 
@@ -439,13 +446,20 @@ export default function MixedBracketView() {
         const allTeamsData = useMixedStore.getState().allTeams;
         const t1 = allTeamsData.find(t => t.teamId === courtAssignMatch.team1Id);
         const t2 = allTeamsData.find(t => t.teamId === courtAssignMatch.team2Id);
-        const courtOpts = (() => {
-          // 1〜16の全コートを候補にする
-          return Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
-        })();
+        // 使用中コートを除外
+        const usedCourts = new Set(Object.values(bracketCourtAssignments).map(ca => ca.courtName));
+        const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
+        const leagueInProgress = new Set<string>();
+        for (const l of leagues) {
+          const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
+          if (lm.some(m => m.status !== 'finished')) {
+            const nums = l.courtName?.match(/\d+/g);
+            if (nums) for (const n of nums) leagueInProgress.add(`${n}コート`);
+          }
+        }
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCourtAssignMatch(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onClick={() => setCourtAssignMatch(null)}>
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[380px] max-w-[95vw] p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <h3 className="text-sm font-bold text-gray-800 mb-3">コートに入れる</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
@@ -458,13 +472,20 @@ export default function MixedBracketView() {
                   <span className="font-bold">{t2?.teamName || courtAssignMatch.team2Name}</span>
                 </div>
               </div>
-              <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択</label>
+              <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択 <span className="text-gray-400 font-normal">（使用中は選択不可）</span></label>
               <div className="grid grid-cols-4 gap-2 mb-4">
-                {courtOpts.map(c => (
-                  <button key={c} onClick={() => setCourtAssignValue(c)}
-                    className={`py-2 text-xs font-bold rounded-lg border-2 transition-all ${courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >{c.replace('コート', '')}</button>
-                ))}
+                {courtOpts.map(c => {
+                  const isUsed = usedCourts.has(c) || leagueInProgress.has(c);
+                  return (
+                    <button key={c} onClick={() => !isUsed && setCourtAssignValue(c)}
+                      disabled={isUsed}
+                      className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
+                        ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
+                          courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                          'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
+                  );
+                })}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
@@ -488,8 +509,8 @@ export default function MixedBracketView() {
 
       {/* スコア入力モーダル */}
       {editingMatch && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-[95vw] p-5" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm" onClick={() => setEditingMatch(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[420px] max-w-[95vw] p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
