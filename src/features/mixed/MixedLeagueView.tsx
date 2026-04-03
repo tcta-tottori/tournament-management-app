@@ -1,11 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft, Download } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 import { GameRatioCell } from './GameRatioCell';
+import { renderLeagueTableToCanvas, downloadLeagueTableAsJpeg } from './mixedLeagueJpeg';
+import JpegPreviewModal from './JpegPreviewModal';
 
 /** コートオーバーライド: matchId -> courtName を localStorage に保存 */
 const COURT_OVERRIDE_KEY = 'mixed-court-overrides';
@@ -40,6 +42,7 @@ export default function MixedLeagueView() {
   const [courtNameInput, setCourtNameInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [previewCanvas, setPreviewCanvas] = useState<HTMLCanvasElement | null>(null);
 
   // Court override state
   const [courtOverrides, setCourtOverrides] = useState<Record<string, string>>(loadCourtOverrides);
@@ -356,6 +359,23 @@ export default function MixedLeagueView() {
                     テスト6-4
                   </button>
                 )}
+                {leagueComplete && (
+                  <button
+                    onClick={() => {
+                      const canvas = renderLeagueTableToCanvas({
+                        league: selectedLeague,
+                        leagueMatches: leagueMatchList,
+                        standings,
+                        tournamentName: tournamentInfo?.name || 'ミックス大会',
+                      });
+                      setPreviewCanvas(canvas);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors"
+                  >
+                    <Download size={12} />
+                    JPEG
+                  </button>
+                )}
                 <button onClick={() => setIsFullscreen(true)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
                   <Maximize2 size={12} />
                   全画面
@@ -622,6 +642,16 @@ export default function MixedLeagueView() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* JPEG preview modal */}
+      {previewCanvas && (
+        <JpegPreviewModal
+          canvas={previewCanvas}
+          title={`${selectedLeague.leagueId.trim()}リーグ結果`}
+          onDownload={() => downloadLeagueTableAsJpeg(previewCanvas, selectedLeague.leagueId, tournamentInfo?.name || 'ミックス大会')}
+          onClose={() => setPreviewCanvas(null)}
+        />
       )}
     </div>
   );

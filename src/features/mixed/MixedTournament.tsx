@@ -1,12 +1,11 @@
 import { useMixedStore } from './mixedStore';
 import type { MixedPhase } from './types';
-import { Upload, Trophy, BarChart3, Swords, FileDown, RotateCcw, ClipboardList } from 'lucide-react';
+import { Upload, Trophy, BarChart3, Swords, RotateCcw, ClipboardList } from 'lucide-react';
 import MixedImportView from './MixedImportView';
 import MixedLeagueView from './MixedLeagueView';
 import MixedStandingsView from './MixedStandingsView';
 import MixedBracketView from './MixedBracketView';
 import MixedWaitingList from './MixedWaitingList';
-import MixedResultsExport from './MixedResultsExport';
 
 const PHASES: { id: MixedPhase; label: string; icon: React.ElementType }[] = [
   { id: 'import', label: 'インポート', icon: Upload },
@@ -14,7 +13,6 @@ const PHASES: { id: MixedPhase; label: string; icon: React.ElementType }[] = [
   { id: 'standings', label: '順位表', icon: BarChart3 },
   { id: 'tournament', label: '決勝トーナメント', icon: Trophy },
   { id: 'waiting', label: '控えリスト', icon: ClipboardList },
-  { id: 'results', label: '結果出力', icon: FileDown },
 ];
 
 export default function MixedTournament() {
@@ -103,7 +101,6 @@ export default function MixedTournament() {
         {currentPhase === 'standings' && <MixedStandingsView />}
         {currentPhase === 'tournament' && <MixedBracketView />}
         {currentPhase === 'waiting' && <MixedWaitingList />}
-        {currentPhase === 'results' && <MixedResultsExport />}
       </div>
     </div>
   );

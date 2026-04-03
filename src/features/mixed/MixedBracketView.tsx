@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList, Download } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { printMixedRefereeSheet } from './printMixedRefereeSheet';
+import { renderBracketToCanvas, downloadBracketAsJpeg } from './mixedBracketJpeg';
+import JpegPreviewModal from './JpegPreviewModal';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -280,6 +282,7 @@ export default function MixedBracketView() {
 
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
   const [drawEditMode, setDrawEditMode] = useState(false);
+  const [bracketPreviewCanvas, setBracketPreviewCanvas] = useState<HTMLCanvasElement | null>(null);
 
   return (
     <div className="space-y-4">
@@ -347,8 +350,24 @@ export default function MixedBracketView() {
         })}
       </div>
 
-      {/* ドロー編集ボタン */}
-      <div className="flex justify-end">
+      {/* ドロー編集ボタン + JPEG DL */}
+      <div className="flex justify-end gap-2">
+        {currentBracket && (
+          <button
+            onClick={() => {
+              const canvas = renderBracketToCanvas({
+                bracket: currentBracket,
+                allTeams: useMixedStore.getState().allTeams,
+                tournamentName: tournamentInfo?.name || 'ミックス大会',
+              });
+              setBracketPreviewCanvas(canvas);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200"
+          >
+            <Download size={12} />
+            JPEG
+          </button>
+        )}
         <button
           onClick={() => setDrawEditMode(!drawEditMode)}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
@@ -567,6 +586,16 @@ export default function MixedBracketView() {
           callTime={callTime}
           setCallTime={setCallTime}
           onClose={() => setCallMatch(null)}
+        />
+      )}
+
+      {/* JPEG preview modal */}
+      {bracketPreviewCanvas && currentBracket && (
+        <JpegPreviewModal
+          canvas={bracketPreviewCanvas}
+          title={`${currentBracket.label}`}
+          onDownload={() => downloadBracketAsJpeg(bracketPreviewCanvas, currentBracket.category, tournamentInfo?.name || 'ミックス大会')}
+          onClose={() => setBracketPreviewCanvas(null)}
         />
       )}
     </div>
