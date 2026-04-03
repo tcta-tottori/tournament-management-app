@@ -21,6 +21,22 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 2.0',
+    date: '2026-04-04',
+    highlights: '決勝トーナメント旧データ残留修正・結果タブ完全削除・ストア永続化改善',
+    timeGroups: [
+      {
+        time: '—',
+        summary: '決勝トーナメントデータ整合性・不要機能の整理',
+        changes: [
+          { type: 'fix', text: '決勝トーナメントページでリーグ順位変更後も旧データが残り続ける問題を修正（順位ハッシュによる自動再生成）' },
+          { type: 'fix', text: 'Zustandストアにバージョン管理・マイグレーションを追加し、アプリ更新時の旧データ互換性を確保' },
+          { type: 'chore', text: '結果タブ削除に伴う未反映箇所を整理（/resultsルート・未使用コンポーネントの除去）' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 1.6',
     date: '2026-03-23',
     highlights: '対戦順テーブル刷新・試合順Excel取込・ブラケット線修正・BYE配置修正',
