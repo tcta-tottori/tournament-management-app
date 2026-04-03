@@ -3,7 +3,7 @@ import { ClipboardList, Printer, Volume2, VolumeX, Play, Edit3, Save, X, MapPin 
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
-import db from '../../db/database';
+import { db } from '../../db/database';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {

@@ -370,7 +370,11 @@ export const useMixedStore = create<MixedState>()(
           const bracket = state.brackets[bracketIdx];
           const reorderedTeams = newOrder.map((teamId, i) => {
             const existing = bracket.teams.find(t => t.teamId === teamId);
-            return existing ? { ...existing, seedPosition: i + 1 } : null;
+            if (existing) return { ...existing, seedPosition: i + 1 };
+            // bracket.teams にない場合は allTeams から取得
+            const fromAll = state.allTeams.find(t => t.teamId === teamId);
+            if (fromAll) return { teamId, teamName: fromAll.teamName, leagueId: fromAll.leagueId, seedPosition: i + 1 };
+            return null;
           }).filter((t): t is NonNullable<typeof t> => t !== null);
 
           const drawSize = bracket.drawSize;

@@ -1549,23 +1549,33 @@ function WaitingList({ waitingMatches, leagues }: {
   leagues: { leagueId: string; courtName: string }[];
 }) {
   const allTeams = useMixedStore(s => s.allTeams);
-  const { assignBracketMatchToCourt } = useMixedStore();
-  const [selectedCourts, setSelectedCourts] = useState<Record<string, string>>({});
-
-  const courtOptions = useMemo(() => {
-    // 1〜16の全コートを候補
-    const courtSet = new Set<string>();
-    for (let i = 1; i <= 16; i++) courtSet.add(`${i}コート`);
-    return [...courtSet].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
-  }, [leagues]);
+  const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
+  const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
+  const [courtAssignValue, setCourtAssignValue] = useState('');
 
   const catLabel = (cat: PlacementCategory) => cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4・5位';
 
-  const handleAssign = (matchId: string) => {
-    const court = selectedCourts[matchId];
-    if (!court) return;
-    assignBracketMatchToCourt(matchId, court);
-    setSelectedCourts(prev => { const { [matchId]: _, ...rest } = prev; return rest; });
+  // 使用中コート
+  const usedCourts = useMemo(() => {
+    const set = new Set<string>();
+    for (const ca of Object.values(bracketCourtAssignments)) set.add(ca.courtName);
+    for (const l of leagues) {
+      const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
+      if (lm.some(m => m.status !== 'finished')) {
+        const nums = l.courtName?.match(/\d+/g);
+        if (nums) for (const n of nums) set.add(`${n}コート`);
+      }
+    }
+    return set;
+  }, [bracketCourtAssignments, leagues]);
+
+  const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
+
+  const handleCourtConfirm = () => {
+    if (!courtAssignMatch || !courtAssignValue) return;
+    assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignValue);
+    setCourtAssignMatch(null);
+    setCourtAssignValue('');
   };
 
   if (waitingMatches.length === 0) {
@@ -1585,7 +1595,6 @@ function WaitingList({ waitingMatches, leagues }: {
       {waitingMatches.map(({ match, bracket, roundLabel }) => {
         const team1 = allTeams.find(t => t.teamId === match.team1Id);
         const team2 = allTeams.find(t => t.teamId === match.team2Id);
-        const selectedCourt = selectedCourts[match.matchId] || '';
         return (
           <div key={match.matchId} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3">
             <div className="shrink-0 text-center">
@@ -1607,27 +1616,58 @@ function WaitingList({ waitingMatches, leagues }: {
                 <span className="font-bold text-gray-800 truncate">{team2?.teamName || match.team2Name}</span>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <select
-                className="text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                value={selectedCourt}
-                onChange={e => setSelectedCourts(prev => ({ ...prev, [match.matchId]: e.target.value }))}
-              >
-                <option value="">コート</option>
-                {courtOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              {selectedCourt && (
-                <button
-                  onClick={() => handleAssign(match.matchId)}
-                  className="px-2.5 py-1.5 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all"
-                >
-                  OK
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => { setCourtAssignMatch(match); setCourtAssignValue(''); }}
+              className="px-3 py-1.5 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all shrink-0"
+            >
+              コート入れ
+            </button>
           </div>
         );
       })}
+
+      {/* コート割当ポップアップ */}
+      {courtAssignMatch && (
+        <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={() => setCourtAssignMatch(null)}>
+          <div className="min-h-full flex items-start justify-center py-[10vh] px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
+                  <span className="font-bold">{allTeams.find(t => t.teamId === courtAssignMatch.team1Id)?.teamName || courtAssignMatch.team1Name}</span>
+                </div>
+                <div className="text-gray-400 text-[9px] my-0.5">vs</div>
+                <div className="flex items-center gap-2">
+                  {courtAssignMatch.team2League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team2League}</span>}
+                  <span className="font-bold">{allTeams.find(t => t.teamId === courtAssignMatch.team2Id)?.teamName || courtAssignMatch.team2Name}</span>
+                </div>
+              </div>
+              <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択 <span className="text-gray-400 font-normal">（使用中は選択不可）</span></label>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {courtOpts.map(c => {
+                  const isUsed = usedCourts.has(c);
+                  return (
+                    <button key={c} onClick={() => !isUsed && setCourtAssignValue(c)}
+                      disabled={isUsed}
+                      className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
+                        ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
+                          courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                          'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
+                <button onClick={handleCourtConfirm} disabled={!courtAssignValue}
+                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >決定</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
