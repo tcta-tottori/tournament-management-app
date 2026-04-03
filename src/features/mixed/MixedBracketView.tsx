@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volume2, VolumeX, ClipboardList, LayoutGrid } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, ClipboardList } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -177,7 +177,6 @@ export default function MixedBracketView() {
   const [courtAssignValue, setCourtAssignValue] = useState('');
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
-  const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [drawEditMode, setDrawEditMode] = useState(false);
 
   const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
@@ -351,49 +350,6 @@ export default function MixedBracketView() {
       )}
 
       {viewMode === 'bracket' && (<>
-      {/* 全表示トグル */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowAllBrackets(!showAllBrackets)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-            showAllBrackets ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          <LayoutGrid size={12} />
-          {showAllBrackets ? '全表示 ON' : '全表示'}
-        </button>
-      </div>
-
-      {/* 全トーナメント表示 */}
-      {showAllBrackets && (
-        <div className="space-y-6">
-          {CATEGORY_TABS.map(tab => {
-            const bracket = brackets.find(b => b.category === tab.id);
-            if (!bracket) return null;
-            const Icon = tab.icon;
-            const finished = bracket.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
-            const total = bracket.matches.length;
-            return (
-              <div key={tab.id}>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-t-xl bg-gradient-to-r ${tab.color} text-white`}>
-                  <Icon size={16} />
-                  <span className="font-bold text-sm">{tab.label}トーナメント</span>
-                  <span className="text-white/70 text-xs ml-1">({finished}/{total})</span>
-                </div>
-                <div className="overflow-x-auto rounded-b-xl border border-t-0 border-gray-200">
-                  <BracketDisplay
-                    bracket={bracket}
-                    onMatchClick={openScoreEditor}
-                    getRoundLabel={getRoundLabel}
-                    allTeams={useMixedStore.getState().allTeams}
-                    courtAssignments={bracketCourtAssignments}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
       {/* カテゴリタブ */}
       <div className="flex gap-2 overflow-x-auto">
         {CATEGORY_TABS.map(tab => {
@@ -950,8 +906,8 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
                 const t2 = a2 ? teams.find(t => t.teamId === a2) : null;
                 const hl1 = currentHighlight === s1 && spinning;
                 const hl2 = currentHighlight === s2 && spinning;
-                const canPlace1 = !isBye1 && !assignedSlots.has(s1) && activeTeam && !spinning;
-                const canPlace2 = !isBye2 && !assignedSlots.has(s2) && activeTeam && !spinning;
+                const canPlace1 = !isBye1 && !assignedSlots.has(s1) && !!activeTeam && !spinning;
+                const canPlace2 = !isBye2 && !assignedSlots.has(s2) && !!activeTeam && !spinning;
 
                 const renderSlot = (si: number, isBye: boolean, team: typeof t1, hl: boolean, canPlace: boolean) => (
                   <div

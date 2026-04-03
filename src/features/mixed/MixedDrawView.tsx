@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, MapPin, Pencil, FlaskConical, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';

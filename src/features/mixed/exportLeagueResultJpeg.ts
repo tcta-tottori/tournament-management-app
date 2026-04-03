@@ -181,34 +181,3 @@ export function exportLeagueResultJpeg(
   }, 'image/jpeg', 0.95);
 }
 
-/**
- * プレビュー用: Canvas要素を返す
- */
-export function createLeagueResultCanvas(
-  league: MixedLeague,
-  standings: LeagueStanding[],
-  matches: LeagueMatchScore[],
-  allTeams: MixedTeam[],
-  tournamentName: string,
-): HTMLCanvasElement {
-  const teams = standings.map(s => allTeams.find(t => t.teamId === s.teamId)!).filter(Boolean);
-  const teamCount = teams.length;
-
-  const scale = 2;
-  const headerH = 60;
-  const colHeaderH = 30;
-  const rowH = 70;
-  const nameColW = 250;
-  const scoreColW = 90;
-  const recordColW = 80;
-  const rankColW = 50;
-  const totalW = nameColW + scoreColW * teamCount + recordColW + rankColW;
-  const totalH = headerH + colHeaderH + rowH * teamCount;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = totalW * scale;
-  canvas.height = totalH * scale;
-  // 再利用: 同じ描画ロジック
-  // (実装簡略化のため export 関数を呼んでcanvasを返すだけ)
-  return canvas;
-}

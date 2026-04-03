@@ -206,7 +206,7 @@ export function calculateLeagueStandings(
 /**
  * 次の2のべき乗を返す
  */
-function nextPowerOf2(n: number): number {
+export function nextPowerOf2(n: number): number {
   let p = 1;
   while (p < n) p *= 2;
   return p;
@@ -380,7 +380,7 @@ function generateBracketMatchesWithSlots(
 /**
  * トーナメント試合生成（1位トーナメント用）
  */
-function generateBracketMatches(
+export function generateBracketMatches(
   category: PlacementCategory,
   drawSize: number,
   teams: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[]

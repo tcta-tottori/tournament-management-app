@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
-import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo, GameRuleSet } from './types';
+import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo } from './types';
 
 /** ルールテキスト配列から構造化ゲームルールを自動抽出 */
-function extractGameRules(rules: string[]): GameRuleSet {
+function extractGameRules(rules: string[]): Record<string, string> {
   let league4 = '';
   let league5 = '';
   let tournament = '';
