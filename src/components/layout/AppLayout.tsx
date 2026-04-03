@@ -197,6 +197,11 @@ export default function AppLayout() {
   const allTabs = useMemo(() => {
     let tabs = ALL_MAIN_TABS;
 
+    // 大会データ未読み込み時: データ・マニュアル・バックアップのみ表示
+    if (!currentTournamentId && !isMixedImported) {
+      return tabs.filter(t => ['/data', '/manual', '/backup'].includes(t.path));
+    }
+
     // ミックスダブルス読込時: 不要なタブを非表示 + ラベル変更
     if (isMixedImported) {
       tabs = tabs.filter((t) => !MIXED_HIDDEN_PATHS.includes(t.path));
