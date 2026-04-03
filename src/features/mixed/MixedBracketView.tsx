@@ -38,7 +38,7 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
   { id: '1st', label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
   { id: '2nd', label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
   { id: '3rd', label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
-  { id: '4th', label: '4-5位', icon: Users, color: 'from-slate-400 to-slate-500' },
+  { id: '4th', label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
 ];
 
 /** 審判用紙を印刷（B5横・シングルス同様の形式） */
@@ -390,7 +390,8 @@ export default function MixedBracketView() {
     return matches;
   }, [brackets]);
 
-  const [viewMode, setViewMode] = useState<'bracket' | 'waiting' | 'all'>('bracket');
+  const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
+  const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [drawEditMode, setDrawEditMode] = useState(false);
 
   return (
@@ -405,15 +406,6 @@ export default function MixedBracketView() {
         >
           <Trophy size={14} />
           トーナメント
-        </button>
-        <button
-          onClick={() => setViewMode('all')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
-            viewMode === 'all' ? 'bg-white border border-b-white border-gray-200 text-gray-800 -mb-[1px]' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <LayoutGrid size={14} />
-          全表示
         </button>
         <button
           onClick={() => setViewMode('waiting')}
@@ -434,8 +426,22 @@ export default function MixedBracketView() {
         <WaitingList waitingMatches={waitingMatches} leagues={leagues} />
       )}
 
+      {viewMode === 'bracket' && (<>
+      {/* 全表示トグル */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setShowAllBrackets(!showAllBrackets)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            showAllBrackets ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <LayoutGrid size={12} />
+          {showAllBrackets ? '全表示 ON' : '全表示'}
+        </button>
+      </div>
+
       {/* 全トーナメント表示 */}
-      {viewMode === 'all' && (
+      {showAllBrackets && (
         <div className="space-y-6">
           {CATEGORY_TABS.map(tab => {
             const bracket = brackets.find(b => b.category === tab.id);
@@ -464,8 +470,6 @@ export default function MixedBracketView() {
           })}
         </div>
       )}
-
-      {viewMode === 'bracket' && (<>
       {/* カテゴリタブ */}
       <div className="flex gap-2 overflow-x-auto">
         {CATEGORY_TABS.map(tab => {
@@ -1245,6 +1249,36 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
+
+  // 4・5位トーナメント: 同一リーグから複数チーム参加時にM4, M5等のサフィックスを付ける
+  const teamLeagueSuffix = useMemo(() => {
+    if (bracket.category !== '4th') return new Map<string, string>();
+    const leagueCount = new Map<string, number>();
+    const result = new Map<string, string>();
+    // 1回戦のチームを順に見て、同一リーグの出現回数をカウント
+    for (const t of bracket.teams) {
+      const lid = t.leagueId.trim();
+      const count = (leagueCount.get(lid) || 0) + 1;
+      leagueCount.set(lid, count);
+      // 2回目以降は5位
+      if (count > 1) result.set(t.teamId, `${lid}5`);
+      else result.set(t.teamId, leagueCount.get(lid)! > 0 ? `${lid}4` : lid);
+    }
+    // 1回しか出現しないリーグはサフィックス不要
+    for (const [tid, suffix] of result) {
+      const lid = suffix.replace(/[0-9]$/, '');
+      if ((leagueCount.get(lid) || 0) <= 1) result.set(tid, lid);
+    }
+    return result;
+  }, [bracket]);
+
+  const getLeagueBadge = (teamId: string | null, league: string) => {
+    if (teamId && teamLeagueSuffix.size > 0) {
+      return teamLeagueSuffix.get(teamId) || league;
+    }
+    return league;
+  };
+
   const totalRounds = Math.log2(bracket.drawSize);
   const matchesByRound: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) {
@@ -1404,9 +1438,10 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                     <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                     `} style={{ height: SLOT_HEIGHT }}>
-                      {slot.league ? (
-                        <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mr-1.5 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{slot.league}</span>
-                      ) : <span className="w-5 shrink-0 mr-1.5" />}
+                      {slot.league ? (() => {
+                        const badge = getLeagueBadge(slot.teamId, slot.league);
+                        return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'} ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{badge}</span>;
+                      })() : <span className="w-5 shrink-0 mr-1.5" />}
                       <div className="flex-1 min-w-0">
                         {teamData ? (
                           <div className="flex items-center gap-1">
@@ -1510,7 +1545,7 @@ function WaitingList({ waitingMatches, leagues }: {
     return [...courtSet].sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
   }, [leagues]);
 
-  const catLabel = (cat: PlacementCategory) => cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4-5位';
+  const catLabel = (cat: PlacementCategory) => cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4・5位';
 
   const handleAssign = (matchId: string) => {
     const court = selectedCourts[matchId];

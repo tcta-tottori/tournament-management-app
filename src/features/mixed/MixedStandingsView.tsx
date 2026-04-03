@@ -143,7 +143,7 @@ export default function MixedStandingsView() {
               { rank: 1, label: '1位トーナメント', color: 'yellow' },
               { rank: 2, label: '2位トーナメント', color: 'gray' },
               { rank: 3, label: '3位トーナメント', color: 'orange' },
-              { rank: 4, label: '4位・5位トーナメント', color: 'slate' },
+              { rank: 4, label: '4・5位トーナメント', color: 'slate' },
             ].map(({ rank, label, color }) => {
               const teamsForRank: { teamName: string; league: string }[] = [];
               for (const league of leagues) {

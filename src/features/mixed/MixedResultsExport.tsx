@@ -10,7 +10,7 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
   '2nd': '2位トーナメント',
   '3rd': '3位トーナメント',
-  '4th': '4位・5位トーナメント',
+  '4th': '4・5位トーナメント',
 };
 
 /** タイブレークスコア表示 */

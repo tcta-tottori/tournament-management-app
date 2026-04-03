@@ -16,7 +16,7 @@ const LEAGUE_BADGE_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
-  '1st': '1位T', '2nd': '2位T', '3rd': '3位T', '4th': '4-5位T',
+  '1st': '1位T', '2nd': '2位T', '3rd': '3位T', '4th': '4・5位T',
 };
 
 const CATEGORY_COLORS: Record<PlacementCategory, string> = {

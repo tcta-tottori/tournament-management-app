@@ -224,7 +224,7 @@ function nextPowerOf2(n: number): number {
  * 3位 (13チーム, 3BYE):
  *   R1: D(bye) | H-M | F-A | K(bye) | I-G | C-E | L-J | B(bye)
  *
- * 4-5位 (14チーム, 2BYE):
+ * 4・5位 (14チーム, 2BYE):
  *   R1: A-M | F-J | L-B | D(bye) | E-H | K-I | G-C | (bye)M5
  */
 export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
@@ -246,7 +246,7 @@ export function generateAllBrackets(
     { cat: '1st', label: '1位トーナメント', rank: 1 },
     { cat: '2nd', label: '2位トーナメント', rank: 2 },
     { cat: '3rd', label: '3位トーナメント', rank: 3 },
-    { cat: '4th', label: '4位・5位トーナメント', rank: 4 },
+    { cat: '4th', label: '4・5位トーナメント', rank: 4 },
   ];
 
   const brackets: PlacementBracket[] = [];

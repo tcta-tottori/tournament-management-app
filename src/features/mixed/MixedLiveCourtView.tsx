@@ -217,7 +217,7 @@ export default function MixedLiveCourtView() {
                       const [matchId, ca] = bracketEntry;
                       const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
                       const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
-                      const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4-5位T';
+                      const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4・5位T';
                       if (bm) bracketMatchData = { matchId, bm, ca, catLabel };
                     }
 
@@ -315,7 +315,7 @@ export default function MixedLiveCourtView() {
               const bf = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
               const bt = b.matches.length;
               const bPct = bt > 0 ? Math.round((bf / bt) * 100) : 0;
-              const label = b.category === '1st' ? '1位' : b.category === '2nd' ? '2位' : b.category === '3rd' ? '3位' : '4-5位';
+              const label = b.category === '1st' ? '1位' : b.category === '2nd' ? '2位' : b.category === '3rd' ? '3位' : '4・5位';
               return (
                 <div key={b.category} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                   <div className="flex items-center justify-between mb-1.5">
@@ -344,7 +344,7 @@ export default function MixedLiveCourtView() {
           const [, ca] = bracketEntry;
           const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === bracketEntry[0]);
           const bCat = brackets.find(b => b.matches.some(m => m.matchId === bracketEntry[0]));
-          const catLabel = bCat?.category === '1st' ? '1位トーナメント' : bCat?.category === '2nd' ? '2位トーナメント' : bCat?.category === '3rd' ? '3位トーナメント' : '4-5位トーナメント';
+          const catLabel = bCat?.category === '1st' ? '1位トーナメント' : bCat?.category === '2nd' ? '2位トーナメント' : bCat?.category === '3rd' ? '3位トーナメント' : '4・5位トーナメント';
           if (bm) {
             const t1 = allTeams.find(t => t.teamId === bm.team1Id);
             const t2 = allTeams.find(t => t.teamId === bm.team2Id);

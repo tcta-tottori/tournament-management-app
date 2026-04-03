@@ -10,7 +10,7 @@ const CATEGORIES: { cat: PlacementCategory; label: string; desc: string; color: 
   { cat: '1st', label: '1位トーナメント', desc: '各リーグ1位（抽選）', color: 'yellow' },
   { cat: '2nd', label: '2位トーナメント', desc: '各リーグ2位', color: 'gray' },
   { cat: '3rd', label: '3位トーナメント', desc: '各リーグ3位', color: 'orange' },
-  { cat: '4th', label: '4-5位トーナメント', desc: '各リーグ4位以下', color: 'slate' },
+  { cat: '4th', label: '4・5位トーナメント', desc: '各リーグ4位以下', color: 'slate' },
 ];
 
 export default function MixedScoreView() {
@@ -65,7 +65,7 @@ export default function MixedScoreView() {
             const slotMap = BRACKET_SLOT_MAP[cat];
 
             if (slotMap) {
-              // ドロー表順で表示（2位/3位/4-5位）
+              // ドロー表順で表示（2位/3位/4・5位）
               const seen = new Set<string>();
               slotMap.forEach((lid, idx) => {
                 if (!lid || seen.has(lid)) return;
