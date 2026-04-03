@@ -3,6 +3,7 @@ import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volum
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { printMixedRefereeSheet } from './printMixedRefereeSheet';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -40,127 +41,6 @@ const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.Element
   { id: '3rd', label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
   { id: '4th', label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
 ];
-
-/** 審判用紙を印刷（B5横・シングルス同様の形式） */
-function printRefereeSheet(
-  match: BracketMatch,
-  allTeams: MixedTeam[],
-  _tournamentName: string,
-  bracketLabel: string,
-  roundLabel: string,
-  gameRule: string,
-  tournamentInfo?: { date?: string } | null,
-) {
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-  if (!team1 || !team2) return;
-
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>審判用紙 - ${bracketLabel}</title>
-<style>
-  @page { size: B5 landscape; margin: 10mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'MS Gothic', 'MS ゴシック', 'Yu Gothic', monospace; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 232mm; margin: auto; }
-  .title { text-align: center; font-size: 22pt; font-weight: bold; letter-spacing: 1.5em; padding: 3mm 0 1mm; }
-  .subtitle { display: flex; justify-content: center; gap: 40mm; font-size: 9pt; padding: 0 0 3mm; }
-  table { width: 100%; border-collapse: collapse; }
-  td, th { border: 1.5px solid #000; padding: 2mm 3mm; font-size: 10pt; vertical-align: middle; }
-  th { background: #f5f5f5; font-weight: bold; text-align: center; }
-  .row-label { width: 24mm; text-align: center; font-weight: bold; font-size: 9pt; letter-spacing: 0.3em; }
-  .val { font-size: 12pt; font-weight: bold; text-align: center; }
-  .val-lg { font-size: 16pt; font-weight: bold; text-align: center; }
-  .name-cell { font-size: 14pt; font-weight: bold; padding: 3mm 5mm; line-height: 1.6; }
-  .aff-cell { font-size: 8pt; padding: 2mm 3mm; line-height: 1.6; white-space: nowrap; }
-  .score-row td { height: 28mm; text-align: center; vertical-align: top; padding-top: 3mm; }
-  .score-label { font-size: 9pt; font-weight: bold; letter-spacing: 0.2em; }
-  .score-box-area { display: flex; align-items: center; justify-content: center; gap: 4mm; margin-top: 3mm; }
-  .score-box { width: 18mm; height: 18mm; border: 2px solid #000; display: inline-block; }
-  .score-dash { font-size: 22pt; font-weight: bold; }
-  .tb-area { margin-top: 1mm; }
-  .tb-label { font-size: 8pt; }
-  .tb-box { width: 14mm; height: 14mm; border: 1.5px solid #000; display: inline-block; margin-top: 1mm; }
-  .footer-row td { height: 10mm; font-size: 9pt; }
-  .uline { display: inline-block; border-bottom: 1px solid #000; min-width: 30mm; margin-left: 1mm; }
-  .notes td { height: 12mm; font-size: 8pt; color: #999; }
-  .credit { text-align: right; font-size: 8pt; padding: 1mm 2mm 0; }
-</style>
-</head><body>
-<div class="page">
-  <div class="title">審　判　用　紙</div>
-  <div class="subtitle">
-    <span>&nbsp;</span>
-    <span>${(tournamentInfo as any)?.date || ''}</span>
-  </div>
-  <table>
-    <tr>
-      <th class="row-label">種　目</th>
-      <td class="val" colspan="2">${bracketLabel}</td>
-      <th class="row-label">回　戦</th>
-      <td class="val" colspan="2">${roundLabel}</td>
-    </tr>
-    <tr>
-      <th class="row-label">コートNo.</th>
-      <td style="width:14%;">&nbsp;</td>
-      <th style="width:12%;">試合方法</th>
-      <td style="font-size:9pt;text-align:center;">${gameRule.replace(/\n/g, '<br>')}</td>
-      <th style="width:12%;">開始時間</th>
-      <td style="width:14%;">&nbsp;</td>
-    </tr>
-    <tr>
-      <th class="row-label">エントリーNo.</th>
-      <td class="val-lg" colspan="2">No.　${team1.pairNumber}</td>
-      <td class="val-lg" colspan="3">No.　${team2.pairNumber}</td>
-    </tr>
-    <tr>
-      <th class="row-label">選手氏名</th>
-      <td class="name-cell" colspan="1">${team1.male.name}<br>${team1.female.name}</td>
-      <td class="aff-cell">（ ${team1.male.affiliation} ）<br>（ ${team1.female.affiliation} ）</td>
-      <td class="name-cell" colspan="2">${team2.male.name}<br>${team2.female.name}</td>
-      <td class="aff-cell">（ ${team2.male.affiliation} ）<br>（ ${team2.female.affiliation} ）</td>
-    </tr>
-    <tr class="score-row">
-      <td>
-        <div class="score-label">ス　コ　ア</div>
-        <div class="tb-area"><span class="tb-label">（ＴＢ）</span></div>
-      </td>
-      <td colspan="2">
-        <div class="score-box-area">
-          <div class="score-box"></div>
-        </div>
-      </td>
-      <td style="border-left:none;border-right:none;">
-        <div class="score-dash">ー</div>
-        <div class="tb-area">（　　　）</div>
-      </td>
-      <td colspan="2">
-        <div class="score-box-area">
-          <div class="score-box"></div>
-        </div>
-      </td>
-    </tr>
-    <tr class="footer-row">
-      <td colspan="2">コート：<span class="uline"></span></td>
-      <td>開始時刻：<span class="uline"></span></td>
-      <td>終了時刻：<span class="uline"></span></td>
-      <td colspan="2">審判：<span class="uline"></span></td>
-    </tr>
-    <tr class="notes">
-      <td colspan="6">備考：</td>
-    </tr>
-  </table>
-  <div class="credit">鳥取市テニス協会</div>
-</div>
-</body></html>`;
-
-  const win = window.open('', '_blank', 'width=900,height=650');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 300);
-  }
-}
 
 /** 苗字を取得（スペースで分割して最初の部分） */
 function familyName(name: string): string {
@@ -684,7 +564,7 @@ export default function MixedBracketView() {
                 const at = useMixedStore.getState().allTeams;
                 const rules = tournamentInfo?.rules || [];
                 const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
-                printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, tournamentInfo);
+                printMixedRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, tournamentInfo?.date || '');
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
               </button>
