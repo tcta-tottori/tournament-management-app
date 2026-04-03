@@ -3,6 +3,17 @@ import { useMixedStore } from './mixedStore';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { LeagueMatchScore, MixedLeague } from './types';
 
+/** リーグバッジの色 */
+const LEAGUE_BADGE_COLORS: Record<string, string> = {
+  'A': 'bg-emerald-100 text-emerald-700', 'B': 'bg-blue-100 text-blue-700',
+  'C': 'bg-purple-100 text-purple-700', 'D': 'bg-rose-100 text-rose-700',
+  'E': 'bg-amber-100 text-amber-700', 'F': 'bg-cyan-100 text-cyan-700',
+  'G': 'bg-lime-100 text-lime-700', 'H': 'bg-fuchsia-100 text-fuchsia-700',
+  'I': 'bg-emerald-100 text-emerald-700', 'J': 'bg-blue-100 text-blue-700',
+  'K': 'bg-purple-100 text-purple-700', 'L': 'bg-rose-100 text-rose-700',
+  'M': 'bg-amber-100 text-amber-700',
+};
+
 /** SVG コートライン（縦向き） */
 function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
   const color = status === 'playing' ? 'rgba(22,163,74,0.15)'
@@ -354,19 +365,36 @@ export default function MixedLiveCourtView() {
             const m = elapsed % 60;
             content = (
               <div>
-                <div className="text-xs font-bold text-emerald-600 mb-2">{catLabel}</div>
+                <div className="text-xs font-bold text-emerald-600 mb-3">{catLabel}</div>
                 <div className="space-y-2 mb-3">
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team1League}</span>
-                    <span className="text-xs text-gray-500 font-mono">{t1?.pairNumber}</span>
-                    <span className="text-sm font-bold text-gray-800">{t1 ? `${sei(t1.male.name)} / ${sei(t1.female.name)}` : bm.team1Name}</span>
-                  </div>
-                  <div className="text-center text-xs text-gray-400">vs</div>
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team2League}</span>
-                    <span className="text-xs text-gray-500 font-mono">{t2?.pairNumber}</span>
-                    <span className="text-sm font-bold text-gray-800">{t2 ? `${sei(t2.male.name)} / ${sei(t2.female.name)}` : bm.team2Name}</span>
-                  </div>
+                  {[{ team: t1, league: bm.team1League, name: bm.team1Name }, { team: t2, league: bm.team2League, name: bm.team2Name }].map((side, si) => (
+                    <div key={si}>
+                      {si === 1 && <div className="text-center text-xs text-gray-400 my-1.5">vs</div>}
+                      <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                        {side.league && (
+                          <span className={`w-6 h-6 rounded text-[10px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[side.league.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                            {side.league}
+                          </span>
+                        )}
+                        {side.team ? (
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0">No.{side.team.pairNumber}</span>
+                            <div className="shrink-0">
+                              <div className="text-xs font-bold text-gray-800">{side.team.male.name}</div>
+                              <div className="text-xs text-gray-700">{side.team.female.name}</div>
+                            </div>
+                            <div className="w-px h-6 bg-gray-200 shrink-0 mx-1" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[10px] text-gray-400 truncate">{side.team.male.affiliation}</div>
+                              <div className="text-[10px] text-gray-400 truncate">{side.team.female.affiliation}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-bold text-gray-800">{side.name}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-green-50 rounded-lg p-2 text-center">
@@ -382,18 +410,44 @@ export default function MixedLiveCourtView() {
             );
           }
         } else if (info && !info.status.isComplete && info.nextMatch) {
+          const lt1 = allTeams.find(t => t.teamId === info.nextMatch!.team1Id);
+          const lt2 = allTeams.find(t => t.teamId === info.nextMatch!.team2Id);
+          const lid = info.league.leagueId.trim();
           content = (
             <div>
-              <div className="text-xs font-bold text-emerald-600 mb-2">{info.league.leagueId}リーグ</div>
-              <div className="text-xs text-gray-500 mb-2">{info.status.finished}/{info.status.total}試合完了</div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`w-7 h-7 rounded-lg text-sm font-bold flex items-center justify-center text-white ${LEAGUE_BADGE_COLORS[lid] ? '' : 'bg-gray-400'}`}
+                  style={LEAGUE_BADGE_COLORS[lid] ? undefined : undefined}>
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${LEAGUE_BADGE_COLORS[lid] || 'bg-gray-200 text-gray-600'}`}>{lid}</span>
+                </span>
+                <span className="text-xs font-bold text-gray-700">{lid}リーグ</span>
+                <span className="text-[10px] text-gray-400 ml-auto">{info.status.finished}/{info.status.total}試合完了</span>
+              </div>
+              <div className="text-[10px] text-gray-500 mb-1.5">次の試合</div>
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team1Id)}</span>
-                </div>
-                <div className="text-center text-xs text-gray-400">vs</div>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team2Id)}</span>
-                </div>
+                {[lt1, lt2].map((team, si) => (
+                  <div key={si}>
+                    {si === 1 && <div className="text-center text-xs text-gray-400 my-1">vs</div>}
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                      {team ? (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <span className="text-[10px] text-gray-400 font-mono shrink-0">No.{team.pairNumber}</span>
+                          <div className="shrink-0">
+                            <div className="text-xs font-bold text-gray-800">{team.male.name}</div>
+                            <div className="text-xs text-gray-700">{team.female.name}</div>
+                          </div>
+                          <div className="w-px h-6 bg-gray-200 shrink-0 mx-1" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] text-gray-400 truncate">{team.male.affiliation}</div>
+                            <div className="text-[10px] text-gray-400 truncate">{team.female.affiliation}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-bold text-gray-800">{si === 0 ? getTeamName(info.nextMatch!.team1Id) : getTeamName(info.nextMatch!.team2Id)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           );
