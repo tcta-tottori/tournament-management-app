@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ClipboardList, Printer, Volume2, VolumeX, Play, Edit3, Save, X, MapPin } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ClipboardList, Printer, Volume2, VolumeX, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
-import { db } from '../../db/database';
+import CallPreviewDialog from './CallPreviewDialog';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
@@ -20,9 +20,6 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位T', '2nd': '2位T', '3rd': '3位T', '4th': '4・5位T',
 };
 
-const CATEGORY_LABELS_FULL: Record<PlacementCategory, string> = {
-  '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント',
-};
 
 const CATEGORY_COLORS: Record<PlacementCategory, string> = {
   '1st': 'bg-yellow-100 text-yellow-700 border-yellow-300',
@@ -92,78 +89,16 @@ function printRefereeSheet(
   if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300); }
 }
 
-/** 苗字のみ取得 */
-const familyName = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
 
-/** コート名を番コート形式に変換 (例: "1コート" → "1番コート") */
-const toCourtCallName = (courtName: string) => {
-  const m = courtName.match(/^(\d+)\s*コート$/);
-  return m ? `${m[1]}番コート` : courtName;
-};
 
-/** コールテキスト生成（新フォーマット） */
-function buildCallText(
-  match: BracketMatch,
-  allTeams: MixedTeam[],
-  category: PlacementCategory,
-  roundLabel: string,
-  courtName: string,
-  startTime: string,
-  furiganaOverrides: Record<string, string>,
-): string {
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-  if (!team1 || !team2) return '';
-
-  const resolve = (key: string, fallback: string) => furiganaOverrides[key] || fallback;
-
-  const catLabel = CATEGORY_LABELS_FULL[category];
-  const courtCallName = toCourtCallName(courtName);
-
-  // 名前読み解決
-  const t1MaleName = resolve(`t1m_name`, familyName(team1.male.name));
-  const t1FemaleName = resolve(`t1f_name`, familyName(team1.female.name));
-  const t2MaleName = resolve(`t2m_name`, familyName(team2.male.name));
-  const t2FemaleName = resolve(`t2f_name`, familyName(team2.female.name));
-
-  // 所属読み解決
-  const t1MaleAff = resolve(`t1m_aff`, team1.male.affiliation);
-  const t1FemaleAff = resolve(`t1f_aff`, team1.female.affiliation);
-  const t2MaleAff = resolve(`t2m_aff`, team2.male.affiliation);
-  const t2FemaleAff = resolve(`t2f_aff`, team2.female.affiliation);
-
-  const parts: string[] = [
-    '試合のコールをします。',
-    `${catLabel}、${roundLabel}。`,
-    `${team1.pairNumber}番、${t1MaleName}さん、${t1MaleAff}、${t1FemaleName}さん、${t1FemaleAff}。`,
-    `${team2.pairNumber}番、${t2MaleName}さん、${t2MaleAff}、${t2FemaleName}さん、${t2FemaleAff}。`,
-  ];
-
-  let ct = `この試合を${courtCallName}で`;
-  if (startTime) {
-    const [h, m] = startTime.split(':');
-    ct += parseInt(m) === 0 ? `、${parseInt(h)}時より` : `、${parseInt(h)}時${parseInt(m)}分より`;
-  }
-  ct += '、おこなってください。';
-  parts.push(ct);
-
-  // ボール担当（チーム1）
-  parts.push(`ボールは${team1.pairNumber}番${t1MaleName}さん、${t1FemaleName}さんお願い致します。`);
-
-  return parts.join(' ');
+interface WaitingMatch {
+  match: BracketMatch;
+  category: PlacementCategory;
+  totalRounds: number;
+  priority: number;
 }
 
-/** コールプレビューで使うエントリ */
-interface CallEntry {
-  key: string;
-  label: string;
-  displayName: string;
-  furigana: string;
-  type: 'name' | 'affiliation';
-}
-
-/** コールプレビューダイアログ */
-function CallPreviewDialog({
+function _LocalCallPreviewDialog_REMOVED({
   match,
   team1,
   team2,

@@ -3,6 +3,7 @@ import { Trophy, Medal, Award, Users, Shuffle, Hand, RotateCcw, Ban, Save, Volum
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import CallPreviewDialog from './CallPreviewDialog';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -162,95 +163,6 @@ function printRefereeSheet(
   }
 }
 
-/** 苗字を取得（スペースで分割して最初の部分） */
-function familyName(name: string): string {
-  return name.trim().split(/[\s　]+/)[0] || name;
-}
-
-/** ふりがな辞書から苗字の読みを取得（非同期） */
-async function getFamilyNameReading(name: string): Promise<string> {
-  try {
-    const { db } = await import('../../db/database');
-    const key = name.replace(/[\s　]+/g, '');
-    const entry = await db.furiganaDict.get(key);
-    if (entry?.furigana) {
-      const parts = entry.furigana.trim().split(/[\s　]+/);
-      return parts[0] || entry.furigana;
-    }
-  } catch { /* ignore */ }
-  return familyName(name);
-}
-
-async function getAffiliationReading(affiliation: string): Promise<string> {
-  if (!affiliation) return '';
-  try {
-    const { db } = await import('../../db/database');
-    const entry = await db.affiliationFurigana.where('name').equals(affiliation).first();
-    if (entry?.furigana) return entry.furigana;
-  } catch { /* ignore */ }
-  return affiliation;
-}
-
-/** コート名を番コート形式に変換 (例: "1コート" → "1番コート") */
-const toCourtCallName = (courtName: string) => {
-  const m = courtName.match(/^(\d+)\s*コート$/);
-  return m ? `${m[1]}番コート` : courtName;
-};
-
-/** ミックスダブルス用コールテキスト生成（非同期） */
-async function buildMixedCallText(
-  match: BracketMatch,
-  allTeams: MixedTeam[],
-  bracketLabel: string,
-  roundLabel: string,
-  courtName: string,
-  startTime: string,
-): Promise<string> {
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-  if (!team1 || !team2) return '';
-
-  // ふりがな（名前＋所属）を取得
-  const [m1Read, f1Read, m2Read, f2Read, m1Aff, f1Aff, m2Aff, f2Aff] = await Promise.all([
-    getFamilyNameReading(team1.male.name),
-    getFamilyNameReading(team1.female.name),
-    getFamilyNameReading(team2.male.name),
-    getFamilyNameReading(team2.female.name),
-    getAffiliationReading(team1.male.affiliation),
-    getAffiliationReading(team1.female.affiliation),
-    getAffiliationReading(team2.male.affiliation),
-    getAffiliationReading(team2.female.affiliation),
-  ]);
-
-  const courtCallName = toCourtCallName(courtName);
-
-  const parts: string[] = [];
-  parts.push('試合のコールをします。');
-  parts.push(`${bracketLabel}${roundLabel}。`);
-
-  // チーム1: 番号＋苗字＋所属
-  parts.push(`${team1.pairNumber}番、${m1Read}さん、${m1Aff}、${f1Read}さん、${f1Aff}。`);
-  // チーム2
-  parts.push(`${team2.pairNumber}番、${m2Read}さん、${m2Aff}、${f2Read}さん、${f2Aff}。`);
-
-  // コート＋時間
-  let courtText = `この試合を${courtCallName}で`;
-  if (startTime) {
-    const [h, m] = startTime.split(':');
-    const minutes = parseInt(m);
-    courtText += minutes === 0
-      ? `、${parseInt(h)}時より`
-      : `、${parseInt(h)}時${minutes}分より`;
-  }
-  courtText += '、おこなってください。';
-  parts.push(courtText);
-
-  // ボール担当（チーム1）
-  parts.push(`ボールは${team1.pairNumber}番${m1Read}さん、${f1Read}さんお願い致します。`);
-
-  return parts.join(' ');
-}
-
 export default function MixedBracketView() {
   const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
@@ -260,6 +172,7 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
+  const { speak } = useSpeechSynthesis();
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
   const [courtAssignValue, setCourtAssignValue] = useState('');
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
@@ -721,180 +634,31 @@ export default function MixedBracketView() {
 
       </>)}
 
-      {/* 音声コールモーダル */}
-      {callMatch && currentBracket && (
-        <CallModal
-          match={callMatch}
-          bracket={currentBracket}
-          leagues={leagues}
-          allTeams={useMixedStore.getState().allTeams}
-          tournamentName={tournamentInfo?.name || ''}
-          getRoundLabel={getRoundLabel}
-          callCourt={callCourt}
-          setCallCourt={setCallCourt}
-          callTime={callTime}
-          setCallTime={setCallTime}
-          onClose={() => setCallMatch(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-/** 音声コールモーダル */
-function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournamentName, getRoundLabel, callCourt, setCallCourt, callTime, setCallTime, onClose }: {
-  match: BracketMatch;
-  bracket: PlacementBracket;
-  leagues: { leagueId: string; courtName: string }[];
-  allTeams: MixedTeam[];
-  tournamentName: string;
-  getRoundLabel: (round: number, total: number) => string;
-  callCourt: string;
-  setCallCourt: (v: string) => void;
-  callTime: string;
-  setCallTime: (v: string) => void;
-  onClose: () => void;
-}) {
-  const { speak, stop, isSpeaking } = useSpeechSynthesis();
-  const bracketCourtAssignments = useMixedStore(s => s.bracketCourtAssignments);
-  const totalRounds = Math.log2(bracket.drawSize);
-  const roundLabel = getRoundLabel(match.round, totalRounds);
-
-  // 使用中コート
-  const usedCourts = useMemo(() => {
-    const set = new Set<string>();
-    for (const ca of Object.values(bracketCourtAssignments)) {
-      set.add(ca.courtName);
-    }
-    return set;
-  }, [bracketCourtAssignments]);
-
-  // コート候補: リーグのコート名を個別コートに分解
-  const courtOptions = useMemo(() => {
-    const courtSet = new Set<string>();
-    for (const l of leagues) {
-      if (!l.courtName) continue;
-      const nums = l.courtName.match(/\d+/g);
-      if (nums) {
-        for (const n of nums) courtSet.add(`${n}コート`);
-      } else {
-        courtSet.add(l.courtName);
-      }
-    }
-    return [...courtSet].sort((a, b) => {
-      const na = parseInt(a) || 0;
-      const nb = parseInt(b) || 0;
-      return na - nb;
-    });
-  }, [leagues]);
-
-  const handleSpeak = async () => {
-    if (!callCourt) return;
-    const text = await buildMixedCallText(match, allTeams, bracket.label, roundLabel, callCourt, callTime);
-    if (!text) return;
-    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
-  };
-
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="min-h-full flex items-start justify-center py-[8vh] px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Volume2 size={16} className="text-blue-600" />
-          音声コール
-        </h3>
-
-        {/* 対戦情報 */}
-        <div className="bg-gray-50 rounded-xl p-3 mb-4 text-xs">
-          <div className="text-gray-500 mb-1">{bracket.label}　{roundLabel}</div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-bold mr-1">{match.team1League}</span>
-              {team1 ? `${team1.male.name} / ${team1.female.name}` : match.team1Name}
-            </div>
-            <span className="text-gray-400 font-bold">vs</span>
-            <div className="flex-1 text-right">
-              <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-bold mr-1">{match.team2League}</span>
-              {team2 ? `${team2.male.name} / ${team2.female.name}` : match.team2Name}
-            </div>
-          </div>
-        </div>
-
-        {/* コート選択 */}
-        <div className="mb-3">
-          <label className="text-xs font-bold text-gray-600 block mb-1">コート指定 *</label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {courtOptions.map(court => {
-              const isUsed = usedCourts.has(court);
-              return (
-                <button
-                  key={court}
-                  onClick={() => !isUsed && setCallCourt(court)}
-                  disabled={isUsed}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isUsed ? 'bg-gray-50 text-gray-300 cursor-not-allowed' :
-                    callCourt === court
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {court}{isUsed && <span className="text-[8px] block text-gray-300">使用中</span>}
-                </button>
-              );
-            })}
-          </div>
-          <input
-            type="text"
-            value={callCourt}
-            onChange={e => setCallCourt(e.target.value)}
-            placeholder="コート名を入力（例: 1コート）"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      {/* 音声コールプレビュー */}
+      {callMatch && currentBracket && (() => {
+        const ct1 = useMixedStore.getState().allTeams.find(t => t.teamId === callMatch.team1Id);
+        const ct2 = useMixedStore.getState().allTeams.find(t => t.teamId === callMatch.team2Id);
+        if (!ct1 || !ct2) return null;
+        const totalR = Math.log2(currentBracket.drawSize);
+        const rl = getRoundLabel(callMatch.round, totalR);
+        return (
+          <CallPreviewDialog
+            match={callMatch}
+            team1={ct1}
+            team2={ct2}
+            category={currentBracket.category}
+            roundLabel={rl}
+            courtName={callCourt}
+            startTime={callTime}
+            allTeams={useMixedStore.getState().allTeams}
+            onConfirm={(text) => {
+              if (text) speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
+              setCallMatch(null);
+            }}
+            onClose={() => setCallMatch(null)}
           />
-        </div>
-
-        {/* 時間指定 */}
-        <div className="mb-4">
-          <label className="text-xs font-bold text-gray-600 block mb-1">開始時間（任意）</label>
-          <input
-            type="time"
-            value={callTime}
-            onChange={e => setCallTime(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* コールボタン */}
-        <button
-          onClick={handleSpeak}
-          disabled={!callCourt || isSpeaking}
-          className={`w-full flex items-center justify-center gap-2 py-3 min-h-[48px] rounded-xl text-sm font-medium mb-2 active:scale-[0.98] transition-all shadow-md ${
-            !callCourt
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : isSpeaking
-              ? 'bg-red-500 text-white'
-              : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-          }`}
-        >
-          {isSpeaking ? <><VolumeX size={14} />再生中...</> : <><Volume2 size={14} />コール開始</>}
-        </button>
-
-        {isSpeaking && (
-          <button
-            onClick={stop}
-            className="w-full flex items-center justify-center gap-2 py-2.5 min-h-[44px] bg-red-50 border-2 border-red-300 text-red-600 rounded-xl hover:bg-red-100 text-sm font-medium mb-2 active:scale-[0.98] transition-all"
-          >
-            <VolumeX size={14} />停止
-          </button>
-        )}
-
-        <button onClick={onClose} className="w-full py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm active:scale-[0.98] transition-all">
-          閉じる
-        </button>
-      </div>
-      </div>
+        );
+      })()}
     </div>
   );
 }
