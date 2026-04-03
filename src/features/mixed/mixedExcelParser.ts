@@ -515,5 +515,33 @@ export function parseMixedExcel(file: ArrayBuffer): {
 
   const matches = generateLeagueMatches(leagues);
 
+  // チーム数別にデフォルトゲームルールを設定
+  if (!info.gameRules) {
+    const teamSizes = new Set(leagues.map(l => l.teams.length));
+    const gameRules: Record<number, string> = {};
+    for (const size of teamSizes) {
+      // rules配列からチーム数に合うルールを検索
+      let found = false;
+      for (const r of info.rules) {
+        const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+        if (/ゲームマッチ|ノーアド|タイブレ|セットマッチ|ゲーム|先取/.test(cleaned) &&
+            (cleaned.includes(`${size}チーム`) || cleaned.includes(`予選${size}`))) {
+          gameRules[size] = cleaned;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // デフォルト: 4チーム=6ゲームマッチ, 5チーム=6ゲーム先取
+        if (size <= 4) {
+          gameRules[size] = 'ノーアド・6ゲームマッチ（6-6タイブレーク）';
+        } else {
+          gameRules[size] = '6ゲーム先取（ノーアド）';
+        }
+      }
+    }
+    info.gameRules = gameRules;
+  }
+
   return { info, leagues, matches };
 }

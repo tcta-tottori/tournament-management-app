@@ -1,7 +1,7 @@
 import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
-import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle, Search, X } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle, Search, X, Settings } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { MixedTeam } from './types';
 
 /** インライン編集セル */
@@ -149,7 +149,7 @@ const LEAGUE_COLORS = [
 ];
 
 export default function MixedEntryView() {
-  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague } = useMixedStore();
+  const { leagues, allTeams, isImported, updateCourtName, updateTeamPlayer, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, moveTeamToLeague, tournamentInfo, updateGameRule } = useMixedStore();
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,6 +259,9 @@ export default function MixedEntryView() {
           </div>
         </div>
       </div>
+
+      {/* ゲームルール設定 */}
+      <GameRuleConfig leagues={leagues} tournamentInfo={tournamentInfo} updateGameRule={updateGameRule} />
 
       {/* リーグ一覧 */}
       <div className="space-y-4">
@@ -479,6 +482,101 @@ export default function MixedEntryView() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** ゲームルール設定コンポーネント */
+function GameRuleConfig({ leagues, tournamentInfo, updateGameRule }: {
+  leagues: { leagueId: string; teams: MixedTeam[] }[];
+  tournamentInfo: ReturnType<typeof useMixedStore>['tournamentInfo'];
+  updateGameRule: (teamCount: number, rule: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // リーグのチーム数別にグルーピング
+  const teamCountGroups = useMemo(() => {
+    const map = new Map<number, string[]>();
+    for (const l of leagues) {
+      const count = l.teams.length;
+      if (!map.has(count)) map.set(count, []);
+      map.get(count)!.push(l.leagueId);
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [leagues]);
+
+  const gameRules = tournamentInfo?.gameRules || {};
+
+  // デフォルトルール候補
+  const defaultRules: Record<number, string> = {
+    4: 'ノーアド・6ゲームマッチ（6-6タイブレーク）',
+    5: '6ゲーム先取（ノーアド）',
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+          <Settings size={14} className="text-gray-500" />
+          ゲームルール設定
+          {teamCountGroups.length > 0 && (
+            <span className="text-[10px] font-normal text-gray-400">
+              ({teamCountGroups.map(([count, ids]) => `${count}チーム: ${ids.length}リーグ`).join('、')})
+            </span>
+          )}
+        </div>
+        <span className={`text-gray-400 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+          <p className="text-[10px] text-gray-500">チーム数ごとにゲームルールを設定します。スコア入力画面に反映されます。</p>
+
+          {teamCountGroups.map(([teamCount, leagueIds]) => (
+            <div key={teamCount} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold text-gray-700">{teamCount}チームリーグ</span>
+                <span className="text-[10px] text-gray-400">({leagueIds.join(', ')}リーグ)</span>
+              </div>
+              <input
+                type="text"
+                value={gameRules[teamCount] ?? defaultRules[teamCount] ?? ''}
+                onChange={e => updateGameRule(teamCount, e.target.value)}
+                placeholder={`${teamCount}チームリーグのゲームルール`}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none"
+              />
+            </div>
+          ))}
+
+          {/* よく使うルールのプリセット */}
+          <div className="pt-2 border-t border-gray-100">
+            <div className="text-[10px] text-gray-400 mb-1.5">プリセット</div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'ノーアド・6ゲームマッチ（6-6タイブレーク）',
+                '6ゲーム先取（ノーアド）',
+                'ノーアド・8ゲームマッチ（8-8タイブレーク）',
+                '4ゲームマッチ（4-4タイブレーク）',
+              ].map(preset => (
+                <button
+                  key={preset}
+                  onClick={() => {
+                    // 最初の未設定グループに適用
+                    const unset = teamCountGroups.find(([c]) => !gameRules[c]);
+                    if (unset) updateGameRule(unset[0], preset);
+                  }}
+                  className="text-[10px] px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-colors"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

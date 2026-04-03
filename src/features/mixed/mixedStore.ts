@@ -78,6 +78,7 @@ interface MixedState {
   setSelectedLeagueId: (id: string | null) => void;
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
   setImportFileName: (name: string) => void;
+  updateGameRule: (teamCount: number, rule: string) => void;
 
   // Test helpers
   fillAllScoresForTest: () => void;
@@ -576,6 +577,12 @@ export const useMixedStore = create<MixedState>()(
       setSelectedLeagueId: (id) => set({ selectedLeagueId: id }),
       setSelectedBracketCategory: (cat) => set({ selectedBracketCategory: cat }),
       setImportFileName: (name) => set({ importFileName: name }),
+      updateGameRule: (teamCount, rule) => set(state => ({
+        tournamentInfo: state.tournamentInfo ? {
+          ...state.tournamentInfo,
+          gameRules: { ...(state.tournamentInfo.gameRules || {}), [teamCount]: rule },
+        } : null,
+      })),
 
       fillAllScoresForTest: () => {
         set(state => ({

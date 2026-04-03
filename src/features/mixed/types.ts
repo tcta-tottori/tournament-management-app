@@ -104,6 +104,8 @@ export interface TournamentInfo {
   date: string;
   venue: string;
   rules: string[];
+  /** チーム数別ゲームルール (例: { 4: "ノーアド・6ゲームマッチ（6-6タイブレーク）", 5: "6ゲーム先取" }) */
+  gameRules?: Record<number, string>;
   /** 順位別トーナメントの並び順（リーグID配列） */
   bracketOrders?: {
     '2nd'?: string[];

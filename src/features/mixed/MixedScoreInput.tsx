@@ -73,8 +73,12 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
   const scrollPosRef = useRef<number>(0);
 
   const gameRule = useMemo(() => {
-    // リーグ内のチーム数を取得してルールを特定
     const teamCount = teams.length;
+    // 1. gameRules に teamCount 用のルールがあればそれを使用
+    if (tournamentInfo?.gameRules?.[teamCount]) {
+      return tournamentInfo.gameRules[teamCount];
+    }
+    // 2. フォールバック: rules 配列からチーム数に合うルールを検索
     return extractGameRule(tournamentInfo?.rules || [], teamCount);
   }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
