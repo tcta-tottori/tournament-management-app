@@ -3,6 +3,7 @@ import { ClipboardList, Printer, Volume2, VolumeX, Play } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { printMixedRefereeSheet } from './printMixedRefereeSheet';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
@@ -32,59 +33,6 @@ function getRoundLabel(round: number, totalRounds: number): string {
   if (fromFinal === 1) return '準決勝';
   if (fromFinal === 2) return '準々決勝';
   return `${round}回戦`;
-}
-
-/** 審判用紙を印刷 */
-function printRefereeSheet(
-  match: BracketMatch,
-  allTeams: MixedTeam[],
-  tournamentName: string,
-  catLabel: string,
-  roundLabel: string,
-  courtName: string,
-) {
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-  if (!team1 || !team2) return;
-
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>審判用紙</title>
-<style>
-  @page { size: A5 landscape; margin: 10mm; }
-  body { font-family: 'Yu Gothic', 'Hiragino Sans', sans-serif; margin: 0; padding: 15px; }
-  .header { text-align: center; margin-bottom: 12px; }
-  .header h2 { margin: 0; font-size: 16px; }
-  .header .sub { font-size: 12px; color: #666; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  th, td { border: 1px solid #333; padding: 6px 10px; font-size: 13px; }
-  th { background: #f0f0f0; width: 80px; text-align: center; }
-  .player-name { font-size: 16px; font-weight: bold; }
-  .score-area { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
-  .score-box { width: 50px; height: 50px; border: 2px solid #333; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; }
-  .dash { font-size: 28px; font-weight: bold; display: inline-flex; align-items: center; }
-  .court-line { margin-top: 12px; font-size: 13px; }
-</style>
-</head><body>
-<div class="header">
-  <h2>${tournamentName}</h2>
-  <div class="sub">${catLabel}　${roundLabel}　${courtName ? 'コート: ' + courtName : ''}</div>
-</div>
-<table>
-  <tr><th rowspan="2">チーム1</th><td class="player-name">${team1.male.name}</td><td>${team1.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team1League}リーグ</td></tr>
-  <tr><td class="player-name">${team1.female.name}</td><td>${team1.female.affiliation}</td></tr>
-  <tr><th rowspan="2">チーム2</th><td class="player-name">${team2.male.name}</td><td>${team2.male.affiliation}</td><td rowspan="2" style="text-align:center;font-weight:bold;font-size:14px;">${match.team2League}リーグ</td></tr>
-  <tr><td class="player-name">${team2.female.name}</td><td>${team2.female.affiliation}</td></tr>
-</table>
-<div style="text-align:center;">
-  <div class="score-area">
-    <div class="score-box"></div><div class="dash">−</div><div class="score-box"></div>
-  </div>
-</div>
-</body></html>`;
-
-  const win = window.open('', '_blank', 'width=800,height=600');
-  if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300); }
 }
 
 /** コールテキスト生成 */
@@ -154,7 +102,10 @@ export default function MixedWaitingList() {
     const court = selectedCourt[wm.match.matchId] || '';
     const catLabel = CATEGORY_LABELS[wm.category];
     const roundLabel = getRoundLabel(wm.match.round, wm.totalRounds);
-    printRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, court);
+    const rules = tournamentInfo?.rules || [];
+    const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
+    const time = selectedTime[wm.match.matchId] || '';
+    printMixedRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, gr, tournamentInfo?.date || '', court, time);
   };
 
   if (waitingMatches.length === 0) {

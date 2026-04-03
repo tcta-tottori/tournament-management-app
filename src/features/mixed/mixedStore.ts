@@ -520,12 +520,6 @@ export const useMixedStore = create<MixedState>()(
 
       autoPopulateBrackets: () => {
         const { leagues, leagueMatches, allTeams } = get();
-        // Check if all leagues are complete
-        const allComplete = leagues.every(l => {
-          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-          return lm.length > 0 && lm.every(m => m.status === 'finished');
-        });
-        if (!allComplete) return;
 
         const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
