@@ -78,8 +78,13 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     if (tournamentInfo?.gameRules?.[teamCount]) {
       return tournamentInfo.gameRules[teamCount];
     }
-    // 2. フォールバック: rules 配列からチーム数に合うルールを検索
-    return extractGameRule(tournamentInfo?.rules || [], teamCount);
+    // 2. フォールバック: rules 配列からチーム数に合うルールを検索（プレフィックス除去）
+    const raw = extractGameRule(tournamentInfo?.rules || [], teamCount);
+    if (raw) {
+      const m = raw.match(/[はの](.+)/);
+      return m ? m[1].trim() : raw;
+    }
+    return null;
   }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
@@ -87,21 +92,13 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     // ポップアップ表示時のスクロール位置を保存し、閉じる時に復元
     const savedScrollY = window.scrollY;
     scrollPosRef.current = savedScrollY;
-    // スクロールを防止（position: fixedでページ全体を固定）
+    // overflow: hiddenでスクロール防止（position:fixedだとスクロール位置がずれる）
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${savedScrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
+    document.documentElement.style.overflow = 'hidden';
     document.body.style.paddingRight = `${scrollbarWidth}px`;
     return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
+      document.documentElement.style.overflow = '';
       document.body.style.paddingRight = '';
-      // 元のスクロール位置に確実に復元
-      window.scrollTo(0, scrollPosRef.current);
     };
   }, []);
 
