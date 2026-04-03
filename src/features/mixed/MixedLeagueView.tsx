@@ -157,8 +157,8 @@ export default function MixedLeagueView() {
               </th>
             ))}
             <th className="px-3 py-2 text-center text-xs text-gray-500 w-16">勝敗</th>
-            <th className="px-2 py-2 text-center text-xs text-gray-500 w-20">ゲーム率</th>
-            <th className="px-3 py-2 text-center text-xs text-gray-500 w-12">順位</th>
+            {leagueComplete && <th className="px-2 py-2 text-center text-xs text-gray-500 w-20">ゲーム率</th>}
+            {leagueComplete && <th className="px-3 py-2 text-center text-xs text-gray-500 w-12">順位</th>}
             {leagueComplete && <th className="px-2 py-2 text-left text-xs text-gray-500">判定</th>}
           </tr>
         </thead>
@@ -215,20 +215,24 @@ export default function MixedLeagueView() {
                 <td className="px-3 py-2 text-center text-sm font-semibold text-gray-700 border-l border-gray-200">
                   {standing ? `${standing.wins}-${standing.losses}` : '-'}
                 </td>
-                <td className="px-2 py-2 text-center text-xs font-mono text-gray-600 border-l border-gray-200">
-                  {standing ? <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} /> : '-'}
-                </td>
-                <td className="px-3 py-2 text-center border-l border-gray-200">
-                  {standing && standing.rank > 0 && (
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold
-                      ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
-                        standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-                        standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
-                    `}>
-                      {standing.rank}
-                    </span>
-                  )}
-                </td>
+                {leagueComplete && (
+                  <td className="px-2 py-2 text-center text-xs font-mono text-gray-600 border-l border-gray-200">
+                    {standing ? <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} /> : '-'}
+                  </td>
+                )}
+                {leagueComplete && (
+                  <td className="px-3 py-2 text-center border-l border-gray-200">
+                    {standing && standing.rank > 0 && (
+                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold
+                        ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+                          standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
+                          standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
+                      `}>
+                        {standing.rank}
+                      </span>
+                    )}
+                  </td>
+                )}
                 {leagueComplete && (
                   <td className="px-2 py-2 text-left border-l border-gray-200">
                     {standing?.tiebreakReason && (
