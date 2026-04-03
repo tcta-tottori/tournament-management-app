@@ -593,6 +593,21 @@ export const useMixedStore = create<MixedState>()(
         }));
       },
     }),
-    { name: 'mixed-tournament-storage' }
+    {
+      name: 'mixed-tournament-storage',
+      version: 2,
+      migrate: (persisted: any, version: number) => {
+        if (version < 2) {
+          // v1→v2: 新規フィールドのデフォルト値を補完
+          return {
+            ...persisted,
+            rankOverrides: persisted.rankOverrides ?? {},
+            bracketCourtAssignments: persisted.bracketCourtAssignments ?? {},
+            rawExcelSheets: persisted.rawExcelSheets ?? [],
+          };
+        }
+        return persisted;
+      },
+    }
   )
 );

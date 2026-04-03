@@ -40,7 +40,7 @@ import LiveDashboard from './features/live/LiveDashboard'
 
 import Manual from './features/manual/Manual'
 import BackupPage from './features/backup/BackupPage';
-import ResultsPage from './features/results/ResultsPage';
+// ResultsPage は結果タブ削除に伴い廃止
 import CourtBracketPage from './features/court-bracket/CourtBracketPage';
 // BroadcastPanel は Scoreboard の MatchActionPanel に統合済み
 
@@ -63,7 +63,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="court-bracket" element={<CourtBracketPage />} />
           <Route path="schedule" element={<CourtSchedule />} />
           <Route path="dashboard" element={<LiveDashboard />} />
-          <Route path="results" element={<ResultsPage />} />
+          {/* results ルートは結果タブ削除に伴い廃止 */}
 
           <Route path="manual" element={<Manual />} />
           <Route path="backup" element={<BackupPage />} />
