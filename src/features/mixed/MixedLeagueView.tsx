@@ -36,6 +36,7 @@ const LEAGUE_COLORS = [
 export default function MixedLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName, tournamentInfo, fillAllScoresForTest } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
+  const [clickY, setClickY] = useState<number | undefined>(undefined);
   const [editingCourt, setEditingCourt] = useState(false);
   const [courtNameInput, setCourtNameInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -193,14 +194,14 @@ export default function MixedLeagueView() {
                     <td
                       key={colIdx}
                       className={`px-2 py-2 text-center text-sm ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors ${cell.text === '__DIAG__' ? 'relative' : ''}`}
-                      onClick={() => {
+                      onClick={(e) => {
                         if (team.teamId === colTeam.teamId) return;
                         if (!allEntryDone) return; // エントリー未完了は入力不可
                         const forwardMatch = leagueMatchList.find(m =>
                           (m.team1Id === team.teamId && m.team2Id === colTeam.teamId) ||
                           (m.team1Id === colTeam.teamId && m.team2Id === team.teamId)
                         );
-                        if (forwardMatch) setEditingMatch(forwardMatch);
+                        if (forwardMatch) { setClickY(e.clientY); setEditingMatch(forwardMatch); }
                       }}
                     >
                       {cell.text === '__DIAG__' ? (
@@ -403,7 +404,7 @@ export default function MixedLeagueView() {
               return (
                 <div key={mo.matchNumber} className="relative flex flex-col items-center">
                   <button
-                    onClick={() => match && setEditingMatch(match)}
+                    onClick={(e) => { if (match) { setClickY(e.clientY); setEditingMatch(match); } }}
                     className={`
                       flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
                       ${isFinished
@@ -567,6 +568,7 @@ export default function MixedLeagueView() {
           match={editingMatch}
           teams={selectedLeague.teams}
           onClose={() => setEditingMatch(null)}
+          anchorY={clickY}
         />
       )}
 
