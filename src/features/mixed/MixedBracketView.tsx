@@ -174,20 +174,28 @@ async function getFamilyNameReading(name: string): Promise<string> {
     const key = name.replace(/[\s　]+/g, '');
     const entry = await db.furiganaDict.get(key);
     if (entry?.furigana) {
-      // ふりがなからスペースで分割して苗字部分を取得
-      // または元の名前のスペース位置から苗字の文字数を推定
-      const nameParts = name.trim().split(/[\s　]+/);
-      if (nameParts.length >= 2) {
-        const seiLen = nameParts[0].length;
-        // ふりがなの先頭seiLen文字相当を取得（カタカナの場合文字数が異なる場合あり）
-        // フルふりがなを返してスピーチエンジンに任せる方が安全
-        return entry.furigana;
-      }
-      return entry.furigana;
+      const parts = entry.furigana.trim().split(/[\s　]+/);
+      return parts[0] || entry.furigana;
     }
   } catch { /* ignore */ }
   return familyName(name);
 }
+
+async function getAffiliationReading(affiliation: string): Promise<string> {
+  if (!affiliation) return '';
+  try {
+    const { db } = await import('../../db/database');
+    const entry = await db.affiliationFurigana.where('name').equals(affiliation).first();
+    if (entry?.furigana) return entry.furigana;
+  } catch { /* ignore */ }
+  return affiliation;
+}
+
+/** コート名を番コート形式に変換 (例: "1コート" → "1番コート") */
+const toCourtCallName = (courtName: string) => {
+  const m = courtName.match(/^(\d+)\s*コート$/);
+  return m ? `${m[1]}番コート` : courtName;
+};
 
 /** ミックスダブルス用コールテキスト生成（非同期） */
 async function buildMixedCallText(
@@ -202,25 +210,31 @@ async function buildMixedCallText(
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
   if (!team1 || !team2) return '';
 
-  // ふりがなを取得（なければ苗字をそのまま使用）
-  const [m1Read, f1Read, m2Read, f2Read] = await Promise.all([
+  // ふりがな（名前＋所属）を取得
+  const [m1Read, f1Read, m2Read, f2Read, m1Aff, f1Aff, m2Aff, f2Aff] = await Promise.all([
     getFamilyNameReading(team1.male.name),
     getFamilyNameReading(team1.female.name),
     getFamilyNameReading(team2.male.name),
     getFamilyNameReading(team2.female.name),
+    getAffiliationReading(team1.male.affiliation),
+    getAffiliationReading(team1.female.affiliation),
+    getAffiliationReading(team2.male.affiliation),
+    getAffiliationReading(team2.female.affiliation),
   ]);
+
+  const courtCallName = toCourtCallName(courtName);
 
   const parts: string[] = [];
   parts.push('試合のコールをします。');
-  parts.push(`${bracketLabel}${roundLabel}、`);
+  parts.push(`${bracketLabel}${roundLabel}。`);
 
-  // チーム1: 番号＋苗字の読み
-  parts.push(`${team1.pairNumber}番、${m1Read}さん、${f1Read}さん。`);
+  // チーム1: 番号＋苗字＋所属
+  parts.push(`${team1.pairNumber}番、${m1Read}さん、${m1Aff}、${f1Read}さん、${f1Aff}。`);
   // チーム2
-  parts.push(`${team2.pairNumber}番、${m2Read}さん、${f2Read}さん。`);
+  parts.push(`${team2.pairNumber}番、${m2Read}さん、${m2Aff}、${f2Read}さん、${f2Aff}。`);
 
   // コート＋時間
-  let courtText = `こちらの試合を${courtName}で`;
+  let courtText = `この試合を${courtCallName}で`;
   if (startTime) {
     const [h, m] = startTime.split(':');
     const minutes = parseInt(m);
@@ -231,8 +245,8 @@ async function buildMixedCallText(
   courtText += '、おこなってください。';
   parts.push(courtText);
 
-  // ボール係（苗字の読み）
-  parts.push(`ボールは${team1.pairNumber}番、${m1Read}さん、${f1Read}さんが本部まで取りに来てください。`);
+  // ボール担当（チーム1）
+  parts.push(`ボールは${team1.pairNumber}番${m1Read}さん、${f1Read}さんお願い致します。`);
 
   return parts.join(' ');
 }
@@ -781,7 +795,7 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
     if (!callCourt) return;
     const text = await buildMixedCallText(match, allTeams, bracket.label, roundLabel, callCourt, callTime);
     if (!text) return;
-    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 2 });
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
   };
 
   const team1 = allTeams.find(t => t.teamId === match.team1Id);
