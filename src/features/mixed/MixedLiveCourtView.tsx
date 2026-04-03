@@ -264,18 +264,20 @@ export default function MixedLiveCourtView() {
                               const { bm, ca, catLabel } = bracketMatchData;
                               const t1 = allTeams.find(t => t.teamId === bm.team1Id);
                               const t2 = allTeams.find(t => t.teamId === bm.team2Id);
-                              const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
+                              const elapsedMin = Math.floor((Date.now() - ca.startedAt) / 60000);
+                              const elapsedH = Math.floor(elapsedMin / 60);
+                              const elapsedM = elapsedMin % 60;
                               return (
-                                <div className="space-y-0.5">
-                                  <p className="text-[7px] font-bold text-green-600">{catLabel}</p>
-                                  <p className="text-[8px] font-bold text-gray-800 truncate">
-                                    {bm.team1League} {t1?.pairNumber} {t1 ? `${sei(t1.male.name)}/${sei(t1.female.name)}` : bm.team1Name}
+                                <div className="flex flex-col h-full">
+                                  <p className="text-[8px] font-black text-green-700 leading-tight">{catLabel}</p>
+                                  <p className="text-[7px] font-bold text-gray-800 truncate mt-0.5">
+                                    {t1?.pairNumber} {t1 ? `${sei(t1.male.name)}/${sei(t1.female.name)}` : bm.team1Name}
                                   </p>
-                                  <p className="text-[6px] text-gray-400">vs</p>
-                                  <p className="text-[8px] font-bold text-gray-800 truncate">
-                                    {bm.team2League} {t2?.pairNumber} {t2 ? `${sei(t2.male.name)}/${sei(t2.female.name)}` : bm.team2Name}
+                                  <p className="text-[6px] font-bold text-gray-400">VS</p>
+                                  <p className="text-[7px] font-bold text-gray-800 truncate">
+                                    {t2?.pairNumber} {t2 ? `${sei(t2.male.name)}/${sei(t2.female.name)}` : bm.team2Name}
                                   </p>
-                                  <p className="text-[7px] text-green-600">{elapsed}分</p>
+                                  <p className="text-[7px] font-mono font-bold text-green-600 mt-auto self-end">{elapsedH}:{String(elapsedM).padStart(2, '0')}</p>
                                 </div>
                               );
                             })() : (
@@ -354,18 +356,16 @@ export default function MixedLiveCourtView() {
             const m = elapsed % 60;
             content = (
               <div>
-                <div className="text-xs font-bold text-emerald-600 mb-2">{catLabel}</div>
-                <div className="space-y-2 mb-3">
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team1League}</span>
-                    <span className="text-xs text-gray-500 font-mono">{t1?.pairNumber}</span>
-                    <span className="text-sm font-bold text-gray-800">{t1 ? `${sei(t1.male.name)} / ${sei(t1.female.name)}` : bm.team1Name}</span>
+                <div className="text-base font-black text-emerald-700 mb-3">{catLabel}</div>
+                <div className="bg-gray-50 rounded-xl p-3 mb-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                    <span className="font-mono text-gray-500">{t1?.pairNumber}</span>
+                    <span>{t1 ? `${sei(t1.male.name)} / ${sei(t1.female.name)}` : bm.team1Name}</span>
                   </div>
-                  <div className="text-center text-xs text-gray-400">vs</div>
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team2League}</span>
-                    <span className="text-xs text-gray-500 font-mono">{t2?.pairNumber}</span>
-                    <span className="text-sm font-bold text-gray-800">{t2 ? `${sei(t2.male.name)} / ${sei(t2.female.name)}` : bm.team2Name}</span>
+                  <div className="text-center text-xs font-bold text-gray-400 my-1.5">VS</div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                    <span className="font-mono text-gray-500">{t2?.pairNumber}</span>
+                    <span>{t2 ? `${sei(t2.male.name)} / ${sei(t2.female.name)}` : bm.team2Name}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -375,7 +375,7 @@ export default function MixedLiveCourtView() {
                   </div>
                   <div className="bg-green-50 rounded-lg p-2 text-center">
                     <div className="text-[10px] text-gray-400">経過時間</div>
-                    <div className="font-bold text-gray-800">{h}:{String(m).padStart(2, '0')}</div>
+                    <div className="text-lg font-black font-mono text-green-700">{h}:{String(m).padStart(2, '0')}</div>
                   </div>
                 </div>
               </div>

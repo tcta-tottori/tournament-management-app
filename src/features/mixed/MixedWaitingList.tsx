@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ClipboardList, Printer, Volume2, VolumeX, Play, Edit3, Save, X } from 'lucide-react';
+import { ClipboardList, Printer, Volume2, VolumeX, Play, Edit3, Save, X, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -404,17 +404,37 @@ interface WaitingMatch {
 }
 
 export default function MixedWaitingList() {
-  const { brackets, allTeams, leagues, tournamentInfo } = useMixedStore();
+  const { brackets, allTeams, leagues, tournamentInfo, assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
   const { speak, stop, isSpeaking } = useSpeechSynthesis();
-  const [selectedCourt, setSelectedCourt] = useState<Record<string, string>>({});
-  const [selectedTime, setSelectedTime] = useState<Record<string, string>>({});
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
-  const [previewMatch, setPreviewMatch] = useState<WaitingMatch | null>(null);
+  const [selectedTime, setSelectedTime] = useState<Record<string, string>>({});
 
-  const courtOptions = useMemo(() => {
-    const courts = leagues.map(l => l.courtName).filter(Boolean);
-    return [...new Set(courts)].sort();
-  }, [leagues]);
+  // コート割当ポップアップ state
+  const [courtAssignWm, setCourtAssignWm] = useState<WaitingMatch | null>(null);
+  const [courtAssignValue, setCourtAssignValue] = useState('');
+
+  // コールプレビュー state
+  const [previewMatch, setPreviewMatch] = useState<WaitingMatch | null>(null);
+  const [previewCourt, setPreviewCourt] = useState('');
+
+  // 使用中コートを計算
+  const usedCourts = useMemo(() => {
+    const set = new Set<string>();
+    for (const ca of Object.values(bracketCourtAssignments)) {
+      set.add(ca.courtName);
+    }
+    // 予選リーグ進行中のコートも除外
+    for (const l of leagues) {
+      const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
+      if (lm.some(m => m.status !== 'finished')) {
+        const nums = l.courtName?.match(/\d+/g);
+        if (nums) for (const n of nums) set.add(`${n}コート`);
+      }
+    }
+    return set;
+  }, [bracketCourtAssignments, leagues]);
+
+  const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
 
   // 全ブラケットから対戦可能な試合を収集
   const waitingMatches = useMemo(() => {
@@ -423,7 +443,6 @@ export default function MixedWaitingList() {
       const totalRounds = Math.log2(bracket.drawSize);
       for (const match of bracket.matches) {
         if (match.status === 'ready' && match.team1Id && match.team2Id && !match.isBye) {
-          // priority: 低い回戦を優先（1回戦が最優先）、同じ回戦ならポジション順
           const priority = match.round * 1000 + match.position;
           result.push({ match, category: bracket.category, totalRounds, priority });
         }
@@ -432,10 +451,20 @@ export default function MixedWaitingList() {
     return result.sort((a, b) => a.priority - b.priority);
   }, [brackets]);
 
-  const handleCallPreview = (wm: WaitingMatch) => {
-    const court = selectedCourt[wm.match.matchId];
-    if (!court) return;
-    setPreviewMatch(wm);
+  // コート入れボタン → ポップアップ表示
+  const handleOpenCourtAssign = (wm: WaitingMatch) => {
+    setCourtAssignWm(wm);
+    setCourtAssignValue('');
+  };
+
+  // コート割当確定 → コート入れ＋コールプレビューへ
+  const handleCourtAssignConfirm = () => {
+    if (!courtAssignWm || !courtAssignValue) return;
+    assignBracketMatchToCourt(courtAssignWm.match.matchId, courtAssignValue);
+    // コールプレビューへ遷移
+    setPreviewMatch(courtAssignWm);
+    setPreviewCourt(courtAssignValue);
+    setCourtAssignWm(null);
   };
 
   const handleConfirmCall = (text: string, _overrides: Record<string, string>) => {
@@ -446,10 +475,9 @@ export default function MixedWaitingList() {
   };
 
   const handlePrint = (wm: WaitingMatch) => {
-    const court = selectedCourt[wm.match.matchId] || '';
     const catLabel = CATEGORY_LABELS[wm.category];
     const roundLabel = getRoundLabel(wm.match.round, wm.totalRounds);
-    printRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, court);
+    printRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, '');
   };
 
   if (waitingMatches.length === 0) {
@@ -482,7 +510,6 @@ export default function MixedWaitingList() {
         const team1 = allTeams.find(t => t.teamId === match.team1Id);
         const team2 = allTeams.find(t => t.teamId === match.team2Id);
         const roundLabel = getRoundLabel(match.round, totalRounds);
-        const court = selectedCourt[match.matchId] || '';
         const isSpeakingThis = speakingMatchId === match.matchId;
 
         return (
@@ -525,30 +552,22 @@ export default function MixedWaitingList() {
               ))}
             </div>
 
-            {/* コート選択 + 時間 + アクション */}
+            {/* アクション: コート入れ + 時間 + 印刷 */}
             <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
-              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                <span className="text-[10px] text-gray-500 font-medium shrink-0">コート:</span>
-                {courtOptions.map(c => (
-                  <button key={c} onClick={() => setSelectedCourt(prev => ({ ...prev, [match.matchId]: c }))}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${court === c ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'}`}>
-                    {c}
-                  </button>
-                ))}
+              <div className="flex items-center gap-1.5 mb-2">
+                <label className="text-[10px] text-gray-500 font-medium shrink-0">開始時間:</label>
                 <input type="time" value={selectedTime[match.matchId] || ''} onChange={e => setSelectedTime(prev => ({ ...prev, [match.matchId]: e.target.value }))}
-                  className="ml-auto px-1.5 py-0.5 border border-gray-200 rounded text-[10px] w-20" />
+                  className="px-1.5 py-0.5 border border-gray-200 rounded text-[10px] w-20" />
               </div>
-
               <div className="flex gap-1.5">
-                <button onClick={() => handleCallPreview(wm)} disabled={!court || isSpeaking}
+                <button onClick={() => handleOpenCourtAssign(wm)} disabled={isSpeaking}
                   className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                    !court ? 'bg-gray-100 text-gray-400 cursor-not-allowed' :
                     isSpeakingThis ? 'bg-blue-600 text-white animate-pulse' :
-                    'bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100'}`}>
-                  {isSpeakingThis ? <><Volume2 size={12} />コール中...</> : <><Play size={12} />コール</>}
+                    'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>
+                  {isSpeakingThis ? <><Volume2 size={12} />コール中...</> : <><MapPin size={12} />コート入れ &amp; コール</>}
                 </button>
                 <button onClick={() => handlePrint(wm)}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all">
+                  className="flex items-center justify-center gap-1 py-2 px-3 rounded-lg text-xs font-medium bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all">
                   <Printer size={12} />印刷
                 </button>
               </div>
@@ -557,12 +576,61 @@ export default function MixedWaitingList() {
         );
       })}
 
-      {/* コールプレビューダイアログ */}
+      {/* ===== コート割当ポップアップ（トーナメント表と同じ形式） ===== */}
+      {courtAssignWm && (() => {
+        const t1 = allTeams.find(t => t.teamId === courtAssignWm.match.team1Id);
+        const t2 = allTeams.find(t => t.teamId === courtAssignWm.match.team2Id);
+        const catLabel = CATEGORY_LABELS[courtAssignWm.category];
+        const roundLabel = getRoundLabel(courtAssignWm.match.round, courtAssignWm.totalRounds);
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={() => setCourtAssignWm(null)}>
+            <div className="min-h-full flex items-start justify-center py-[10vh] px-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
+                <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
+                <div className="bg-gray-50 rounded-lg p-3 mb-3 text-xs">
+                  <div className="text-gray-500 mb-1.5">{catLabel} {roundLabel}</div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {courtAssignWm.match.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignWm.match.team1League}</span>}
+                    <span className="font-bold">{t1?.teamName || courtAssignWm.match.team1Name}</span>
+                  </div>
+                  <div className="text-gray-400 text-[9px] my-0.5">vs</div>
+                  <div className="flex items-center gap-2">
+                    {courtAssignWm.match.team2League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignWm.match.team2League}</span>}
+                    <span className="font-bold">{t2?.teamName || courtAssignWm.match.team2Name}</span>
+                  </div>
+                </div>
+                <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択 <span className="text-gray-400 font-normal">（使用中は選択不可）</span></label>
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {courtOpts.map(c => {
+                    const isUsed = usedCourts.has(c);
+                    return (
+                      <button key={c} onClick={() => !isUsed && setCourtAssignValue(c)}
+                        disabled={isUsed}
+                        className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
+                          ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
+                            courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                            'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setCourtAssignWm(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
+                  <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue}
+                    className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >決定 &amp; コール</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===== コールプレビューダイアログ ===== */}
       {previewMatch && (() => {
         const team1 = allTeams.find(t => t.teamId === previewMatch.match.team1Id);
         const team2 = allTeams.find(t => t.teamId === previewMatch.match.team2Id);
         if (!team1 || !team2) return null;
-        const court = selectedCourt[previewMatch.match.matchId] || '';
         const time = selectedTime[previewMatch.match.matchId] || '';
         const roundLabel = getRoundLabel(previewMatch.match.round, previewMatch.totalRounds);
         return (
@@ -572,7 +640,7 @@ export default function MixedWaitingList() {
             team2={team2}
             category={previewMatch.category}
             roundLabel={roundLabel}
-            courtName={court}
+            courtName={previewCourt}
             startTime={time}
             allTeams={allTeams}
             onConfirm={handleConfirmCall}
