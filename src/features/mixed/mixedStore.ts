@@ -118,21 +118,25 @@ export const useMixedStore = create<MixedState>()(
 
       setRawExcelSheets: (sheets) => set({ rawExcelSheets: sheets }),
 
-      resetAll: () => set({
-        tournamentInfo: null,
-        leagues: [],
-        leagueMatches: [],
-        brackets: [],
-        allTeams: [],
-        rawExcelSheets: [],
-        currentPhase: 'import',
-        selectedLeagueId: null,
-        selectedBracketCategory: '1st',
-        importFileName: '',
-        isImported: false,
-        rankOverrides: {},
-        bracketCourtAssignments: {},
-      }),
+      resetAll: () => {
+        // localStorage も明示的にクリア
+        try { localStorage.removeItem('mixed-tournament-storage'); } catch {}
+        set({
+          tournamentInfo: null,
+          leagues: [],
+          leagueMatches: [],
+          brackets: [],
+          allTeams: [],
+          rawExcelSheets: [],
+          currentPhase: 'import',
+          selectedLeagueId: null,
+          selectedBracketCategory: '1st',
+          importFileName: '',
+          isImported: false,
+          rankOverrides: {},
+          bracketCourtAssignments: {},
+        });
+      },
 
       updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
         set(state => ({
