@@ -61,6 +61,9 @@ interface MixedState {
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
 
+  // Rebuild bracket from raw 16-slot array (null=BYE)
+  rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[]) => void;
+
   // Auto-populate non-1st brackets from league standings
   autoPopulateBrackets: () => void;
 
@@ -435,6 +438,79 @@ export const useMixedStore = create<MixedState>()(
               }
             }
           }
+
+          const newBrackets = [...state.brackets];
+          newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };
+          return { brackets: newBrackets };
+        });
+      },
+
+      rebuildBracketFromSlots: (category, slotsArray) => {
+        set(state => {
+          const bracketIdx = state.brackets.findIndex(b => b.category === category);
+          if (bracketIdx === -1) return state;
+          const bracket = state.brackets[bracketIdx];
+          const drawSize = slotsArray.length;
+          const totalRounds = Math.log2(drawSize);
+          const matches: BracketMatch[] = [];
+
+          for (let round = 1; round <= totalRounds; round++) {
+            const matchesInRound = drawSize / Math.pow(2, round);
+            for (let pos = 1; pos <= matchesInRound; pos++) {
+              const matchId = `bracket-${category}-R${round}-${pos}`;
+              const nextRound = round + 1;
+              const nextPos = Math.ceil(pos / 2);
+              const nextMatchId = round < totalRounds ? `bracket-${category}-R${nextRound}-${nextPos}` : null;
+              const nextSlot = pos % 2 === 1 ? 'team1' as const : 'team2' as const;
+              matches.push({
+                matchId, category, round, position: pos,
+                team1Id: null, team2Id: null, team1Name: '', team2Name: '',
+                team1League: '', team2League: '',
+                score1: null, score2: null, winnerId: null,
+                status: 'waiting', isBye: false,
+                nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
+              });
+            }
+          }
+
+          const r1 = matches.filter(m => m.round === 1);
+          for (let i = 0; i < r1.length; i++) {
+            const tid1 = slotsArray[i * 2];
+            const tid2 = slotsArray[i * 2 + 1];
+            const t1 = tid1 ? state.allTeams.find(t => t.teamId === tid1) : null;
+            const t2 = tid2 ? state.allTeams.find(t => t.teamId === tid2) : null;
+            if (t1) { r1[i].team1Id = t1.teamId; r1[i].team1Name = t1.teamName; r1[i].team1League = t1.leagueId; }
+            if (t2) { r1[i].team2Id = t2.teamId; r1[i].team2Name = t2.teamName; r1[i].team2League = t2.leagueId; }
+            if (r1[i].team1Id && !r1[i].team2Id) {
+              r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team1Id; r1[i].team2Name = 'BYE';
+            } else if (!r1[i].team1Id && r1[i].team2Id) {
+              r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team2Id; r1[i].team1Name = 'BYE';
+            } else if (r1[i].team1Id && r1[i].team2Id) {
+              r1[i].status = 'ready';
+            }
+          }
+
+          // BYE winners advance
+          for (const m of r1) {
+            if (m.isBye && m.winnerId && m.nextMatchId) {
+              const next = matches.find(nm => nm.matchId === m.nextMatchId);
+              if (next) {
+                const team = state.allTeams.find(t => t.teamId === m.winnerId);
+                if (m.nextSlot === 'team1') {
+                  next.team1Id = m.winnerId; next.team1Name = team?.teamName || ''; next.team1League = team?.leagueId || '';
+                } else {
+                  next.team2Id = m.winnerId; next.team2Name = team?.teamName || ''; next.team2League = team?.leagueId || '';
+                }
+                if (next.team1Id && next.team2Id) next.status = 'ready';
+              }
+            }
+          }
+
+          const reorderedTeams = slotsArray.filter((id): id is string => id !== null)
+            .map((teamId, i) => {
+              const existing = bracket.teams.find(t => t.teamId === teamId);
+              return existing ? { ...existing, seedPosition: i + 1 } : null;
+            }).filter((t): t is NonNullable<typeof t> => t !== null);
 
           const newBrackets = [...state.brackets];
           newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };

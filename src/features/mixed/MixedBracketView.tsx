@@ -885,30 +885,38 @@ function CallModal({ match, bracket, leagues, allTeams, tournamentName: _tournam
 
 /** ドロー編集パネル: 1回戦の対戦順を手動で修正 */
 function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
-  const { shuffleBracketSeeds } = useMixedStore();
+  const { rebuildBracketFromSlots } = useMixedStore();
   const allTeams = useMixedStore(s => s.allTeams);
 
-  // 1回戦のスロット順を取得（上から順に team1, team2, team1, team2...）
+  // 1回戦の16スロット（BYE=null含む）を構築
   const r1Matches = bracket.matches.filter(m => m.round === 1).sort((a, b) => a.position - b.position);
-  const slots: { teamId: string | null; teamName: string; league: string; isBye: boolean; matchIdx: number; slotIdx: 'team1' | 'team2' }[] = [];
-  for (let i = 0; i < r1Matches.length; i++) {
-    const m = r1Matches[i];
-    slots.push({ teamId: m.team1Id, teamName: m.team1Name, league: m.team1League, isBye: !m.team1Id && m.team2Name === 'BYE' ? false : !m.team1Id, matchIdx: i, slotIdx: 'team1' });
-    slots.push({ teamId: m.team2Id, teamName: m.team2Name, league: m.team2League, isBye: m.team2Name === 'BYE' || (!m.team2Id && !!m.team1Id), matchIdx: i, slotIdx: 'team2' });
+  const slots: { teamId: string | null; teamName: string; league: string; isBye: boolean }[] = [];
+  for (const m of r1Matches) {
+    const t1Bye = !m.team1Id && (m.team2Name === 'BYE' || m.isBye);
+    const t2Bye = !m.team2Id && (m.team1Name === 'BYE' || m.isBye);
+    slots.push({
+      teamId: m.team1Id || (m.team1Name === 'BYE' ? null : null),
+      teamName: m.team1Name, league: m.team1League,
+      isBye: t1Bye || m.team1Name === 'BYE',
+    });
+    slots.push({
+      teamId: m.team2Id || null,
+      teamName: m.team2Name, league: m.team2League,
+      isBye: t2Bye || m.team2Name === 'BYE',
+    });
   }
 
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const swapSlots = (fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
-    // 新しい順序を構築
     const newSlots = [...slots];
     const temp = newSlots[fromIdx];
     newSlots[fromIdx] = newSlots[toIdx];
     newSlots[toIdx] = temp;
-    // teamId順序を構築してshuffleBracketSeedsに渡す
-    const newOrder = newSlots.filter(s => s.teamId).map(s => s.teamId!);
-    shuffleBracketSeeds(bracket.category, newOrder);
+    // 16スロット配列を直接渡してブラケットを再構築
+    const slotArray: (string | null)[] = newSlots.map(s => s.isBye ? null : s.teamId);
+    rebuildBracketFromSlots(bracket.category, slotArray);
   };
 
   const hasStartedMatches = r1Matches.some(m => m.status === 'finished' || m.status === 'playing');
@@ -1242,11 +1250,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
 
-  const MATCH_HEIGHT = compact ? 84 : 130;
-  const BYE_HEIGHT = compact ? 36 : 56;
-  const MATCH_WIDTH = compact ? 220 : 300;
-  const ROUND_GAP = compact ? 36 : 52;
-  const MATCH_GAP = compact ? 12 : 24; // ボタン分の余白を確保
+  const MATCH_HEIGHT = compact ? 64 : 130;
+  const BYE_HEIGHT = compact ? 28 : 56;
+  const MATCH_WIDTH = compact ? 160 : 300;
+  const ROUND_GAP = compact ? 20 : 52;
+  const MATCH_GAP = compact ? 6 : 24;
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
   const is1stBracket = bracket.category === '1st';
@@ -1352,7 +1360,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                     if (wName && wLeague) winnerData = allTeams.find(t => t.teamName === wName && t.leagueId === wLeague.trim()) || null;
                   }
                   const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
-                  const byeBoxH = winnerData ? (compact ? 50 : 70) : BYE_HEIGHT;
+                  const byeBoxH = winnerData ? (compact ? 28 : 70) : BYE_HEIGHT;
                   return (
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
                       <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white" style={{ height: byeBoxH }}>
@@ -1383,8 +1391,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 }
 
                 // 通常マッチ
-                const SLOT_HEIGHT = compact ? 28 : 42;
-                const STATUS_HEIGHT = compact ? 22 : 30;
+                const SLOT_HEIGHT = compact ? 22 : 42;
+                const STATUS_HEIGHT = compact ? 16 : 30;
                 const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
                   // teamIdから探す。なければnameから逆引き
                   let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
