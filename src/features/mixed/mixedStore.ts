@@ -57,7 +57,6 @@ interface MixedState {
 
   // Tournament info editing
   updateTournamentInfo: (field: 'name' | 'date' | 'venue', value: string) => void;
-  updateGameRules: (rules: Partial<import('./types').GameRuleSet>) => void;
 
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
@@ -368,14 +367,6 @@ export const useMixedStore = create<MixedState>()(
         }));
       },
 
-      updateGameRules: (rules) => {
-        set(state => ({
-          tournamentInfo: state.tournamentInfo ? {
-            ...state.tournamentInfo,
-            gameRules: { ...state.tournamentInfo.gameRules ?? { league4: '', league5: '', tournament: '' }, ...rules },
-          } : null,
-        }));
-      },
 
       shuffleBracketSeeds: (category, newOrder) => {
         set(state => {

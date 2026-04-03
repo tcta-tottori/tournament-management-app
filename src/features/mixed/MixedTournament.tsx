@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMixedStore } from './mixedStore';
 import type { MixedPhase } from './types';
-import { Upload, Trophy, BarChart3, Swords, RotateCcw, ClipboardList, Download, X, ChevronDown } from 'lucide-react';
+import { Upload, Trophy, BarChart3, Swords, RotateCcw, ClipboardList, Download, ChevronDown } from 'lucide-react';
 import MixedImportView from './MixedImportView';
 import MixedLeagueView from './MixedLeagueView';
 import MixedStandingsView from './MixedStandingsView';

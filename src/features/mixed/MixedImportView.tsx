@@ -4,7 +4,7 @@ import { useMixedStore } from './mixedStore';
 import { parseMixedExcel } from './mixedExcelParser';
 
 export default function MixedImportView() {
-  const { importData, setImportFileName, importFileName, isImported, leagues, tournamentInfo, updateTournamentInfo, updateGameRules } = useMixedStore();
+  const { importData, setImportFileName, importFileName, isImported, leagues, tournamentInfo, updateTournamentInfo, updateGameRule } = useMixedStore();
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setPreview] = useState<{ leagueCount: number; teamCount: number; matchCount: number } | null>(null);
@@ -186,8 +186,8 @@ export default function MixedImportView() {
                   <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（4チーム）</label>
                   <input
                     type="text"
-                    value={tournamentInfo.gameRules?.league4 || ''}
-                    onChange={e => updateGameRules({ league4: e.target.value })}
+                    value={tournamentInfo.gameRules?.[4] || ''}
+                    onChange={e => updateGameRule(4, e.target.value)}
                     placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
@@ -196,8 +196,8 @@ export default function MixedImportView() {
                   <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（5チーム）</label>
                   <input
                     type="text"
-                    value={tournamentInfo.gameRules?.league5 || ''}
-                    onChange={e => updateGameRules({ league5: e.target.value })}
+                    value={tournamentInfo.gameRules?.[5] || ''}
+                    onChange={e => updateGameRule(5, e.target.value)}
                     placeholder="例: ノーアド・4ゲームマッチ（4-4タイブレーク）"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
@@ -206,8 +206,8 @@ export default function MixedImportView() {
                   <label className="text-[10px] font-medium text-gray-400 block mb-0.5">決勝トーナメント</label>
                   <input
                     type="text"
-                    value={tournamentInfo.gameRules?.tournament || ''}
-                    onChange={e => updateGameRules({ tournament: e.target.value })}
+                    value={tournamentInfo.gameRules?.[0] || ''}
+                    onChange={e => updateGameRule(0, e.target.value)}
                     placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />

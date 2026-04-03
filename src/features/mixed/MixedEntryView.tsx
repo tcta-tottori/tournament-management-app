@@ -2,7 +2,7 @@ import { useMixedStore } from './mixedStore';
 import MixedImportView from './MixedImportView';
 import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle, Search, X, Settings } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { MixedTeam } from './types';
+import type { MixedTeam, TournamentInfo } from './types';
 
 /** インライン編集セル */
 function EditableCell({ value, onSave, className = '' }: {
@@ -489,7 +489,7 @@ export default function MixedEntryView() {
 /** ゲームルール設定コンポーネント */
 function GameRuleConfig({ leagues, tournamentInfo, updateGameRule }: {
   leagues: { leagueId: string; teams: MixedTeam[] }[];
-  tournamentInfo: ReturnType<typeof useMixedStore>['tournamentInfo'];
+  tournamentInfo: TournamentInfo | null;
   updateGameRule: (teamCount: number, rule: string) => void;
 }) {
   const [open, setOpen] = useState(false);
