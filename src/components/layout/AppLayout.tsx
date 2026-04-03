@@ -291,8 +291,24 @@ export default function AppLayout() {
 
         {/* タイトル */}
         <div className="min-w-0 flex-1">
-          <p className="header-org-name">鳥取市テニス協会</p>
-          <h1 className="header-title">大会運営システム</h1>
+          {(() => {
+            // 大会名が確定していたらヘッダーに大会名を表示
+            const tName = isMixedImported ? mixedTournamentInfo?.name : tournament?.name;
+            if (tName) {
+              // 「令和○年度」「第○回」等のプレフィックスを抽出
+              const prefixMatch = tName.match(/^((?:令和|平成|昭和)[\d０-９]+年度\s*|第[\d０-９]+回\s*)/);
+              const prefix = prefixMatch ? prefixMatch[1].trim() : '';
+              const mainName = prefix ? tName.slice(prefixMatch![0].length).trim() : tName;
+              return (<>
+                <p className="header-org-name" style={{ color: '#fbbf24' }}>{prefix || '鳥取市テニス協会'}</p>
+                <h1 className="header-title">{mainName}</h1>
+              </>);
+            }
+            return (<>
+              <p className="header-org-name">鳥取市テニス協会</p>
+              <h1 className="header-title">大会運営システム</h1>
+            </>);
+          })()}
         </div>
 
         {/* 右側: リンク & バージョン */}
@@ -391,23 +407,21 @@ export default function AppLayout() {
         const activeTickerItems = isMixedImported ? mixedTickerItems : tickerItems;
         return (
           <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
-            <div className="flex items-center gap-1.5 px-3 shrink-0 h-full info-bar-label max-w-[50vw]">
-              <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="font-bold text-gray-800 text-[11px] truncate">{displayName}</span>
-            </div>
-            {activeTickerItems.length > 0 && (
-              <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-                <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                  {activeTickerItems.map((item, i) => (
-                    <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                      {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                      <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                      {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
-                    </span>
-                  ))}
-                </div>
+            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+              <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
+                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                  </span>
+                )) : (
+                  <span className="info-ticker-item">
+                    <span>{displayName || '大会運営システム'}</span>
+                  </span>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
       })()}
