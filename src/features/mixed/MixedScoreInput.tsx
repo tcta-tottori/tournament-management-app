@@ -56,7 +56,32 @@ interface Props {
 }
 
 export default function MixedScoreInput({ match, teams, onClose, anchorY }: Props) {
-  const { updateLeagueScore, setLeagueMatchStatus, tournamentInfo } = useMixedStore();
+  const { updateLeagueScore, setLeagueMatchStatus, tournamentInfo, leagues, updateGameRule } = useMixedStore();
+
+  // gameRulesが未設定の場合、リーグデータから自動設定
+  useEffect(() => {
+    if (tournamentInfo && !tournamentInfo.gameRules && leagues.length > 0) {
+      const teamSizes = new Set(leagues.map(l => l.teams.length));
+      for (const size of teamSizes) {
+        // rules配列からチーム数に合うルールを検索
+        let rule = '';
+        for (const r of tournamentInfo.rules || []) {
+          const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+          const half = cleaned.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+          if (/ゲームマッチ|ノーアド|タイブレ|ゲーム|先取/.test(half) &&
+              (half.includes(`${size}チーム`) || half.includes(`予選${size}`))) {
+            const m = half.match(/[はの](.+)/);
+            rule = m ? m[1].trim() : half;
+            break;
+          }
+        }
+        if (!rule) {
+          rule = size <= 4 ? 'ノーアド・6ゲームマッチ（6-6タイブレーク）' : '6ゲーム先取（ノーアド）';
+        }
+        updateGameRule(size, rule);
+      }
+    }
+  }, [tournamentInfo, leagues, updateGameRule]);
 
   const team1 = teams.find(t => t.teamId === match.team1Id);
   const team2 = teams.find(t => t.teamId === match.team2Id);
