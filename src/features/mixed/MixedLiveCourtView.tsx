@@ -234,8 +234,8 @@ export default function MixedLiveCourtView() {
                     return (
                       <div
                         key={courtNum}
-                        onClick={() => (isBracketPlaying || isLeaguePlaying) && setSelectedCourt(courtNum)}
-                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''} ${isPlaying ? 'cursor-pointer' : ''}`}
+                        onClick={() => (isBracketPlaying || hasActiveMatch) && setSelectedCourt(courtNum)}
+                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''} ${(isPlaying || hasActiveMatch) ? 'cursor-pointer' : ''}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
                         <VerticalCourtLines status={isPlaying ? 'playing' : hasActiveMatch ? 'ready' : 'empty'} />
@@ -381,19 +381,59 @@ export default function MixedLiveCourtView() {
               </div>
             );
           }
-        } else if (info && !info.status.isComplete && info.nextMatch) {
+        } else if (info && !info.status.isComplete) {
+          const leagueAllMatches = leagueMatches
+            .filter(m => m.leagueId === info.league.leagueId)
+            .sort((a, b) => a.matchNumber - b.matchNumber);
           content = (
             <div>
-              <div className="text-xs font-bold text-emerald-600 mb-2">{info.league.leagueId}リーグ</div>
-              <div className="text-xs text-gray-500 mb-2">{info.status.finished}/{info.status.total}試合完了</div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team1Id)}</span>
-                </div>
-                <div className="text-center text-xs text-gray-400">vs</div>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
-                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team2Id)}</span>
-                </div>
+              <div className="text-xs font-bold text-emerald-600 mb-1">{info.league.leagueId}リーグ</div>
+              <div className="text-xs text-gray-500 mb-3">{info.status.finished}/{info.status.total}試合完了</div>
+              <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+                {leagueAllMatches.map(m => {
+                  const isFinished = m.status === 'finished';
+                  const isPlaying = m.status === 'playing';
+                  const t1Name = getTeamName(m.team1Id);
+                  const t2Name = getTeamName(m.team2Id);
+                  const scoreStr = isFinished && m.score1 != null && m.score2 != null
+                    ? `${m.score1}-${m.score2}${m.tiebreakScore != null ? `(${m.tiebreakScore})` : ''}`
+                    : null;
+                  return (
+                    <div
+                      key={m.matchId}
+                      className={`rounded-lg p-2.5 border ${
+                        isPlaying ? 'bg-green-50 border-green-300'
+                        : isFinished ? 'bg-gray-50 border-gray-200'
+                        : 'bg-white border-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-bold text-gray-500">第{m.matchNumber}試合</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          isPlaying ? 'bg-green-200 text-green-800'
+                          : isFinished ? 'bg-gray-200 text-gray-600'
+                          : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          {isPlaying ? '試合中' : isFinished ? '終了' : '待機'}
+                        </span>
+                        {scoreStr && (
+                          <span className="text-[10px] font-mono font-bold text-gray-700 ml-auto bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                            {scoreStr}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold flex-1 truncate ${isFinished && m.winnerId === m.team1Id ? 'text-amber-600' : 'text-gray-800'}`}>
+                          {isFinished && m.winnerId === m.team1Id && '🏆 '}{t1Name}
+                        </span>
+                        <span className="text-[10px] text-gray-400 shrink-0">vs</span>
+                        <span className={`text-xs font-bold flex-1 truncate text-right ${isFinished && m.winnerId === m.team2Id ? 'text-amber-600' : 'text-gray-800'}`}>
+                          {t2Name}{isFinished && m.winnerId === m.team2Id && ' 🏆'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
