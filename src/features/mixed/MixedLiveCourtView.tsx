@@ -60,6 +60,7 @@ function getLeagueCourtStatus(_league: MixedLeague, lMatches: LeagueMatchScore[]
 export default function MixedLiveCourtView() {
   const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments } = useMixedStore();
 
+  const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -207,37 +208,42 @@ export default function MixedLiveCourtView() {
                     const hasActiveMatch = info && !info.status.isComplete;
                     const isLeaguePlaying = hasActiveMatch && info.nextMatch;
 
-                    // ブラケット試合がこのコートに入っているか
+                    // ブラケット試合情報を事前に取得
                     const courtStr = `${courtNum}コート`;
                     const bracketEntry = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
                     const isBracketPlaying = !!bracketEntry;
+                    let bracketMatchData: { matchId: string; bm: any; ca: any; catLabel: string } | null = null;
+                    if (bracketEntry) {
+                      const [matchId, ca] = bracketEntry;
+                      const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
+                      const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
+                      const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4-5位T';
+                      if (bm) bracketMatchData = { matchId, bm, ca, catLabel };
+                    }
 
                     const isPlaying = isLeaguePlaying || isBracketPlaying;
-
-                    // 進行中 = 緑(点滅), リーグ待機 = 青, 空き = グレー
                     const statusStyle = isPlaying
                       ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', blink: true }
                       : hasActiveMatch
                         ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', blink: false }
                         : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500', blink: false };
 
+                    // 苗字のみ取得
+                    const sei = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+
                     return (
                       <div
                         key={courtNum}
-                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''}`}
+                        onClick={() => (isBracketPlaying || isLeaguePlaying) && setSelectedCourt(courtNum)}
+                        className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''} ${isPlaying ? 'cursor-pointer' : ''}`}
                         style={{ aspectRatio: '1 / 1.6' }}
                       >
                         <VerticalCourtLines status={isPlaying ? 'playing' : hasActiveMatch ? 'ready' : 'empty'} />
                         <div className="relative z-10 flex flex-col h-full p-1.5">
-                          {/* コート番号 + ステータス */}
                           <div className="flex items-center justify-between mb-0.5">
                             <div className={`text-xl font-black ${statusStyle.text} leading-none`}>{courtNum}</div>
-                            {isPlaying && (
-                              <Play className="w-3.5 h-3.5 text-green-500 fill-green-500" />
-                            )}
+                            {isPlaying && <Play className="w-3.5 h-3.5 text-green-500 fill-green-500" />}
                           </div>
-
-                          {/* 中央: コート使用状況 */}
                           <div className="flex-1 flex flex-col justify-center min-w-0">
                             {hasActiveMatch ? (
                               <>
@@ -254,32 +260,29 @@ export default function MixedLiveCourtView() {
                                   <p className="text-[8px] text-gray-400 text-center">待機中</p>
                                 )}
                               </>
-                            ) : (() => {
-                              // ブラケット試合がこのコートに入っているか（既に上で計算済み）
-                              if (bracketEntry) {
-                                const [matchId, ca] = bracketEntry;
-                                const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
-                                const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
-                                const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4-5位T';
-                                if (bm) {
-                                  const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
-                                  return (
-                                    <div className="space-y-0">
-                                      <p className="text-[7px] font-bold text-green-600 mb-0.5">{catLabel}</p>
-                                      <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team1Name}</p>
-                                      <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
-                                      <p className="text-[8px] font-bold text-gray-800 truncate">{bm.team2Name}</p>
-                                      <p className="text-[7px] text-green-600 mt-0.5">{elapsed}分</p>
-                                    </div>
-                                  );
-                                }
-                              }
+                            ) : bracketMatchData ? (() => {
+                              const { bm, ca, catLabel } = bracketMatchData;
+                              const t1 = allTeams.find(t => t.teamId === bm.team1Id);
+                              const t2 = allTeams.find(t => t.teamId === bm.team2Id);
+                              const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
                               return (
-                                <div className="flex flex-col items-center justify-center flex-1">
-                                  <p className="text-[10px] text-gray-400 font-medium">空き</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-[7px] font-bold text-green-600">{catLabel}</p>
+                                  <p className="text-[8px] font-bold text-gray-800 truncate">
+                                    {bm.team1League} {t1?.pairNumber} {t1 ? `${sei(t1.male.name)}/${sei(t1.female.name)}` : bm.team1Name}
+                                  </p>
+                                  <p className="text-[6px] text-gray-400">vs</p>
+                                  <p className="text-[8px] font-bold text-gray-800 truncate">
+                                    {bm.team2League} {t2?.pairNumber} {t2 ? `${sei(t2.male.name)}/${sei(t2.female.name)}` : bm.team2Name}
+                                  </p>
+                                  <p className="text-[7px] text-green-600">{elapsed}分</p>
                                 </div>
                               );
-                            })()}
+                            })() : (
+                              <div className="flex flex-col items-center justify-center flex-1">
+                                <p className="text-[10px] text-gray-400 font-medium">空き</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -328,6 +331,90 @@ export default function MixedLiveCourtView() {
           </div>
         </div>
       )}
+
+      {/* コート詳細ポップアップ */}
+      {selectedCourt && (() => {
+        const courtStr = `${selectedCourt}コート`;
+        const info = courtMap.get(selectedCourt);
+        const bracketEntry = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
+        const sei = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+
+        let content = null;
+        if (bracketEntry) {
+          const [, ca] = bracketEntry;
+          const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === bracketEntry[0]);
+          const bCat = brackets.find(b => b.matches.some(m => m.matchId === bracketEntry[0]));
+          const catLabel = bCat?.category === '1st' ? '1位トーナメント' : bCat?.category === '2nd' ? '2位トーナメント' : bCat?.category === '3rd' ? '3位トーナメント' : '4-5位トーナメント';
+          if (bm) {
+            const t1 = allTeams.find(t => t.teamId === bm.team1Id);
+            const t2 = allTeams.find(t => t.teamId === bm.team2Id);
+            const startTime = new Date(ca.startedAt);
+            const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
+            const h = Math.floor(elapsed / 60);
+            const m = elapsed % 60;
+            content = (
+              <div>
+                <div className="text-xs font-bold text-emerald-600 mb-2">{catLabel}</div>
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team1League}</span>
+                    <span className="text-xs text-gray-500 font-mono">{t1?.pairNumber}</span>
+                    <span className="text-sm font-bold text-gray-800">{t1 ? `${sei(t1.male.name)} / ${sei(t1.female.name)}` : bm.team1Name}</span>
+                  </div>
+                  <div className="text-center text-xs text-gray-400">vs</div>
+                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                    <span className="w-5 h-5 rounded bg-gray-200 text-[9px] font-bold text-gray-600 flex items-center justify-center">{bm.team2League}</span>
+                    <span className="text-xs text-gray-500 font-mono">{t2?.pairNumber}</span>
+                    <span className="text-sm font-bold text-gray-800">{t2 ? `${sei(t2.male.name)} / ${sei(t2.female.name)}` : bm.team2Name}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <div className="text-[10px] text-gray-400">開始時刻</div>
+                    <div className="font-bold text-gray-800">{startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <div className="text-[10px] text-gray-400">経過時間</div>
+                    <div className="font-bold text-gray-800">{h}:{String(m).padStart(2, '0')}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        } else if (info && !info.status.isComplete && info.nextMatch) {
+          content = (
+            <div>
+              <div className="text-xs font-bold text-emerald-600 mb-2">{info.league.leagueId}リーグ</div>
+              <div className="text-xs text-gray-500 mb-2">{info.status.finished}/{info.status.total}試合完了</div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team1Id)}</span>
+                </div>
+                <div className="text-center text-xs text-gray-400">vs</div>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                  <span className="text-sm font-bold text-gray-800">{getTeamName(info.nextMatch.team2Id)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (!content) { setSelectedCourt(null); return null; }
+
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setSelectedCourt(null)}>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[360px] max-w-[92vw] p-5 z-50" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-800">{selectedCourt}コート</h3>
+                <button onClick={() => setSelectedCourt(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+                  <span className="text-gray-400 text-lg">×</span>
+                </button>
+              </div>
+              {content}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
