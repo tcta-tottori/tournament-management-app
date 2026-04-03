@@ -1011,6 +1011,7 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   bracket: PlacementBracket;
   onShuffle: (category: PlacementCategory, newOrder: string[]) => void;
 }) {
+  const { rebuildBracketFromSlots } = useMixedStore();
   const [spinning, setSpinning] = useState(false);
   const [currentHighlight, setCurrentHighlight] = useState(-1);
   const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(new Map());
@@ -1037,6 +1038,15 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   const unassignedTeams = useMemo(() => teams.filter(t => !assignedTeamIds.has(t.teamId)), [teams, assignedTeamIds]);
   const activeTeam = selectedTeamId ? teams.find(t => t.teamId === selectedTeamId) : unassignedTeams[0];
 
+  // 配置のたびにブラケットを即時更新
+  const updateBracketFromSlots = useCallback((newSlots: Map<number, string>) => {
+    const slotsArray: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    newSlots.forEach((teamId, idx) => { slotsArray[idx] = teamId; });
+    // BYE位置は明示的にnull
+    BYE_POSITIONS.forEach(pos => { slotsArray[pos] = null; });
+    rebuildBracketFromSlots(bracket.category, slotsArray);
+  }, [bracket.category, rebuildBracketFromSlots]);
+
   // ルーレット
   const spinRoulette = useCallback(() => {
     if (!activeTeam || availableSlots.length === 0) return;
@@ -1051,17 +1061,27 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
       } else {
         const finalSlot = availableSlots[Math.floor(Math.random() * availableSlots.length)];
         setCurrentHighlight(finalSlot);
-        setAssignedSlots(prev => { const n = new Map(prev); n.set(finalSlot, activeTeam.teamId); return n; });
+        setAssignedSlots(prev => {
+          const n = new Map(prev);
+          n.set(finalSlot, activeTeam.teamId);
+          updateBracketFromSlots(n);
+          return n;
+        });
         setSpinning(false);
         setSelectedTeamId(null);
       }
     };
     spin();
-  }, [activeTeam, availableSlots]);
+  }, [activeTeam, availableSlots, updateBracketFromSlots]);
 
   const manualAssign = (slotIdx: number) => {
     if (!activeTeam || assignedSlots.has(slotIdx) || BYE_POSITIONS.has(slotIdx)) return;
-    setAssignedSlots(prev => { const n = new Map(prev); n.set(slotIdx, activeTeam.teamId); return n; });
+    setAssignedSlots(prev => {
+      const n = new Map(prev);
+      n.set(slotIdx, activeTeam.teamId);
+      updateBracketFromSlots(n);
+      return n;
+    });
     setSelectedTeamId(null);
   };
 
@@ -1097,6 +1117,8 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
     setCurrentHighlight(-1);
     setDrawComplete(false);
     if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+    // ブラケットも空に戻す
+    rebuildBracketFromSlots(bracket.category, Array(DRAW_SIZE).fill(null));
   };
 
   useEffect(() => () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); }, []);

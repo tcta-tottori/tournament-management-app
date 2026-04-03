@@ -290,7 +290,7 @@ export function generateAllBrackets(
       const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
     } else {
-      // 1位トーナメント: 抽選なのでリーグ順で収集
+      // 1位トーナメント: 抽選なのでリーグ順で収集、BYE位置付き16スロットで生成
       const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
       let seed = 1;
       for (const [, teamList] of teamByLeague) {
@@ -298,8 +298,10 @@ export function generateAllBrackets(
           teamsForBracket.push({ ...t, seedPosition: seed++ });
         }
       }
-      const drawSize = nextPowerOf2(teamsForBracket.length);
-      const matches = generateBracketMatches(cat, drawSize, teamsForBracket);
+      const drawSize = 16; // 固定16ドロー
+      // BYE位置(index 1,7,15)を含む空スロットで生成（チームは配置しない、抽選で決める）
+      const emptySlots: (null)[] = Array(drawSize).fill(null);
+      const matches = generateBracketMatchesWithSlots(cat, drawSize, emptySlots);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
     }
   }
