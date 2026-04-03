@@ -94,10 +94,10 @@ async function buildMixedCallText(
   parts.push('試合のコールをします。');
   parts.push(`${bracketLabel}${roundLabel}、`);
 
-  // チーム1: 番号＋苗字の読み
-  parts.push(`${team1.pairNumber}番、${m1Read}さん、${f1Read}さん。`);
+  // チーム1: 番号＋苗字の読み（所属）
+  parts.push(`${team1.pairNumber}番、${m1Read}さん（${team1.male.affiliation}）、${f1Read}さん（${team1.female.affiliation}）。`);
   // チーム2
-  parts.push(`${team2.pairNumber}番、${m2Read}さん、${f2Read}さん。`);
+  parts.push(`${team2.pairNumber}番、${m2Read}さん（${team2.male.affiliation}）、${f2Read}さん（${team2.female.affiliation}）。`);
 
   // コート＋時間
   let courtText = `こちらの試合を${courtName}で`;
