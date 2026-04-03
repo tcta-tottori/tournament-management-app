@@ -260,10 +260,37 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
+  const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
+  const [courtAssignValue, setCourtAssignValue] = useState('');
+  const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
+  const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
+  const [showAllBrackets, setShowAllBrackets] = useState(false);
+  const [drawEditMode, setDrawEditMode] = useState(false);
 
   const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
+
+  // 控えリスト: 全ブラケットの対戦待ちマッチを1回戦優先で収集
+  const waitingMatches = useMemo(() => {
+    const matches: { match: BracketMatch; bracket: PlacementBracket; roundLabel: string }[] = [];
+    for (const b of brackets) {
+      const totalR = Math.log2(b.drawSize);
+      for (const m of b.matches) {
+        if (m.team1Id && m.team2Id && !m.isBye && (m.status === 'waiting' || m.status === 'ready')) {
+          const fromFinal = totalR - m.round;
+          const rl = fromFinal === 0 ? '決勝' : fromFinal === 1 ? '準決勝' : fromFinal === 2 ? '準々決勝' : `${m.round}回戦`;
+          matches.push({ match: m, bracket: b, roundLabel: rl });
+        }
+      }
+    }
+    matches.sort((a, b) => {
+      if (a.match.round !== b.match.round) return a.match.round - b.match.round;
+      const catOrder = ['1st', '2nd', '3rd', '4th'];
+      return catOrder.indexOf(a.bracket.category) - catOrder.indexOf(b.bracket.category);
+    });
+    return matches;
+  }, [brackets]);
 
   if (brackets.length === 0) {
     return (
@@ -281,10 +308,6 @@ export default function MixedBracketView() {
     if (fromFinal === 2) return '準々決勝';
     return `${round}回戦`;
   };
-
-  const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
-  const [courtAssignValue, setCourtAssignValue] = useState('');
-  const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
 
   const openScoreEditor = (match: BracketMatch) => {
     if (!match.team1Id || !match.team2Id || match.isBye) return;
@@ -381,32 +404,6 @@ export default function MixedBracketView() {
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
   const noMatchesStarted = currentBracket?.matches.every(m => m.status === 'waiting' || m.status === 'bye') ?? true;
-
-  // 控えリスト: 全ブラケットの対戦待ちマッチを1回戦優先で収集
-  const waitingMatches = useMemo(() => {
-    const matches: { match: BracketMatch; bracket: PlacementBracket; roundLabel: string }[] = [];
-    for (const b of brackets) {
-      const totalR = Math.log2(b.drawSize);
-      for (const m of b.matches) {
-        if (m.team1Id && m.team2Id && !m.isBye && (m.status === 'waiting' || m.status === 'ready')) {
-          const fromFinal = totalR - m.round;
-          const rl = fromFinal === 0 ? '決勝' : fromFinal === 1 ? '準決勝' : fromFinal === 2 ? '準々決勝' : `${m.round}回戦`;
-          matches.push({ match: m, bracket: b, roundLabel: rl });
-        }
-      }
-    }
-    // 1回戦優先、同ラウンド内はカテゴリ順
-    matches.sort((a, b) => {
-      if (a.match.round !== b.match.round) return a.match.round - b.match.round;
-      const catOrder = ['1st', '2nd', '3rd', '4th'];
-      return catOrder.indexOf(a.bracket.category) - catOrder.indexOf(b.bracket.category);
-    });
-    return matches;
-  }, [brackets]);
-
-  const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
-  const [showAllBrackets, setShowAllBrackets] = useState(false);
-  const [drawEditMode, setDrawEditMode] = useState(false);
 
   return (
     <div className="space-y-4">
