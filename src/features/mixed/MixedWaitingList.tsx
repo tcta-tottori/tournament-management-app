@@ -102,8 +102,7 @@ export default function MixedWaitingList() {
     const court = selectedCourt[wm.match.matchId] || '';
     const catLabel = CATEGORY_LABELS[wm.category];
     const roundLabel = getRoundLabel(wm.match.round, wm.totalRounds);
-    const rules = tournamentInfo?.rules || [];
-    const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
+    const gr = tournamentInfo?.gameRules?.tournament || '';
     const time = selectedTime[wm.match.matchId] || '';
     printMixedRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, gr, tournamentInfo?.date || '', court, time);
   };

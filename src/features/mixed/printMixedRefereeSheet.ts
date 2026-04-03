@@ -365,7 +365,7 @@ export function printMixedRefereeSheet(
       </td>
       <!-- Score left: G21:U25 (cols 7-21, 15 cols) -->
       <td colspan="15" rowspan="5"
-          class="fg bt bl br"
+          class="fg bt"
           style="text-align:center; font-size:24px;">
       </td>
       <!-- Dash: V21:W25 (cols 22-23, 2 cols) -->
@@ -376,7 +376,7 @@ export function printMixedRefereeSheet(
       </td>
       <!-- Score right: X21:AL25 (cols 24-38, 15 cols) -->
       <td colspan="15" rowspan="5"
-          class="fg bt bl br2"
+          class="fg bt br2"
           style="text-align:center; font-size:24px;">
       </td>
     </tr>

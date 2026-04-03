@@ -30,6 +30,22 @@ function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complet
   );
 }
 
+/** 横向きコートライン（PC用） */
+function HorizontalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
+  const color = status === 'playing' ? 'rgba(22,163,74,0.15)'
+    : status === 'ready' ? 'rgba(59,130,246,0.1)'
+    : status === 'complete' ? 'rgba(16,185,129,0.08)'
+    : 'rgba(0,0,0,0.04)';
+  return (
+    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 160 100" preserveAspectRatio="none">
+      <rect x="5" y="5" width="150" height="90" fill="none" stroke={color} strokeWidth="1.5" />
+      <line x1="80" y1="5" x2="80" y2="95" stroke={color} strokeWidth="1" />
+      <line x1="5" y1="50" x2="155" y2="50" stroke={color} strokeWidth="1" />
+      <rect x="5" y="20" width="150" height="60" fill="none" stroke={color} strokeWidth="0.8" />
+    </svg>
+  );
+}
+
 /** ドーナツチャートコンポーネント */
 function DonutChart({ percent, finished, total }: { percent: number; finished: number; total: number }) {
   const radius = 44;
@@ -203,8 +219,119 @@ export default function MixedLiveCourtView() {
           </div>
         </div>
 
-        {/* 物理コート配置: 4コートごとのブロック */}
-        <div className="flex flex-col gap-3 items-center">
+        {/* 物理コート配置: モバイル(md未満)は縦並び、PC(md以上)は反時計回り90度回転レイアウト */}
+
+        {/* === PC横向きレイアウト (md以上) === */}
+        <div className="hidden md:block">
+          <div className="flex items-start gap-0 justify-center">
+            {physicalBlocks.map((block, blockIdx) => (
+              <div key={blockIdx} className="flex items-start">
+                <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      {block[0]}〜{block[block.length - 1]}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {[...block].reverse().map(courtNum => {
+                      const info = courtMap.get(courtNum);
+                      const hasActiveMatch = info && !info.status.isComplete;
+                      const isLeaguePlaying = hasActiveMatch && info.nextMatch;
+
+                      const courtStr = `${courtNum}コート`;
+                      const bracketEntry = Object.entries(bracketCourtAssignments).find(([, ca]) => ca.courtName === courtStr);
+                      const isBracketPlaying = !!bracketEntry;
+                      let bracketMatchData: { matchId: string; bm: any; ca: any; catLabel: string } | null = null;
+                      if (bracketEntry) {
+                        const [matchId, ca] = bracketEntry;
+                        const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
+                        const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
+                        const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4・5位T';
+                        if (bm) bracketMatchData = { matchId, bm, ca, catLabel };
+                      }
+
+                      const isPlaying = isLeaguePlaying || isBracketPlaying;
+                      const statusStyle = isPlaying
+                        ? { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', blink: true }
+                        : hasActiveMatch
+                          ? { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', blink: false }
+                          : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500', blink: false };
+
+                      const sei = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+
+                      return (
+                        <div
+                          key={courtNum}
+                          onClick={() => (isBracketPlaying || isLeaguePlaying) && setSelectedCourt(courtNum)}
+                          className={`relative rounded-lg border-2 transition-all overflow-hidden ${statusStyle.bg} ${statusStyle.border} ${statusStyle.blink ? 'court-playing-blink' : ''} ${isPlaying ? 'cursor-pointer' : ''}`}
+                          style={{ width: '160px', aspectRatio: '1.6 / 1' }}
+                        >
+                          <HorizontalCourtLines status={isPlaying ? 'playing' : hasActiveMatch ? 'ready' : 'empty'} />
+                          <div className="relative z-10 flex h-full p-1.5">
+                            <div className="flex flex-col justify-between mr-1.5">
+                              <div className={`text-xl font-black ${statusStyle.text} leading-none`}>{courtNum}</div>
+                              {isPlaying && <Play className="w-3.5 h-3.5 text-green-500 fill-green-500" />}
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center min-w-0">
+                              {hasActiveMatch ? (
+                                <>
+                                  <div className="text-[9px] font-bold text-gray-500">{info!.league.leagueId}リーグ</div>
+                                  {info!.nextMatch ? (
+                                    <div className="space-y-0">
+                                      <p className="text-[7px] font-bold text-green-600/80">第{info!.nextMatch.matchNumber}試合</p>
+                                      <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team1Id)}</p>
+                                      <p className="text-[6px] text-gray-400">vs</p>
+                                      <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team2Id)}</p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[8px] text-gray-400">待機中</p>
+                                  )}
+                                </>
+                              ) : bracketMatchData ? (() => {
+                                const { bm, ca, catLabel } = bracketMatchData;
+                                const t1 = allTeams.find(t => t.teamId === bm.team1Id);
+                                const t2 = allTeams.find(t => t.teamId === bm.team2Id);
+                                const elapsed = Math.floor((Date.now() - ca.startedAt) / 60000);
+                                return (
+                                  <div className="space-y-0.5">
+                                    <p className="text-[7px] font-bold text-green-600">{catLabel}</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">
+                                      {bm.team1League} {t1?.pairNumber} {t1 ? `${sei(t1.male.name)}/${sei(t1.female.name)}` : bm.team1Name}
+                                    </p>
+                                    <p className="text-[6px] text-gray-400">vs</p>
+                                    <p className="text-[8px] font-bold text-gray-800 truncate">
+                                      {bm.team2League} {t2?.pairNumber} {t2 ? `${sei(t2.male.name)}/${sei(t2.female.name)}` : bm.team2Name}
+                                    </p>
+                                    <p className="text-[7px] text-green-600">{elapsed}分</p>
+                                  </div>
+                                );
+                              })() : (
+                                <div className="flex items-center justify-center flex-1">
+                                  <p className="text-[10px] text-gray-400 font-medium">空き</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* 通路(縦線) */}
+                {blockIdx < physicalBlocks.length - 1 && (
+                  <div className="flex flex-col items-center justify-center mx-1 self-stretch">
+                    <div className="flex-1 w-px bg-gray-200" />
+                    <span className="text-[9px] text-gray-400 [writing-mode:vertical-rl] py-1">通路</span>
+                    <div className="flex-1 w-px bg-gray-200" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* === モバイル縦向きレイアウト (md未満) === */}
+        <div className="md:hidden flex flex-col gap-3 items-center">
           {physicalBlocks.map((block, blockIdx) => (
             <div key={blockIdx} className="contents">
               <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">

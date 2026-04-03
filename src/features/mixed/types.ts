@@ -98,12 +98,24 @@ export interface PlacementBracket {
 /** フェーズ */
 export type MixedPhase = 'import' | 'league' | 'standings' | 'tournament' | 'waiting' | 'results';
 
+/** ゲームルール設定 */
+export interface GameRuleSet {
+  /** 4チームリーグ用ルール (例: "ノーアド・6ゲームマッチ（6-6タイブレーク）") */
+  league4: string;
+  /** 5チームリーグ用ルール */
+  league5: string;
+  /** 決勝トーナメント用ルール */
+  tournament: string;
+}
+
 /** 大会情報 */
 export interface TournamentInfo {
   name: string;
   date: string;
   venue: string;
   rules: string[];
+  /** 構造化ゲームルール */
+  gameRules?: GameRuleSet;
   /** 順位別トーナメントの並び順（リーグID配列） */
   bracketOrders?: {
     '2nd'?: string[];

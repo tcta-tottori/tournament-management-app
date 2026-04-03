@@ -127,7 +127,15 @@ export default function MixedBracketView() {
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
 
-  const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
+  const winGames = useMemo(() => {
+    // 構造化ゲームルールがあればそちらを使用
+    const tr = tournamentInfo?.gameRules?.tournament;
+    if (tr) {
+      const m = tr.match(/(\d+)\s*ゲーム/);
+      if (m) return parseInt(m[1]);
+    }
+    return getWinningGamesFromRules(tournamentInfo?.rules || []);
+  }, [tournamentInfo]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -518,8 +526,7 @@ export default function MixedBracketView() {
             <div className="flex gap-2 mb-3">
               <button onClick={() => {
                 const at = useMixedStore.getState().allTeams;
-                const rules = tournamentInfo?.rules || [];
-                const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
+                const gr = tournamentInfo?.gameRules?.tournament || '';
                 printMixedRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, tournamentInfo?.date || '');
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
