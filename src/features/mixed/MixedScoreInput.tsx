@@ -55,7 +55,7 @@ interface Props {
   anchorY?: number;
 }
 
-export default function MixedScoreInput({ match, teams, onClose, anchorY }: Props) {
+export default function MixedScoreInput({ match, teams, onClose }: Props) {
   const { updateLeagueScore, setLeagueMatchStatus, tournamentInfo, leagues, updateGameRule } = useMixedStore();
 
   // gameRulesが未設定の場合、リーグデータから自動設定
@@ -247,18 +247,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     setTiebreakInput(raw);
   };
 
-  const popupStyle: React.CSSProperties = {};
-  if (anchorY !== undefined) {
-    const vh = window.innerHeight;
-    const popupH = 480;
-    let top = anchorY - popupH / 2;
-    if (top < 10) top = 10;
-    if (top + popupH > vh - 10) top = vh - popupH - 10;
-    popupStyle.position = 'fixed';
-    popupStyle.top = top;
-    popupStyle.left = '50%';
-    popupStyle.transform = 'translateX(-50%)';
-  }
+  // ポップアップは常にビューポート中央に表示（anchorYは使用しない）
 
   const tbInput = (
     <input
@@ -290,7 +279,7 @@ export default function MixedScoreInput({ match, teams, onClose, anchorY }: Prop
     <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
       <div
         ref={popupRef}
-        className="fixed top-[10%] sm:top-1/2 left-1/2 -translate-x-1/2 sm:-translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[80vh] overflow-y-auto z-50"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-50"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
