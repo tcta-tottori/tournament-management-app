@@ -41,13 +41,28 @@ function buildCallText(match: BracketMatch, allTeams: MixedTeam[], catLabel: str
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
   if (!team1 || !team2) return '';
   const fn = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
-  const parts = ['試合のコールをします。', `ミックスダブルス、${catLabel}、${roundLabel}。`,
-    `${match.team1League}リーグ、${fn(team1.male.name)}さん、${fn(team1.female.name)}さん ペア。`,
-    `${match.team2League}リーグ、${fn(team2.male.name)}さん、${fn(team2.female.name)}さん ペア。`];
-  let ct = `この試合を、${courtName}で`;
-  if (startTime) { const [h, m] = startTime.split(':'); ct += parseInt(m) === 0 ? `、${parseInt(h)}時より` : `、${parseInt(h)}時${parseInt(m)}分より`; }
+
+  const parts: string[] = [];
+  parts.push('試合のコールをします。');
+  parts.push(`${catLabel}${roundLabel}、`);
+
+  // チーム1: 番号＋苗字（所属）
+  parts.push(`${team1.pairNumber}番、${fn(team1.male.name)}さん（${team1.male.affiliation}）、${fn(team1.female.name)}さん（${team1.female.affiliation}）。`);
+  // チーム2
+  parts.push(`${team2.pairNumber}番、${fn(team2.male.name)}さん（${team2.male.affiliation}）、${fn(team2.female.name)}さん（${team2.female.affiliation}）。`);
+
+  // コート＋時間
+  let ct = `こちらの試合を${courtName}で`;
+  if (startTime) {
+    const [h, m] = startTime.split(':');
+    ct += parseInt(m) === 0 ? `、${parseInt(h)}時より` : `、${parseInt(h)}時${parseInt(m)}分より`;
+  }
   ct += '、おこなってください。';
   parts.push(ct);
+
+  // ボール係
+  parts.push(`ボールは${team1.pairNumber}番、${fn(team1.male.name)}さん、${fn(team1.female.name)}さんが本部まで取りに来てください。`);
+
   return parts.join(' ');
 }
 
