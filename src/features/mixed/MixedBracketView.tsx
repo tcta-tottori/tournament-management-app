@@ -450,14 +450,15 @@ export default function MixedBracketView() {
                   <span className="font-bold text-sm">{tab.label}トーナメント</span>
                   <span className="text-white/70 text-xs ml-1">({finished}/{total})</span>
                 </div>
-                <BracketDisplay
-                  bracket={bracket}
-                  onMatchClick={openScoreEditor}
-                  getRoundLabel={getRoundLabel}
-                  allTeams={useMixedStore.getState().allTeams}
-                  courtAssignments={bracketCourtAssignments}
-                  compact
-                />
+                <div className="overflow-x-auto rounded-b-xl border border-t-0 border-gray-200">
+                  <BracketDisplay
+                    bracket={bracket}
+                    onMatchClick={openScoreEditor}
+                    getRoundLabel={getRoundLabel}
+                    allTeams={useMixedStore.getState().allTeams}
+                    courtAssignments={bracketCourtAssignments}
+                  />
+                </div>
               </div>
             );
           })}
