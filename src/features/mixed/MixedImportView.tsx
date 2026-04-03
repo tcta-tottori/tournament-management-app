@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Users } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Users, Settings } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { parseMixedExcel } from './mixedExcelParser';
 
 export default function MixedImportView() {
-  const { importData, setImportFileName, importFileName, isImported, leagues } = useMixedStore();
+  const { importData, setImportFileName, importFileName, isImported, leagues, tournamentInfo, updateTournamentInfo, updateGameRules } = useMixedStore();
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setPreview] = useState<{ leagueCount: number; teamCount: number; matchCount: number } | null>(null);
@@ -144,6 +144,77 @@ export default function MixedImportView() {
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
           <span className="text-sm">{error}</span>
+        </div>
+      )}
+
+      {/* 大会設定（読み込み後に表示） */}
+      {isImported && tournamentInfo && (
+        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4">
+            <Settings size={16} className="text-gray-500" />
+            大会設定
+          </h3>
+
+          <div className="space-y-3">
+            {/* 大会名 */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">大会名</label>
+              <input
+                type="text"
+                value={tournamentInfo.name}
+                onChange={e => updateTournamentInfo('name', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* 日付 */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">日付</label>
+              <input
+                type="text"
+                value={tournamentInfo.date}
+                onChange={e => updateTournamentInfo('date', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* ゲームルール */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="text-xs font-bold text-gray-700 block mb-2">ゲームルール</label>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（4チーム）</label>
+                  <input
+                    type="text"
+                    value={tournamentInfo.gameRules?.league4 || ''}
+                    onChange={e => updateGameRules({ league4: e.target.value })}
+                    placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（5チーム）</label>
+                  <input
+                    type="text"
+                    value={tournamentInfo.gameRules?.league5 || ''}
+                    onChange={e => updateGameRules({ league5: e.target.value })}
+                    placeholder="例: ノーアド・4ゲームマッチ（4-4タイブレーク）"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">決勝トーナメント</label>
+                  <input
+                    type="text"
+                    value={tournamentInfo.gameRules?.tournament || ''}
+                    onChange={e => updateGameRules({ tournament: e.target.value })}
+                    placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

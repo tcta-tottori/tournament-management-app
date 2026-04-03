@@ -57,6 +57,7 @@ interface MixedState {
 
   // Tournament info editing
   updateTournamentInfo: (field: 'name' | 'date' | 'venue', value: string) => void;
+  updateGameRules: (rules: Partial<import('./types').GameRuleSet>) => void;
 
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
@@ -363,6 +364,15 @@ export const useMixedStore = create<MixedState>()(
         }));
       },
 
+      updateGameRules: (rules) => {
+        set(state => ({
+          tournamentInfo: state.tournamentInfo ? {
+            ...state.tournamentInfo,
+            gameRules: { ...state.tournamentInfo.gameRules ?? { league4: '', league5: '', tournament: '' }, ...rules },
+          } : null,
+        }));
+      },
+
       shuffleBracketSeeds: (category, newOrder) => {
         set(state => {
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
@@ -525,12 +535,6 @@ export const useMixedStore = create<MixedState>()(
 
       autoPopulateBrackets: () => {
         const { leagues, leagueMatches, allTeams } = get();
-        // Check if all leagues are complete
-        const allComplete = leagues.every(l => {
-          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-          return lm.length > 0 && lm.every(m => m.status === 'finished');
-        });
-        if (!allComplete) return;
 
         const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);

@@ -1,5 +1,51 @@
 import * as XLSX from 'xlsx';
-import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo } from './types';
+import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo, GameRuleSet } from './types';
+
+/** ルールテキスト配列から構造化ゲームルールを自動抽出 */
+function extractGameRules(rules: string[]): GameRuleSet {
+  let league4 = '';
+  let league5 = '';
+  let tournament = '';
+
+  for (const r of rules) {
+    const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+    // 全角数字を半角に
+    const half = cleaned.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+
+    if (/4チーム|4チーム/.test(half)) {
+      // "予選4チームリーグは..." から "は" 以降を取得
+      const match = half.match(/[はの](.+)/);
+      league4 = match ? match[1].trim() : half;
+    } else if (/5チーム|5チーム/.test(half)) {
+      const match = half.match(/[はの](.+)/);
+      league5 = match ? match[1].trim() : half;
+    } else if (/決勝|トーナメント/.test(half)) {
+      const match = half.match(/[はの](.+)/);
+      tournament = match ? match[1].trim() : half;
+    }
+  }
+
+  // フォールバック: ゲームルールが見つからない場合は最初のルールを使う
+  if (!league4 && !league5 && !tournament) {
+    for (const r of rules) {
+      const cleaned = r.replace(/^（[０-９\d]+）\s*/, '').trim();
+      if (/ゲームマッチ|ゲーム/.test(cleaned)) {
+        league4 = league4 || cleaned;
+        league5 = league5 || cleaned;
+        tournament = tournament || cleaned;
+        break;
+      }
+    }
+  }
+
+  // 未設定のものを他からコピー
+  const fallback = league4 || league5 || tournament || '6ゲームマッチ（6-6タイブレーク）';
+  return {
+    league4: league4 || fallback,
+    league5: league5 || fallback,
+    tournament: tournament || fallback,
+  };
+}
 
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
@@ -224,12 +270,12 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
       if (v && v.startsWith('（')) rules.push(v);
     }
 
-    if (name) return { name: name.trim(), date, venue, rules };
+    if (name) return { name: name.trim(), date, venue, rules, gameRules: extractGameRules(rules) };
   }
 
   // 表紙がない場合、リーグシートから取得
   const ws = wb.Sheets[leagueSheetName];
-  if (!ws) return { name: 'ミックスダブルス大会', date: '', venue: '', rules: [] };
+  if (!ws) return { name: 'ミックスダブルス大会', date: '', venue: '', rules: [], gameRules: extractGameRules([]) };
 
   const name = cellVal(ws, 'A1').replace(/\s+/g, ' ').trim() || 'ミックスダブルス大会';
   const date = cellVal(ws, 'O2') || cellVal(ws, 'M9');
@@ -240,7 +286,7 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
     if (v) rules.push(v);
   }
 
-  return { name, date, venue, rules };
+  return { name, date, venue, rules, gameRules: extractGameRules(rules) };
 }
 
 // ============================================================
