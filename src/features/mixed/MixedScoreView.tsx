@@ -4,7 +4,10 @@ import { calculateLeagueStandings } from './mixedLogic';
 import MixedBracketView from './MixedBracketView';
 
 export default function MixedScoreView() {
-  const { brackets, leagues, leagueMatches, rankOverrides, autoPopulateBrackets, regenerateBrackets } = useMixedStore();
+  const {
+    brackets, leagues, leagueMatches, rankOverrides,
+    lastStandingsHash, autoPopulateBrackets, regenerateBrackets,
+  } = useMixedStore();
   const hasInitialized = useRef(false);
 
   // 完了リーグ数チェック
@@ -20,7 +23,7 @@ export default function MixedScoreView() {
   const anyLeagueComplete = completedLeagueIds.length > 0;
 
   // 完了リーグの順位ハッシュ（変化検出用）
-  const standingsHash = useMemo(() => {
+  const currentHash = useMemo(() => {
     if (completedLeagueIds.length === 0) return '';
     const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
     const parts: string[] = [];
@@ -36,7 +39,7 @@ export default function MixedScoreView() {
   // 完了リーグがゼロなのにブラケットが残っている場合 → 旧データなのでクリア
   useEffect(() => {
     if (!anyLeagueComplete && brackets.length > 0) {
-      useMixedStore.setState({ brackets: [], bracketCourtAssignments: {} });
+      useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
     }
   }, [anyLeagueComplete, brackets.length]);
 
@@ -44,25 +47,29 @@ export default function MixedScoreView() {
   useEffect(() => {
     if (!anyLeagueComplete || leagues.length === 0) return;
 
-    if (!hasInitialized.current) {
-      hasInitialized.current = true;
-      useMixedStore.setState({ brackets: [], bracketCourtAssignments: {} });
-      autoPopulateBrackets();
-      return;
-    }
-
     if (brackets.length === 0) {
       autoPopulateBrackets();
+      useMixedStore.setState({ lastStandingsHash: currentHash });
+      hasInitialized.current = true;
     }
-  }, [anyLeagueComplete, brackets.length, leagues.length, autoPopulateBrackets]);
+  }, [anyLeagueComplete, brackets.length, leagues.length, autoPopulateBrackets, currentHash]);
 
   // 完了リーグの順位が変わった場合、ブラケットを自動更新
+  // （ストアに保存されたハッシュと比較し、実際に変化した時だけ実行）
   useEffect(() => {
-    if (!hasInitialized.current) return;
-    if (!anyLeagueComplete || brackets.length === 0 || !standingsHash) return;
+    if (!anyLeagueComplete || brackets.length === 0 || !currentHash) return;
+    // 初回: ハッシュが未保存なら保存のみ
+    if (!lastStandingsHash) {
+      useMixedStore.setState({ lastStandingsHash: currentHash });
+      return;
+    }
+    // ハッシュが同一なら何もしない
+    if (currentHash === lastStandingsHash) return;
+    // 順位が実際に変わった → 再生成
     regenerateBrackets();
+    useMixedStore.setState({ lastStandingsHash: currentHash });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standingsHash, anyLeagueComplete]);
+  }, [currentHash, lastStandingsHash, anyLeagueComplete]);
 
   return (
     <div className="p-2 sm:p-4 space-y-4">

@@ -90,7 +90,7 @@ export default function AppLayout() {
       return lm.length > 0 && lm.every(m => m.status === 'finished');
     });
     if (!allLeaguesComplete && mixedBrackets.length > 0) {
-      useMixedStore.setState({ brackets: [] });
+      useMixedStore.setState({ brackets: [], lastStandingsHash: '' });
     }
   }, [isMixedImported, mixedLeagues, mixedLeagueMatches, mixedBrackets]);
 

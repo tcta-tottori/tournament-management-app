@@ -26,6 +26,8 @@ interface MixedState {
   rankOverrides: Record<string, Record<string, number>>;
   /** ブラケット試合のコート割当: matchId -> { courtName, startedAt } */
   bracketCourtAssignments: Record<string, { courtName: string; startedAt: number }>;
+  /** ブラケット生成時のリーグ順位ハッシュ（再生成判定用） */
+  lastStandingsHash: string;
 
   // Actions: Import
   importData: (info: TournamentInfo, leagues: MixedLeague[], matches: LeagueMatchScore[]) => void;
@@ -100,6 +102,7 @@ export const useMixedStore = create<MixedState>()(
       isImported: false,
       rankOverrides: {},
       bracketCourtAssignments: {},
+      lastStandingsHash: '',
 
       importData: (info, leagues, matches) => {
         const allTeams = leagues.flatMap(l => l.teams);
@@ -112,6 +115,9 @@ export const useMixedStore = create<MixedState>()(
           currentPhase: 'league',
           selectedLeagueId: leagues[0]?.leagueId || null,
           brackets: [],
+          rankOverrides: {},
+          bracketCourtAssignments: {},
+          lastStandingsHash: '',
         });
       },
 
@@ -134,6 +140,7 @@ export const useMixedStore = create<MixedState>()(
           isImported: false,
           rankOverrides: {},
           bracketCourtAssignments: {},
+          lastStandingsHash: '',
         });
       },
 
@@ -575,27 +582,26 @@ export const useMixedStore = create<MixedState>()(
         }
         const newBrackets = generateAllBrackets(filteredStandings, allTeams, leagues, tournamentInfo?.bracketOrders);
 
-        // 1位トーナメントは実際に試合が進行中/完了の場合のみ維持（'ready'だけでは保持しない）
-        let preserve1st = false;
-        const old1st = oldBrackets.find(b => b.category === '1st');
-        if (old1st) {
-          const hasActuallyStarted = old1st.matches.some(m => m.status === 'finished' || m.status === 'playing');
-          if (hasActuallyStarted) {
-            const idx = newBrackets.findIndex(b => b.category === '1st');
+        // 実際に試合が進行中/完了のブラケットは維持する（'ready'だけでは保護しない）
+        // 全カテゴリ（1位/2位/3位/4位）に適用
+        const preservedCategories = new Set<string>();
+        for (const oldB of oldBrackets) {
+          const hasRealProgress = oldB.matches.some(m => m.status === 'finished' || m.status === 'playing');
+          if (hasRealProgress) {
+            const idx = newBrackets.findIndex(b => b.category === oldB.category);
             if (idx >= 0) {
-              newBrackets[idx] = old1st;
-              preserve1st = true;
+              newBrackets[idx] = oldB;
+              preservedCategories.add(oldB.category);
             }
           }
         }
 
-        // コート割当をクリア（1位トーナメント保持時はそのコート割当のみ維持）
-        let newCourtAssignments: Record<string, { courtName: string; startedAt: number }> = {};
-        if (preserve1st) {
-          for (const [matchId, ca] of Object.entries(bracketCourtAssignments)) {
-            if (matchId.startsWith('bracket-1st-')) {
-              newCourtAssignments[matchId] = ca;
-            }
+        // コート割当をクリア（保護されたブラケットのコート割当のみ維持）
+        const newCourtAssignments: Record<string, { courtName: string; startedAt: number }> = {};
+        for (const [matchId, ca] of Object.entries(bracketCourtAssignments)) {
+          const cat = matchId.match(/^bracket-(\w+)-/)?.[1];
+          if (cat && preservedCategories.has(cat)) {
+            newCourtAssignments[matchId] = ca;
           }
         }
 
@@ -643,18 +649,20 @@ export const useMixedStore = create<MixedState>()(
     }),
     {
       name: 'mixed-tournament-storage',
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version: number) => {
+        const state = { ...persisted };
         if (version < 2) {
-          // v1→v2: 新規フィールドのデフォルト値を補完
-          return {
-            ...persisted,
-            rankOverrides: persisted.rankOverrides ?? {},
-            bracketCourtAssignments: persisted.bracketCourtAssignments ?? {},
-            rawExcelSheets: persisted.rawExcelSheets ?? [],
-          };
+          state.rankOverrides = state.rankOverrides ?? {};
+          state.bracketCourtAssignments = state.bracketCourtAssignments ?? {};
+          state.rawExcelSheets = state.rawExcelSheets ?? [];
         }
-        return persisted;
+        if (version < 3) {
+          state.lastStandingsHash = '';
+          // v3: 旧データで残っているブラケットをクリアして再生成させる
+          state.brackets = [];
+        }
+        return state;
       },
     }
   )
