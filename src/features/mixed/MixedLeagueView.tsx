@@ -570,14 +570,15 @@ export default function MixedLeagueView() {
         document.body
       )}
 
-      {/* Score input dialog */}
-      {editingMatch && (
+      {/* Score input dialog (createPortal で body 直下に描画し、レイアウト影響を排除) */}
+      {editingMatch && createPortal(
         <MixedScoreInput
           match={editingMatch}
           teams={selectedLeague.teams}
           onClose={() => setEditingMatch(null)}
           anchorY={clickY}
-        />
+        />,
+        document.body
       )}
 
       {/* Rules popup */}

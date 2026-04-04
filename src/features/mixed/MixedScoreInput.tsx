@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { X, Save, Trash2, AlertTriangle, Ban } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore, MixedTeam } from './types';
@@ -113,12 +113,11 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
-  useEffect(() => {
-    // ポップアップ表示時のスクロール位置を保存し、背景スクロールを防止
+  // useLayoutEffect でペイント前にスクロール固定（useEffectだとちらつく）
+  useLayoutEffect(() => {
     const savedScrollY = window.scrollY;
     scrollPosRef.current = savedScrollY;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    // body を fixed にして現在のスクロール位置を視覚的に維持
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
     document.body.style.left = '0';
