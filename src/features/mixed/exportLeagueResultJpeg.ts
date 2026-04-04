@@ -1,15 +1,15 @@
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
 
 /**
- * リーグ結果を添付画像の形式でCanvas描画しJPEGダウンロード
+ * リーグ結果を表形式で描画したCanvasからData URL (JPEG) を生成する
  */
-export function exportLeagueResultJpeg(
+export async function generateLeagueResultDataUrl(
   league: MixedLeague,
   standings: LeagueStanding[],
   matches: LeagueMatchScore[],
   allTeams: MixedTeam[],
   tournamentName: string,
-) {
+): Promise<string> {
   const teams = standings.map(s => allTeams.find(t => t.teamId === s.teamId)!).filter(Boolean);
   const teamCount = teams.length;
 
@@ -169,15 +169,37 @@ export function exportLeagueResultJpeg(
   drawLine(tableLeft, tableTop, tableLeft, bottomY, 1.5);
   drawLine(totalW, tableTop, totalW, bottomY, 1.5);
 
-  // JPEG出力
-  canvas.toBlob(blob => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${league.leagueId.trim()}リーグ結果.jpg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, 'image/jpeg', 0.95);
+  // PromiseでエンコードしてData URLを返す
+  return new Promise<string>((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) {
+        reject(new Error('Canvas to Blob failed'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }, 'image/jpeg', 0.95);
+  });
+}
+
+/**
+ * リーグ結果を添付画像の形式でCanvas描画しJPEGダウンロード
+ */
+export async function exportLeagueResultJpeg(
+  league: MixedLeague,
+  standings: LeagueStanding[],
+  matches: LeagueMatchScore[],
+  allTeams: MixedTeam[],
+  tournamentName: string,
+) {
+  const dataUrl = await generateLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName);
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = `${league.leagueId.trim()}リーグ結果.jpg`;
+  a.click();
 }
 

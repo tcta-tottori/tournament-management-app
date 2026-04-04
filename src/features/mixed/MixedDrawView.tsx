@@ -4,6 +4,7 @@ import { Check, MapPin, Pencil, FlaskConical, Info } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
+import { LeagueResultPreview } from './LeagueResultPreview';
 import type { LeagueMatchScore, LeagueStanding } from './types';
 import { GameRatioCell } from './GameRatioCell';
 
@@ -310,7 +311,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
 
 /** 全リーグ一覧表示 */
 function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) => void }) {
-  const { leagues, leagueMatches, updateCourtName, rankOverrides } = useMixedStore();
+  const { leagues, leagueMatches, updateCourtName, rankOverrides, allTeams, tournamentInfo } = useMixedStore();
   const allStandings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [courtInput, setCourtInput] = useState('');
@@ -438,6 +439,19 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                   </div>
                 </div>
               </div>
+
+              {/* 結果プレビュー＆ダウンロード (全試合完了時) */}
+              {isComplete && (
+                <div className="px-3 sm:px-4 py-2 bg-gray-50/50 border-b border-gray-100 flex justify-end">
+                  <LeagueResultPreview
+                    league={league}
+                    standings={standings}
+                    matches={leagueMatches}
+                    allTeams={allTeams}
+                    tournamentName={tournamentInfo?.name || ''}
+                  />
+                </div>
+              )}
 
               {/* 対戦マトリックス — scrollbar-thin */}
               <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
