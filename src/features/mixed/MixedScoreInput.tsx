@@ -52,7 +52,6 @@ interface Props {
   match: LeagueMatchScore;
   teams: MixedTeam[];
   onClose: () => void;
-  anchorY?: number;
 }
 
 export default function MixedScoreInput({ match, teams, onClose }: Props) {
@@ -95,7 +94,6 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   const score2Ref = useRef<HTMLInputElement>(null);
   const tiebreakRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const scrollPosRef = useRef<number>(0);
 
   const gameRule = useMemo(() => {
     const teamCount = teams.length;
@@ -113,23 +111,12 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
-  // useLayoutEffect でペイント前にスクロール固定（useEffectだとちらつく）
+  // 背後のスクロールを防止するだけのシンプルな処理（position: fixed はレイアウト崩れやスクロールジャンプの原因になるため不使用）
   useLayoutEffect(() => {
-    const savedScrollY = window.scrollY;
-    scrollPosRef.current = savedScrollY;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${savedScrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.paddingRight = '';
-      window.scrollTo(0, savedScrollY);
+      document.body.style.overflow = originalOverflow;
     };
   }, []);
 

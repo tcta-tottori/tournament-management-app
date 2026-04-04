@@ -37,7 +37,6 @@ const LEAGUE_COLORS = [
 export default function MixedLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, updateCourtName, tournamentInfo, fillAllScoresForTest } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
-  const [clickY, setClickY] = useState<number | undefined>(undefined);
   const [editingCourt, setEditingCourt] = useState(false);
   const [courtNameInput, setCourtNameInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -202,7 +201,7 @@ export default function MixedLeagueView() {
                           (m.team1Id === team.teamId && m.team2Id === colTeam.teamId) ||
                           (m.team1Id === colTeam.teamId && m.team2Id === team.teamId)
                         );
-                        if (forwardMatch) { setClickY(e.clientY); setEditingMatch(forwardMatch); }
+                        if (forwardMatch) { setEditingMatch(forwardMatch); }
                       }}
                     >
                       {cell.text === '__DIAG__' ? (
@@ -422,7 +421,7 @@ export default function MixedLeagueView() {
               return (
                 <div key={mo.matchNumber} className="relative flex flex-col items-center">
                   <button
-                    onClick={(e) => { if (match) { setClickY(e.clientY); setEditingMatch(match); } }}
+                    onClick={() => { if (match) { setEditingMatch(match); } }}
                     className={`
                       flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
                       ${isFinished
@@ -590,7 +589,6 @@ export default function MixedLeagueView() {
           match={editingMatch}
           teams={selectedLeague.teams}
           onClose={() => setEditingMatch(null)}
-          anchorY={clickY}
         />,
         document.body
       )}
