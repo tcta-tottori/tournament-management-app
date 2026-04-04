@@ -471,7 +471,7 @@ export default function MixedLeagueView() {
         {/* Standings table */}
         {standings.length > 0 && finishedCount > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">暫定順位</h3>
+            <h3 className="text-sm font-bold text-gray-700 mb-3">{leagueComplete ? '確定順位' : '暫定順位'}</h3>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-gray-500 border-b border-gray-200">
@@ -480,8 +480,8 @@ export default function MixedLeagueView() {
                   <th className="py-2 px-2 text-center w-16">勝敗</th>
                   <th className="py-2 px-2 text-center w-16">取得G</th>
                   <th className="py-2 px-2 text-center w-16">失G</th>
-                  <th className="py-2 px-2 text-center w-20">ゲーム率</th>
-                  <th className="py-2 px-2 text-left w-28">判定理由</th>
+                  {leagueComplete && <th className="py-2 px-2 text-center w-20">ゲーム率</th>}
+                  {leagueComplete && <th className="py-2 px-2 text-left w-28">判定理由</th>}
                 </tr>
               </thead>
               <tbody>
@@ -498,27 +498,31 @@ export default function MixedLeagueView() {
                     <td className="py-2 px-2 text-center font-mono text-gray-700">{s.wins}-{s.losses}</td>
                     <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
                     <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
-                    <td className="py-2 px-2 text-center font-mono text-gray-600">
-                      <GameRatioCell
-                        gamesWon={s.gamesWon}
-                        gamesLost={s.gamesLost}
-                        teamName={s.teamName}
-                        matchDetails={leagueMatchList.filter(m => m.status === 'finished' && (m.team1Id === s.teamId || m.team2Id === s.teamId)).map(m => {
-                          const isT1 = m.team1Id === s.teamId;
-                          const oppId = isT1 ? m.team2Id : m.team1Id;
-                          const oppTeam = selectedLeague.teams.find(t => t.teamId === oppId);
-                          return {
-                            opponentName: oppTeam?.teamName || '?',
-                            won: (isT1 ? m.score1 : m.score2) ?? 0,
-                            lost: (isT1 ? m.score2 : m.score1) ?? 0,
-                            isWin: m.winnerId === s.teamId,
-                          };
-                        })}
-                      />
-                    </td>
-                    <td className="py-2 px-2 text-xs text-gray-400">
-                      {s.tiebreakReason || ''}
-                    </td>
+                    {leagueComplete && (
+                      <td className="py-2 px-2 text-center font-mono text-gray-600">
+                        <GameRatioCell
+                          gamesWon={s.gamesWon}
+                          gamesLost={s.gamesLost}
+                          teamName={s.teamName}
+                          matchDetails={leagueMatchList.filter(m => m.status === 'finished' && (m.team1Id === s.teamId || m.team2Id === s.teamId)).map(m => {
+                            const isT1 = m.team1Id === s.teamId;
+                            const oppId = isT1 ? m.team2Id : m.team1Id;
+                            const oppTeam = selectedLeague.teams.find(t => t.teamId === oppId);
+                            return {
+                              opponentName: oppTeam?.teamName || '?',
+                              won: (isT1 ? m.score1 : m.score2) ?? 0,
+                              lost: (isT1 ? m.score2 : m.score1) ?? 0,
+                              isWin: m.winnerId === s.teamId,
+                            };
+                          })}
+                        />
+                      </td>
+                    )}
+                    {leagueComplete && (
+                      <td className="py-2 px-2 text-xs text-gray-400">
+                        {s.tiebreakReason || ''}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
