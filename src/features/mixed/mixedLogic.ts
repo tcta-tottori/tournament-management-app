@@ -299,7 +299,7 @@ export function generateAllBrackets(
         }
       }
       const drawSize = 16; // 固定16ドロー
-      // BYE位置(index 1,7,15)を含む空スロットで生成（チームは配置しない、抽選で決める）
+      // BYE位置(index 2,7,15)を含む空スロットで生成（チームは配置しない、抽選で決める）
       const emptySlots: (null)[] = Array(drawSize).fill(null);
       const matches = generateBracketMatchesWithSlots(cat, drawSize, emptySlots);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });

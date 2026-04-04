@@ -759,10 +759,10 @@ function RouletteDrawPanel({ bracket, onShuffle, onRebuild }: {
 
   const teams = bracket.teams;
 
-  // ドロー表通りの16スロット構造（BYE位置は2位等と同じパターン: slot2,slot8,slot16がBYE）
-  // ①=slot1(BYE), ②③=slot3-4, ④⑤=slot5-6, ⑥=slot7(BYE), ⑦⑧=slot9-10, ⑨⑩=slot11-12, ⑪⑫=slot13-14, ⑬=slot15(BYE)
+  // ドロー表通りの16スロット構造（1位トーナメント: ①②が対戦、③がBYE）
+  // ①②=slot0-1, BYE=slot2, ③=slot3, ④⑤=slot4-5, ⑥=slot6, BYE=slot7, ⑦⑧=slot8-9, ⑨⑩=slot10-11, ⑪⑫=slot12-13, ⑬=slot14, BYE=slot15
   const DRAW_SIZE = 16;
-  const BYE_POSITIONS = new Set([1, 7, 15]); // 0-indexed: slot2, slot8, slot16
+  const BYE_POSITIONS = new Set([2, 7, 15]); // 0-indexed: ドロー表通りのBYE位置
   const circled = (n: number) => String.fromCodePoint(0x2460 + n);
 
   // チーム配置可能なスロット（BYE以外）
@@ -1055,7 +1055,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
   };
   // 1位トーナメント: BYE位置 (0-indexed)
-  const BYE_POSITIONS_1ST = new Set([1, 7, 15]);
+  const BYE_POSITIONS_1ST = new Set([2, 7, 15]);
   // スロット→丸番号マップ（BYE以外に①~⑬を割り当て）
   const slotCircledNum = useMemo(() => {
     const map = new Map<number, string>();
