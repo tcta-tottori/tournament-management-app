@@ -194,7 +194,7 @@ export default function MixedLeagueView() {
                     <td
                       key={colIdx}
                       className={`px-2 py-2 text-center text-sm ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors ${cell.text === '__DIAG__' ? 'relative' : ''}`}
-                      onClick={(e) => {
+                      onClick={() => {
                         if (team.teamId === colTeam.teamId) return;
                         if (!allEntryDone) return; // エントリー未完了は入力不可
                         const forwardMatch = leagueMatchList.find(m =>

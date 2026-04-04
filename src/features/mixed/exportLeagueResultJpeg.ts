@@ -7,7 +7,7 @@ export async function generateLeagueResultDataUrl(
   league: MixedLeague,
   standings: LeagueStanding[],
   matches: LeagueMatchScore[],
-  allTeams: MixedTeam[],
+  _allTeams: MixedTeam[],
   tournamentName: string,
 ): Promise<string> {
   // ペア番号順に並べ替え

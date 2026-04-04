@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, ClipboardList } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
@@ -356,8 +357,9 @@ export default function MixedBracketView() {
           const Icon = tab.icon;
           const bracket = brackets.find(b => b.category === tab.id);
           const isActive = selectedBracketCategory === tab.id;
-          const finished = bracket?.matches.filter(m => m.status === 'finished' || m.status === 'bye').length || 0;
-          const total = bracket?.matches.length || 0;
+          const nonByeMatches = bracket?.matches.filter(m => !m.isBye) || [];
+          const finished = nonByeMatches.filter(m => m.status === 'finished').length;
+          const total = nonByeMatches.length;
 
           return (
             <button
@@ -436,10 +438,12 @@ export default function MixedBracketView() {
             if (nums) for (const n of nums) leagueInProgress.add(`${n}コート`);
           }
         }
-        return (
-          <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={() => setCourtAssignMatch(null)}>
-            <div className="min-h-full flex items-start justify-center py-[10vh] px-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-[380px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
+        return createPortal(
+          <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setCourtAssignMatch(null)}>
+            <div
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[380px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-[110] p-5"
+              onClick={e => e.stopPropagation()}
+            >
               <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
@@ -483,16 +487,18 @@ export default function MixedBracketView() {
                 スキップしてスコア入力 →
               </button>
             </div>
-          </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 
       {/* スコア入力モーダル */}
-      {editingMatch && (
-        <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm overflow-y-auto" onClick={() => setEditingMatch(null)}>
-          <div className="min-h-full flex items-start justify-center py-[8vh] px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-full p-5 z-50" onClick={e => e.stopPropagation()}>
+      {editingMatch && createPortal(
+        <div className="fixed inset-0 bg-black/40 z-[100]" onClick={() => setEditingMatch(null)}>
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[420px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-[110] p-5"
+            onClick={e => e.stopPropagation()}
+          >
             <h3 className="text-sm font-bold text-gray-800 mb-4">スコア入力</h3>
 
             <div className="flex items-center gap-4 mb-5">
@@ -584,8 +590,8 @@ export default function MixedBracketView() {
               キャンセル
             </button>
           </div>
-          </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       </>)}
@@ -768,6 +774,17 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   const unassignedTeams = useMemo(() => teams.filter(t => !assignedTeamIds.has(t.teamId)), [teams, assignedTeamIds]);
   const activeTeam = selectedTeamId ? teams.find(t => t.teamId === selectedTeamId) : unassignedTeams[0];
 
+  // 現在の割当状態をブラケットに即時反映するヘルパー
+  const syncToBracket = useCallback((slotsMap: Map<number, string>) => {
+    const slots16: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    slotsMap.forEach((teamId, slot) => { slots16[slot] = teamId; });
+    const order = slots16.filter((id): id is string => id !== null);
+    // 未配置チームも末尾に追加（ブラケット再構築に必要）
+    const ids = new Set(order);
+    for (const t of teams) { if (!ids.has(t.teamId)) order.push(t.teamId); }
+    onShuffle(bracket.category, order);
+  }, [teams, bracket.category, onShuffle]);
+
   // ルーレット
   const spinRoulette = useCallback(() => {
     if (!activeTeam || availableSlots.length === 0) return;
@@ -782,18 +799,26 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
       } else {
         const finalSlot = availableSlots[Math.floor(Math.random() * availableSlots.length)];
         setCurrentHighlight(finalSlot);
-        setAssignedSlots(prev => { const n = new Map(prev); n.set(finalSlot, activeTeam.teamId); return n; });
+        const newSlots = new Map(assignedSlots);
+        newSlots.set(finalSlot, activeTeam.teamId);
+        setAssignedSlots(newSlots);
         setSpinning(false);
         setSelectedTeamId(null);
+        // トーナメント表に即座に反映
+        syncToBracket(newSlots);
       }
     };
     spin();
-  }, [activeTeam, availableSlots]);
+  }, [activeTeam, availableSlots, assignedSlots, syncToBracket]);
 
   const manualAssign = (slotIdx: number) => {
     if (!activeTeam || assignedSlots.has(slotIdx) || BYE_POSITIONS.has(slotIdx)) return;
-    setAssignedSlots(prev => { const n = new Map(prev); n.set(slotIdx, activeTeam.teamId); return n; });
+    const newSlots = new Map(assignedSlots);
+    newSlots.set(slotIdx, activeTeam.teamId);
+    setAssignedSlots(newSlots);
     setSelectedTeamId(null);
+    // トーナメント表に即座に反映
+    syncToBracket(newSlots);
   };
 
   // 全自動抽選
