@@ -649,7 +649,7 @@ export const useMixedStore = create<MixedState>()(
     }),
     {
       name: 'mixed-tournament-storage',
-      version: 3,
+      version: 4,
       migrate: (persisted: any, version: number) => {
         const state = { ...persisted };
         if (version < 2) {
@@ -657,10 +657,11 @@ export const useMixedStore = create<MixedState>()(
           state.bracketCourtAssignments = state.bracketCourtAssignments ?? {};
           state.rawExcelSheets = state.rawExcelSheets ?? [];
         }
-        if (version < 3) {
+        if (version < 4) {
+          // v4: 旧ブラケット・コート割当・順位ハッシュを完全クリアして再生成させる
           state.lastStandingsHash = '';
-          // v3: 旧データで残っているブラケットをクリアして再生成させる
           state.brackets = [];
+          state.bracketCourtAssignments = {};
         }
         return state;
       },

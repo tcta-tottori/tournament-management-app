@@ -54,8 +54,9 @@ export default function MixedScoreView() {
     }
   }, [anyLeagueComplete, brackets.length, leagues.length, autoPopulateBrackets, currentHash]);
 
-  // 完了リーグの順位が変わった場合、ブラケットを自動更新
+  // 完了リーグの順位が変わった場合、ブラケットを完全に再生成
   // （ストアに保存されたハッシュと比較し、実際に変化した時だけ実行）
+  // 順位が変わった＝チーム配置が変わるため、旧ブラケットの試合結果は無効→保護せず全クリア
   useEffect(() => {
     if (!anyLeagueComplete || brackets.length === 0 || !currentHash) return;
     // 初回: ハッシュが未保存なら保存のみ
@@ -65,9 +66,8 @@ export default function MixedScoreView() {
     }
     // ハッシュが同一なら何もしない
     if (currentHash === lastStandingsHash) return;
-    // 順位が実際に変わった → 再生成
-    regenerateBrackets();
-    useMixedStore.setState({ lastStandingsHash: currentHash });
+    // 順位が実際に変わった → 完全に再生成（旧結果は無効なので保護しない）
+    useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentHash, lastStandingsHash, anyLeagueComplete]);
 
