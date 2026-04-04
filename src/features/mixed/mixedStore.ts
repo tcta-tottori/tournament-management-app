@@ -105,6 +105,8 @@ export const useMixedStore = create<MixedState>()(
       lastStandingsHash: '',
 
       importData: (info, leagues, matches) => {
+        // 旧データの persist hydration 競合を防ぐため、localStorage を先にクリア
+        try { localStorage.removeItem('mixed-tournament-storage'); } catch {}
         const allTeams = leagues.flatMap(l => l.teams);
         set({
           tournamentInfo: info,

@@ -5,7 +5,7 @@ import MixedBracketView from './MixedBracketView';
 
 export default function MixedScoreView() {
   const {
-    brackets, leagues, leagueMatches, rankOverrides,
+    brackets, leagues, leagueMatches, rankOverrides, allTeams,
     lastStandingsHash, autoPopulateBrackets,
   } = useMixedStore();
 
@@ -19,6 +19,28 @@ export default function MixedScoreView() {
     }
     return parts.sort().join('|');
   }, [leagues, leagueMatches, rankOverrides]);
+
+  // ブラケットが現在の大会データと整合しているか検証
+  // （persist hydration で旧大会のブラケットが復元された場合を検出）
+  const bracketsStale = useMemo(() => {
+    if (brackets.length === 0 || allTeams.length === 0) return false;
+    const validTeamIds = new Set(allTeams.map(t => t.teamId));
+    // ブラケット内のチームIDが現在の大会に存在するかチェック
+    for (const b of brackets) {
+      for (const m of b.matches) {
+        if (m.team1Id && !validTeamIds.has(m.team1Id)) return true;
+        if (m.team2Id && !validTeamIds.has(m.team2Id)) return true;
+      }
+    }
+    return false;
+  }, [brackets, allTeams]);
+
+  // 旧大会のブラケットが検出されたら即座にクリア
+  useEffect(() => {
+    if (bracketsStale) {
+      useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
+    }
+  }, [bracketsStale]);
 
   // リーグが存在すればブラケットを常に生成（予選未完了でも構造を表示）
   useEffect(() => {
@@ -37,7 +59,6 @@ export default function MixedScoreView() {
       return;
     }
     if (currentHash === lastStandingsHash) return;
-    // 順位が変わった → 完全クリア → 次レンダーで autoPopulateBrackets が再生成
     useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentHash, lastStandingsHash]);
