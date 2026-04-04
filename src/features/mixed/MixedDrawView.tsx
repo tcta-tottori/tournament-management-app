@@ -32,10 +32,7 @@ function AlignedName({ name, className = '' }: { name: string; className?: strin
 export default function MixedDrawView() {
   const { leagues, leagueMatches, fillAllScoresForTest } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<LeagueMatchScore | null>(null);
-  const [clickY, setClickY] = useState<number | undefined>(undefined);
-
-  const handleEditMatch = (m: LeagueMatchScore, e?: React.MouseEvent) => {
-    setClickY(e?.clientY);
+  const handleEditMatch = (m: LeagueMatchScore) => {
     setEditingMatch(m);
   };
 
@@ -63,7 +60,6 @@ export default function MixedDrawView() {
           match={editingMatch}
           teams={leagues.find(l => l.leagueId === editingMatch.leagueId)?.teams || []}
           onClose={() => setEditingMatch(null)}
-          anchorY={clickY}
         />
       )}
     </div>
@@ -313,7 +309,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
 }
 
 /** 全リーグ一覧表示 */
-function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?: React.MouseEvent) => void }) {
+function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) => void }) {
   const { leagues, leagueMatches, updateCourtName, rankOverrides } = useMixedStore();
   const allStandings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
@@ -343,7 +339,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
           const standings = allStandings.get(league.leagueId) || [];
           const isComplete = finishedCount === totalCount && totalCount > 0;
           const colors = LEAGUE_COLORS[leagueIdx % LEAGUE_COLORS.length];
-          const hasTiebreak = finishedCount > 0 && standings.some(s => s.tiebreakReason);
+          const showTiebreak = isComplete && standings.some(s => s.tiebreakReason);
           // エントリーが全チーム完了しているか（entry or def）
           const allEntryDone = league.teams.every(t => t.status === 'entry' || t.status === 'def');
 
@@ -463,7 +459,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                       })}
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-10 sm:w-14">勝敗</th>
                       <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-8 sm:w-10">位</th>
-                      {hasTiebreak && (
+                      {showTiebreak && (
                         <th className="px-1 sm:px-2 py-1.5 text-center text-[10px] sm:text-xs text-gray-500 w-20 sm:w-28">判定</th>
                       )}
                     </tr>
@@ -493,13 +489,13 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                               <td
                                 key={colIdx}
                                 className={`px-0.5 sm:px-1 py-1.5 text-center text-[9px] sm:text-[11px] ${cell.color} ${cell.bg} border-l border-gray-100 transition-colors whitespace-nowrap ${cell.text === '__DIAG__' ? 'relative' : ''}`}
-                                onClick={e => {
+                                onClick={() => {
                                   if (team.teamId === colTeam.teamId) return;
                                   const match = lMatches.find(m =>
                                     (m.team1Id === team.teamId && m.team2Id === colTeam.teamId) ||
                                     (m.team1Id === colTeam.teamId && m.team2Id === team.teamId)
                                   );
-                                  if (match) onEditMatch(match, e);
+                                  if (match) onEditMatch(match);
                                 }}
                               >
                                 {cell.text === '__DIAG__' ? (
@@ -522,7 +518,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore, e?
                               </span>
                             )}
                           </td>
-                          {hasTiebreak && (
+                          {showTiebreak && (
                             <td className="px-1 sm:px-2 py-1.5 text-center border-l border-gray-200">
                               {standing?.tiebreakReason && (
                                 standing.tiebreakReason.startsWith('ゲーム率') ? (
