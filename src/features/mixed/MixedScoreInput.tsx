@@ -1,4 +1,5 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Save, Trash2, AlertTriangle, Ban } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore, MixedTeam } from './types';
@@ -270,11 +271,11 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
     ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
     : 'border-emerald-300';
 
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 z-[100]" onClick={onClose}>
       <div
         ref={popupRef}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-50"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-[110]"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -408,6 +409,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
