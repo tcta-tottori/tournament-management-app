@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, VolumeX, Square, ClipboardList } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -173,7 +173,8 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
-  const { speak } = useSpeechSynthesis();
+  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const [speakingText, setSpeakingText] = useState('');
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
   const [courtAssignValue, setCourtAssignValue] = useState('');
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
@@ -597,6 +598,27 @@ export default function MixedBracketView() {
 
       </>)}
 
+      {/* 音声再生中ポップアップ */}
+      {isSpeaking && speakingText && createPortal(
+        <div className="fixed bottom-6 right-6 z-[200] w-80 bg-white rounded-2xl shadow-2xl border border-blue-200 overflow-hidden animate-in slide-in-from-bottom-4">
+          <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center gap-2">
+            <Volume2 size={16} className="animate-pulse shrink-0" />
+            <span className="text-sm font-bold flex-1">コール再生中...</span>
+            <button
+              onClick={() => { stop(); setSpeakingText(''); }}
+              className="flex items-center gap-1 px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+            >
+              <Square size={10} />
+              停止
+            </button>
+          </div>
+          <div className="px-4 py-3 max-h-24 overflow-y-auto">
+            <p className="text-[11px] text-gray-600 leading-relaxed">{speakingText}</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* 音声コールプレビュー */}
       {callMatch && currentBracket && (() => {
         const ct1 = useMixedStore.getState().allTeams.find(t => t.teamId === callMatch.team1Id);
@@ -615,7 +637,10 @@ export default function MixedBracketView() {
             startTime={callTime}
             allTeams={useMixedStore.getState().allTeams}
             onConfirm={(text) => {
-              if (text) speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
+              if (text) {
+                setSpeakingText(text);
+                speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => setSpeakingText(''));
+              }
               setCallMatch(null);
             }}
             onClose={() => setCallMatch(null)}
@@ -1382,33 +1407,57 @@ function WaitingList({ waitingMatches, leagues }: {
       {waitingMatches.map(({ match, bracket, roundLabel }) => {
         const team1 = allTeams.find(t => t.teamId === match.team1Id);
         const team2 = allTeams.find(t => t.teamId === match.team2Id);
+        const renderTeamRow = (team: typeof team1, league: string) => (
+          <div className="flex items-center gap-1.5">
+            {league && (
+              <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[league.trim()] || 'bg-gray-100 text-gray-600'}`}>{league}</span>
+            )}
+            {team ? (
+              <>
+                <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{team.pairNumber}</span>
+                <div className="shrink-0" style={{ width: 90 }}>
+                  <div className="text-xs font-bold text-gray-800 leading-tight">{team.male.name.replace(/[\s\u3000]+/g, '')}</div>
+                  <div className="text-xs font-bold text-gray-800 leading-tight">{team.female.name.replace(/[\s\u3000]+/g, '')}</div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-gray-400 truncate">{team.male.affiliation}</div>
+                  <div className="text-[10px] text-gray-400 truncate">{team.female.affiliation}</div>
+                </div>
+              </>
+            ) : (
+              <span className="text-xs text-gray-500 truncate">{match.team1Name || match.team2Name}</span>
+            )}
+          </div>
+        );
         return (
-          <div key={match.matchId} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3">
-            <div className="shrink-0 text-center">
-              <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                bracket.category === '1st' ? 'bg-yellow-100 text-yellow-700' :
-                bracket.category === '2nd' ? 'bg-gray-200 text-gray-600' :
-                bracket.category === '3rd' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600'
-              }`}>{catLabel(bracket.category)}</div>
-              <div className="text-[9px] text-gray-400 mt-0.5">{roundLabel}</div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-xs">
-                {match.team1League && <span className="w-4 h-4 rounded bg-gray-100 text-[8px] font-bold text-gray-600 flex items-center justify-center shrink-0">{match.team1League}</span>}
-                <span className="font-bold text-gray-800 truncate">{team1?.teamName || match.team1Name}</span>
+          <div key={match.matchId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-stretch">
+              <div className={`shrink-0 w-12 flex flex-col items-center justify-center border-r border-gray-100 ${
+                bracket.category === '1st' ? 'bg-yellow-50' :
+                bracket.category === '2nd' ? 'bg-gray-50' :
+                bracket.category === '3rd' ? 'bg-orange-50' : 'bg-slate-50'
+              }`}>
+                <div className={`text-[10px] font-bold ${
+                  bracket.category === '1st' ? 'text-yellow-700' :
+                  bracket.category === '2nd' ? 'text-gray-600' :
+                  bracket.category === '3rd' ? 'text-orange-600' : 'text-slate-600'
+                }`}>{catLabel(bracket.category)}</div>
+                <div className="text-[8px] text-gray-400">{roundLabel}</div>
               </div>
-              <div className="text-[9px] text-gray-400 my-0.5">vs</div>
-              <div className="flex items-center gap-2 text-xs">
-                {match.team2League && <span className="w-4 h-4 rounded bg-gray-100 text-[8px] font-bold text-gray-600 flex items-center justify-center shrink-0">{match.team2League}</span>}
-                <span className="font-bold text-gray-800 truncate">{team2?.teamName || match.team2Name}</span>
+              <div className="flex-1 min-w-0 py-2 px-3">
+                {renderTeamRow(team1, match.team1League)}
+                <div className="text-[9px] text-gray-300 font-bold my-0.5 pl-6">VS</div>
+                {renderTeamRow(team2, match.team2League)}
+              </div>
+              <div className="shrink-0 flex items-center pr-3">
+                <button
+                  onClick={() => { setCourtAssignMatch(match); setCourtAssignValue(''); }}
+                  className="px-3 py-2 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all"
+                >
+                  コート入れ
+                </button>
               </div>
             </div>
-            <button
-              onClick={() => { setCourtAssignMatch(match); setCourtAssignValue(''); }}
-              className="px-3 py-1.5 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all shrink-0"
-            >
-              コート入れ
-            </button>
           </div>
         );
       })}

@@ -67,6 +67,7 @@ export function buildCallText(
 interface CallEntry {
   key: string;
   label: string;
+  fullName: string;
   displayName: string;
   furigana: string;
   type: 'name' | 'affiliation';
@@ -100,7 +101,7 @@ export default function CallPreviewDialog({
 
   useEffect(() => {
     const init = async () => {
-      // teamNameから苗字を確実に取得（"竹安・楠瀬" → ["竹安", "楠瀬"]）
+      // teamNameから苗字を取得（"竹安・楠瀬" → ["竹安", "楠瀬"]）
       const t1Parts = team1.teamName.split('・');
       const t2Parts = team2.teamName.split('・');
       const maleFN1 = t1Parts[0] || familyName(team1.male.name);
@@ -127,31 +128,28 @@ export default function CallPreviewDialog({
 
       // 苗字のふりがなを取得: 苗字キー→全名キー（スペース区切りで先頭部分）の順で検索
       const getFamilyFurigana = (familyNameKanji: string, fullName: string): string => {
-        // まず苗字キーで辞書を検索（前回保存分）
         const fnKey = familyNameKanji.replace(/\s/g, '');
         const fnFurigana = nameMap.get(fnKey);
         if (fnFurigana) return fnFurigana;
-        // 全名キーで検索し、スペース区切りで先頭部分を返す
         const fullKey = fullName.replace(/\s/g, '');
         const fullFurigana = nameMap.get(fullKey);
         if (fullFurigana) {
           const parts = fullFurigana.trim().split(/[\s　]+/);
           if (parts.length > 1) return parts[0];
-          // スペースなしの全名ふりがな → 苗字漢字をデフォルトにする
           return familyNameKanji;
         }
         return familyNameKanji;
       };
 
       setEntries([
-        { key: 't1m_name', label: 'チーム1 男子 名前', displayName: maleFN1, furigana: getFamilyFurigana(maleFN1, team1.male.name), type: 'name' },
-        { key: 't1m_aff', label: 'チーム1 男子 所属', displayName: team1.male.affiliation, furigana: affMap.get(team1.male.affiliation) || team1.male.affiliation, type: 'affiliation' },
-        { key: 't1f_name', label: 'チーム1 女子 名前', displayName: femaleFN1, furigana: getFamilyFurigana(femaleFN1, team1.female.name), type: 'name' },
-        { key: 't1f_aff', label: 'チーム1 女子 所属', displayName: team1.female.affiliation, furigana: affMap.get(team1.female.affiliation) || team1.female.affiliation, type: 'affiliation' },
-        { key: 't2m_name', label: 'チーム2 男子 名前', displayName: maleFN2, furigana: getFamilyFurigana(maleFN2, team2.male.name), type: 'name' },
-        { key: 't2m_aff', label: 'チーム2 男子 所属', displayName: team2.male.affiliation, furigana: affMap.get(team2.male.affiliation) || team2.male.affiliation, type: 'affiliation' },
-        { key: 't2f_name', label: 'チーム2 女子 名前', displayName: femaleFN2, furigana: getFamilyFurigana(femaleFN2, team2.female.name), type: 'name' },
-        { key: 't2f_aff', label: 'チーム2 女子 所属', displayName: team2.female.affiliation, furigana: affMap.get(team2.female.affiliation) || team2.female.affiliation, type: 'affiliation' },
+        { key: 't1m_name', label: 'チーム1 男子', fullName: team1.male.name, displayName: maleFN1, furigana: getFamilyFurigana(maleFN1, team1.male.name), type: 'name' },
+        { key: 't1m_aff', label: 'チーム1 男子 所属', fullName: '', displayName: team1.male.affiliation, furigana: affMap.get(team1.male.affiliation) || team1.male.affiliation, type: 'affiliation' },
+        { key: 't1f_name', label: 'チーム1 女子', fullName: team1.female.name, displayName: femaleFN1, furigana: getFamilyFurigana(femaleFN1, team1.female.name), type: 'name' },
+        { key: 't1f_aff', label: 'チーム1 女子 所属', fullName: '', displayName: team1.female.affiliation, furigana: affMap.get(team1.female.affiliation) || team1.female.affiliation, type: 'affiliation' },
+        { key: 't2m_name', label: 'チーム2 男子', fullName: team2.male.name, displayName: maleFN2, furigana: getFamilyFurigana(maleFN2, team2.male.name), type: 'name' },
+        { key: 't2m_aff', label: 'チーム2 男子 所属', fullName: '', displayName: team2.male.affiliation, furigana: affMap.get(team2.male.affiliation) || team2.male.affiliation, type: 'affiliation' },
+        { key: 't2f_name', label: 'チーム2 女子', fullName: team2.female.name, displayName: femaleFN2, furigana: getFamilyFurigana(femaleFN2, team2.female.name), type: 'name' },
+        { key: 't2f_aff', label: 'チーム2 女子 所属', fullName: '', displayName: team2.female.affiliation, furigana: affMap.get(team2.female.affiliation) || team2.female.affiliation, type: 'affiliation' },
       ]);
     };
     init();
@@ -215,7 +213,7 @@ export default function CallPreviewDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          <p className="text-[10px] text-gray-500">読み仮名を確認・修正してください。修正内容はデータベースに保存されます。</p>
+          <p className="text-[10px] text-gray-500">苗字の読み仮名を確認・修正してください。コールは<span className="font-bold text-amber-600">苗字のみ</span>で行います。</p>
 
           {[{ team: team1, prefix: 't1', league: match.team1League },
             { team: team2, prefix: 't2', league: match.team2League }].map(({ team, prefix, league }) => (
@@ -227,7 +225,16 @@ export default function CallPreviewDialog({
                 <div key={entry.key} className="px-3 py-2 border-b border-gray-100 last:border-b-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] text-gray-400">{entry.label}</span>
-                    <span className="text-xs font-bold text-gray-800">{entry.displayName}</span>
+                    {entry.type === 'name' && entry.fullName ? (
+                      <span className="text-xs text-gray-800">
+                        <span className="font-bold">{entry.displayName}</span>
+                        {entry.fullName.replace(/[\s　]+/g, '') !== entry.displayName && (
+                          <span className="text-[10px] text-gray-400 ml-1">({entry.fullName})</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-gray-800">{entry.displayName}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Edit3 size={10} className="text-gray-400 shrink-0" />
@@ -236,7 +243,7 @@ export default function CallPreviewDialog({
                       value={entry.furigana}
                       onChange={e => updateFurigana(entry.key, e.target.value)}
                       className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
-                      placeholder="読み仮名"
+                      placeholder={entry.type === 'name' ? '苗字の読み仮名' : '読み仮名'}
                     />
                   </div>
                 </div>
