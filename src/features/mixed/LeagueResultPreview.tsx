@@ -52,9 +52,9 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
       {/* プレビュー呼び出しボタン */}
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
-        className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 shadow-sm hover:shadow hover:bg-teal-100 hover:border-teal-300 transition-all active:scale-95 whitespace-nowrap"
       >
-        <ImageIcon size={12} className="text-gray-500" />
+        <ImageIcon size={14} className="text-teal-600" />
         結果画像
       </button>
 

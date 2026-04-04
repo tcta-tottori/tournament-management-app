@@ -10,20 +10,25 @@ export async function generateLeagueResultDataUrl(
   allTeams: MixedTeam[],
   tournamentName: string,
 ): Promise<string> {
-  const teams = standings.map(s => allTeams.find(t => t.teamId === s.teamId)!).filter(Boolean);
+  // ペア番号順に並べ替え
+  const teams = [...league.teams].sort((a, b) => a.pairNumber - b.pairNumber);
   const teamCount = teams.length;
 
   // レイアウト定数
   const scale = 2; // 高解像度
-  const headerH = 60;
-  const colHeaderH = 30;
-  const rowH = 70;
-  const nameColW = 250;
-  const scoreColW = 90;
-  const recordColW = 80;
-  const rankColW = 50;
-  const totalW = nameColW + scoreColW * teamCount + recordColW + rankColW;
-  const totalH = headerH + colHeaderH + rowH * teamCount;
+  const paddingX = 40;
+  const paddingY = 40;
+  const headerH = 65;
+  const colHeaderH = 34;
+  const rowH = 76;
+  const nameColW = 260;
+  const scoreColW = 95;
+  const recordColW = 90;
+  const rankColW = 60;
+  const tableW = nameColW + scoreColW * teamCount + recordColW + rankColW;
+  const tableH = colHeaderH + rowH * teamCount;
+  const totalW = tableW + paddingX * 2;
+  const totalH = paddingY * 2 + headerH + tableH;
 
   const canvas = document.createElement('canvas');
   canvas.width = totalW * scale;
@@ -32,12 +37,12 @@ export async function generateLeagueResultDataUrl(
   ctx.scale(scale, scale);
 
   // 背景
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
 
   // ヘルパー
-  const drawLine = (x1: number, y1: number, x2: number, y2: number, w = 1) => {
-    ctx.strokeStyle = '#000';
+  const drawLine = (x1: number, y1: number, x2: number, y2: number, color = '#cbd5e1', w = 1.5) => {
+    ctx.strokeStyle = color;
     ctx.lineWidth = w;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
@@ -45,89 +50,126 @@ export async function generateLeagueResultDataUrl(
     ctx.stroke();
   };
 
-  const drawText = (text: string, x: number, y: number, size: number, align: CanvasTextAlign = 'center', bold = false) => {
-    ctx.fillStyle = '#000';
-    ctx.font = `${bold ? 'bold ' : ''}${size}px "Hiragino Sans", "Yu Gothic", "MS Gothic", sans-serif`;
+  const drawText = (text: string, x: number, y: number, size: number, align: CanvasTextAlign = 'center', color = '#1e293b', bold = false) => {
+    ctx.fillStyle = color;
+    ctx.font = `${bold ? 'bold ' : '500 '}${size}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
   };
 
-  // ---- ヘッダー ----
-  // リーグ名（大きく左）
-  drawText(`${league.leagueId.trim()}`, 30, 25, 36, 'left', true);
-  drawText('リーグ', 55, 35, 14, 'left', false);
-  // 大会名（右寄せ）
-  drawText(tournamentName, totalW - 10, 25, 16, 'right', false);
+  const drawRoundRect = (x: number, y: number, w: number, h: number, r: number, fill?: string, stroke?: string, strokeW = 1.5) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = strokeW; ctx.stroke(); }
+  };
 
-  // ---- 列ヘッダー ----
-  const tableTop = headerH;
-  const tableLeft = 0;
+  // ---- ページヘッダー ----
+  const pLId = league.leagueId.trim();
+  // リーグバッジ風
+  drawRoundRect(paddingX, paddingY - 10, 52, 52, 12, '#10b981');
+  drawText(pLId, paddingX + 26, paddingY + 16, 32, 'center', '#ffffff', true);
+  drawText('リーグ', paddingX + 65, paddingY + 28, 16, 'left', '#64748b', true);
+  
+  // 大会名
+  drawText(tournamentName, paddingX + tableW, paddingY + 24, 20, 'right', '#334155', true);
 
-  // ヘッダー行の線
-  drawLine(tableLeft, tableTop, totalW, tableTop, 1.5);
-  drawLine(tableLeft, tableTop + colHeaderH, totalW, tableTop + colHeaderH, 1);
+  // ---- 表全体枠（影付け） ----
+  const tableX = paddingX;
+  const tableY = paddingY + headerH;
+  
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.05)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+  drawRoundRect(tableX, tableY, tableW, tableH, 12, '#ffffff'); // 白背景と影
+  ctx.restore();
+
+  // 列ヘッダー背景部分だけ先に塗る（角丸マスク）
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(tableX + 12, tableY);
+  ctx.arcTo(tableX + tableW, tableY, tableX + tableW, tableY + colHeaderH, 12);
+  ctx.arcTo(tableX + tableW, tableY + colHeaderH, tableX, tableY + colHeaderH, 0); // 右下と左下は丸めない
+  ctx.arcTo(tableX, tableY + colHeaderH, tableX, tableY, 0);
+  ctx.arcTo(tableX, tableY, tableX + tableW, tableY, 12);
+  ctx.clip();
+  ctx.fillStyle = '#f0fdf4'; // 薄いグリーン
+  ctx.fillRect(tableX, tableY, tableW, colHeaderH);
+  ctx.restore();
+
+  // ---- 列ヘッダー区切り線 ----
+  drawLine(tableX, tableY + colHeaderH, tableX + tableW, tableY + colHeaderH, '#10b981', 1.5);
 
   // 列ヘッダーテキスト
-  drawText('選手名', nameColW / 2, tableTop + colHeaderH / 2, 11, 'center', true);
+  const thColor = '#166534';
+  drawText('選手名', tableX + nameColW / 2, tableY + colHeaderH / 2, 13, 'center', thColor, true);
+  
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
     const sei = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
-    const x = nameColW + scoreColW * i + scoreColW / 2;
-    drawText(`${sei(team.male.name)}・${sei(team.female.name)}`, x, tableTop + colHeaderH / 2, 9, 'center', false);
+    const x = tableX + nameColW + scoreColW * i + scoreColW / 2;
+    drawText(`${sei(team.male.name)}・${sei(team.female.name)}`, x, tableY + colHeaderH / 2, 11, 'center', thColor, true);
   }
-  const recordX = nameColW + scoreColW * teamCount + recordColW / 2;
-  drawText('勝敗', recordX, tableTop + colHeaderH / 2, 11, 'center', true);
-  const rankX = nameColW + scoreColW * teamCount + recordColW + rankColW / 2;
-  drawText('順位', rankX, tableTop + colHeaderH / 2, 11, 'center', true);
+  const recordX = tableX + nameColW + scoreColW * teamCount + recordColW / 2;
+  drawText('勝敗', recordX, tableY + colHeaderH / 2, 13, 'center', thColor, true);
+  const rankX = tableX + nameColW + scoreColW * teamCount + recordColW + rankColW / 2;
+  drawText('順位', rankX, tableY + colHeaderH / 2, 13, 'center', thColor, true);
 
-  // ---- 各行 ----
+  // ---- 各行の描画 ----
   for (let rowIdx = 0; rowIdx < teamCount; rowIdx++) {
     const team = teams[rowIdx];
-    const standing = standings[rowIdx];
-    const rowTop = tableTop + colHeaderH + rowH * rowIdx;
+    const standing = standings.find(s => s.teamId === team.teamId) || { wins: 0, losses: 0, rank: 0 };
+    const rowTop = tableY + colHeaderH + rowH * rowIdx;
 
-    // 行の線
-    drawLine(tableLeft, rowTop, totalW, rowTop, 1);
+    if (rowIdx > 0) {
+      drawLine(tableX, rowTop, tableX + tableW, rowTop, '#e2e8f0', 1);
+    }
 
     // ペア番号
-    drawText(String(team.pairNumber), 18, rowTop + rowH / 2, 16, 'center', false);
+    drawText(String(team.pairNumber), tableX + 22, rowTop + rowH / 2, 18, 'center', '#64748b', true);
 
     // 男子名 + 所属
-    const nameX = 40;
+    const nameStartX = tableX + 46;
     
-    // 名前の幅を14px boldで計算
-    ctx.font = 'bold 14px "Hiragino Sans", "Yu Gothic", "MS Gothic", sans-serif';
+    ctx.font = 'bold 15px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     const maleNameW = ctx.measureText(team.male.name).width;
+    drawText(team.male.name, nameStartX, rowTop + 22, 15, 'left', '#0f172a', true);
     
-    drawText(team.male.name, nameX, rowTop + 18, 14, 'left', true);
-    ctx.font = '10px "Hiragino Sans", "Yu Gothic", sans-serif';
-    ctx.fillStyle = '#555';
+    ctx.font = '11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText(team.male.affiliation, nameX + maleNameW + 10, rowTop + 19);
+    ctx.fillText(team.male.affiliation, nameStartX + maleNameW + 12, rowTop + 23);
 
     // 女子名 + 所属
-    ctx.font = 'bold 14px "Hiragino Sans", "Yu Gothic", "MS Gothic", sans-serif';
+    ctx.font = 'bold 15px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     const femaleNameW = ctx.measureText(team.female.name).width;
+    drawText(team.female.name, nameStartX, rowTop + 50, 15, 'left', '#0f172a', true);
     
-    ctx.fillStyle = '#000';
-    drawText(team.female.name, nameX, rowTop + 45, 14, 'left', true);
-    ctx.font = '10px "Hiragino Sans", "Yu Gothic", sans-serif';
-    ctx.fillStyle = '#555';
+    ctx.font = '11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText(team.female.affiliation, nameX + femaleNameW + 10, rowTop + 46);
+    ctx.fillText(team.female.affiliation, nameStartX + femaleNameW + 12, rowTop + 51);
 
     // 対戦スコア
     for (let colIdx = 0; colIdx < teamCount; colIdx++) {
-      const x = nameColW + scoreColW * colIdx;
+      const x = tableX + nameColW + scoreColW * colIdx;
 
       // 縦線
-      drawLine(x, rowTop, x, rowTop + rowH, 1);
+      drawLine(x, tableY, x, tableY + tableH, '#e2e8f0', 1);
 
       if (colIdx === rowIdx) {
-        // 自分同士: 灰色背景
-        ctx.fillStyle = '#f0f0f0';
+        // 自分同士: 灰色背景 & 斜線
+        ctx.fillStyle = '#f8fafc';
+        // 左上が角のマスなら角丸を考慮する等の細かい処理は clipping されている表全体枠でカバーする
         ctx.fillRect(x + 0.5, rowTop + 0.5, scoreColW - 1, rowH - 1);
+        drawLine(x, rowTop, x + scoreColW, rowTop + rowH, '#cbd5e1', 1);
         continue;
       }
 
@@ -144,38 +186,29 @@ export async function generateLeagueResultDataUrl(
         const oppScore = isTeam1 ? match.score2 : match.score1;
         const won = match.winnerId === team.teamId;
 
-        let scoreText = `${myScore}-${oppScore}`;
-        // タイブレーク表示
-        if (match.tiebreakScore != null &&
-            ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
-          // 勝者は (TB) を右側、敗者は (TB) を左側に表示しない - シンプルにスコアのみ
-          scoreText = `${myScore}-${oppScore}`;
+        let scoreText = `${myScore} - ${oppScore}`;
+        if (match.tiebreakScore != null && ((match.score1 === 7 && match.score2 === 6) || (match.score1 === 6 && match.score2 === 7))) {
+          scoreText = `${myScore} - ${oppScore}`;
         }
 
         const cx = x + scoreColW / 2;
-        ctx.fillStyle = '#000';
-        drawText(scoreText, cx, rowTop + rowH / 2, won ? 16 : 14, 'center', won);
+        drawText(scoreText, cx, rowTop + rowH / 2, won ? 18 : 16, 'center', won ? '#0f172a' : '#64748b', won);
       }
     }
 
     // 勝敗列
-    const recX = nameColW + scoreColW * teamCount;
-    drawLine(recX, rowTop, recX, rowTop + rowH, 1);
-    drawText(`${standing.wins}勝${standing.losses}敗`, recX + recordColW / 2, rowTop + rowH / 2, 12, 'center', false);
+    const recL = tableX + nameColW + scoreColW * teamCount;
+    drawLine(recL, tableY, recL, tableY + tableH, '#e2e8f0', 1);
+    drawText(`${standing.wins}勝${standing.losses}敗`, recL + recordColW / 2, rowTop + rowH / 2, 14, 'center', '#334155', false);
 
     // 順位列
-    const rkX = recX + recordColW;
-    drawLine(rkX, rowTop, rkX, rowTop + rowH, 1);
-    drawText(`${standing.rank}位`, rkX + rankColW / 2, rowTop + rowH / 2, 16, 'center', true);
+    const rkL = recL + recordColW;
+    drawLine(rkL, tableY, rkL, tableY + tableH, '#e2e8f0', 1);
+    drawText(standing.rank ? `${standing.rank}位` : '-', rkL + rankColW / 2, rowTop + rowH / 2, 18, 'center', '#0f172a', true);
   }
 
-  // 最下線
-  const bottomY = tableTop + colHeaderH + rowH * teamCount;
-  drawLine(tableLeft, bottomY, totalW, bottomY, 1.5);
-
-  // 左右枠線
-  drawLine(tableLeft, tableTop, tableLeft, bottomY, 1.5);
-  drawLine(totalW, tableTop, totalW, bottomY, 1.5);
+  // 表の外枠を後から重ね描きして綺麗にする
+  drawRoundRect(tableX, tableY, tableW, tableH, 12, undefined, '#94a3b8', 2);
 
   // PromiseでエンコードしてData URLを返す
   return new Promise<string>((resolve, reject) => {
