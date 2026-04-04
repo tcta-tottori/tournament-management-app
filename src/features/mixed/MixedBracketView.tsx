@@ -1195,7 +1195,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
                       <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white" style={{ height: byeBoxH }}>
                         {byeSlotNum && (
-                          <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 text-base font-bold flex items-center justify-center shrink-0 border border-amber-300">{byeSlotNum}</span>
+                          <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-600 text-base font-normal flex items-center justify-center shrink-0 border border-amber-200">{byeSlotNum}</span>
                         )}
                         {winnerLeague && (
                           <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
@@ -1237,7 +1237,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                     `} style={{ height: SLOT_HEIGHT }}>
                       {slot.slotNum && (
-                        <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 text-base font-bold flex items-center justify-center shrink-0 mr-1.5 border border-amber-300">{slot.slotNum}</span>
+                        <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-600 text-base font-normal flex items-center justify-center shrink-0 mr-1 border border-amber-200">{slot.slotNum}</span>
                       )}
                       {slot.league ? (() => {
                         const badge = getLeagueBadge(slot.teamId, slot.league);
