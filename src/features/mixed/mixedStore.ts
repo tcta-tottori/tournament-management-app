@@ -534,14 +534,19 @@ export const useMixedStore = create<MixedState>()(
             }
           }
 
-          const reorderedTeams = slotsArray.filter((id): id is string => id !== null)
+          // 配置済みチームのseedPositionを更新し、未配置チームも保持する
+          const assignedTeams = slotsArray.filter((id): id is string => id !== null)
             .map((teamId, i) => {
-              const existing = bracket.teams.find(t => t.teamId === teamId);
+              const existing = bracket.teams.find(t => t.teamId === teamId)
+                || (() => { const a = state.allTeams.find(t => t.teamId === teamId); return a ? { teamId: a.teamId, teamName: a.teamName, leagueId: a.leagueId, seedPosition: 0 } : null; })();
               return existing ? { ...existing, seedPosition: i + 1 } : null;
             }).filter((t): t is NonNullable<typeof t> => t !== null);
+          const assignedIds = new Set(assignedTeams.map(t => t.teamId));
+          const unassignedTeams = bracket.teams.filter(t => !assignedIds.has(t.teamId));
+          const allBracketTeams = [...assignedTeams, ...unassignedTeams];
 
           const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };
+          newBrackets[bracketIdx] = { ...bracket, teams: allBracketTeams, matches };
           return { brackets: newBrackets };
         });
       },

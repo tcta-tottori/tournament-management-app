@@ -1054,14 +1054,41 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     '3rd': ['D',null,'H','M','F','A','K',null,'I','G','C','E','L','J','B',null],
     '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
   };
+  // 1位トーナメント: BYE位置 (0-indexed)
+  const BYE_POSITIONS_1ST = new Set([1, 7, 15]);
+  // スロット→丸番号マップ（BYE以外に①~⑬を割り当て）
+  const slotCircledNum = useMemo(() => {
+    const map = new Map<number, string>();
+    let num = 0;
+    for (let i = 0; i < 16; i++) {
+      if (BYE_POSITIONS_1ST.has(i)) continue;
+      map.set(i, String.fromCodePoint(0x2460 + num));
+      num++;
+    }
+    return map;
+  }, []);
+
+  // 1回戦スロットの丸番号を取得（1回戦のみ、team1=上段, team2=下段）
+  const getSlotNumber = (match: BracketMatch, slot: 'team1' | 'team2'): string | null => {
+    if (match.round !== 1) return null;
+    const slotIdx = slot === 'team1' ? (match.position - 1) * 2 : (match.position - 1) * 2 + 1;
+    return slotCircledNum.get(slotIdx) || null;
+  };
+
   const getPlaceholderInfo = (match: BracketMatch, slot: 'team1' | 'team2'): { text: string; leagueId?: string; rank?: string } | null => {
-    if (is1stBracket) return { text: '―' };
     const id = slot === 'team1' ? match.team1Id : match.team2Id;
     if (id) return null; // 既に配置済み
     // 1回戦のみプレースホルダー表示
     if (match.round !== 1) return null;
     const pos = match.position;
     const slotIdx = slot === 'team1' ? (pos - 1) * 2 : (pos - 1) * 2 + 1;
+
+    if (is1stBracket) {
+      if (BYE_POSITIONS_1ST.has(slotIdx)) return { text: 'BYE' };
+      const num = slotCircledNum.get(slotIdx) || '';
+      return { text: `${num} 未配置` };
+    }
+
     // スロットマップからリーグIDを取得
     const slotMap = BRACKET_SLOT_MAP[bracket.category];
     if (slotMap && slotIdx < slotMap.length) {
@@ -1162,9 +1189,13 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                   }
                   const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
                   const byeBoxH = winnerData ? (compact ? 28 : 70) : BYE_HEIGHT;
+                  const byeSlotNum = match.round === 1 ? getSlotNumber(match, match.team1Id ? 'team1' : 'team2') : null;
                   return (
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
                       <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white" style={{ height: byeBoxH }}>
+                        {byeSlotNum && (
+                          <span className="text-[10px] text-gray-400 font-bold shrink-0 w-4 text-center">{byeSlotNum}</span>
+                        )}
                         {winnerLeague && (
                           <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
                             {winnerLeague}
@@ -1194,7 +1225,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 // 通常マッチ
                 const SLOT_HEIGHT = compact ? 22 : 42;
                 const STATUS_HEIGHT = compact ? 16 : 30;
-                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean }) => {
+                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null }) => {
                   // teamIdから探す。なければnameから逆引き
                   let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
                   if (!teamData && slot.name && slot.league) {
@@ -1204,10 +1235,13 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                     <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
                       ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
                     `} style={{ height: SLOT_HEIGHT }}>
+                      {slot.slotNum && (
+                        <span className="text-[10px] text-gray-400 font-bold shrink-0 mr-1 w-4 text-center">{slot.slotNum}</span>
+                      )}
                       {slot.league ? (() => {
                         const badge = getLeagueBadge(slot.teamId, slot.league);
                         return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'} ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{badge}</span>;
-                      })() : <span className="w-5 shrink-0 mr-1.5" />}
+                      })() : !slot.slotNum ? <span className="w-5 shrink-0 mr-1.5" /> : null}
                       <div className="flex-1 min-w-0">
                         {teamData ? (
                           <div className="flex items-center gap-1">
@@ -1250,8 +1284,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       `}
                       style={{ height: MATCH_HEIGHT }}
                     >
-                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true })}
-                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false })}
+                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1') })}
+                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2') })}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
                         <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
