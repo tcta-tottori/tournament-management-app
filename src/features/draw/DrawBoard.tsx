@@ -44,11 +44,15 @@ export type MatchResult = {
 export default function DrawBoard() {
   const isMixedImported = useMixedStore(s => s.isImported);
 
-  // ミックスダブルスモード
+  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
   if (isMixedImported) {
     return <MixedDrawView />;
   }
 
+  return <NormalDrawBoard />;
+}
+
+function NormalDrawBoard() {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [editedSlots, setEditedSlots] = useState<DrawSlotData[]>([]);
   const [isSaving, setIsSaving] = useState(false);

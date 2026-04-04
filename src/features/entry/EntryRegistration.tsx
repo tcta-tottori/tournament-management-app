@@ -105,12 +105,17 @@ type CheckInSlot = {
 
 export default function EntryRegistration() {
   const isMixedImported = useMixedStore(s => s.isImported);
-  const currentTournamentId = useAppStore(state => state.currentTournamentId);
 
-  // ミックスダブルスモード
+  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
   if (isMixedImported) {
     return <MixedEntryView />;
   }
+
+  return <NormalEntryRegistration />;
+}
+
+function NormalEntryRegistration() {
+  const currentTournamentId = useAppStore(state => state.currentTournamentId);
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');

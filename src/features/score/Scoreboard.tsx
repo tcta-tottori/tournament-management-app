@@ -113,11 +113,15 @@ type ViewMode = 'bracket' | 'table';
 export default function Scoreboard() {
   const isMixedImported = useMixedStore(s => s.isImported);
 
-  // ミックスダブルスモード
+  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
   if (isMixedImported) {
     return <MixedScoreView />;
   }
 
+  return <NormalScoreboard />;
+}
+
+function NormalScoreboard() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
 
