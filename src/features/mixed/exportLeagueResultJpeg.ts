@@ -50,12 +50,16 @@ export async function generateLeagueResultDataUrl(
     ctx.stroke();
   };
 
-  const drawText = (text: string, x: number, y: number, size: number, align: CanvasTextAlign = 'center', color = '#1e293b', bold = false) => {
+  const drawText = (text: string, x: number, y: number, size: number, align: CanvasTextAlign = 'center', color = '#1e293b', bold = false, maxWidth?: number) => {
     ctx.fillStyle = color;
     ctx.font = `${bold ? 'bold ' : '500 '}${size}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y);
+    if (maxWidth) {
+      ctx.fillText(text, x, y, maxWidth);
+    } else {
+      ctx.fillText(text, x, y);
+    }
   };
 
   const drawRoundRect = (x: number, y: number, w: number, h: number, r: number, fill?: string, stroke?: string, strokeW = 1.5) => {
@@ -113,9 +117,14 @@ export async function generateLeagueResultDataUrl(
   
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
-    const sei = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
+    const extractSei = (n: string) => {
+      const trimmed = n.trim();
+      if (trimmed.includes(' ') || trimmed.includes('　')) return trimmed.split(/[\s　]+/)[0];
+      if (trimmed.length >= 4) return trimmed.substring(0, 2); // 例: 細川善貴 -> 細川
+      return trimmed;
+    };
     const x = tableX + nameColW + scoreColW * i + scoreColW / 2;
-    drawText(`${sei(team.male.name)}・${sei(team.female.name)}`, x, tableY + colHeaderH / 2, 11, 'center', thColor, true);
+    drawText(`${extractSei(team.male.name)}・${extractSei(team.female.name)}`, x, tableY + colHeaderH / 2, 11, 'center', thColor, true, scoreColW - 8);
   }
   const recordX = tableX + nameColW + scoreColW * teamCount + recordColW / 2;
   drawText('勝敗', recordX, tableY + colHeaderH / 2, 13, 'center', thColor, true);
@@ -137,25 +146,23 @@ export async function generateLeagueResultDataUrl(
 
     // 男子名 + 所属
     const nameStartX = tableX + 46;
+    const affiliationStartX = tableX + 160; // 所属の開始位置を揃える
     
-    ctx.font = 'bold 15px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-    const maleNameW = ctx.measureText(team.male.name).width;
-    drawText(team.male.name, nameStartX, rowTop + 22, 15, 'left', '#0f172a', true);
+    // 名前の幅を考慮して描画 (最大幅を設定)
+    drawText(team.male.name, nameStartX, rowTop + 22, 15, 'left', '#0f172a', true, affiliationStartX - nameStartX - 10);
     
     ctx.font = '11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText(team.male.affiliation, nameStartX + maleNameW + 12, rowTop + 23);
+    ctx.fillText(team.male.affiliation, affiliationStartX, rowTop + 23, nameColW - (affiliationStartX - tableX) - 10);
 
     // 女子名 + 所属
-    ctx.font = 'bold 15px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-    const femaleNameW = ctx.measureText(team.female.name).width;
-    drawText(team.female.name, nameStartX, rowTop + 50, 15, 'left', '#0f172a', true);
+    drawText(team.female.name, nameStartX, rowTop + 50, 15, 'left', '#0f172a', true, affiliationStartX - nameStartX - 10);
     
     ctx.font = '11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText(team.female.affiliation, nameStartX + femaleNameW + 12, rowTop + 51);
+    ctx.fillText(team.female.affiliation, affiliationStartX, rowTop + 51, nameColW - (affiliationStartX - tableX) - 10);
 
     // 対戦スコア
     for (let colIdx = 0; colIdx < teamCount; colIdx++) {
