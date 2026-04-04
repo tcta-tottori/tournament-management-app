@@ -165,7 +165,7 @@ function printRefereeSheet(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, tournamentInfo, leagues } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, rebuildBracketFromSlots, tournamentInfo, leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -316,7 +316,7 @@ export default function MixedBracketView() {
 
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
-  const noMatchesStarted = currentBracket?.matches.every(m => m.status === 'waiting' || m.status === 'bye') ?? true;
+  const noMatchesStarted = currentBracket?.matches.every(m => m.status === 'waiting' || m.status === 'bye' || m.status === 'ready') ?? true;
 
   return (
     <div className="space-y-4">
@@ -408,6 +408,7 @@ export default function MixedBracketView() {
         <RouletteDrawPanel
           bracket={currentBracket}
           onShuffle={shuffleBracketSeeds}
+          onRebuild={rebuildBracketFromSlots}
         />
       )}
 
@@ -744,9 +745,10 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
 }
 
 /** ルーレット抽選パネル（改善版: 全ペア表示・個別選択・手動配置） */
-function RouletteDrawPanel({ bracket, onShuffle }: {
+function RouletteDrawPanel({ bracket, onShuffle, onRebuild }: {
   bracket: PlacementBracket;
   onShuffle: (category: PlacementCategory, newOrder: string[]) => void;
+  onRebuild: (category: PlacementCategory, slots: (string | null)[]) => void;
 }) {
   const [spinning, setSpinning] = useState(false);
   const [currentHighlight, setCurrentHighlight] = useState(-1);
@@ -774,16 +776,12 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
   const unassignedTeams = useMemo(() => teams.filter(t => !assignedTeamIds.has(t.teamId)), [teams, assignedTeamIds]);
   const activeTeam = selectedTeamId ? teams.find(t => t.teamId === selectedTeamId) : unassignedTeams[0];
 
-  // 現在の割当状態をブラケットに即時反映するヘルパー
+  // 現在の割当状態をブラケットに即時反映するヘルパー（未配置スロットはnullのまま、BYE位置のみBYE扱い）
   const syncToBracket = useCallback((slotsMap: Map<number, string>) => {
     const slots16: (string | null)[] = Array(DRAW_SIZE).fill(null);
     slotsMap.forEach((teamId, slot) => { slots16[slot] = teamId; });
-    const order = slots16.filter((id): id is string => id !== null);
-    // 未配置チームも末尾に追加（ブラケット再構築に必要）
-    const ids = new Set(order);
-    for (const t of teams) { if (!ids.has(t.teamId)) order.push(t.teamId); }
-    onShuffle(bracket.category, order);
-  }, [teams, bracket.category, onShuffle]);
+    onRebuild(bracket.category, slots16, BYE_POSITIONS);
+  }, [bracket.category, onRebuild]);
 
   // ルーレット
   const spinRoulette = useCallback(() => {
@@ -831,21 +829,17 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
       if (BYE_POSITIONS.has(i)) continue;
       if (ti < shuffled.length) { slots16[i] = shuffled[ti].teamId; ti++; }
     }
-    const order = slots16.filter((id): id is string => id !== null);
-    onShuffle(bracket.category, order);
+    onRebuild(bracket.category, slots16, BYE_POSITIONS);
     setDrawComplete(true);
-  }, [teams, bracket.category, onShuffle]);
+  }, [teams, bracket.category, onRebuild]);
 
   // 手動割当確定
   const confirmDraw = useCallback(() => {
     const slots16: (string | null)[] = Array(DRAW_SIZE).fill(null);
     assignedSlots.forEach((teamId, slot) => { slots16[slot] = teamId; });
-    const order = slots16.filter((id): id is string => id !== null);
-    const ids = new Set(order);
-    for (const t of teams) { if (!ids.has(t.teamId)) order.push(t.teamId); }
-    onShuffle(bracket.category, order);
+    onRebuild(bracket.category, slots16, BYE_POSITIONS);
     setDrawComplete(true);
-  }, [assignedSlots, teams, bracket.category, onShuffle]);
+  }, [assignedSlots, bracket.category, onRebuild]);
 
   const resetDraw = () => {
     setAssignedSlots(new Map());
@@ -853,6 +847,9 @@ function RouletteDrawPanel({ bracket, onShuffle }: {
     setCurrentHighlight(-1);
     setDrawComplete(false);
     if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+    // ブラケットも全スロット空にリセット
+    const emptySlots: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    onRebuild(bracket.category, emptySlots, BYE_POSITIONS);
   };
 
   useEffect(() => () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); }, []);

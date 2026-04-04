@@ -63,8 +63,8 @@ interface MixedState {
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
 
-  // Rebuild bracket from raw 16-slot array (null=BYE)
-  rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[]) => void;
+  // Rebuild bracket from raw 16-slot array (null=BYE or unassigned)
+  rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
 
   // Auto-populate non-1st brackets from league standings
   autoPopulateBrackets: () => void;
@@ -470,7 +470,7 @@ export const useMixedStore = create<MixedState>()(
         });
       },
 
-      rebuildBracketFromSlots: (category, slotsArray) => {
+      rebuildBracketFromSlots: (category, slotsArray, byePositions) => {
         set(state => {
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
           if (bracketIdx === -1) return state;
@@ -506,9 +506,12 @@ export const useMixedStore = create<MixedState>()(
             const t2 = tid2 ? state.allTeams.find(t => t.teamId === tid2) : null;
             if (t1) { r1[i].team1Id = t1.teamId; r1[i].team1Name = t1.teamName; r1[i].team1League = t1.leagueId; }
             if (t2) { r1[i].team2Id = t2.teamId; r1[i].team2Name = t2.teamName; r1[i].team2League = t2.leagueId; }
-            if (r1[i].team1Id && !r1[i].team2Id) {
+            // byePositionsが指定されている場合、BYE位置のnullのみBYE扱い（ルーレット中の未配置はBYEにしない）
+            const s1IsBye = byePositions ? byePositions.has(i * 2) : !tid1;
+            const s2IsBye = byePositions ? byePositions.has(i * 2 + 1) : !tid2;
+            if (r1[i].team1Id && !r1[i].team2Id && s2IsBye) {
               r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team1Id; r1[i].team2Name = 'BYE';
-            } else if (!r1[i].team1Id && r1[i].team2Id) {
+            } else if (!r1[i].team1Id && r1[i].team2Id && s1IsBye) {
               r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team2Id; r1[i].team1Name = 'BYE';
             } else if (r1[i].team1Id && r1[i].team2Id) {
               r1[i].status = 'ready';
