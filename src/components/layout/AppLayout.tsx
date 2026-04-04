@@ -82,6 +82,18 @@ export default function AppLayout() {
   const mixedBrackets = useMixedStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
 
+  // 予選リーグ未完了なのにブラケット(決勝T)が残っている場合 → 旧データなのでクリア
+  useEffect(() => {
+    if (!isMixedImported || mixedLeagues.length === 0) return;
+    const allLeaguesComplete = mixedLeagues.every(l => {
+      const lm = mixedLeagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+    if (!allLeaguesComplete && mixedBrackets.length > 0) {
+      useMixedStore.setState({ brackets: [] });
+    }
+  }, [isMixedImported, mixedLeagues, mixedLeagueMatches, mixedBrackets]);
+
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
     () => currentTournamentId
@@ -183,7 +195,12 @@ export default function AppLayout() {
       items.push(`${completedLeagues.length}/${mixedLeagues.length}リーグ完了 (${completedLeagues.map(l => l.leagueId.trim()).join(',')})`);
     }
 
-    if (mixedBrackets.length > 0) {
+    // 全リーグ完了時のみブラケット情報を表示（未完了時は旧データの可能性）
+    const allLeaguesComplete = mixedLeagues.every(l => {
+      const lm = mixedLeagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+    if (mixedBrackets.length > 0 && allLeaguesComplete) {
       const bracketFinished = mixedBrackets.reduce((sum, b) => sum + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
       const bracketTotal = mixedBrackets.reduce((sum, b) => sum + b.matches.length, 0);
       items.push(`決勝トーナメント: ${bracketFinished}/${bracketTotal}試合完了`);

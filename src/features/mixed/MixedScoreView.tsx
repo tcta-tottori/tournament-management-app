@@ -6,6 +6,14 @@ import MixedBracketView from './MixedBracketView';
 export default function MixedScoreView() {
   const { brackets, leagues, leagueMatches, rankOverrides, autoPopulateBrackets, regenerateBrackets } = useMixedStore();
 
+  // 全リーグ完了チェック
+  const allLeaguesComplete = useMemo(() => {
+    return leagues.length > 0 && leagues.every(l => {
+      const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+  }, [leagues, leagueMatches]);
+
   // 現在のリーグ順位からブラケットチームの整合性チェック用ハッシュ
   const standingsHash = useMemo(() => {
     if (leagues.length === 0) return '';
@@ -18,31 +26,27 @@ export default function MixedScoreView() {
     return parts.sort().join('|');
   }, [leagues, leagueMatches, rankOverrides]);
 
-  // ブラケットがまだ生成されていなければ自動生成
+  // 予選リーグが未完了なのにブラケットが残っている場合 → 旧データなのでクリア
   useEffect(() => {
-    if (brackets.length === 0 && leagues.length > 0) {
+    if (!allLeaguesComplete && brackets.length > 0) {
+      useMixedStore.setState({ brackets: [] });
+    }
+  }, [allLeaguesComplete, brackets.length]);
+
+  // 全リーグ完了時にブラケットがまだなければ自動生成
+  useEffect(() => {
+    if (allLeaguesComplete && brackets.length === 0 && leagues.length > 0) {
       autoPopulateBrackets();
     }
-  }, [brackets.length, leagues.length, autoPopulateBrackets]);
+  }, [allLeaguesComplete, brackets.length, leagues.length, autoPopulateBrackets]);
 
-  // リーグ順位が変わった場合、試合未開始のブラケットを自動更新
+  // リーグ順位が変わった場合、試合未開始のブラケットを自動更新（全リーグ完了時のみ）
   useEffect(() => {
-    if (brackets.length === 0 || !standingsHash) return;
-    // 1位ブラケットで試合が始まっていたら全体再生成をスキップ（regenerateBracketsが1st保護する）
-    // 2位以降は自動的に再生成される
-    const hasAnyStarted = brackets.some(b =>
-      b.matches.some(m => m.status === 'finished' || m.status === 'playing')
-    );
-    if (!hasAnyStarted) {
-      // 全ブラケット未開始なら完全再生成
-      regenerateBrackets();
-    } else {
-      // 一部開始済みの場合は regenerateBrackets が1位ブラケットを保護しつつ再生成
-      regenerateBrackets();
-    }
+    if (!allLeaguesComplete || brackets.length === 0 || !standingsHash) return;
+    regenerateBrackets();
     // standingsHash の変化のみでトリガー（brackets は依存に含めない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standingsHash]);
+  }, [standingsHash, allLeaguesComplete]);
 
   return (
     <div className="p-2 sm:p-4 space-y-4">

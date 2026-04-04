@@ -138,8 +138,8 @@ export const useMixedStore = create<MixedState>()(
       },
 
       updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
-        set(state => ({
-          leagueMatches: state.leagueMatches.map(m => {
+        set(state => {
+          const newMatches = state.leagueMatches.map(m => {
             if (m.matchId !== matchId) return m;
             // Clear: score1=-1 && score2=-1
             if (score1 === -1 && score2 === -1) {
@@ -150,8 +150,14 @@ export const useMixedStore = create<MixedState>()(
               : (score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null);
             const tb = tiebreakScore !== undefined ? tiebreakScore : null;
             return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
-          }),
-        }));
+          });
+          // スコアクリア時: ブラケットが既に生成されていれば旧データになるためクリア
+          const isClearing = score1 === -1 && score2 === -1;
+          return {
+            leagueMatches: newMatches,
+            ...(isClearing && state.brackets.length > 0 ? { brackets: [] } : {}),
+          };
+        });
       },
 
       setLeagueMatchStatus: (matchId, status) => {
@@ -530,6 +536,12 @@ export const useMixedStore = create<MixedState>()(
 
       autoPopulateBrackets: () => {
         const { leagues, leagueMatches, allTeams } = get();
+        // 全リーグ完了チェック: 未完了時はブラケットを生成しない
+        const allComplete = leagues.every(l => {
+          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+          return lm.length > 0 && lm.every(m => m.status === 'finished');
+        });
+        if (!allComplete) return;
 
         const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
