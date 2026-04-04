@@ -111,13 +111,15 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   }, [tournamentInfo, teams.length]);
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
-  // 背後のスクロールを防止するだけのシンプルな処理（position: fixed はレイアウト崩れやスクロールジャンプの原因になるため不使用）
-  useLayoutEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
+  // autoFocus によるスクロールジャンプを防ぐための手動フォーカス
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (score1Ref.current) {
+        score1Ref.current.focus({ preventScroll: true });
+        score1Ref.current.select();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -334,7 +336,6 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
               data-form-type="other"
               className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score1HighlightClass}`}
               placeholder="0"
-              autoFocus
             />
             <span className="text-3xl font-bold text-gray-400">-</span>
             <input
