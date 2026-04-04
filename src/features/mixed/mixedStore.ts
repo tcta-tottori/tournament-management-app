@@ -545,25 +545,40 @@ export const useMixedStore = create<MixedState>()(
 
         const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
         const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
-        set({ brackets });
+        // 完全新規生成なのでコート割当もリセット
+        set({ brackets, bracketCourtAssignments: {} });
       },
 
       regenerateBrackets: () => {
-        const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo, rankOverrides } = get();
+        const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo, rankOverrides, bracketCourtAssignments } = get();
         const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
         const newBrackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
 
-        // 1位トーナメントは試合が始まっていたら維持
+        // 1位トーナメントは実際に試合が進行中/完了の場合のみ維持（'ready'だけでは保持しない）
+        let preserve1st = false;
         const old1st = oldBrackets.find(b => b.category === '1st');
         if (old1st) {
-          const hasStarted = old1st.matches.some(m => m.status === 'finished' || m.status === 'playing' || m.status === 'ready');
-          if (hasStarted) {
+          const hasActuallyStarted = old1st.matches.some(m => m.status === 'finished' || m.status === 'playing');
+          if (hasActuallyStarted) {
             const idx = newBrackets.findIndex(b => b.category === '1st');
-            if (idx >= 0) newBrackets[idx] = old1st;
+            if (idx >= 0) {
+              newBrackets[idx] = old1st;
+              preserve1st = true;
+            }
           }
         }
 
-        set({ brackets: newBrackets });
+        // コート割当をクリア（1位トーナメント保持時はそのコート割当のみ維持）
+        let newCourtAssignments: Record<string, { courtName: string; startedAt: number }> = {};
+        if (preserve1st) {
+          for (const [matchId, ca] of Object.entries(bracketCourtAssignments)) {
+            if (matchId.startsWith('bracket-1st-')) {
+              newCourtAssignments[matchId] = ca;
+            }
+          }
+        }
+
+        set({ brackets: newBrackets, bracketCourtAssignments: newCourtAssignments });
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
