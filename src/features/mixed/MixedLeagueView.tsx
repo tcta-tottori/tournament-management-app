@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft, Download } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
 import { GameRatioCell } from './GameRatioCell';
+import { exportLeagueResultJpeg } from './exportLeagueResultJpeg';
 
 /** コートオーバーライド: matchId -> courtName を localStorage に保存 */
 const COURT_OVERRIDE_KEY = 'mixed-court-overrides';
@@ -346,6 +347,19 @@ export default function MixedLeagueView() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {leagueComplete && (
+                  <button
+                    onClick={() => {
+                      const allTeams = useMixedStore.getState().allTeams;
+                      const tName = tournamentInfo?.name || '';
+                      exportLeagueResultJpeg(selectedLeague, standings, leagueMatchList, allTeams, tName);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/25 rounded-lg hover:bg-white/35 transition-colors font-bold"
+                  >
+                    <Download size={12} />
+                    結果DL
+                  </button>
+                )}
                 {tournamentInfo?.rules && tournamentInfo.rules.length > 0 && (
                   <button onClick={() => setShowRules(true)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/15 rounded-lg hover:bg-white/25 transition-colors">
                     <BookOpen size={12} />

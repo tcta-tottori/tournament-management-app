@@ -208,7 +208,8 @@ export default function MixedBracketView() {
     return (
       <div className="text-center py-20 text-gray-400">
         <Trophy size={48} className="mx-auto mb-4 opacity-30" />
-        <p className="text-lg">順位表からトーナメントを生成してください</p>
+        <p className="text-lg">予選リーグ完了後にトーナメントが表示されます</p>
+        <p className="text-sm mt-1">リーグが完了するごとに該当チームが追加されます</p>
       </div>
     );
   }
@@ -1027,6 +1028,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
 
 
   // 未配置スロットに配置予定のリーグ情報を表示
+  const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
+    '2nd': ['G',null,'E','L','H','C','J',null,'B','F','A','M','I','D','K',null],
+    '3rd': ['D',null,'H','M','F','A','K',null,'I','G','C','E','L','J','B',null],
+    '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
+  };
   const getPlaceholderInfo = (match: BracketMatch, slot: 'team1' | 'team2'): { text: string; leagueId?: string; rank?: string } | null => {
     if (is1stBracket) return { text: '―' };
     const id = slot === 'team1' ? match.team1Id : match.team2Id;
@@ -1035,6 +1041,14 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     if (match.round !== 1) return null;
     const pos = match.position;
     const slotIdx = slot === 'team1' ? (pos - 1) * 2 : (pos - 1) * 2 + 1;
+    // スロットマップからリーグIDを取得
+    const slotMap = BRACKET_SLOT_MAP[bracket.category];
+    if (slotMap && slotIdx < slotMap.length) {
+      const lid = slotMap[slotIdx];
+      if (lid === null) return { text: 'BYE' };
+      const rank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
+      return { text: `${lid}リーグ ${rank}位`, leagueId: lid, rank };
+    }
     if (slotIdx < bracket.teams.length) {
       const t = bracket.teams[slotIdx];
       const rank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
