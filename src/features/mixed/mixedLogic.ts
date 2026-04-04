@@ -230,7 +230,7 @@ export function nextPowerOf2(n: number): number {
 export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
   '2nd': ['G',null,'E','L','H','C','J',null,'B','F','A','M','I','D','K',null],
   '3rd': ['D',null,'H','M','F','A','K',null,'I','G','C','E','L','J','B',null],
-  '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C','M',null],
+  '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
 };
 
 /**
