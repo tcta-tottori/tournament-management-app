@@ -640,6 +640,9 @@ export const useMixedStore = create<MixedState>()(
             return { ...m, score1: 6, score2: 4, tiebreakScore: null, winnerId: m.team1Id, status: 'finished' as const };
           }),
         }));
+        
+        // リーグ戦が全試合完了状態になったため、決勝トーナメントを再生成して反映させる
+        get().generateBrackets();
       },
     }),
     {
