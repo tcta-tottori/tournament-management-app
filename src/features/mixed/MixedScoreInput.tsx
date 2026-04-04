@@ -114,16 +114,23 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   const winGames = useMemo(() => getWinningGames(gameRule), [gameRule]);
 
   useEffect(() => {
-    // ポップアップ表示時のスクロール位置を保存し、閉じる時に復元
+    // ポップアップ表示時のスクロール位置を保存し、背景スクロールを防止
     const savedScrollY = window.scrollY;
     scrollPosRef.current = savedScrollY;
-    // overflow: hiddenでスクロール防止（position:fixedだとスクロール位置がずれる）
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.documentElement.style.overflow = 'hidden';
+    // body を fixed にして現在のスクロール位置を視覚的に維持
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
     document.body.style.paddingRight = `${scrollbarWidth}px`;
     return () => {
-      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
       document.body.style.paddingRight = '';
+      window.scrollTo(0, savedScrollY);
     };
   }, []);
 
