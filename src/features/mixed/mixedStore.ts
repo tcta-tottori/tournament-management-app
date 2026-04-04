@@ -543,44 +543,20 @@ export const useMixedStore = create<MixedState>()(
 
       autoPopulateBrackets: () => {
         const { leagues, leagueMatches, allTeams } = get();
-        // 完了リーグのみでスタンディング計算（1つも完了していなければ生成しない）
-        const completedLeagues = leagues.filter(l => {
-          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-          return lm.length > 0 && lm.every(m => m.status === 'finished');
-        });
-        if (completedLeagues.length === 0) return;
+        if (leagues.length === 0) return;
 
-        // 完了リーグのみの standings を生成
-        const allStandings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
-        const completedIds = new Set(completedLeagues.map(l => l.leagueId));
-        const filteredStandings = new Map<string, import('./types').LeagueStanding[]>();
-        for (const [lid, ls] of allStandings) {
-          if (completedIds.has(lid) || completedIds.has(lid.trim())) {
-            filteredStandings.set(lid, ls);
-          }
-        }
+        // 全リーグの standings を生成（未完了リーグも含む → 暫定順位で表示）
+        const standings = calculateLeagueStandings(leagues, leagueMatches, get().rankOverrides);
 
-        const brackets = generateAllBrackets(filteredStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
-        // 完全新規生成なのでコート割当もリセット
+        const brackets = generateAllBrackets(standings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
         set({ brackets, bracketCourtAssignments: {} });
       },
 
       regenerateBrackets: () => {
         const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo, rankOverrides, bracketCourtAssignments } = get();
-        // 完了リーグのみの standings で再生成
-        const allStandings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
-        const completedLeagues = leagues.filter(l => {
-          const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-          return lm.length > 0 && lm.every(m => m.status === 'finished');
-        });
-        const completedIds = new Set(completedLeagues.map(l => l.leagueId));
-        const filteredStandings = new Map<string, import('./types').LeagueStanding[]>();
-        for (const [lid, ls] of allStandings) {
-          if (completedIds.has(lid) || completedIds.has(lid.trim())) {
-            filteredStandings.set(lid, ls);
-          }
-        }
-        const newBrackets = generateAllBrackets(filteredStandings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        // 全リーグの standings で再生成（未完了リーグも含む）
+        const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
+        const newBrackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
 
         // 実際に試合が進行中/完了のブラケットは維持する（'ready'だけでは保護しない）
         // 全カテゴリ（1位/2位/3位/4位）に適用

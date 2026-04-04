@@ -208,8 +208,7 @@ export default function MixedBracketView() {
     return (
       <div className="text-center py-20 text-gray-400">
         <Trophy size={48} className="mx-auto mb-4 opacity-30" />
-        <p className="text-lg">予選リーグ完了後にトーナメントが表示されます</p>
-        <p className="text-sm mt-1">リーグが完了するごとに該当チームが追加されます</p>
+        <p className="text-lg">データをインポートするとトーナメント表が表示されます</p>
       </div>
     );
   }

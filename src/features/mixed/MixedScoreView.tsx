@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedBracketView from './MixedBracketView';
@@ -6,70 +6,41 @@ import MixedBracketView from './MixedBracketView';
 export default function MixedScoreView() {
   const {
     brackets, leagues, leagueMatches, rankOverrides,
-    lastStandingsHash, autoPopulateBrackets, regenerateBrackets,
+    lastStandingsHash, autoPopulateBrackets,
   } = useMixedStore();
-  const hasInitialized = useRef(false);
 
-  // 完了リーグ数チェック
-  const completedLeagueIds = useMemo(() => {
-    return leagues
-      .filter(l => {
-        const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-        return lm.length > 0 && lm.every(m => m.status === 'finished');
-      })
-      .map(l => l.leagueId);
-  }, [leagues, leagueMatches]);
-
-  const anyLeagueComplete = completedLeagueIds.length > 0;
-
-  // 完了リーグの順位ハッシュ（変化検出用）
+  // 全リーグの順位ハッシュ（変化検出用）
   const currentHash = useMemo(() => {
-    if (completedLeagueIds.length === 0) return '';
+    if (leagues.length === 0) return '';
     const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
     const parts: string[] = [];
-    for (const lid of completedLeagueIds) {
-      const ls = standings.get(lid) || standings.get(lid.trim());
-      if (ls) {
-        parts.push(`${lid}:${ls.map(s => `${s.teamId}@${s.rank}`).join(',')}`);
-      }
+    for (const [leagueId, ls] of standings) {
+      parts.push(`${leagueId}:${ls.map(s => `${s.teamId}@${s.rank}`).join(',')}`);
     }
     return parts.sort().join('|');
-  }, [leagues, leagueMatches, rankOverrides, completedLeagueIds]);
+  }, [leagues, leagueMatches, rankOverrides]);
 
-  // 完了リーグがゼロなのにブラケットが残っている場合 → 旧データなのでクリア
+  // リーグが存在すればブラケットを常に生成（予選未完了でも構造を表示）
   useEffect(() => {
-    if (!anyLeagueComplete && brackets.length > 0) {
-      useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
-    }
-  }, [anyLeagueComplete, brackets.length]);
-
-  // リーグが1つでも完了したらブラケットを生成/更新
-  useEffect(() => {
-    if (!anyLeagueComplete || leagues.length === 0) return;
-
+    if (leagues.length === 0) return;
     if (brackets.length === 0) {
       autoPopulateBrackets();
       useMixedStore.setState({ lastStandingsHash: currentHash });
-      hasInitialized.current = true;
     }
-  }, [anyLeagueComplete, brackets.length, leagues.length, autoPopulateBrackets, currentHash]);
+  }, [leagues.length, brackets.length, autoPopulateBrackets, currentHash]);
 
-  // 完了リーグの順位が変わった場合、ブラケットを完全に再生成
-  // （ストアに保存されたハッシュと比較し、実際に変化した時だけ実行）
-  // 順位が変わった＝チーム配置が変わるため、旧ブラケットの試合結果は無効→保護せず全クリア
+  // 順位が変わった場合、ブラケットを完全に再生成
   useEffect(() => {
-    if (!anyLeagueComplete || brackets.length === 0 || !currentHash) return;
-    // 初回: ハッシュが未保存なら保存のみ
+    if (brackets.length === 0 || !currentHash) return;
     if (!lastStandingsHash) {
       useMixedStore.setState({ lastStandingsHash: currentHash });
       return;
     }
-    // ハッシュが同一なら何もしない
     if (currentHash === lastStandingsHash) return;
-    // 順位が実際に変わった → 完全に再生成（旧結果は無効なので保護しない）
+    // 順位が変わった → 完全クリア → 次レンダーで autoPopulateBrackets が再生成
     useMixedStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentHash, lastStandingsHash, anyLeagueComplete]);
+  }, [currentHash, lastStandingsHash]);
 
   return (
     <div className="p-2 sm:p-4 space-y-4">

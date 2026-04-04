@@ -82,18 +82,6 @@ export default function AppLayout() {
   const mixedBrackets = useMixedStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
 
-  // 予選リーグ未完了なのにブラケット(決勝T)が残っている場合 → 旧データなのでクリア
-  useEffect(() => {
-    if (!isMixedImported || mixedLeagues.length === 0) return;
-    const allLeaguesComplete = mixedLeagues.every(l => {
-      const lm = mixedLeagueMatches.filter(m => m.leagueId === l.leagueId);
-      return lm.length > 0 && lm.every(m => m.status === 'finished');
-    });
-    if (!allLeaguesComplete && mixedBrackets.length > 0) {
-      useMixedStore.setState({ brackets: [], lastStandingsHash: '' });
-    }
-  }, [isMixedImported, mixedLeagues, mixedLeagueMatches, mixedBrackets]);
-
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
     () => currentTournamentId
