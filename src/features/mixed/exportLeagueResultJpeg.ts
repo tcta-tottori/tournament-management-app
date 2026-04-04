@@ -95,19 +95,27 @@ export async function generateLeagueResultDataUrl(
 
     // 男子名 + 所属
     const nameX = 40;
+    
+    // 名前の幅を14px boldで計算
+    ctx.font = 'bold 14px "Hiragino Sans", "Yu Gothic", "MS Gothic", sans-serif';
+    const maleNameW = ctx.measureText(team.male.name).width;
+    
     drawText(team.male.name, nameX, rowTop + 18, 14, 'left', true);
-    ctx.font = '9px "Hiragino Sans", "Yu Gothic", sans-serif';
-    ctx.fillStyle = '#444';
+    ctx.font = '10px "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.fillStyle = '#555';
     ctx.textAlign = 'left';
-    ctx.fillText(team.male.affiliation, nameX + ctx.measureText(team.male.name).width + 8, rowTop + 18);
+    ctx.fillText(team.male.affiliation, nameX + maleNameW + 10, rowTop + 19);
 
     // 女子名 + 所属
+    ctx.font = 'bold 14px "Hiragino Sans", "Yu Gothic", "MS Gothic", sans-serif';
+    const femaleNameW = ctx.measureText(team.female.name).width;
+    
     ctx.fillStyle = '#000';
     drawText(team.female.name, nameX, rowTop + 45, 14, 'left', true);
-    ctx.font = '9px "Hiragino Sans", "Yu Gothic", sans-serif';
-    ctx.fillStyle = '#444';
+    ctx.font = '10px "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.fillStyle = '#555';
     ctx.textAlign = 'left';
-    ctx.fillText(team.female.affiliation, nameX + ctx.measureText(team.female.name).width + 8, rowTop + 45);
+    ctx.fillText(team.female.affiliation, nameX + femaleNameW + 10, rowTop + 46);
 
     // 対戦スコア
     for (let colIdx = 0; colIdx < teamCount; colIdx++) {

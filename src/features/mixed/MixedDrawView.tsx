@@ -429,6 +429,15 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {isComplete && (
+                    <LeagueResultPreview
+                      league={league}
+                      standings={standings}
+                      matches={leagueMatches}
+                      allTeams={allTeams}
+                      tournamentName={tournamentInfo?.name || ''}
+                    />
+                  )}
                   <span className="text-xs text-gray-500">{finishedCount}/{totalCount}</span>
                   {isComplete && <Check size={14} className="text-emerald-500" />}
                   <div className="w-12 sm:w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -439,19 +448,6 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                   </div>
                 </div>
               </div>
-
-              {/* 結果プレビュー＆ダウンロード (全試合完了時) */}
-              {isComplete && (
-                <div className="px-3 sm:px-4 py-2 bg-gray-50/50 border-b border-gray-100 flex justify-end">
-                  <LeagueResultPreview
-                    league={league}
-                    standings={standings}
-                    matches={leagueMatches}
-                    allTeams={allTeams}
-                    tournamentName={tournamentInfo?.name || ''}
-                  />
-                </div>
-              )}
 
               {/* 対戦マトリックス — scrollbar-thin */}
               <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">

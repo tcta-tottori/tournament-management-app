@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, ImageIcon, Loader2 } from 'lucide-react';
 import { generateLeagueResultDataUrl } from './exportLeagueResultJpeg';
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
@@ -47,53 +48,69 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
   };
 
   return (
-    <div className="flex flex-col items-end">
-      {/* トグルボタン */}
+    <>
+      {/* プレビュー呼び出しボタン */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-          isOpen ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-        }`}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
+        className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
       >
-        {isOpen ? <ImageIcon size={14} /> : <Download size={14} />}
-        {isOpen ? 'プレビューを閉じる' : '結果DLプレビュー'}
+        <ImageIcon size={12} className="text-gray-500" />
+        結果画像
       </button>
 
-      {/* プレビュー領域 */}
-      {isOpen && (
-        <div className="mt-3 w-full bg-gray-50 border border-gray-200 p-3 rounded-xl shadow-inner relative animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500">生成済みプレビュー (JPEG)</span>
-            {dataUrl && (
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:opacity-90 transition-opacity active:scale-95"
-              >
-                <Download size={14} />
-                ダウンロードして保存
-              </button>
-            )}
-          </div>
-          
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex items-center justify-center min-h-[150px]">
-            {isLoading && (
-              <div className="flex flex-col items-center gap-2 text-gray-400 py-8">
-                <Loader2 size={24} className="animate-spin" />
-                <span className="text-xs font-medium">画像を生成中...</span>
+      {/* モーダル表示 */}
+      {isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setIsOpen(false)}>
+          <div 
+            className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-full max-w-5xl max-h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* モーダルヘッダー */}
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                <ImageIcon size={16} className="text-gray-500" />
+                {league.leagueId.trim()}リーグ 結果プレビュー表示
+              </h3>
+              <div className="flex items-center gap-3">
+                {dataUrl && (
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:opacity-90 transition-opacity active:scale-95"
+                  >
+                    <Download size={14} />
+                    ダウンロード
+                  </button>
+                )}
+                <button 
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-1.5 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                >
+                  閉じる
+                </button>
               </div>
-            )}
-            {dataUrl && !isLoading && (
-              <img
-                src={dataUrl}
-                alt={`${league.leagueId}リーグ結果`}
-                className="w-full max-w-full h-auto object-contain cursor-pointer hover:opacity-95 transition-opacity"
-                onClick={handleDownload}
-                title="クリックしてダウンロード"
-              />
-            )}
+            </div>
+            
+            {/* プレビュー画像本体 */}
+            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
+              {isLoading && (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <Loader2 size={32} className="animate-spin" />
+                  <span className="text-sm font-medium">画像を生成中...</span>
+                </div>
+              )}
+              {dataUrl && !isLoading && (
+                <img
+                  src={dataUrl}
+                  alt={`${league.leagueId}リーグ結果`}
+                  className="max-w-full h-auto object-contain shadow-sm border border-gray-200 bg-white"
+                  style={{ maxHeight: '100%' }}
+                />
+              )}
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
