@@ -471,7 +471,7 @@ export default function MixedBracketView() {
 
       {/* ドロー編集 / プレビュー / 賞状ボタン */}
       <div className="flex justify-end gap-2">
-        <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} />
+        <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} selectedCategory={selectedBracketCategory} />
         {currentBracket && (
           <BracketPreviewButton bracket={currentBracket} />
         )}
@@ -1744,12 +1744,13 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
 // ---------------------------------------------------------------------------
 
 /** ブラケットから入賞者を取得 */
-function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[]): { rank: string; category: string; names: string }[] {
+function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[], filterCategory?: PlacementCategory): { rank: string; category: string; names: string }[] {
   const results: { rank: string; category: string; names: string }[] = [];
   const catLabels: Record<string, string> = { '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント' };
   const familyN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
 
   for (const b of brackets) {
+    if (filterCategory && b.category !== filterCategory) continue;
     const maxRound = Math.max(...b.matches.map(m => m.round));
     const finalMatch = b.matches.find(m => m.round === maxRound);
     if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winnerId) continue;
@@ -1772,8 +1773,8 @@ function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTea
   return results;
 }
 
-/** 賞状CSS（行書風 Google Font: Yuji Syuku） */
-const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap';
+/** 賞状CSS（太筆行書風 Google Font: Yuji Mai） */
+const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Yuji+Mai&display=swap';
 
 function buildCertificateHtml(entries: { rank: string; category: string; names: string }[]): string {
   const pages = entries.map(e => `
@@ -1792,7 +1793,7 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
 <style>
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Yuji Syuku", "游明朝", "Yu Mincho", serif; color: #000; }
+  body { font-family: "Yuji Mai", "游明朝", "Yu Mincho", serif; color: #000; }
   .page {
     width: 210mm; height: 297mm;
     page-break-after: always; position: relative;
@@ -1811,24 +1812,28 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
     font-size: 28pt; font-weight: 400;
     letter-spacing: 0.4em; color: #000;
     margin-bottom: 5mm;
+    -webkit-text-stroke: 0.5px #000;
   }
   .rank-name {
     font-size: 32pt; font-weight: 400;
     letter-spacing: 0.6em; color: #000;
     margin-bottom: 6mm;
+    -webkit-text-stroke: 0.5px #000;
   }
   .player-name {
     font-size: 36pt; font-weight: 400;
     letter-spacing: 0.4em; color: #000;
+    -webkit-text-stroke: 0.5px #000;
   }
   @media print { body { -webkit-print-color-adjust: exact; } }
 </style></head><body>${pages}</body></html>`;
 }
 
 /** 賞状印刷ボタン */
-function CertificatePrintButton({ brackets, allTeams }: {
+function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
   brackets: PlacementBracket[];
   allTeams: MixedTeam[];
+  selectedCategory: PlacementCategory;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [entries, setEntries] = useState<{ rank: string; category: string; names: string; selected: boolean }[]>([]);
@@ -1847,7 +1852,7 @@ function CertificatePrintButton({ brackets, allTeams }: {
   }, [isOpen]);
 
   const openDialog = () => {
-    const auto = getWinnersFromBrackets(brackets, allTeams);
+    const auto = getWinnersFromBrackets(brackets, allTeams, selectedCategory);
     setEntries(auto.map(e => ({ ...e, selected: true })));
     setPreviewIdx(0);
     setIsOpen(true);
@@ -1942,18 +1947,18 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute inset-3 border border-amber-200/30 rounded" />
                     {/* 上部: 表彰状（印刷済み模擬） */}
                     <div className="absolute top-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>表　彰　状</span>
+                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Yuji Mai", serif' }}>表　彰　状</span>
                     </div>
                     {/* 印刷対象エリア: A4中央より少し上、約3cm幅 */}
                     <div className="absolute left-0 right-0 flex flex-col items-center justify-center px-4" style={{ top: '35%', height: '11%' }}>
                       <div className="border-y-2 border-dashed border-amber-300/50 py-2 w-full flex flex-col items-center justify-center">
-                        <div className="text-sm text-black tracking-[0.3em] mb-1.5" style={{ fontFamily: '"Yuji Syuku", serif' }}>
+                        <div className="text-sm text-black tracking-[0.3em] mb-1.5" style={{ fontFamily: '"Yuji Mai", serif' }}>
                           {previewEntry.category || '（クラス未入力）'}
                         </div>
-                        <div className="text-base text-black tracking-[0.5em] mb-1.5" style={{ fontFamily: '"Yuji Syuku", serif' }}>
+                        <div className="text-base text-black tracking-[0.5em] mb-1.5" style={{ fontFamily: '"Yuji Mai", serif' }}>
                           {previewEntry.rank}
                         </div>
-                        <div className="text-lg text-black tracking-[0.35em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>
+                        <div className="text-lg text-black tracking-[0.35em]" style={{ fontFamily: '"Yuji Mai", serif' }}>
                           {previewEntry.names || '（氏名未入力）'}
                         </div>
                       </div>
@@ -1962,7 +1967,7 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute right-1 text-[6px] text-amber-400" style={{ top: '34%' }}>印刷範囲↓</div>
                     {/* 下部: 鳥取市テニス協会（印刷済み模擬） */}
                     <div className="absolute bottom-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>鳥取市テニス協会</span>
+                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Yuji Mai", serif' }}>鳥取市テニス協会</span>
                     </div>
                   </div>
                 ) : (
