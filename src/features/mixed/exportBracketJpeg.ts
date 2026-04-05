@@ -89,7 +89,7 @@ function drawBracketLines(
 
   // スコア（横線を挟んですぐ上/すぐ下）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-    const so = 8; // 横線からのオフセット（すぐ上/すぐ下）
+    const so = 1; // 横線のすぐ下/すぐ上
     if (isLeft) {
       txt(ctx, String(m.score1), jx + 2, t1cy + so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
       txt(ctx, String(m.score2), jx + 2, t2cy - so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
@@ -120,36 +120,20 @@ export async function generateBracketDataUrl(
   const rightR1 = r1.slice(half);
   const sideRounds = maxRound >= 2 ? maxRound - 1 : maxRound;
 
-  const byeSlotH = 16;
   const normalGap = 14;
 
-  function calcPositions(r1Matches: BracketMatch[]) {
-    const pos: { t1y: number; t2y: number }[] = [];
-    let curY = 0;
-    for (const m of r1Matches) {
-      const bye1 = !m.team1Id && m.team1Name === 'BYE';
-      const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
-      const h1 = bye1 ? byeSlotH : SLOT_H;
-      const h2 = bye2 ? byeSlotH : SLOT_H;
-      const gap = isByeMatch(m) ? 4 : normalGap;
-      pos.push({ t1y: curY, t2y: curY + h1 + gap });
-      curY += h1 + gap + h2 + 28;
-    }
-    return pos;
+  // 左右統一: BYE有無に関係なく全マッチ同じ高さで配置
+  const maxSide = Math.max(leftR1.length, rightR1.length);
+  const matchBlockH = SLOT_H * 2 + normalGap; // 1マッチの高さ
+  const r1Spacing = matchBlockH + 28;          // マッチ間隔
+
+  function getPos(i: number) {
+    const t1y = i * r1Spacing;
+    const t2y = t1y + SLOT_H + normalGap;
+    return { t1y, t2y };
   }
 
-  // 左右で同じ位置配列を使用（決勝線がぴったり合うように）
-  const maxSide = Math.max(leftR1.length, rightR1.length);
-  const unifiedPos = calcPositions(Array.from({ length: maxSide }, (_, i) => {
-    const leftM = leftR1[i];
-    const rightM = rightR1[i];
-    // BYE判定は両方のうちBYEがある方を優先
-    return leftM || rightM || leftR1[0];
-  }));
-  const leftPos = unifiedPos.slice(0, leftR1.length);
-  const rightPos = unifiedPos.slice(0, rightR1.length);
-  const lastPos = unifiedPos.length > 0 ? unifiedPos[unifiedPos.length - 1] : { t1y: 0, t2y: 0 };
-  const areaH = lastPos.t2y + SLOT_H + 10;
+  const areaH = maxSide * r1Spacing;
 
   const gapX = 75;
   const sideW = SLOT_W + (sideRounds > 1 ? (sideRounds - 1) * gapX : 0);
@@ -179,14 +163,12 @@ export async function generateBracketDataUrl(
   // 左R1
   for (let i = 0; i < leftR1.length; i++) {
     const m = leftR1[i];
-    const p = leftPos[i];
+    const p = getPos(i);
     const bye1 = !m.team1Id && m.team1Name === 'BYE';
     const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
     const bye = isByeMatch(m);
-    const h1 = bye1 ? byeSlotH : SLOT_H;
-    const h2 = bye2 ? byeSlotH : SLOT_H;
-    const t1cy = top + p.t1y + h1 / 2;
-    const t2cy = top + p.t2y + h2 / 2;
+    const t1cy = top + p.t1y + SLOT_H / 2;
+    const t2cy = top + p.t2y + SLOT_H / 2;
     const cy = (t1cy + t2cy) / 2;
 
     drawTeamEntry(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
@@ -209,14 +191,12 @@ export async function generateBracketDataUrl(
   // 右R1（番号は左、線から間隔を取る）
   for (let i = 0; i < rightR1.length; i++) {
     const m = rightR1[i];
-    const p = rightPos[i];
+    const p = getPos(i);
     const bye1 = !m.team1Id && m.team1Name === 'BYE';
     const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
     const bye = isByeMatch(m);
-    const h1 = bye1 ? byeSlotH : SLOT_H;
-    const h2 = bye2 ? byeSlotH : SLOT_H;
-    const t1cy = top + p.t1y + h1 / 2;
-    const t2cy = top + p.t2y + h2 / 2;
+    const t1cy = top + p.t1y + SLOT_H / 2;
+    const t2cy = top + p.t2y + SLOT_H / 2;
     const cy = (t1cy + t2cy) / 2;
 
     // 右山: 線から RIGHT_MARGIN 離してチーム情報を配置（番号は左）
