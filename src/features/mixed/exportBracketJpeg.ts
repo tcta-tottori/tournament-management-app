@@ -206,7 +206,7 @@ export async function generateBracketDataUrl(
     return nextMatch?.winnerId === m.winnerId;
   };
 
-  // R1描画ヘルパー
+  // R1描画: BYEも通常マッチも同じ構造でまっすぐ描画
   const drawR1 = (r1Arr: BracketMatch[], isLeft: boolean) => {
     for (let i = 0; i < r1Arr.length; i++) {
       const m = r1Arr[i];
@@ -216,7 +216,7 @@ export async function generateBracketDataUrl(
       const bye = isByeMatch(m);
       const t1cy = top + p.t1y + SLOT_H / 2;
       const t2cy = top + p.t2y + SLOT_H / 2;
-      const cy = (t1cy + t2cy) / 2; // BYEでも通常マッチと同じcy
+      const cy = (t1cy + t2cy) / 2;
 
       if (isLeft) {
         drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
@@ -224,19 +224,16 @@ export async function generateBracketDataUrl(
         const slotR = PADDING_X + SLOT_W;
         const exitX = slotR + gapX;
         if (bye) {
-          const teamCy = bye2 ? t1cy : t2cy;
-          // BYE: 次ラウンドで勝った場合のみ赤線
+          // BYE: チーム位置からまっすぐ水平に出力（曲げない）
           const adv = byeWinnerAdvanced(m);
-          ln(ctx, slotR, teamCy, slotR + gapX * 0.3, teamCy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          // cyに向かって縦に移動し、cyからexitへ水平に
-          ln(ctx, slotR + gapX * 0.3, teamCy, slotR + gapX * 0.3, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          ln(ctx, slotR + gapX * 0.3, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          jp.set(m.matchId, { x: exitX, y: cy });
+          const col = adv ? WIN_COLOR : LINE_COLOR;
+          const w = adv ? WIN_W : LOSE_W;
+          ln(ctx, slotR, cy, exitX, cy, col, w);
         } else {
           const jx = slotR + gapX * 0.42;
           drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true);
-          jp.set(m.matchId, { x: exitX, y: cy });
         }
+        jp.set(m.matchId, { x: exitX, y: cy });
       } else {
         const rx = totalW - PADDING_X - SLOT_W;
         drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
@@ -244,17 +241,15 @@ export async function generateBracketDataUrl(
         const slotL = rx;
         const exitX = slotL - gapX;
         if (bye) {
-          const teamCy = bye2 ? t1cy : t2cy;
           const adv = byeWinnerAdvanced(m);
-          ln(ctx, slotL, teamCy, slotL - gapX * 0.3, teamCy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          ln(ctx, slotL - gapX * 0.3, teamCy, slotL - gapX * 0.3, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          ln(ctx, slotL - gapX * 0.3, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
-          jp.set(m.matchId, { x: exitX, y: cy });
+          const col = adv ? WIN_COLOR : LINE_COLOR;
+          const w = adv ? WIN_W : LOSE_W;
+          ln(ctx, slotL, cy, exitX, cy, col, w);
         } else {
           const jx = slotL - gapX * 0.42;
           drawBracketLines(ctx, t1cy, t2cy, cy, slotL, jx, exitX, m, false);
-          jp.set(m.matchId, { x: exitX, y: cy });
         }
+        jp.set(m.matchId, { x: exitX, y: cy });
       }
     }
   };
@@ -343,13 +338,7 @@ export async function generateBracketDataUrl(
           ln(ctx, jx, t1cy, jx, t2cy, LINE_COLOR, LOSE_W);
         }
 
-        // スコア（中央寄せ）
-        if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
-          txt(ctx, String(fm.score1), jx + 4, cy - 9, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-          txt(ctx, String(fm.score2), jx + 4, cy + 9, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-        }
-
-        // 優勝者: 中央から上に線→名前+スコア
+        // 優勝者: 中央から上に線→スコア→名前（スコアは優勝者名の上のみ）
         const winnerTeam = fm.winnerId ? allTeams.find(t => t.teamId === fm.winnerId) : null;
         const defaultWinnerName = winnerTeam ? `${familyName(winnerTeam.male.name)}・${familyName(winnerTeam.female.name)}` : '';
         const displayName = winnerOverride ?? defaultWinnerName;
@@ -357,10 +346,11 @@ export async function generateBracketDataUrl(
         if (displayName) {
           const lineTop = cy - 25;
           ln(ctx, jx, cy, jx, lineTop, WIN_COLOR, WIN_W);
-          txt(ctx, displayName, jx, lineTop - 14, 13, { align: 'center', bold: true });
+          // スコアを優勝者名の上に表示
           if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
-            txt(ctx, `${fm.score1}−${fm.score2}`, jx, lineTop - 30, 11, { align: 'center', color: '#555' });
+            txt(ctx, `${fm.score1}−${fm.score2}`, jx, lineTop - 28, 11, { align: 'center', color: '#555' });
           }
+          txt(ctx, displayName, jx, lineTop - 12, 13, { align: 'center', bold: true });
         }
       }
     }
