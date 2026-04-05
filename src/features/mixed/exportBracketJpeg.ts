@@ -54,22 +54,22 @@ function drawTeamLeft(ctx: CanvasRenderingContext2D, x: number, y: number, teamI
   if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
 }
 
-// 右山チーム描画（名前+所属 → 番号の順、左から: 名前 所属 番号）
+// 右山チーム描画（左から: ペア番号, 名前, 所属 — 左山と同じ配置）
 function drawTeamRight(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
   if (isBye || (!teamId && teamName === 'BYE')) return;
   if (!teamId) return;
   const team = allTeams.find(t => t.teamId === teamId);
   if (!team) return;
+  // 左山と同じレイアウト: 番号(左) → 名前 → 所属
+  txt(ctx, String(team.pairNumber), x, y + SLOT_H / 2, 14, { bold: true });
+  const nx = x + NUM_W;
   const mw = SLOT_W - NUM_W;
-  // 名前+所属（左寄せ）
-  txt(ctx, team.male.name, x, y + 12, 11, { bold: true, maxW: mw * 0.52 });
+  txt(ctx, team.male.name, nx, y + 12, 11, { bold: true, maxW: mw * 0.52 });
   const mnw = Math.min(approxW(team.male.name, 11), mw * 0.52);
-  if (team.male.affiliation) txt(ctx, team.male.affiliation, x + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
-  txt(ctx, team.female.name, x, y + 32, 11, { bold: true, maxW: mw * 0.52 });
+  if (team.male.affiliation) txt(ctx, team.male.affiliation, nx + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
+  txt(ctx, team.female.name, nx, y + 32, 11, { bold: true, maxW: mw * 0.52 });
   const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
-  if (team.female.affiliation) txt(ctx, team.female.affiliation, x + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
-  // 番号は右端（線の近く）
-  txt(ctx, String(team.pairNumber), x + SLOT_W, y + SLOT_H / 2, 14, { align: 'right', bold: true });
+  if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
 }
 
 function familyName(name: string): string { return name.trim().split(/[\s　]+/)[0] || name; }
@@ -105,22 +105,29 @@ function drawBracketLines(
 
   ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
 
-  // スコア（縦線の横、横線のすぐ内側に中央寄せ）
+  // スコア（縦線の横、中央寄せ）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
     const mid = (t1cy + t2cy) / 2;
-    const s1y = mid - 8; // 上スコア: 中央の少し上
-    const s2y = mid + 8; // 下スコア: 中央の少し下
-    // タイブレーク表示
+    const s1y = mid - 7;
+    const s2y = mid + 7;
     const tb = m.tiebreakScore;
-    const loserScore = tb != null ? (m.winnerId === m.team1Id ? `${m.score2}(${tb})` : `${m.score1}(${tb})`) : null;
-    const s1text = (m.winnerId !== m.team1Id && loserScore) ? loserScore : String(m.score1);
-    const s2text = (m.winnerId !== m.team2Id && loserScore) ? loserScore : String(m.score2);
-    if (isLeft) {
-      txt(ctx, s1text, jx + 2, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-      txt(ctx, s2text, jx + 2, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-    } else {
-      txt(ctx, s1text, jx - 2, s1y, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
-      txt(ctx, s2text, jx - 2, s2y, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+    const t1isLoser = m.winnerId != null && m.winnerId !== m.team1Id;
+    const t2isLoser = m.winnerId != null && m.winnerId !== m.team2Id;
+    const xOff = isLeft ? jx + 2 : jx - 2;
+    const align: CanvasTextAlign = isLeft ? 'left' : 'right';
+
+    // 上スコア
+    txt(ctx, String(m.score1), xOff, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
+    // 上が敗者 → スコアの上にタイブレーク
+    if (t1isLoser && tb != null) {
+      txt(ctx, `(${tb})`, xOff, s1y - 10, 9, { color: SCORE_COLOR, align });
+    }
+
+    // 下スコア
+    txt(ctx, String(m.score2), xOff, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
+    // 下が敗者 → スコアの下にタイブレーク
+    if (t2isLoser && tb != null) {
+      txt(ctx, `(${tb})`, xOff, s2y + 10, 9, { color: SCORE_COLOR, align });
     }
   }
 }
@@ -285,7 +292,7 @@ export async function generateBracketDataUrl(
     }
   }
 
-  // 決勝
+  // 決勝: 左右が中央でぴったり合うよう、同じ描画構造を使用
   if (maxRound >= 2) {
     const finals = rm.get(maxRound) || [];
     if (finals.length > 0) {
@@ -299,17 +306,21 @@ export async function generateBracketDataUrl(
         const leftP = parents.find(p => p.x < totalW / 2) || parents[0];
         const rightP = parents.find(p => p.x >= totalW / 2) || parents[1];
         const jx = totalW / 2;
-        const meetY = (leftP.y + rightP.y) / 2;
+
+        // 全体のブラケットエリアの中央Yを使う（左右が完全に同じY座標で合流）
+        const bracketCenterY = top + areaH / 2;
 
         const w1 = fm.winnerId === fm.team1Id && fm.winnerId != null;
         const w2 = fm.winnerId === fm.team2Id && fm.winnerId != null;
 
-        // 左山→中央: 水平→縦
+        // 左山→中央（上側）: 水平に中央へ、縦にbracketCenterYへ
         ln(ctx, leftP.x, leftP.y, jx, leftP.y, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-        ln(ctx, jx, leftP.y, jx, meetY, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-        // 右山→中央: 水平→縦
+        ln(ctx, jx, leftP.y, jx, bracketCenterY, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
+        // 右山→中央（下側）: 水平に中央へ、縦にbracketCenterYへ
         ln(ctx, rightP.x, rightP.y, jx, rightP.y, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
-        ln(ctx, jx, rightP.y, jx, meetY, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
+        ln(ctx, jx, rightP.y, jx, bracketCenterY, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
+
+        const meetY = bracketCenterY;
 
         // 優勝者表示
         const winnerTeam = fm.winnerId ? allTeams.find(t => t.teamId === fm.winnerId) : null;
