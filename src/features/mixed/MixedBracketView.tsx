@@ -79,9 +79,7 @@ function printRefereeSheet(
     display: flex; justify-content: center; gap: 20mm;
     font-size: 9pt; padding: 0 0 1.5mm; color: #555;
   }
-  .tbl-wrap {
-    border: 2px solid #444; border-radius: 10px; overflow: hidden;
-  }
+  .tbl-wrap { border: 2px solid #444; border-radius: 10px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
   td, th { border: 1px solid #999; padding: 1.5mm 3mm; font-size: 10pt; vertical-align: middle; }
   .lbl {
@@ -97,18 +95,15 @@ function printRefereeSheet(
   }
   .aff { font-size: 9pt; padding: 2mm 3mm; line-height: 1.8; color: #555; white-space: nowrap; }
   .dbl-top td, .dbl-top th { border-top: 3px double #444; }
-  .score-row td { height: 30mm; text-align: center; vertical-align: middle; }
-  .score-lbl { font-size: 10pt; font-weight: 700; letter-spacing: 0.2em; }
-  .score-tb { font-size: 9pt; color: #666; margin-top: 2mm; }
+  .score-row td { height: 38mm; text-align: center; vertical-align: middle; }
+  .score-lbl { font-size: 10pt; font-weight: 700; letter-spacing: 0.3em; }
+  .score-tb { font-size: 9pt; color: #666; margin-top: 8mm; }
   .score-box {
-    width: 18mm; height: 18mm; border: 2px solid #555;
+    width: 20mm; height: 20mm; border: 2px solid #555;
     border-radius: 4px; display: inline-block; vertical-align: middle;
   }
   .score-dash { font-size: 26pt; font-weight: 700; color: #444; }
-  .tb-par { font-size: 12pt; color: #666; margin-top: 2mm; }
-  .ftr td { font-size: 9pt; height: 8mm; color: #444; }
-  .uline { display: inline-block; border-bottom: 1px solid #888; min-width: 28mm; margin-left: 1mm; }
-  .note td { font-size: 9pt; height: 8mm; color: #999; vertical-align: top; padding-top: 2mm; }
+  .tb-par { font-size: 12pt; color: #666; margin-top: 4mm; }
   .credit { text-align: right; font-size: 8pt; color: #999; padding: 1mm 2mm 0; }
 </style>
 </head><body>
@@ -157,15 +152,6 @@ function printRefereeSheet(
           <div class="tb-par">（　　　）</div>
         </td>
         <td colspan="2"><div class="score-box"></div></td>
-      </tr>
-      <tr class="ftr">
-        <td colspan="2">コート：<span class="uline"></span></td>
-        <td>開始時刻：<span class="uline"></span></td>
-        <td>終了時刻：<span class="uline"></span></td>
-        <td colspan="2">審判：<span class="uline"></span></td>
-      </tr>
-      <tr class="note">
-        <td colspan="6" contenteditable="true">備考：</td>
       </tr>
     </table>
   </div>
