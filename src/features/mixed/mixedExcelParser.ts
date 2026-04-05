@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo } from './types';
 
+/** 日付文字列から「予備日」以降を除去して本戦日のみ返す */
+function stripReserveDate(dateStr: string): string {
+  if (!dateStr) return '';
+  // 「予備日」「予備日：」「予備日:」以降を除去
+  return dateStr.split(/予備日[：:]?/)[0].trim();
+}
+
 /** ルールテキスト配列から構造化ゲームルールを自動抽出 */
 function extractGameRules(rules: string[]): Record<string, string> {
   let league4 = '';
@@ -263,6 +270,8 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
         }
       }
     }
+    // 予備日を除去して本戦日のみ
+    date = stripReserveDate(date);
 
     const rules: string[] = [];
     for (let r = 20; r <= 40; r++) {
@@ -270,7 +279,14 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
       if (v && v.startsWith('（')) rules.push(v);
     }
 
-    if (name) return { name: name.trim(), date, venue, rules, gameRules: extractGameRules(rules) };
+    const extracted = extractGameRules(rules);
+    // 決勝トーナメント用ゲームルールをgameRules[0]に保存
+    const gameRules: Record<number, string> = {};
+    if (extracted.league4) gameRules[4] = extracted.league4;
+    if (extracted.league5) gameRules[5] = extracted.league5;
+    if (extracted.tournament) gameRules[0] = extracted.tournament;
+
+    if (name) return { name: name.trim(), date, venue, rules, gameRules };
   }
 
   // 表紙がない場合、リーグシートから取得
@@ -278,7 +294,7 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
   if (!ws) return { name: 'ミックスダブルス大会', date: '', venue: '', rules: [], gameRules: extractGameRules([]) };
 
   const name = cellVal(ws, 'A1').replace(/\s+/g, ' ').trim() || 'ミックスダブルス大会';
-  const date = cellVal(ws, 'O2') || cellVal(ws, 'M9');
+  const date = stripReserveDate(cellVal(ws, 'O2') || cellVal(ws, 'M9'));
   const venue = cellVal(ws, 'O3') || cellVal(ws, 'M10');
   const rules: string[] = [];
   for (let r = 5; r <= 15; r++) {
@@ -286,7 +302,13 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
     if (v) rules.push(v);
   }
 
-  return { name, date, venue, rules, gameRules: extractGameRules(rules) };
+  const extracted = extractGameRules(rules);
+  const gameRules: Record<number, string> = {};
+  if (extracted.league4) gameRules[4] = extracted.league4;
+  if (extracted.league5) gameRules[5] = extracted.league5;
+  if (extracted.tournament) gameRules[0] = extracted.tournament;
+
+  return { name, date, venue, rules, gameRules };
 }
 
 // ============================================================
@@ -561,8 +583,8 @@ export function parseMixedExcel(file: ArrayBuffer): {
 
   const matches = generateLeagueMatches(leagues);
 
-  // チーム数別にデフォルトゲームルールを設定
-  if (!info.gameRules) {
+  // チーム数別にデフォルトゲームルールを補完
+  if (!info.gameRules || Object.keys(info.gameRules).length === 0) {
     const teamSizes = new Set(leagues.map(l => l.teams.length));
     const gameRules: Record<number, string> = {};
     for (const size of teamSizes) {
@@ -586,7 +608,16 @@ export function parseMixedExcel(file: ArrayBuffer): {
         }
       }
     }
+    // 決勝トーナメント用ルール (key=0) がなければ rules から抽出
+    if (!gameRules[0]) {
+      const extracted = extractGameRules(info.rules);
+      gameRules[0] = extracted.tournament;
+    }
     info.gameRules = gameRules;
+  } else if (!info.gameRules[0]) {
+    // gameRulesは設定済みだが決勝用が未設定の場合
+    const extracted = extractGameRules(info.rules);
+    info.gameRules[0] = extracted.tournament;
   }
 
   return { info, leagues, matches };

@@ -5,7 +5,6 @@ import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import CallPreviewDialog from './CallPreviewDialog';
-import { printMixedRefereeSheet } from './printMixedRefereeSheet';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -62,10 +61,10 @@ function printRefereeSheet(
 <html><head><meta charset="utf-8">
 <title>審判用紙 - ${bracketLabel}</title>
 <style>
-  @page { size: B5 landscape; margin: 10mm; }
+  @page { size: B5 landscape; margin: 8mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', 'Arial', 'Hiragino Sans', 'Meiryo', sans-serif; color: #1f2937; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 232mm; margin: auto; padding: 5mm 0; background: #fff; }
+  .page { width: 100%; max-width: 241mm; margin: auto; padding: 3mm 0; background: #fff; }
   .title { text-align: center; font-size: 24pt; font-weight: 800; letter-spacing: 1.2em; padding: 0 0 2mm; color: #111827; }
   .subtitle { display: flex; justify-content: center; gap: 40mm; font-size: 10pt; padding: 0 0 4mm; color: #6b7280; font-weight: 500; }
   
@@ -580,18 +579,13 @@ export default function MixedBracketView() {
             <div className="flex gap-2 mb-3">
               <button onClick={() => {
                 const at = useMixedStore.getState().allTeams;
-                const rules = tournamentInfo?.rules || [];
-                const gr = rules.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim() || '';
-                printMixedRefereeSheet(
-                  editingMatch,
-                  at,
-                  tournamentInfo?.name || '',
-                  currentBracket?.label || '',
-                  getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)),
-                  gr,
-                  tournamentInfo?.date || '',
-                  bracketCourtAssignments[editingMatch.matchId]?.courtName || ''
-                );
+                // 決勝トーナメント用ゲームルール: gameRules[0] を優先、無ければ rules から検索
+                const gr = tournamentInfo?.gameRules?.[0]
+                  || tournamentInfo?.rules?.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim()
+                  || '';
+                // 日付から予備日を除去
+                const dateStr = (tournamentInfo?.date || '').split(/予備日[：:]?/)[0].trim();
+                printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, { date: dateStr });
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
               </button>
