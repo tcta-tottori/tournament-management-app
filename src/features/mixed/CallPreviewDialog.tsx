@@ -11,6 +11,9 @@ const CATEGORY_LABELS_FULL: Record<PlacementCategory, string> = {
 /** 苗字のみ取得 */
 export const familyName = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
 
+/** カタカナ→ひらがな変換 */
+const kataToHira = (s: string) => s.replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
 /** コート名を番コート形式に変換 */
 export const toCourtCallName = (courtName: string) => {
   const m = courtName.match(/^(\d+)\s*コート$/);
@@ -35,12 +38,10 @@ export function buildCallText(
   const catLabel = CATEGORY_LABELS_FULL[category];
   const courtCallName = toCourtCallName(courtName);
 
-  const t1Parts = team1.teamName.split('・');
-  const t2Parts = team2.teamName.split('・');
-  const t1MaleName = resolve('t1m_name', t1Parts[0] || familyName(team1.male.name));
-  const t1FemaleName = resolve('t1f_name', t1Parts[1] || familyName(team1.female.name));
-  const t2MaleName = resolve('t2m_name', t2Parts[0] || familyName(team2.male.name));
-  const t2FemaleName = resolve('t2f_name', t2Parts[1] || familyName(team2.female.name));
+  const t1MaleName = resolve('t1m_name', familyName(team1.male.name));
+  const t1FemaleName = resolve('t1f_name', familyName(team1.female.name));
+  const t2MaleName = resolve('t2m_name', familyName(team2.male.name));
+  const t2FemaleName = resolve('t2f_name', familyName(team2.female.name));
   const t1MaleAff = resolve('t1m_aff', team1.male.affiliation);
   const t1FemaleAff = resolve('t1f_aff', team1.female.affiliation);
   const t2MaleAff = resolve('t2m_aff', team2.male.affiliation);
@@ -102,27 +103,15 @@ export default function CallPreviewDialog({
 
   useEffect(() => {
     const init = async () => {
-      // teamNameから苗字を取得（"竹安・楠瀬" → ["竹安", "楠瀬"]）
-      const t1Parts = team1.teamName.split('・');
-      const t2Parts = team2.teamName.split('・');
-      const maleFN1 = t1Parts[0] || familyName(team1.male.name);
-      const femaleFN1 = t1Parts[1] || familyName(team1.female.name);
-      const maleFN2 = t2Parts[0] || familyName(team2.male.name);
-      const femaleFN2 = t2Parts[1] || familyName(team2.female.name);
+      // 苗字は必ず male.name / female.name のスペース区切りから取得（teamNameはフルネームの場合がある）
+      const maleFN1 = familyName(team1.male.name);
+      const femaleFN1 = familyName(team1.female.name);
+      const maleFN2 = familyName(team2.male.name);
+      const femaleFN2 = familyName(team2.female.name);
 
-      // Playerテーブルからスペース付きふりがなを取得（苗字分割の信頼できるソース）
-      const fullNameKeys = [
-        team1.male.name, team1.female.name,
-        team2.male.name, team2.female.name,
-      ].map(n => n.replace(/\s+/g, ''));
+      // Playerテーブルからスペース付きふりがなを取得（カタカナ "タケヤス シュウヘイ" 形式）
       const players = await db.players.toArray();
       const playerMap = new Map(players.map(p => [p.name.replace(/\s+/g, ''), p.furigana]));
-
-      // ふりがな辞書も事前取得
-      const familyKeys = [maleFN1, femaleFN1, maleFN2, femaleFN2].map(n => n.replace(/\s/g, ''));
-      const allDictKeys = [...new Set([...familyKeys, ...fullNameKeys])];
-      const nameFuriganas = await db.furiganaDict.where('name').anyOf(allDictKeys).toArray();
-      const dictMap = new Map(nameFuriganas.map(f => [f.name, f.furigana]));
 
       const affKeys = [
         team1.male.affiliation, team1.female.affiliation,
@@ -131,35 +120,30 @@ export default function CallPreviewDialog({
       const affFuriganas = await db.affiliationFurigana.where('name').anyOf(affKeys).toArray();
       const affMap = new Map(affFuriganas.map(f => [f.name, f.furigana]));
 
-      // 苗字のふりがなを取得: Playerテーブル（スペース付き）→辞書→漢字フォールバック
-      const getFamilyFurigana = (familyNameKanji: string, fullName: string): string => {
+      // 苗字のひらがな読みを取得
+      // 1. Playerテーブルのスペース付きふりがな（カタカナ）→ひらがな変換→苗字部分
+      // 2. フォールバック: 漢字の苗字
+      const getFamilyFurigana = (fullName: string): string => {
         const fullKey = fullName.replace(/\s+/g, '');
-        // 1. Playerテーブル: スペース付きふりがなから苗字部分を取得
         const playerFurigana = playerMap.get(fullKey);
         if (playerFurigana) {
-          const parts = playerFurigana.trim().split(/[\s　]+/);
+          const hira = kataToHira(playerFurigana);
+          const parts = hira.trim().split(/[\s　]+/);
           if (parts.length > 1) return parts[0];
+          // スペースなしの場合もそのまま返す（手動修正されたひらがなの可能性）
+          return hira;
         }
-        // 2. ふりがな辞書: スペース付きなら先頭部分を取得
-        for (const key of [familyNameKanji.replace(/\s/g, ''), fullKey]) {
-          const dictFurigana = dictMap.get(key);
-          if (dictFurigana) {
-            const parts = dictFurigana.trim().split(/[\s　]+/);
-            if (parts.length > 1) return parts[0];
-          }
-        }
-        // 3. フォールバック: 漢字の苗字をそのまま使用
-        return familyNameKanji;
+        return familyName(fullName);
       };
 
       setEntries([
-        { key: 't1m_name', label: 'チーム1 男子', fullName: team1.male.name, displayName: maleFN1, furigana: getFamilyFurigana(maleFN1, team1.male.name), type: 'name' },
+        { key: 't1m_name', label: 'チーム1 男子', fullName: team1.male.name, displayName: maleFN1, furigana: getFamilyFurigana(team1.male.name), type: 'name' },
         { key: 't1m_aff', label: 'チーム1 男子 所属', fullName: '', displayName: team1.male.affiliation, furigana: affMap.get(team1.male.affiliation) || team1.male.affiliation, type: 'affiliation' },
-        { key: 't1f_name', label: 'チーム1 女子', fullName: team1.female.name, displayName: femaleFN1, furigana: getFamilyFurigana(femaleFN1, team1.female.name), type: 'name' },
+        { key: 't1f_name', label: 'チーム1 女子', fullName: team1.female.name, displayName: femaleFN1, furigana: getFamilyFurigana(team1.female.name), type: 'name' },
         { key: 't1f_aff', label: 'チーム1 女子 所属', fullName: '', displayName: team1.female.affiliation, furigana: affMap.get(team1.female.affiliation) || team1.female.affiliation, type: 'affiliation' },
-        { key: 't2m_name', label: 'チーム2 男子', fullName: team2.male.name, displayName: maleFN2, furigana: getFamilyFurigana(maleFN2, team2.male.name), type: 'name' },
+        { key: 't2m_name', label: 'チーム2 男子', fullName: team2.male.name, displayName: maleFN2, furigana: getFamilyFurigana(team2.male.name), type: 'name' },
         { key: 't2m_aff', label: 'チーム2 男子 所属', fullName: '', displayName: team2.male.affiliation, furigana: affMap.get(team2.male.affiliation) || team2.male.affiliation, type: 'affiliation' },
-        { key: 't2f_name', label: 'チーム2 女子', fullName: team2.female.name, displayName: femaleFN2, furigana: getFamilyFurigana(femaleFN2, team2.female.name), type: 'name' },
+        { key: 't2f_name', label: 'チーム2 女子', fullName: team2.female.name, displayName: femaleFN2, furigana: getFamilyFurigana(team2.female.name), type: 'name' },
         { key: 't2f_aff', label: 'チーム2 女子 所属', fullName: '', displayName: team2.female.affiliation, furigana: affMap.get(team2.female.affiliation) || team2.female.affiliation, type: 'affiliation' },
       ]);
     };
