@@ -81,6 +81,7 @@ interface MixedState {
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
   setImportFileName: (name: string) => void;
   updateGameRule: (teamCount: number, rule: string) => void;
+  updateBracketGameRule: (rule: string) => void;
 
   // Test helpers
   fillAllScoresForTest: () => void;
@@ -637,6 +638,12 @@ export const useMixedStore = create<MixedState>()(
         tournamentInfo: state.tournamentInfo ? {
           ...state.tournamentInfo,
           gameRules: { ...(state.tournamentInfo.gameRules || {}), [teamCount]: rule },
+        } : null,
+      })),
+      updateBracketGameRule: (rule) => set(state => ({
+        tournamentInfo: state.tournamentInfo ? {
+          ...state.tournamentInfo,
+          bracketGameRule: rule,
         } : null,
       })),
 

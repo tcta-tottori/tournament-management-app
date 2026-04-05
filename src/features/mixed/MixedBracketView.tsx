@@ -84,7 +84,9 @@ function printRefereeSheet(
     letter-spacing: 0.8em; padding: 1mm 0 0;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS PMincho', serif;
   }
-  .meta { display: flex; justify-content: center; gap: 16mm; font-size: 11pt; padding: 0 0 1mm; color: #333; }
+  .meta { text-align: center; font-size: 11pt; padding: 0 0 1mm; color: #333; position: relative; }
+  .meta-name { display: block; }
+  .meta-date { position: absolute; right: 0; top: 0; }
 
   .tbl-wrap { flex: 1; border: 2px solid #333; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
   table { width: 100%; border-collapse: collapse; }
@@ -144,8 +146,8 @@ function printRefereeSheet(
 <div class="page">
   <div class="title">審　判　用　紙</div>
   <div class="meta">
-    <span>${tournamentInfo?.name || ''}</span>
-    <span>${dateStr}</span>
+    <span class="meta-name">${tournamentInfo?.name || ''}</span>
+    <span class="meta-date">${dateStr}</span>
   </div>
   <div class="tbl-wrap">
     <table>
@@ -196,7 +198,7 @@ function printRefereeSheet(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, rebuildBracketFromSlots, tournamentInfo, leagues } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, rebuildBracketFromSlots, tournamentInfo, leagues, updateBracketGameRule } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -212,7 +214,17 @@ export default function MixedBracketView() {
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
   const [drawEditMode, setDrawEditMode] = useState(false);
 
-  const winGames = useMemo(() => getWinningGamesFromRules(tournamentInfo?.rules || []), [tournamentInfo]);
+  const bracketGameRule = tournamentInfo?.bracketGameRule || '';
+  const winGames = useMemo(() => {
+    // bracketGameRuleが設定されていればそれからゲーム数を抽出
+    if (bracketGameRule) {
+      const m = bracketGameRule.match(/(\d+)\s*ゲーム/);
+      if (m) return parseInt(m[1]);
+      const m2 = bracketGameRule.match(/([０-９]+)\s*ゲーム/);
+      if (m2) return parseInt(toHalfWidth(m2[1]));
+    }
+    return getWinningGamesFromRules(tournamentInfo?.rules || []);
+  }, [tournamentInfo, bracketGameRule]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -430,6 +442,18 @@ export default function MixedBracketView() {
         </button>
       </div>
 
+      {/* 決勝トーナメント用ゲームルール設定 */}
+      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+        <label className="text-xs font-bold text-gray-500 whitespace-nowrap">ゲームルール:</label>
+        <input
+          type="text"
+          value={bracketGameRule}
+          onChange={e => updateBracketGameRule(e.target.value)}
+          placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
+          className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+        />
+      </div>
+
       {/* ドロー編集パネル */}
       {drawEditMode && currentBracket && (
         <DrawEditPanel bracket={currentBracket} />
@@ -600,8 +624,8 @@ export default function MixedBracketView() {
             <div className="flex gap-2 mb-3">
               <button onClick={() => {
                 const at = useMixedStore.getState().allTeams;
-                // 決勝トーナメント用ゲームルール: gameRules[0] を優先、無ければ rules から検索
-                const gr = tournamentInfo?.gameRules?.[0]
+                const gr = tournamentInfo?.bracketGameRule
+                  || tournamentInfo?.gameRules?.[0]
                   || tournamentInfo?.rules?.find(r => /ゲームマッチ|ノーアド|タイブレ/.test(r))?.replace(/^（[０-９\d]+）\s*/, '').trim()
                   || '';
                 // 日付から予備日を除去
