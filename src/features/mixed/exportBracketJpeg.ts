@@ -422,7 +422,7 @@ export async function generateResultDataUrl(
 ): Promise<string> {
   const SC = 2;
   const R1W = 290;     // 1回戦幅（フルネーム+所属）
-  const R2W = 200;     // 2回戦以降幅（名字のみ）
+  const R2W = 150;     // 2回戦以降幅（名字のみ、切り詰め）
   const SH = 56;
   const MH = SH * 2;
   const MGAP = 10;
@@ -558,11 +558,14 @@ export async function generateResultDataUrl(
         ctx.fillText(t.female.affiliation, afX, ny2, afW);
       }
     } else {
-      // 2回戦以降: 名字のみ
+      // 2回戦以降: 名字のみ（teamName "姓・姓" を優先、fallback: extractFamily）
+      const parts = t.teamName.split('・');
+      const fn1 = (parts[0] && parts[0] !== t.male.name) ? parts[0] : extractFamily(t.male.name);
+      const fn2 = (parts[1] && parts[1] !== t.female.name) ? parts[1] : extractFamily(t.female.name);
       setFont(ctx, 15, true);
       ctx.fillStyle = tc; ctx.textAlign = 'left';
-      ctx.fillText(extractFamily(t.male.name), nx, ny1);
-      ctx.fillText(extractFamily(t.female.name), nx, ny2);
+      ctx.fillText(fn1, nx, ny1);
+      ctx.fillText(fn2, nx, ny2);
     }
 
     // スコア（常に右揃え同一位置）
