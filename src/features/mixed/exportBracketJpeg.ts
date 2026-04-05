@@ -539,28 +539,18 @@ export async function generateResultDataUrl(
       ctx.fillText(t.female.affiliation, afX, ny2, afW);
     }
 
-    // スコア
+    // スコア（常に右揃え同一位置）
     if (score !== null) {
+      const scoreX = bx + bw - 8;
+      setFont(ctx, 22, true);
+      ctx.fillStyle = sc2; ctx.textAlign = 'right';
+      ctx.fillText(String(score), scoreX, by + SH / 2);
+      // タイブレーク: スコアの左側に表示
       if (isLose && tb != null) {
-        const ss = `${score}`;
-        const ts = `(${tb})`;
-        setFont(ctx, 22, true);
-        const sw2 = ctx.measureText(ss).width;
-        setFont(ctx, 12, true);
-        const tw2 = ctx.measureText(ts).width;
-        const totalSW = sw2 + tw2 + 1;
-        const sRight = bx + bw - 8;
-        const sLeft = sRight - totalSW;
-        setFont(ctx, 22, true);
-        ctx.fillStyle = sc2; ctx.textAlign = 'left';
-        ctx.fillText(ss, sLeft, by + SH / 2);
-        setFont(ctx, 12, true);
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillText(ts, sLeft + sw2 + 1, by + SH * 0.28);
-      } else {
-        setFont(ctx, 22, true);
-        ctx.fillStyle = sc2; ctx.textAlign = 'right';
-        ctx.fillText(String(score), bx + bw - 8, by + SH / 2);
+        const scoreW = ctx.measureText(String(score)).width;
+        setFont(ctx, 11, true);
+        ctx.fillStyle = '#3b82f6'; ctx.textAlign = 'right';
+        ctx.fillText(`(${tb})`, scoreX - scoreW - 2, by + SH / 2);
       }
     }
   };

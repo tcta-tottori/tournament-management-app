@@ -1792,8 +1792,10 @@ function ResultPreviewButton({ bracket }: { bracket: PlacementBracket }) {
         <div className="fixed inset-0 bg-black/60 z-[200]" onClick={() => setIsOpen(false)}>
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-[95vw] max-w-6xl max-h-[90vh] z-[210]" onClick={e => e.stopPropagation()}>
             <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <ClipboardList size={16} className="text-blue-500" /> 結果画像プレビュー
+              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-3">
+                <ClipboardList size={16} className="text-blue-500" />
+                <span>{({'1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント'} as Record<string, string>)[bracket.category] || bracket.category}</span>
+                <span className="text-xs text-gray-500 font-normal">{tournamentName}</span>
               </h3>
               <div className="flex items-center gap-3">
                 {dataUrl && (
