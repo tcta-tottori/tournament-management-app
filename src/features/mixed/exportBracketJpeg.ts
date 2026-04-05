@@ -390,8 +390,8 @@ export async function generateResultDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
 ): Promise<string> {
   const SC = 2;
-  const MW = 340;      // マッチ幅（広め）
-  const SH = 56;       // スロット高さ（大きめ）
+  const MW = 290;      // マッチ幅（切り詰め）
+  const SH = 56;       // スロット高さ
   const MH = SH * 2;   // マッチ高さ
   const MGAP = 10;     // マッチ間隔（狭く）
   const RGAP = 40;     // ラウンド間隔（狭く）
@@ -524,20 +524,16 @@ export async function generateResultDataUrl(
     ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, ny1, 105);
     ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, ny2, 105);
 
-    // 所属（太字、名前のすぐ右に配置）
-    setFont(ctx, 15, true);
-    const maleNW = ctx.measureText(t.male.name.replace(/[\s\u3000]+/g, '')).width;
-    const femaleNW = ctx.measureText(t.female.name.replace(/[\s\u3000]+/g, '')).width;
-    const maleAfX = nx + Math.min(maleNW, 105) + 6;
-    const femaleAfX = nx + Math.min(femaleNW, 105) + 6;
-    // スコアの幅を確保（約40px）
-    const scoreReserve = score !== null ? 40 : 8;
-    const maleAfW = bw - (maleAfX - bx) - scoreReserve;
-    const femaleAfW = bw - (femaleAfX - bx) - scoreReserve;
-    setFont(ctx, 11, true);
-    ctx.fillStyle = ac;
-    if (maleAfW > 10) ctx.fillText(t.male.affiliation, maleAfX, ny1, maleAfW);
-    if (femaleAfW > 10) ctx.fillText(t.female.affiliation, femaleAfX, ny2, femaleAfW);
+    // 所属（太字、列で統一した固定位置）
+    const afX = nx + 108;
+    const scoreReserve = score !== null ? 34 : 6;
+    const afW = bw - (afX - bx) - scoreReserve;
+    if (afW > 10) {
+      setFont(ctx, 11, true);
+      ctx.fillStyle = ac;
+      ctx.fillText(t.male.affiliation, afX, ny1, afW);
+      ctx.fillText(t.female.affiliation, afX, ny2, afW);
+    }
 
     // スコア
     if (score !== null) {
