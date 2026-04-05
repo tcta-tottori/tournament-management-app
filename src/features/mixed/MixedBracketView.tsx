@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList, Download } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import CallPreviewDialog from './CallPreviewDialog';
+import { exportBracketJpeg } from './exportBracketJpeg';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -429,8 +430,21 @@ export default function MixedBracketView() {
         })}
       </div>
 
-      {/* ドロー編集ボタン */}
-      <div className="flex justify-end">
+      {/* ドロー編集 / ダウンロードボタン */}
+      <div className="flex justify-end gap-2">
+        {currentBracket && (
+          <button
+            onClick={() => {
+              const allTeamsData = useMixedStore.getState().allTeams;
+              const tName = useMixedStore.getState().tournamentInfo?.name || '';
+              exportBracketJpeg(currentBracket, allTeamsData, tName);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+          >
+            <Download size={12} />
+            画像DL
+          </button>
+        )}
         <button
           onClick={() => setDrawEditMode(!drawEditMode)}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
@@ -459,8 +473,12 @@ export default function MixedBracketView() {
         <DrawEditPanel bracket={currentBracket} />
       )}
 
-      {/* 1位トーナメント: ルーレット抽選 */}
-      {is1stBracket && currentBracket && (
+      {/* 1位トーナメント: ルーレット抽選（1回戦に未配置スロットがある場合のみ） */}
+      {is1stBracket && currentBracket && (() => {
+        const r1 = currentBracket.matches.filter(m => m.round === 1 && !m.isBye);
+        const hasEmptySlot = r1.some(m => !m.team1Id || !m.team2Id);
+        return hasEmptySlot;
+      })() && (
         <RouletteDrawPanel
           bracket={currentBracket}
           onRebuild={rebuildBracketFromSlots}
