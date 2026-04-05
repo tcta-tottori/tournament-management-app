@@ -19,7 +19,7 @@ const LINE_COLOR = '#222';
 const WIN_W = 2.8;
 const LOSE_W = 0.8;
 const SCORE_COLOR = '#222';
-const SCORE_SIZE = 12;
+const SCORE_SIZE = 14;
 
 function setFont(ctx: CanvasRenderingContext2D, size: number, bold = false) {
   ctx.font = `${bold ? 'bold ' : ''}${size}px "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif`;
@@ -105,29 +105,25 @@ function drawBracketLines(
 
   ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
 
-  // スコア（縦線の横、中央寄せ）
+  // スコア（縦線の横、中央寄せ、線から余裕を持たせる）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
     const mid = (t1cy + t2cy) / 2;
-    const s1y = mid - 7;
-    const s2y = mid + 7;
+    const s1y = mid - 9;
+    const s2y = mid + 9;
     const tb = m.tiebreakScore;
     const t1isLoser = m.winnerId != null && m.winnerId !== m.team1Id;
     const t2isLoser = m.winnerId != null && m.winnerId !== m.team2Id;
-    const xOff = isLeft ? jx + 2 : jx - 2;
+    const xOff = isLeft ? jx + 4 : jx - 4;
     const align: CanvasTextAlign = isLeft ? 'left' : 'right';
 
-    // 上スコア
     txt(ctx, String(m.score1), xOff, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
-    // 上が敗者 → スコアの上にタイブレーク
     if (t1isLoser && tb != null) {
-      txt(ctx, `(${tb})`, xOff, s1y - 10, 9, { color: SCORE_COLOR, align });
+      txt(ctx, `(${tb})`, xOff, s1y - 12, 10, { color: SCORE_COLOR, align });
     }
 
-    // 下スコア
     txt(ctx, String(m.score2), xOff, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
-    // 下が敗者 → スコアの下にタイブレーク
     if (t2isLoser && tb != null) {
-      txt(ctx, `(${tb})`, xOff, s2y + 10, 9, { color: SCORE_COLOR, align });
+      txt(ctx, `(${tb})`, xOff, s2y + 12, 10, { color: SCORE_COLOR, align });
     }
   }
 }
@@ -178,7 +174,18 @@ export async function generateBracketDataUrl(
   canvas.width = totalW * SCALE; canvas.height = totalH * SCALE;
   const ctx = canvas.getContext('2d')!;
   ctx.scale(SCALE, SCALE);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, totalW, totalH);
+  // 背景（角丸）
+  const bgR = 12;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(bgR, 0); ctx.arcTo(totalW, 0, totalW, totalH, bgR);
+  ctx.arcTo(totalW, totalH, 0, totalH, bgR);
+  ctx.arcTo(0, totalH, 0, 0, bgR);
+  ctx.arcTo(0, 0, totalW, 0, bgR);
+  ctx.closePath(); ctx.fill();
+  // 外枠（角丸、薄いグレー）
+  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+  ctx.stroke();
 
   // ヘッダー
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
@@ -210,8 +217,10 @@ export async function generateBracketDataUrl(
     const exitX = slotR + gapX;
 
     if (bye) {
+      // BYE: 勝者の線は赤で描画
       const teamCy = bye2 ? t1cy : t2cy;
-      ln(ctx, slotR, teamCy, exitX, teamCy, LINE_COLOR, LOSE_W);
+      const hasW = m.winnerId != null;
+      ln(ctx, slotR, teamCy, exitX, teamCy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
       jp.set(m.matchId, { x: exitX, y: teamCy });
     } else {
       const jx = slotR + gapX * 0.42;
@@ -231,7 +240,6 @@ export async function generateBracketDataUrl(
     const t2cy = top + p.t2y + SLOT_H / 2;
     const cy = (t1cy + t2cy) / 2;
 
-    // 右山: 線から間隔を取って右揃えで配置
     const rx = totalW - PADDING_X - SLOT_W;
     drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
     drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
@@ -240,8 +248,10 @@ export async function generateBracketDataUrl(
     const exitX = slotL - gapX;
 
     if (bye) {
+      // BYE: 勝者の線は赤で描画
       const teamCy = bye2 ? t1cy : t2cy;
-      ln(ctx, slotL, teamCy, exitX, teamCy, LINE_COLOR, LOSE_W);
+      const hasW = m.winnerId != null;
+      ln(ctx, slotL, teamCy, exitX, teamCy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
       jp.set(m.matchId, { x: exitX, y: teamCy });
     } else {
       const jx = slotL - gapX * 0.42;
@@ -265,7 +275,8 @@ export async function generateBracketDataUrl(
       if (parents.length < 2) {
         if (parents.length === 1) {
           const p = parents[0];
-          const hasW = m.winnerId != null && !isByeMatch(m);
+          // BYEでも勝者がいれば赤線
+          const hasW = m.winnerId != null;
           const exitX = p.x + (isLeft ? gapX : -gapX);
           ln(ctx, p.x, p.y, exitX, p.y, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
           jp.set(m.matchId, { x: exitX, y: p.y });
