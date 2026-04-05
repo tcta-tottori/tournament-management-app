@@ -43,7 +43,7 @@ interface MixedState {
   generateBrackets: () => void;
 
   // Actions: Tournament
-  updateBracketScore: (matchId: string, score1: number, score2: number, overrideWinnerId?: string | null) => void;
+  updateBracketScore: (matchId: string, score1: number, score2: number, overrideWinnerId?: string | null, tiebreakScore?: number | null) => void;
   setBracketMatchStatus: (matchId: string, status: BracketMatch['status']) => void;
   advanceWinner: (matchId: string) => void;
 
@@ -190,7 +190,7 @@ export const useMixedStore = create<MixedState>()(
         set({ brackets, currentPhase: 'tournament' });
       },
 
-      updateBracketScore: (matchId, score1, score2, overrideWinnerId) => {
+      updateBracketScore: (matchId, score1, score2, overrideWinnerId, tiebreakScore) => {
         set(state => ({
           brackets: state.brackets.map(b => ({
             ...b,
@@ -199,7 +199,8 @@ export const useMixedStore = create<MixedState>()(
               const winnerId = overrideWinnerId !== undefined && overrideWinnerId !== null
                 ? overrideWinnerId
                 : (score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null);
-              return { ...m, score1, score2, winnerId, status: 'finished' as const };
+              const tb = tiebreakScore !== undefined ? tiebreakScore : null;
+              return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
             }),
           })),
         }));
@@ -415,7 +416,7 @@ export const useMixedStore = create<MixedState>()(
                 matchId, category, round, position: pos,
                 team1Id: null, team2Id: null, team1Name: '', team2Name: '',
                 team1League: '', team2League: '',
-                score1: null, score2: null, winnerId: null,
+                score1: null, score2: null, tiebreakScore: null, winnerId: null,
                 status: 'waiting', isBye: false,
                 nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
               });
@@ -492,7 +493,7 @@ export const useMixedStore = create<MixedState>()(
                 matchId, category, round, position: pos,
                 team1Id: null, team2Id: null, team1Name: '', team2Name: '',
                 team1League: '', team2League: '',
-                score1: null, score2: null, winnerId: null,
+                score1: null, score2: null, tiebreakScore: null, winnerId: null,
                 status: 'waiting', isBye: false,
                 nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
               });

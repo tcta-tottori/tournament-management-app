@@ -79,6 +79,7 @@ export interface BracketMatch {
   team2League: string;
   score1: number | null;
   score2: number | null;
+  tiebreakScore: number | null; // タイブレーク敗者側スコア
   winnerId: string | null;
   status: 'waiting' | 'ready' | 'playing' | 'finished' | 'bye';
   isBye: boolean;

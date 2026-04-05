@@ -203,7 +203,9 @@ export default function MixedBracketView() {
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
+  const [tiebreakInput, setTiebreakInput] = useState('');
   const score2Ref = useRef<HTMLInputElement>(null);
+  const tiebreakRef = useRef<HTMLInputElement>(null);
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
@@ -290,6 +292,7 @@ export default function MixedBracketView() {
     setEditingMatch(match);
     setScore1Input(match.score1 !== null && match.score1 >= 0 ? match.score1.toString() : '');
     setScore2Input(match.score2 !== null && match.score2 >= 0 ? match.score2.toString() : '');
+    setTiebreakInput(match.tiebreakScore?.toString() ?? '');
   };
 
   const handleCourtAssignConfirm = () => {
@@ -310,7 +313,9 @@ export default function MixedBracketView() {
     const s1 = parseInt(score1Input);
     const s2 = parseInt(score2Input);
     if (isNaN(s1) || isNaN(s2) || s1 === s2) return;
-    updateBracketScore(editingMatch.matchId, s1, s2);
+    const isTb = (s1 === winGames + 1 && s2 === winGames) || (s1 === winGames && s2 === winGames + 1);
+    const tb = isTb && tiebreakInput ? parseInt(tiebreakInput) : null;
+    updateBracketScore(editingMatch.matchId, s1, s2, undefined, tb);
     setTimeout(() => advanceWinner(editingMatch.matchId), 50);
     // コートから解放
     if (bracketCourtAssignments[editingMatch.matchId]) {
@@ -356,7 +361,16 @@ export default function MixedBracketView() {
       if (!isNaN(num) && num !== winGames && num !== winGames + 1 && score1Input === '') {
         setScore1Input(winGames.toString());
       }
+      const s1 = parseInt(score1Input);
+      if (!isNaN(s1) && ((s1 === winGames + 1 && num === winGames) || (s1 === winGames && num === winGames + 1))) {
+        setTimeout(() => { tiebreakRef.current?.focus(); tiebreakRef.current?.select(); }, 50);
+      }
     }
+  };
+
+  const handleTiebreakChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = toHalfWidth(e.target.value).replace(/[^0-9]/g, '');
+    setTiebreakInput(raw);
   };
 
   // Winner highlight
@@ -368,6 +382,21 @@ export default function MixedBracketView() {
     if (s2 > s1) return 2;
     return 0;
   })();
+
+  // Tiebreak detection
+  const isTiebreak = useMemo(() => {
+    const s1 = parseInt(score1Input);
+    const s2 = parseInt(score2Input);
+    return (s1 === winGames + 1 && s2 === winGames) || (s1 === winGames && s2 === winGames + 1);
+  }, [score1Input, score2Input, winGames]);
+
+  const loserSide = useMemo(() => {
+    const s1 = parseInt(score1Input);
+    const s2 = parseInt(score2Input);
+    if (s1 === winGames + 1 && s2 === winGames) return 2;
+    if (s1 === winGames && s2 === winGames + 1) return 1;
+    return 0;
+  }, [score1Input, score2Input, winGames]);
 
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
@@ -578,6 +607,7 @@ export default function MixedBracketView() {
                 setEditingMatch(courtAssignMatch);
                 setScore1Input(courtAssignMatch.score1 !== null && courtAssignMatch.score1 >= 0 ? courtAssignMatch.score1.toString() : '');
                 setScore2Input(courtAssignMatch.score2 !== null && courtAssignMatch.score2 >= 0 ? courtAssignMatch.score2.toString() : '');
+                setTiebreakInput(courtAssignMatch.tiebreakScore?.toString() ?? '');
               }} className="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 スキップしてスコア入力 →
               </button>
@@ -608,7 +638,22 @@ export default function MixedBracketView() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-4 mb-5">
+            <div className="flex items-center justify-center gap-2 mb-5">
+              {isTiebreak && loserSide === 1 && (
+                <div className="flex flex-col items-center">
+                  <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                  <input
+                    ref={tiebreakRef}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={tiebreakInput}
+                    onChange={handleTiebreakChange}
+                    onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
+                    className="w-10 h-12 text-center text-lg font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-blue-50 transition-all"
+                  />
+                </div>
+              )}
               <input
                 type="text"
                 inputMode="numeric"
@@ -626,9 +671,24 @@ export default function MixedBracketView() {
                 maxLength={1}
                 value={score2Input}
                 onChange={handleScore2Change}
-                onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
+                onKeyDown={e => { if (e.key === 'Enter' && !isTiebreak) saveScore(); }}
                 className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${winnerSide === 2 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300' : 'border-emerald-300'}`}
               />
+              {isTiebreak && loserSide === 2 && (
+                <div className="flex flex-col items-center">
+                  <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                  <input
+                    ref={tiebreakRef}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={tiebreakInput}
+                    onChange={handleTiebreakChange}
+                    onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
+                    className="w-10 h-12 text-center text-lg font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-blue-50 transition-all"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Save button */}
@@ -1338,7 +1398,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 // 通常マッチ
                 const SLOT_HEIGHT = compact ? 22 : 42;
                 const STATUS_HEIGHT = compact ? 16 : 30;
-                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null }) => {
+                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null }) => {
                   // teamIdから探す。なければnameから逆引き
                   let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
                   if (!teamData && slot.name && slot.league) {
@@ -1379,7 +1439,12 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                         : <span className="text-[10px] text-gray-400">―</span>}
                       </div>
                       {slot.score !== null && (
-                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>{slot.score}</span>
+                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
+                          {slot.score}
+                          {slot.isLoser && slot.tiebreakScore !== null && (
+                            <span className="text-[9px] text-blue-500 align-super ml-0.5">({slot.tiebreakScore})</span>
+                          )}
+                        </span>
                       )}
                     </div>
                   );
@@ -1397,8 +1462,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       `}
                       style={{ height: MATCH_HEIGHT }}
                     >
-                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1') })}
-                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2') })}
+                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, isLoser: match.winnerId !== null && match.winnerId !== match.team1Id, tiebreakScore: match.tiebreakScore, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1') })}
+                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, isLoser: match.winnerId !== null && match.winnerId !== match.team2Id, tiebreakScore: match.tiebreakScore, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2') })}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
                         <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2

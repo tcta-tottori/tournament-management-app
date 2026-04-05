@@ -337,7 +337,7 @@ function generateBracketMatchesWithSlots(
         matchId, category, round, position: pos,
         team1Id: null, team2Id: null, team1Name: '', team2Name: '',
         team1League: '', team2League: '',
-        score1: null, score2: null, winnerId: null,
+        score1: null, score2: null, tiebreakScore: null, winnerId: null,
         status: 'waiting', isBye: false,
         nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
       });
@@ -415,6 +415,7 @@ export function generateBracketMatches(
         team2League: '',
         score1: null,
         score2: null,
+        tiebreakScore: null,
         winnerId: null,
         status: 'waiting',
         isBye: false,
