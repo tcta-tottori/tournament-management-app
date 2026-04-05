@@ -37,40 +37,34 @@ function approxW(t: string, fs: number): number {
   let w = 0; for (const c of t) w += c.charCodeAt(0) > 0x2fff ? fs : c === ' ' ? fs * 0.3 : fs * 0.6; return w;
 }
 
-// 左山チーム描画（番号左、名前+所属が右へ）
-function drawTeamLeft(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
+// 名前の固定列幅（所属の開始位置を統一）
+const NAME_COL_W = 80; // 名前列の固定幅
+const AFF_OFFSET = NAME_COL_W + 4; // 所属の開始オフセット
+const NAME_SIZE = 12; // 名前の文字サイズ
+const AFF_SIZE = 9;  // 所属の文字サイズ
+
+// 共通チーム描画（番号→名前→所属の均一レイアウト）
+function drawTeamEntry(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
   if (isBye || (!teamId && teamName === 'BYE')) return;
   if (!teamId) return;
   const team = allTeams.find(t => t.teamId === teamId);
   if (!team) return;
-  txt(ctx, String(team.pairNumber), x, y + SLOT_H / 2, 14, { bold: true });
+  // 番号（固定列）
+  txt(ctx, String(team.pairNumber), x, y + SLOT_H / 2, 15, { bold: true });
+  // 名前（固定開始列、固定幅）
   const nx = x + NUM_W;
-  const mw = SLOT_W - NUM_W;
-  txt(ctx, team.male.name, nx, y + 12, 11, { bold: true, maxW: mw * 0.52 });
-  const mnw = Math.min(approxW(team.male.name, 11), mw * 0.52);
-  if (team.male.affiliation) txt(ctx, team.male.affiliation, nx + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
-  txt(ctx, team.female.name, nx, y + 32, 11, { bold: true, maxW: mw * 0.52 });
-  const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
-  if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
+  txt(ctx, team.male.name, nx, y + 12, NAME_SIZE, { bold: true, maxW: NAME_COL_W });
+  txt(ctx, team.female.name, nx, y + 33, NAME_SIZE, { bold: true, maxW: NAME_COL_W });
+  // 所属（固定開始列）
+  const ax = nx + AFF_OFFSET;
+  const aw = SLOT_W - NUM_W - AFF_OFFSET - 4;
+  if (team.male.affiliation) txt(ctx, team.male.affiliation, ax, y + 12, AFF_SIZE, { color: '#555', maxW: aw });
+  if (team.female.affiliation) txt(ctx, team.female.affiliation, ax, y + 33, AFF_SIZE, { color: '#555', maxW: aw });
 }
 
-// 右山チーム描画（左から: ペア番号, 名前, 所属 — 左山と同じ配置）
-function drawTeamRight(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
-  if (isBye || (!teamId && teamName === 'BYE')) return;
-  if (!teamId) return;
-  const team = allTeams.find(t => t.teamId === teamId);
-  if (!team) return;
-  // 左山と同じレイアウト: 番号(左) → 名前 → 所属
-  txt(ctx, String(team.pairNumber), x, y + SLOT_H / 2, 14, { bold: true });
-  const nx = x + NUM_W;
-  const mw = SLOT_W - NUM_W;
-  txt(ctx, team.male.name, nx, y + 12, 11, { bold: true, maxW: mw * 0.52 });
-  const mnw = Math.min(approxW(team.male.name, 11), mw * 0.52);
-  if (team.male.affiliation) txt(ctx, team.male.affiliation, nx + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
-  txt(ctx, team.female.name, nx, y + 32, 11, { bold: true, maxW: mw * 0.52 });
-  const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
-  if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
-}
+// 左山・右山で同じ関数を使用
+const drawTeamLeft = drawTeamEntry;
+const drawTeamRight = drawTeamEntry;
 
 function familyName(name: string): string { return name.trim().split(/[\s　]+/)[0] || name; }
 
