@@ -10,8 +10,8 @@ const SLOT_W = 170;
 const SLOT_H = 44;
 const NUM_W = 28;
 const PADDING_X = 32;
-const PADDING_Y = 30;
-const HEADER_H = 44;
+const PADDING_Y = 24;
+const HEADER_H = 36;
 const RIGHT_MARGIN = 10; // 右山のチーム情報と線の間
 
 const WIN_COLOR = '#cc0000';
@@ -87,16 +87,15 @@ function drawBracketLines(
 
   ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
 
-  // スコア（横線のすぐ内側、中央寄せ）
+  // スコア（横線を挟んですぐ上/すぐ下）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-    // スコアは縦線のすぐ横、上下の横線より中央寄りに配置
-    const scoreOffY = (t2cy - t1cy) * 0.15; // 中央寄せのオフセット
+    const so = 8; // 横線からのオフセット（すぐ上/すぐ下）
     if (isLeft) {
-      txt(ctx, String(m.score1), jx + 2, t1cy + scoreOffY, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx + 2, t2cy - scoreOffY, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score1), jx + 2, t1cy + so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score2), jx + 2, t2cy - so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
     } else {
-      txt(ctx, String(m.score1), jx - 2, t1cy + scoreOffY, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx - 2, t2cy - scoreOffY, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score1), jx - 2, t1cy + so, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score2), jx - 2, t2cy - so, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
     }
   }
 }
@@ -139,17 +138,24 @@ export async function generateBracketDataUrl(
     return pos;
   }
 
-  const leftPos = calcPositions(leftR1);
-  const rightPos = calcPositions(rightR1);
-  const lastLeft = leftPos.length > 0 ? leftPos[leftPos.length - 1] : { t1y: 0, t2y: 0 };
-  const lastRight = rightPos.length > 0 ? rightPos[rightPos.length - 1] : { t1y: 0, t2y: 0 };
-  const areaH = Math.max(lastLeft.t2y + SLOT_H + 10, lastRight.t2y + SLOT_H + 10, 200);
+  // 左右で同じ位置配列を使用（決勝線がぴったり合うように）
+  const maxSide = Math.max(leftR1.length, rightR1.length);
+  const unifiedPos = calcPositions(Array.from({ length: maxSide }, (_, i) => {
+    const leftM = leftR1[i];
+    const rightM = rightR1[i];
+    // BYE判定は両方のうちBYEがある方を優先
+    return leftM || rightM || leftR1[0];
+  }));
+  const leftPos = unifiedPos.slice(0, leftR1.length);
+  const rightPos = unifiedPos.slice(0, rightR1.length);
+  const lastPos = unifiedPos.length > 0 ? unifiedPos[unifiedPos.length - 1] : { t1y: 0, t2y: 0 };
+  const areaH = lastPos.t2y + SLOT_H + 10;
 
   const gapX = 75;
   const sideW = SLOT_W + (sideRounds > 1 ? (sideRounds - 1) * gapX : 0);
   const centerGap = 160;
   const totalW = PADDING_X * 2 + sideW * 2 + centerGap;
-  const winnerAreaH = 50;
+  const winnerAreaH = 35; // 切り詰め
   const totalH = PADDING_Y * 2 + HEADER_H + winnerAreaH + areaH;
 
   const canvas = document.createElement('canvas');
@@ -165,7 +171,7 @@ export async function generateBracketDataUrl(
   ctx.strokeRect(PADDING_X, PADDING_Y, cw, 30);
   txt(ctx, catLabel, PADDING_X + cw / 2, PADDING_Y + 15, 16, { align: 'center', bold: true });
   txt(ctx, tournamentName, totalW - PADDING_X, PADDING_Y + 15, 14, { align: 'right', bold: true, color: '#333' });
-  ln(ctx, PADDING_X, PADDING_Y + 38, totalW - PADDING_X, PADDING_Y + 38, '#ddd', 0.5);
+  ln(ctx, PADDING_X, PADDING_Y + 34, totalW - PADDING_X, PADDING_Y + 34, '#ddd', 0.5);
 
   const top = PADDING_Y + HEADER_H + winnerAreaH;
   const jp = new Map<string, JP>();
