@@ -72,18 +72,23 @@ function isByeMatch(m: BracketMatch): boolean {
   return m.isBye || (!m.team1Id && m.team1Name === 'BYE') || (!m.team2Id && m.team2Name === 'BYE');
 }
 
+// lineOverrides: 'auto' | 't1red' | 't2red' | 'black'
+type LineOvValue = 't1red' | 't2red' | 'black';
+type LineOverrides = Record<string, LineOvValue>;
+
 function drawBracketLines(
   ctx: CanvasRenderingContext2D,
   t1cy: number, t2cy: number, cy: number,
   fromX: number, jx: number, exitX: number,
   m: BracketMatch, isLeft: boolean,
-  lineOv?: Record<string, 'red' | 'black'>
+  lineOv?: LineOverrides
 ) {
   const ov = lineOv?.[m.matchId];
   let w1 = m.winnerId === m.team1Id && m.winnerId != null;
   let w2 = m.winnerId === m.team2Id && m.winnerId != null;
   if (ov === 'black') { w1 = false; w2 = false; }
-  if (ov === 'red' && !w1 && !w2) { w1 = true; }
+  if (ov === 't1red') { w1 = true; w2 = false; }
+  if (ov === 't2red') { w1 = false; w2 = true; }
   const hasW = w1 || w2;
 
   ln(ctx, fromX, t1cy, jx, t1cy, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
@@ -131,7 +136,7 @@ interface JP { x: number; y: number }
 export async function generateBracketDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
   winnerOverride?: string,
-  lineOverrides?: Record<string, 'red' | 'black'>,
+  lineOverrides?: LineOverrides,
 ): Promise<string> {
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
@@ -225,8 +230,9 @@ export async function generateBracketDataUrl(
           if (wId) drawTeamLeft(ctx, PADDING_X, teamY, wId, '', false, allTeams);
           const slotR = PADDING_X + SLOT_W;
           const exitX = slotR + gapX;
-          const adv = byeWinnerAdvanced(m);
-          ln(ctx, slotR, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          const ov = lineOverrides?.[m.matchId];
+          const isRed = ov === 't1red' || ov === 't2red' ? true : ov === 'black' ? false : byeWinnerAdvanced(m);
+          ln(ctx, slotR, cy, exitX, cy, isRed ? WIN_COLOR : LINE_COLOR, isRed ? WIN_W : LOSE_W);
         } else {
           drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
           drawTeamLeft(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
@@ -243,8 +249,9 @@ export async function generateBracketDataUrl(
           const wId = m.winnerId || (bye2 ? m.team1Id : m.team2Id);
           if (wId) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, wId, '', false, allTeams);
           const exitX = rx - gapX;
-          const adv = byeWinnerAdvanced(m);
-          ln(ctx, rx, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          const ov2 = lineOverrides?.[m.matchId];
+          const isRed2 = ov2 === 't1red' || ov2 === 't2red' ? true : ov2 === 'black' ? false : byeWinnerAdvanced(m);
+          ln(ctx, rx, cy, exitX, cy, isRed2 ? WIN_COLOR : LINE_COLOR, isRed2 ? WIN_W : LOSE_W);
         } else {
           drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
           drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
@@ -275,7 +282,8 @@ export async function generateBracketDataUrl(
       if (parents.length < 2) {
         if (parents.length === 1) {
           const p = parents[0];
-          const hasW = m.winnerId != null;
+          const ov1p = lineOverrides?.[m.matchId];
+          const hasW = ov1p === 't1red' || ov1p === 't2red' ? true : ov1p === 'black' ? false : m.winnerId != null;
           const exitX = p.x + (isLeft ? gapX : -gapX);
           ln(ctx, p.x, p.y, exitX, p.y, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
           jp.set(m.matchId, { x: exitX, y: p.y });
@@ -327,11 +335,19 @@ export async function generateBracketDataUrl(
         });
         const leftIsTeam1 = !leftParentMatch || leftParentMatch.nextSlot === 'team1';
 
-        // 左山の勝者判定（leftPがteam1/team2のどちらに対応するか）
-        const leftWon = fm.winnerId != null && (
-          leftIsTeam1 ? fm.winnerId === fm.team1Id : fm.winnerId === fm.team2Id
-        );
-        const rightWon = fm.winnerId != null && !leftWon;
+        // lineOverrides対応
+        const finalOv = lineOverrides?.[fm.matchId];
+        let leftWon: boolean;
+        let rightWon: boolean;
+        if (finalOv === 't1red') { leftWon = true; rightWon = false; }
+        else if (finalOv === 't2red') { leftWon = false; rightWon = true; }
+        else if (finalOv === 'black') { leftWon = false; rightWon = false; }
+        else {
+          leftWon = fm.winnerId != null && (
+            leftIsTeam1 ? fm.winnerId === fm.team1Id : fm.winnerId === fm.team2Id
+          );
+          rightWon = fm.winnerId != null && !leftWon;
+        }
 
         // 左山→中央（勝者なら赤、敗者なら黒）
         ln(ctx, leftP.x, topY, jx, topY, leftWon ? WIN_COLOR : LINE_COLOR, leftWon ? WIN_W : LOSE_W);
@@ -372,7 +388,7 @@ export async function generateBracketDataUrl(
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 
-export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string, winnerOverride?: string, lineOverrides?: Record<string, 'red' | 'black'>) {
+export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string, winnerOverride?: string, lineOverrides?: LineOverrides) {
   const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName, winnerOverride, lineOverrides);
   const a = document.createElement('a');
   a.href = dataUrl;
@@ -383,6 +399,16 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
 // ---------------------------------------------------------------------------
 // 結果画像
 // ---------------------------------------------------------------------------
+
+/** 名前から名字を抽出。スペースがあれば分割、なければ全体の半分（2〜3文字）を名字とみなす */
+function _extractFamily(name: string): string {
+  const n = name.replace(/\u3000/g, ' ').trim();
+  if (n.includes(' ')) return n.split(/\s+/)[0];
+  // スペースなし: 漢字のみなら2文字、それ以外は3文字を名字とする
+  if (n.length <= 2) return n;
+  // 3文字以上: 一般的な日本の名字は2文字が多い
+  return n.substring(0, 2);
+}
 
 function _rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -532,14 +558,11 @@ export async function generateResultDataUrl(
         ctx.fillText(t.female.affiliation, afX, ny2, afW);
       }
     } else {
-      // 2回戦以降: 名字のみ（teamNameの「姓・姓」から取得、fallbackはスペース分割）
-      const parts = t.teamName.split('・');
-      const maleFN = parts[0] || t.male.name.trim().split(/[\s\u3000]+/)[0];
-      const femaleFN = parts[1] || t.female.name.trim().split(/[\s\u3000]+/)[0];
+      // 2回戦以降: 名字のみ
       setFont(ctx, 15, true);
       ctx.fillStyle = tc; ctx.textAlign = 'left';
-      ctx.fillText(maleFN, nx, ny1);
-      ctx.fillText(femaleFN, nx, ny2);
+      ctx.fillText(_extractFamily(t.male.name), nx, ny1);
+      ctx.fillText(_extractFamily(t.female.name), nx, ny2);
     }
 
     // スコア（常に右揃え同一位置）
