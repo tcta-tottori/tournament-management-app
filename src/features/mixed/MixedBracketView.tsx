@@ -348,7 +348,7 @@ export default function MixedBracketView() {
 
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
-  const noMatchesStarted = currentBracket?.matches.every(m => m.status === 'waiting' || m.status === 'bye' || m.status === 'ready') ?? true;
+
 
   return (
     <div className="space-y-4">
@@ -436,7 +436,7 @@ export default function MixedBracketView() {
       )}
 
       {/* 1位トーナメント: ルーレット抽選 */}
-      {is1stBracket && noMatchesStarted && currentBracket && (
+      {is1stBracket && currentBracket && (
         <RouletteDrawPanel
           bracket={currentBracket}
           onRebuild={rebuildBracketFromSlots}
@@ -721,8 +721,6 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
     rebuildBracketFromSlots(bracket.category, slotArray);
   };
 
-  const hasStartedMatches = r1Matches.some(m => m.status === 'finished' || m.status === 'playing');
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
@@ -733,11 +731,6 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
         </h3>
       </div>
       <div className="p-4">
-        {hasStartedMatches && (
-          <div className="mb-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
-            試合が開始済みのため編集できません。
-          </div>
-        )}
         <div className="space-y-0.5">
           {slots.map((slot, idx) => {
             const isMatchBoundary = idx % 2 === 0 && idx > 0;
@@ -752,9 +745,7 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                   <div className="text-[9px] text-gray-400 font-bold mb-0.5 ml-1">第{matchNum}試合</div>
                 )}
                 <button
-                  disabled={hasStartedMatches}
                   onClick={() => {
-                    if (hasStartedMatches) return;
                     if (dragIdx === null) {
                       setDragIdx(idx);
                     } else {
@@ -767,7 +758,7 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                     dragIdx !== null ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 cursor-pointer' :
                     slot.isBye || slot.teamName === 'BYE' ? 'bg-gray-50 border border-gray-200 text-gray-400' :
                     'bg-white border border-gray-200 hover:bg-gray-50'
-                  } ${hasStartedMatches ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  }`}
                 >
                   <span className="w-5 text-center text-[10px] text-gray-400 font-mono shrink-0">{idx + 1}</span>
                   {slot.teamId && slot.league ? (
