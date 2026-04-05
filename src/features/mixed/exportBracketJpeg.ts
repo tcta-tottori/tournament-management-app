@@ -1,6 +1,5 @@
 import type { PlacementBracket, BracketMatch, MixedTeam } from './types';
 
-// カテゴリ表示ラベル
 const CATEGORY_LABELS: Record<string, string> = {
   '1st': '1位トーナメント',
   '2nd': '2位トーナメント',
@@ -8,89 +7,48 @@ const CATEGORY_LABELS: Record<string, string> = {
   '4th': '4・5位トーナメント',
 };
 
-// ラウンド名
-function roundLabel(round: number, maxRound: number): string {
-  if (round === maxRound) return '決勝';
-  if (round === maxRound - 1) return '準決勝';
-  if (round === maxRound - 2) return '準々決勝';
-  return `${round}回戦`;
-}
+// ---------------------------------------------------------------------------
+// レイアウト定数
+// ---------------------------------------------------------------------------
+const SCALE = 2;
+const SLOT_W = 200;   // チーム枠の幅
+const SLOT_H = 48;    // チーム枠の高さ
+const NUM_W = 28;     // ペア番号の幅
+const MATCH_GAP = 16; // 同一試合の2チーム間の隙間
+const ROUND_GAP_X = 70; // ラウンド間の水平距離（接続線の長さ）
+const PADDING_X = 30;
+const PADDING_Y = 30;
+const HEADER_H = 85;
+const ROUND_LABEL_H = 30;
+const CENTER_GAP = 80; // 決勝の中央スペース
 
 // ---------------------------------------------------------------------------
 // Canvas描画ヘルパー
 // ---------------------------------------------------------------------------
-
-function drawText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  size: number,
-  align: CanvasTextAlign = 'left',
-  color = '#1e293b',
-  bold = false,
-  maxWidth?: number,
-) {
-  ctx.fillStyle = color;
+function setFont(ctx: CanvasRenderingContext2D, size: number, bold = false) {
   ctx.font = `${bold ? 'bold ' : ''}${size}px "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif`;
-  ctx.textAlign = align;
-  ctx.textBaseline = 'middle';
-  if (maxWidth) {
-    ctx.fillText(text, x, y, maxWidth);
-  } else {
-    ctx.fillText(text, x, y);
-  }
 }
 
-function drawLine(
-  ctx: CanvasRenderingContext2D,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  color = '#555555',
-  width = 1.5,
-) {
+function fillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, opts?: { align?: CanvasTextAlign; color?: string; bold?: boolean; maxW?: number }) {
+  const { align = 'left', color = '#1a1a1a', bold = false, maxW } = opts || {};
+  ctx.fillStyle = color;
+  setFont(ctx, size, bold);
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  if (maxW) ctx.fillText(text, x, y, maxW);
+  else ctx.fillText(text, x, y);
+}
+
+function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#333', w = 1.2) {
   ctx.strokeStyle = color;
-  ctx.lineWidth = width;
+  ctx.lineWidth = w;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
 }
 
-function drawRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill?: string,
-  stroke?: string,
-  strokeW = 1,
-) {
-  if (fill) {
-    ctx.fillStyle = fill;
-    ctx.fillRect(x, y, w, h);
-  }
-  if (stroke) {
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = strokeW;
-    ctx.strokeRect(x, y, w, h);
-  }
-}
-
-function drawRoundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-  fill?: string,
-  stroke?: string,
-  strokeW = 1,
-) {
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill?: string, stroke?: string, sw = 1) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -99,88 +57,74 @@ function drawRoundRect(
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = strokeW; ctx.stroke(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); }
+}
+
+function approxW(text: string, fontSize: number): number {
+  let w = 0;
+  for (const ch of text) {
+    w += ch.charCodeAt(0) > 0x2fff ? fontSize : ch === ' ' ? fontSize * 0.3 : fontSize * 0.6;
+  }
+  return w;
 }
 
 // ---------------------------------------------------------------------------
-// Team slot (entry box) 描画
+// チーム枠の描画
 // ---------------------------------------------------------------------------
-
-interface SlotPos { x: number; y: number }
-
-const SLOT_W = 210;
-const SLOT_H = 52;
-
-function drawTeamSlot(
-  ctx: CanvasRenderingContext2D,
-  pos: SlotPos,
-  teamId: string | null,
-  teamName: string,
-  isBye: boolean,
-  allTeams: MixedTeam[],
-) {
-  const { x, y } = pos;
-
-  // Background & border
-  drawRoundRect(ctx, x, y, SLOT_W, SLOT_H, 3, '#fafafa', '#c0c0c0', 1);
+function drawSlot(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
+  roundRect(ctx, x, y, SLOT_W, SLOT_H, 3, '#fafafa', '#b0b0b0', 1);
 
   if (isBye || (!teamId && teamName === 'BYE')) {
-    drawText(ctx, 'BYE', x + SLOT_W / 2, y + SLOT_H / 2, 14, 'center', '#c0c0c0', false);
+    fillText(ctx, 'BYE', x + SLOT_W / 2, y + SLOT_H / 2, 13, { align: 'center', color: '#bbb' });
     return;
   }
-
   if (!teamId) {
-    // Waiting / empty
-    if (teamName) {
-      drawText(ctx, teamName, x + SLOT_W / 2, y + SLOT_H / 2, 12, 'center', '#999999', false, SLOT_W - 8);
-    }
+    if (teamName) fillText(ctx, teamName, x + SLOT_W / 2, y + SLOT_H / 2, 11, { align: 'center', color: '#999', maxW: SLOT_W - 8 });
     return;
   }
 
   const team = allTeams.find(t => t.teamId === teamId);
-  if (!team) {
-    drawText(ctx, teamName || '???', x + SLOT_W / 2, y + SLOT_H / 2, 12, 'center', '#999999', false, SLOT_W - 8);
-    return;
-  }
+  if (!team) { fillText(ctx, teamName || '?', x + SLOT_W / 2, y + SLOT_H / 2, 11, { align: 'center', color: '#999' }); return; }
 
-  // Pair number box
-  const numW = 30;
-  drawRect(ctx, x, y, numW, SLOT_H, '#f0f0f0', '#c0c0c0', 1);
-  drawText(ctx, String(team.pairNumber), x + numW / 2, y + SLOT_H / 2, 14, 'center', '#333333', true);
+  // ペア番号
+  ctx.fillStyle = '#eee';
+  ctx.fillRect(x + 0.5, y + 0.5, NUM_W, SLOT_H - 1);
+  line(ctx, x + NUM_W, y, x + NUM_W, y + SLOT_H, '#b0b0b0', 1);
+  fillText(ctx, String(team.pairNumber), x + NUM_W / 2, y + SLOT_H / 2, 13, { align: 'center', color: '#333', bold: true });
 
-  // Male name + affiliation
-  const nameX = x + numW + 6;
-  const nameMaxW = SLOT_W - numW - 12;
-  const maleAff = team.male.affiliation ? ` ${team.male.affiliation}` : '';
-  const femaleAff = team.female.affiliation ? ` ${team.female.affiliation}` : '';
+  // 名前と所属
+  const nx = x + NUM_W + 5;
+  const mw = SLOT_W - NUM_W - 10;
+  fillText(ctx, team.male.name, nx, y + 14, 12, { bold: true, maxW: mw * 0.62 });
+  const maleNameW = Math.min(approxW(team.male.name, 12), mw * 0.62);
+  if (team.male.affiliation) fillText(ctx, team.male.affiliation, nx + maleNameW + 3, y + 14, 9, { color: '#888', maxW: mw - maleNameW - 6 });
 
-  drawText(ctx, team.male.name, nameX, y + 15, 12, 'left', '#1a1a1a', true, nameMaxW - 50);
-  drawText(ctx, maleAff, nameX + measureTextApprox(team.male.name, 12, true), y + 15, 10, 'left', '#888888', false, 60);
-
-  drawText(ctx, team.female.name, nameX, y + 37, 12, 'left', '#1a1a1a', true, nameMaxW - 50);
-  drawText(ctx, femaleAff, nameX + measureTextApprox(team.female.name, 12, true), y + 37, 10, 'left', '#888888', false, 60);
+  fillText(ctx, team.female.name, nx, y + 34, 12, { bold: true, maxW: mw * 0.62 });
+  const femaleNameW = Math.min(approxW(team.female.name, 12), mw * 0.62);
+  if (team.female.affiliation) fillText(ctx, team.female.affiliation, nx + femaleNameW + 3, y + 34, 9, { color: '#888', maxW: mw - femaleNameW - 6 });
 }
 
-/** テキスト幅の近似計算（Canvas measureText が使えないコンテキストのためのフォールバック） */
-function measureTextApprox(text: string, fontSize: number, _bold = false): number {
-  let width = 0;
-  for (const ch of text) {
-    const code = ch.charCodeAt(0);
-    if (code > 0x2fff) {
-      // CJK文字は全角幅
-      width += fontSize;
-    } else if (ch === ' ') {
-      width += fontSize * 0.3;
-    } else {
-      width += fontSize * 0.6;
-    }
-  }
-  return width;
+// ---------------------------------------------------------------------------
+// ラウンドラベル
+// ---------------------------------------------------------------------------
+function roundLabel(round: number, maxRound: number): string {
+  if (round === maxRound) return '決勝';
+  if (round === maxRound - 1) return '準決勝';
+  if (round === maxRound - 2) return '準々決勝';
+  return `${round}回戦`;
 }
 
 // ---------------------------------------------------------------------------
 // メイン描画
 // ---------------------------------------------------------------------------
+interface MatchLayout {
+  match: BracketMatch;
+  x: number;          // チーム枠のx座標
+  t1y: number;        // team1の枠y座標
+  t2y: number;        // team2の枠y座標
+  cy: number;         // マッチの中心y
+  isLeft: boolean;    // 左側か
+}
 
 export async function generateBracketDataUrl(
   bracket: PlacementBracket,
@@ -188,457 +132,260 @@ export async function generateBracketDataUrl(
   tournamentName: string,
 ): Promise<string> {
   const matches = bracket.matches;
-  if (matches.length === 0) {
-    throw new Error('No matches in bracket');
-  }
+  if (matches.length === 0) throw new Error('No matches');
 
-  // ラウンド情報を解析
   const maxRound = Math.max(...matches.map(m => m.round));
-  const rounds: Map<number, BracketMatch[]> = new Map();
+  const roundMap = new Map<number, BracketMatch[]>();
   for (const m of matches) {
-    if (!rounds.has(m.round)) rounds.set(m.round, []);
-    rounds.get(m.round)!.push(m);
+    if (!roundMap.has(m.round)) roundMap.set(m.round, []);
+    roundMap.get(m.round)!.push(m);
   }
-  // 各ラウンドをposition順にソート
-  for (const [, arr] of rounds) {
-    arr.sort((a, b) => a.position - b.position);
-  }
+  for (const [, arr] of roundMap) arr.sort((a, b) => a.position - b.position);
 
-  const round1Matches = rounds.get(1) || [];
-  const totalSlots = round1Matches.length * 2; // 1回戦のスロット数
-  const halfSlots = Math.ceil(round1Matches.length / 2); // 片側の試合数
-
-  // レイアウト定数
-  const scale = 2;
-  const headerH = 90;
-  const roundLabelH = 36;
-  const slotGapY = 12; // スロット間の隙間
-  const matchGapY = SLOT_H * 2 + slotGapY; // 1マッチ分の高さ
-  const connectorW = 50; // 接続線の水平長さ
-  const roundGapX = connectorW + 20; // ラウンド間の水平間隔
-  const paddingX = 30;
-  const paddingY = 30;
-  const centerGap = 60; // 左右ブロック間のギャップ（決勝用）
-
-  // 片側のラウンド数（決勝を除く）
+  const r1 = roundMap.get(1) || [];
+  const halfCount = Math.ceil(r1.length / 2);
+  const leftR1 = r1.slice(0, halfCount);
+  const rightR1 = r1.slice(halfCount);
   const sideRounds = maxRound >= 2 ? maxRound - 1 : maxRound;
 
-  // 片側の幅 = (SLOT_W + roundGapX) * sideRounds
-  const sideWidth = SLOT_W + (sideRounds > 1 ? (SLOT_W + roundGapX) * (sideRounds - 1) : 0);
-
-  // 高さ計算: 片側の1回戦試合数に基づく
-  const leftR1Count = halfSlots;
-  const rightR1Count = round1Matches.length - halfSlots;
-  const maxR1Count = Math.max(leftR1Count, rightR1Count);
-  const bracketAreaH = maxR1Count * matchGapY + SLOT_H;
+  // 片側の1回戦マッチ間の縦方向スペーシング
+  const matchH = SLOT_H * 2 + MATCH_GAP; // 1マッチ分の高さ
+  const r1Spacing = matchH * 1.4;        // 1回戦マッチ間の間隔
+  const maxR1 = Math.max(leftR1.length, rightR1.length);
+  const bracketAreaH = maxR1 * r1Spacing;
 
   // 全体サイズ
-  const totalW = paddingX * 2 + sideWidth * 2 + centerGap;
-  const totalH = paddingY * 2 + headerH + roundLabelH + bracketAreaH + 20;
+  const sideW = SLOT_W + (sideRounds > 1 ? (sideRounds - 1) * (SLOT_W + ROUND_GAP_X) : 0);
+  const totalW = PADDING_X * 2 + sideW * 2 + CENTER_GAP;
+  const totalH = PADDING_Y * 2 + HEADER_H + ROUND_LABEL_H + bracketAreaH + 30;
 
   const canvas = document.createElement('canvas');
-  canvas.width = totalW * scale;
-  canvas.height = totalH * scale;
+  canvas.width = totalW * SCALE;
+  canvas.height = totalH * SCALE;
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(scale, scale);
-
-  // 背景
-  ctx.fillStyle = '#ffffff';
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, totalW, totalH);
 
   // ---- ヘッダー ----
-  const currentYear = new Date().getFullYear();
-  const titleText = `${currentYear}${tournamentName}`;
-  drawText(ctx, titleText, totalW / 2, paddingY + 22, 22, 'center', '#1a1a1a', true);
+  const year = new Date().getFullYear();
+  const era = year >= 2019 ? `令和${year - 2018}年度` : '';
+  fillText(ctx, `${year}${era} ${tournamentName}`, totalW / 2, PADDING_Y + 22, 20, { align: 'center', bold: true });
+  const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
+  const catW = approxW(catLabel, 16) + 30;
+  roundRect(ctx, (totalW - catW) / 2, PADDING_Y + 42, catW, 30, 3, '#fff', '#333', 1.5);
+  fillText(ctx, catLabel, totalW / 2, PADDING_Y + 57, 16, { align: 'center', bold: true });
 
-  const categoryLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
-  const labelW = measureTextApprox(categoryLabel, 18, true) + 30;
-  const labelX = (totalW - labelW) / 2;
-  const labelY = paddingY + 44;
-  drawRoundRect(ctx, labelX, labelY, labelW, 32, 4, '#f5f5f5', '#333333', 1.5);
-  drawText(ctx, categoryLabel, totalW / 2, labelY + 16, 18, 'center', '#1a1a1a', true);
-
-  // ---- ラウンドラベル描画 ----
-  const topY = paddingY + headerH;
-
-  // 左側ラウンドラベル
+  // ---- ラウンドラベル ----
+  const labelY = PADDING_Y + HEADER_H + ROUND_LABEL_H / 2;
   for (let r = 1; r <= sideRounds; r++) {
-    const rx = paddingX + (r - 1) * (SLOT_W + roundGapX) + SLOT_W / 2;
-    const label = roundLabel(r, maxRound);
-    drawText(ctx, label, rx, topY + roundLabelH / 2, 12, 'center', '#666666', true);
+    const lx = PADDING_X + (r - 1) * (SLOT_W + ROUND_GAP_X) + SLOT_W / 2;
+    fillText(ctx, roundLabel(r, maxRound), lx, labelY, 11, { align: 'center', color: '#555', bold: true });
+    const rx = totalW - PADDING_X - (r - 1) * (SLOT_W + ROUND_GAP_X) - SLOT_W / 2;
+    fillText(ctx, roundLabel(r, maxRound), rx, labelY, 11, { align: 'center', color: '#555', bold: true });
   }
-  // 右側ラウンドラベル（右から左へ）
-  for (let r = 1; r <= sideRounds; r++) {
-    const rx = totalW - paddingX - (r - 1) * (SLOT_W + roundGapX) - SLOT_W / 2;
-    const label = roundLabel(r, maxRound);
-    drawText(ctx, label, rx, topY + roundLabelH / 2, 12, 'center', '#666666', true);
-  }
-  // 決勝ラベル
   if (maxRound >= 2) {
-    drawText(ctx, '決勝', totalW / 2, topY + roundLabelH / 2, 14, 'center', '#cc0000', true);
+    fillText(ctx, '決勝', totalW / 2, labelY, 13, { align: 'center', color: '#cc0000', bold: true });
   }
 
-  // ---- ブラケット描画 ----
-  const bracketTopY = topY + roundLabelH + 10;
-
-  // マッチを左右に分割
-  // 左側: round1の前半, 右側: round1の後半
-  const leftR1 = round1Matches.slice(0, halfSlots);
-  const rightR1 = round1Matches.slice(halfSlots);
-
-  // 各マッチのスロット中心Y座標を計算する関数
-  // マッチの位置（position）から、そのラウンド・サイドでの表示位置を求める
-  interface MatchLayout {
-    match: BracketMatch;
-    x: number;
-    team1SlotY: number;
-    team2SlotY: number;
-    centerY: number;
-  }
-
+  // ---- レイアウト計算 ----
+  const bracketTop = PADDING_Y + HEADER_H + ROUND_LABEL_H + 10;
   const layoutMap = new Map<string, MatchLayout>();
 
-  // 左側の描画 (Round 1から外側→内側)
-  function layoutLeftSide() {
-    // Round 1 - 左側
-    for (let i = 0; i < leftR1.length; i++) {
-      const m = leftR1[i];
-      const x = paddingX;
-      const t1y = bracketTopY + i * matchGapY;
-      const t2y = t1y + SLOT_H + slotGapY;
-      layoutMap.set(m.matchId, {
-        match: m,
-        x,
-        team1SlotY: t1y,
-        team2SlotY: t2y,
-        centerY: (t1y + SLOT_H / 2 + t2y + SLOT_H / 2) / 2,
-      });
-    }
+  // 左側 Round 1
+  for (let i = 0; i < leftR1.length; i++) {
+    const m = leftR1[i];
+    const x = PADDING_X;
+    const t1y = bracketTop + i * r1Spacing;
+    const t2y = t1y + SLOT_H + MATCH_GAP;
+    layoutMap.set(m.matchId, { match: m, x, t1y, t2y, cy: (t1y + t2y + SLOT_H) / 2, isLeft: true });
+  }
 
-    // 後続ラウンド（左側）
-    for (let r = 2; r <= sideRounds; r++) {
-      const roundMatches = (rounds.get(r) || []).filter(m => {
-        // 左側のマッチを判定: positionが前半
-        const totalInRound = (rounds.get(r) || []).length;
-        const halfInRound = Math.ceil(totalInRound / 2);
-        return m.position <= halfInRound;
-      });
+  // 右側 Round 1
+  for (let i = 0; i < rightR1.length; i++) {
+    const m = rightR1[i];
+    const x = totalW - PADDING_X - SLOT_W;
+    const t1y = bracketTop + i * r1Spacing;
+    const t2y = t1y + SLOT_H + MATCH_GAP;
+    layoutMap.set(m.matchId, { match: m, x, t1y, t2y, cy: (t1y + t2y + SLOT_H) / 2, isLeft: false });
+  }
 
-      for (const m of roundMatches) {
-        const x = paddingX + (r - 1) * (SLOT_W + roundGapX);
-        // このマッチに接続する前ラウンドのマッチを探す
-        const prevRoundMatches = (rounds.get(r - 1) || [])
-          .filter(pm => pm.nextMatchId === m.matchId)
-          .map(pm => layoutMap.get(pm.matchId))
-          .filter(Boolean) as MatchLayout[];
+  // 左側 Round 2 ~ sideRounds
+  for (let r = 2; r <= sideRounds; r++) {
+    const roundMatches = (roundMap.get(r) || []);
+    const totalInRound = roundMatches.length;
+    const halfInRound = Math.ceil(totalInRound / 2);
+    const leftMatches = roundMatches.filter(m => m.position <= halfInRound);
 
-        let centerY: number;
-        if (prevRoundMatches.length === 2) {
-          centerY = (prevRoundMatches[0].centerY + prevRoundMatches[1].centerY) / 2;
-        } else if (prevRoundMatches.length === 1) {
-          centerY = prevRoundMatches[0].centerY;
-        } else {
-          // フォールバック: 均等配置
-          const idx = roundMatches.indexOf(m);
-          const spacing = matchGapY * Math.pow(2, r - 1);
-          centerY = bracketTopY + SLOT_H / 2 + slotGapY / 2 + idx * spacing + spacing / 2;
-        }
+    for (const m of leftMatches) {
+      const x = PADDING_X + (r - 1) * (SLOT_W + ROUND_GAP_X);
+      const parents = (roundMap.get(r - 1) || [])
+        .filter(pm => pm.nextMatchId === m.matchId)
+        .map(pm => layoutMap.get(pm.matchId))
+        .filter(Boolean) as MatchLayout[];
 
-        const t1y = centerY - SLOT_H - slotGapY / 2;
-        const t2y = centerY + slotGapY / 2;
-        layoutMap.set(m.matchId, {
-          match: m,
-          x,
-          team1SlotY: t1y,
-          team2SlotY: t2y,
-          centerY,
-        });
-      }
+      let cy: number;
+      if (parents.length >= 2) cy = (parents[0].cy + parents[1].cy) / 2;
+      else if (parents.length === 1) cy = parents[0].cy;
+      else cy = bracketTop + bracketAreaH / 2;
+
+      const t1y = cy - SLOT_H - MATCH_GAP / 2;
+      const t2y = cy + MATCH_GAP / 2;
+      layoutMap.set(m.matchId, { match: m, x, t1y, t2y, cy, isLeft: true });
     }
   }
 
-  // 右側の描画 (Round 1から外側→内側、ただしX座標は右から)
-  function layoutRightSide() {
-    for (let i = 0; i < rightR1.length; i++) {
-      const m = rightR1[i];
-      const x = totalW - paddingX - SLOT_W;
-      const t1y = bracketTopY + i * matchGapY;
-      const t2y = t1y + SLOT_H + slotGapY;
-      layoutMap.set(m.matchId, {
-        match: m,
-        x,
-        team1SlotY: t1y,
-        team2SlotY: t2y,
-        centerY: (t1y + SLOT_H / 2 + t2y + SLOT_H / 2) / 2,
-      });
-    }
+  // 右側 Round 2 ~ sideRounds
+  for (let r = 2; r <= sideRounds; r++) {
+    const roundMatches = (roundMap.get(r) || []);
+    const totalInRound = roundMatches.length;
+    const halfInRound = Math.ceil(totalInRound / 2);
+    const rightMatches = roundMatches.filter(m => m.position > halfInRound);
 
-    for (let r = 2; r <= sideRounds; r++) {
-      const roundMatches = (rounds.get(r) || []).filter(m => {
-        const totalInRound = (rounds.get(r) || []).length;
-        const halfInRound = Math.ceil(totalInRound / 2);
-        return m.position > halfInRound;
-      });
+    for (const m of rightMatches) {
+      const x = totalW - PADDING_X - SLOT_W - (r - 1) * (SLOT_W + ROUND_GAP_X);
+      const parents = (roundMap.get(r - 1) || [])
+        .filter(pm => pm.nextMatchId === m.matchId)
+        .map(pm => layoutMap.get(pm.matchId))
+        .filter(Boolean) as MatchLayout[];
 
-      for (const m of roundMatches) {
-        const x = totalW - paddingX - SLOT_W - (r - 1) * (SLOT_W + roundGapX);
-        const prevRoundMatches = (rounds.get(r - 1) || [])
-          .filter(pm => pm.nextMatchId === m.matchId)
-          .map(pm => layoutMap.get(pm.matchId))
-          .filter(Boolean) as MatchLayout[];
+      let cy: number;
+      if (parents.length >= 2) cy = (parents[0].cy + parents[1].cy) / 2;
+      else if (parents.length === 1) cy = parents[0].cy;
+      else cy = bracketTop + bracketAreaH / 2;
 
-        let centerY: number;
-        if (prevRoundMatches.length === 2) {
-          centerY = (prevRoundMatches[0].centerY + prevRoundMatches[1].centerY) / 2;
-        } else if (prevRoundMatches.length === 1) {
-          centerY = prevRoundMatches[0].centerY;
-        } else {
-          const idx = roundMatches.indexOf(m);
-          const spacing = matchGapY * Math.pow(2, r - 1);
-          centerY = bracketTopY + SLOT_H / 2 + slotGapY / 2 + idx * spacing + spacing / 2;
-        }
-
-        const t1y = centerY - SLOT_H - slotGapY / 2;
-        const t2y = centerY + slotGapY / 2;
-        layoutMap.set(m.matchId, {
-          match: m,
-          x,
-          team1SlotY: t1y,
-          team2SlotY: t2y,
-          centerY,
-        });
-      }
+      const t1y = cy - SLOT_H - MATCH_GAP / 2;
+      const t2y = cy + MATCH_GAP / 2;
+      layoutMap.set(m.matchId, { match: m, x, t1y, t2y, cy, isLeft: false });
     }
   }
 
-  // 決勝のレイアウト
-  function layoutFinal() {
-    const finalMatches = rounds.get(maxRound) || [];
-    if (finalMatches.length === 0) return;
-
-    const fm = finalMatches[0];
-    const x = (totalW - SLOT_W) / 2;
-    // 左右の準決勝マッチの中間Y
-    const prevMatches = [...layoutMap.values()].filter(
-      l => l.match.round === maxRound - 1
-    );
-    let centerY: number;
-    if (prevMatches.length >= 2) {
-      centerY = (prevMatches[0].centerY + prevMatches[prevMatches.length - 1].centerY) / 2;
-    } else if (prevMatches.length === 1) {
-      centerY = prevMatches[0].centerY;
-    } else {
-      centerY = bracketTopY + bracketAreaH / 2;
-    }
-
-    const t1y = centerY - SLOT_H - slotGapY / 2;
-    const t2y = centerY + slotGapY / 2;
-    layoutMap.set(fm.matchId, {
-      match: fm,
-      x,
-      team1SlotY: t1y,
-      team2SlotY: t2y,
-      centerY,
-    });
-  }
-
-  layoutLeftSide();
-  layoutRightSide();
+  // 決勝
   if (maxRound >= 2) {
-    layoutFinal();
+    const finals = roundMap.get(maxRound) || [];
+    if (finals.length > 0) {
+      const fm = finals[0];
+      const x = (totalW - SLOT_W) / 2;
+      const prevLayouts = [...layoutMap.values()].filter(l => l.match.round === maxRound - 1);
+      let cy: number;
+      if (prevLayouts.length >= 2) cy = (prevLayouts[0].cy + prevLayouts[prevLayouts.length - 1].cy) / 2;
+      else cy = bracketTop + bracketAreaH / 2;
+      const t1y = cy - SLOT_H - MATCH_GAP / 2;
+      const t2y = cy + MATCH_GAP / 2;
+      layoutMap.set(fm.matchId, { match: fm, x, t1y, t2y, cy, isLeft: true });
+    }
   }
 
-  // ---- 接続線を描画 ----
+  // ---- ブラケット線とスコアの描画 ----
   for (const [, layout] of layoutMap) {
     const m = layout.match;
-    const isLeftSide = layout.x < totalW / 2;
     const isFinal = m.round === maxRound && maxRound >= 2;
+    const t1cy = layout.t1y + SLOT_H / 2;
+    const t2cy = layout.t2y + SLOT_H / 2;
+    const isWinner1 = m.winnerId === m.team1Id && m.winnerId != null;
+    const isWinner2 = m.winnerId === m.team2Id && m.winnerId != null;
 
-    // 前ラウンドのマッチからの接続線
-    const prevMatches = (rounds.get(m.round - 1) || [])
-      .filter(pm => pm.nextMatchId === m.matchId)
-      .map(pm => layoutMap.get(pm.matchId))
-      .filter(Boolean) as MatchLayout[];
+    if (isFinal) {
+      // 決勝: 左右からの接続線のみ、内部のチーム間接続線は不要
+      // スコアはチーム枠の横に表示
+      if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
+        fillText(ctx, String(m.score1), layout.x + SLOT_W + 8, t1cy, 13, { color: '#cc0000', bold: true });
+        fillText(ctx, String(m.score2), layout.x + SLOT_W + 8, t2cy, 13, { color: '#cc0000', bold: true });
+      }
+    } else if (layout.isLeft) {
+      // 左側: チーム枠の右側にブラケット線
+      const jx = layout.x + SLOT_W + ROUND_GAP_X / 2; // 接合点のx
+      // team1 → 接合点
+      line(ctx, layout.x + SLOT_W, t1cy, jx, t1cy, isWinner1 ? '#cc0000' : '#333', isWinner1 ? 2 : 1.2);
+      // team2 → 接合点
+      line(ctx, layout.x + SLOT_W, t2cy, jx, t2cy, isWinner2 ? '#cc0000' : '#333', isWinner2 ? 2 : 1.2);
+      // 縦線（接合）
+      line(ctx, jx, t1cy, jx, t2cy, '#333', 1.2);
+      // 接合点 → 右（次ラウンドへ）
+      const exitY = layout.cy;
+      const exitColor = (isWinner1 || isWinner2) ? '#cc0000' : '#333';
+      const exitW = (isWinner1 || isWinner2) ? 2 : 1.2;
+      line(ctx, jx, exitY, layout.x + SLOT_W + ROUND_GAP_X, exitY, exitColor, exitW);
 
-    if (prevMatches.length > 0) {
-      for (const prev of prevMatches) {
-        const prevIsLeft = prev.x < totalW / 2;
+      // スコア表示（接合点の横、各チームのライン上）
+      if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
+        fillText(ctx, String(m.score1), jx + 4, t1cy - 1, 12, { color: '#cc0000', bold: true });
+        fillText(ctx, String(m.score2), jx + 4, t2cy - 1, 12, { color: '#cc0000', bold: true });
+      }
+    } else {
+      // 右側: チーム枠の左側にブラケット線（ミラー）
+      const jx = layout.x - ROUND_GAP_X / 2;
+      line(ctx, layout.x, t1cy, jx, t1cy, isWinner1 ? '#cc0000' : '#333', isWinner1 ? 2 : 1.2);
+      line(ctx, layout.x, t2cy, jx, t2cy, isWinner2 ? '#cc0000' : '#333', isWinner2 ? 2 : 1.2);
+      line(ctx, jx, t1cy, jx, t2cy, '#333', 1.2);
+      const exitY = layout.cy;
+      const exitColor = (isWinner1 || isWinner2) ? '#cc0000' : '#333';
+      const exitW = (isWinner1 || isWinner2) ? 2 : 1.2;
+      line(ctx, jx, exitY, layout.x - ROUND_GAP_X, exitY, exitColor, exitW);
 
-        if (prevIsLeft) {
-          // 左側: 前マッチの右端 → 現マッチの左端
-          const fromX = prev.x + SLOT_W;
-          const fromY = prev.centerY;
-          const toX = layout.x;
-          const toY = isFinal
-            ? (prev.match.nextSlot === 'team1' ? layout.team1SlotY + SLOT_H / 2 : layout.team2SlotY + SLOT_H / 2)
-            : layout.centerY;
+      if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
+        fillText(ctx, String(m.score1), jx - 4, t1cy - 1, 12, { align: 'right', color: '#cc0000', bold: true });
+        fillText(ctx, String(m.score2), jx - 4, t2cy - 1, 12, { align: 'right', color: '#cc0000', bold: true });
+      }
+    }
+  }
 
-          // 横線(前マッチから)
-          const midX = (fromX + toX) / 2;
-          drawLine(ctx, fromX, fromY, midX, fromY, '#555555', 1.5);
-          // 縦線
-          drawLine(ctx, midX, fromY, midX, toY, '#555555', 1.5);
-          // 横線(現マッチへ)
-          drawLine(ctx, midX, toY, toX, toY, '#555555', 1.5);
-
-          // スコア表示（前マッチが完了している場合）
-          if (prev.match.status === 'finished' && prev.match.score1 != null && prev.match.score2 != null) {
-            const score1Y = prev.team1SlotY + SLOT_H / 2;
-            const score2Y = prev.team2SlotY + SLOT_H / 2;
-            drawText(ctx, String(prev.match.score1), fromX + 8, score1Y, 13, 'left', '#cc0000', true);
-            drawText(ctx, String(prev.match.score2), fromX + 8, score2Y, 13, 'left', '#cc0000', true);
-          }
+  // 決勝への接続線（準決勝→決勝）
+  if (maxRound >= 2) {
+    const finalLayout = [...layoutMap.values()].find(l => l.match.round === maxRound);
+    if (finalLayout) {
+      const prevLayouts = [...layoutMap.values()].filter(l => l.match.round === maxRound - 1);
+      for (const prev of prevLayouts) {
+        const exitY = prev.cy;
+        if (prev.isLeft) {
+          // 左側準決勝 → 決勝team1
+          const fromX = prev.x + SLOT_W + ROUND_GAP_X;
+          const toX = finalLayout.x;
+          const toY = finalLayout.t1y + SLOT_H / 2;
+          const isWin = prev.match.winnerId != null;
+          const c = isWin ? '#cc0000' : '#333';
+          const w = isWin ? 2 : 1.2;
+          line(ctx, fromX, exitY, fromX + (toX - fromX) / 2, exitY, c, w);
+          line(ctx, fromX + (toX - fromX) / 2, exitY, fromX + (toX - fromX) / 2, toY, c, w);
+          line(ctx, fromX + (toX - fromX) / 2, toY, toX, toY, c, w);
         } else {
-          // 右側: 前マッチの左端 → 現マッチの右端
-          const fromX = prev.x;
-          const fromY = prev.centerY;
-          const toX = layout.x + SLOT_W;
-          const toY = isFinal
-            ? (prev.match.nextSlot === 'team2' ? layout.team2SlotY + SLOT_H / 2 : layout.team1SlotY + SLOT_H / 2)
-            : layout.centerY;
-
-          const midX = (fromX + toX) / 2;
-          drawLine(ctx, fromX, fromY, midX, fromY, '#555555', 1.5);
-          drawLine(ctx, midX, fromY, midX, toY, '#555555', 1.5);
-          drawLine(ctx, midX, toY, toX, toY, '#555555', 1.5);
-
-          if (prev.match.status === 'finished' && prev.match.score1 != null && prev.match.score2 != null) {
-            const score1Y = prev.team1SlotY + SLOT_H / 2;
-            const score2Y = prev.team2SlotY + SLOT_H / 2;
-            drawText(ctx, String(prev.match.score1), fromX - 8, score1Y, 13, 'right', '#cc0000', true);
-            drawText(ctx, String(prev.match.score2), fromX - 8, score2Y, 13, 'right', '#cc0000', true);
-          }
-        }
-      }
-    }
-
-    // Round 1のマッチで、team1 と team2 の間に接続線
-    if (m.round === 1) {
-      if (isLeftSide) {
-        // 左側: team1スロット右端→team2スロット右端を縦線で接続
-        const lineX = layout.x + SLOT_W + 8;
-        const t1cy = layout.team1SlotY + SLOT_H / 2;
-        const t2cy = layout.team2SlotY + SLOT_H / 2;
-        drawLine(ctx, layout.x + SLOT_W, t1cy, lineX, t1cy, '#555555', 1.5);
-        drawLine(ctx, layout.x + SLOT_W, t2cy, lineX, t2cy, '#555555', 1.5);
-        drawLine(ctx, lineX, t1cy, lineX, t2cy, '#555555', 1.5);
-
-        // スコア
-        if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-          drawText(ctx, String(m.score1), lineX + 6, t1cy, 13, 'left', '#cc0000', true);
-          drawText(ctx, String(m.score2), lineX + 6, t2cy, 13, 'left', '#cc0000', true);
-        }
-      } else {
-        // 右側: team1スロット左端→team2スロット左端を縦線で接続
-        const lineX = layout.x - 8;
-        const t1cy = layout.team1SlotY + SLOT_H / 2;
-        const t2cy = layout.team2SlotY + SLOT_H / 2;
-        drawLine(ctx, layout.x, t1cy, lineX, t1cy, '#555555', 1.5);
-        drawLine(ctx, layout.x, t2cy, lineX, t2cy, '#555555', 1.5);
-        drawLine(ctx, lineX, t1cy, lineX, t2cy, '#555555', 1.5);
-
-        if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-          drawText(ctx, String(m.score1), lineX - 6, t1cy, 13, 'right', '#cc0000', true);
-          drawText(ctx, String(m.score2), lineX - 6, t2cy, 13, 'right', '#cc0000', true);
-        }
-      }
-    } else if (m.round > 1 && m.round < maxRound) {
-      // 中間ラウンドのマッチ内接続線
-      if (isLeftSide) {
-        const lineX = layout.x + SLOT_W + 8;
-        const t1cy = layout.team1SlotY + SLOT_H / 2;
-        const t2cy = layout.team2SlotY + SLOT_H / 2;
-        drawLine(ctx, layout.x + SLOT_W, t1cy, lineX, t1cy, '#555555', 1.5);
-        drawLine(ctx, layout.x + SLOT_W, t2cy, lineX, t2cy, '#555555', 1.5);
-        drawLine(ctx, lineX, t1cy, lineX, t2cy, '#555555', 1.5);
-
-        if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-          drawText(ctx, String(m.score1), lineX + 6, t1cy, 13, 'left', '#cc0000', true);
-          drawText(ctx, String(m.score2), lineX + 6, t2cy, 13, 'left', '#cc0000', true);
-        }
-      } else {
-        const lineX = layout.x - 8;
-        const t1cy = layout.team1SlotY + SLOT_H / 2;
-        const t2cy = layout.team2SlotY + SLOT_H / 2;
-        drawLine(ctx, layout.x, t1cy, lineX, t1cy, '#555555', 1.5);
-        drawLine(ctx, layout.x, t2cy, lineX, t2cy, '#555555', 1.5);
-        drawLine(ctx, lineX, t1cy, lineX, t2cy, '#555555', 1.5);
-
-        if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-          drawText(ctx, String(m.score1), lineX - 6, t1cy, 13, 'right', '#cc0000', true);
-          drawText(ctx, String(m.score2), lineX - 6, t2cy, 13, 'right', '#cc0000', true);
+          // 右側準決勝 → 決勝team2
+          const fromX = prev.x - ROUND_GAP_X;
+          const toX = finalLayout.x + SLOT_W;
+          const toY = finalLayout.t2y + SLOT_H / 2;
+          const isWin = prev.match.winnerId != null;
+          const c = isWin ? '#cc0000' : '#333';
+          const w = isWin ? 2 : 1.2;
+          line(ctx, fromX, exitY, fromX - (fromX - toX) / 2, exitY, c, w);
+          line(ctx, fromX - (fromX - toX) / 2, exitY, fromX - (fromX - toX) / 2, toY, c, w);
+          line(ctx, fromX - (fromX - toX) / 2, toY, toX, toY, c, w);
         }
       }
     }
   }
 
-  // 決勝のスコア表示（マッチ内接続線）
-  const finalLayout = [...layoutMap.values()].find(l => l.match.round === maxRound && maxRound >= 2);
-  if (finalLayout) {
-    const fm = finalLayout.match;
-    // 決勝は中央配置なので、左右からの線はprevMatchesで処理済み
-    // team1/team2スロットの間に縦線を追加
-    const cx = finalLayout.x + SLOT_W / 2;
-    const t1cy = finalLayout.team1SlotY + SLOT_H;
-    const t2cy = finalLayout.team2SlotY;
-    drawLine(ctx, cx - 30, t1cy, cx - 30, t2cy, '#555555', 0); // invisible spacer
-
-    if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
-      // スコアをスロットの右横に
-      drawText(ctx, String(fm.score1), finalLayout.x + SLOT_W + 10, finalLayout.team1SlotY + SLOT_H / 2, 14, 'left', '#cc0000', true);
-      drawText(ctx, String(fm.score2), finalLayout.x + SLOT_W + 10, finalLayout.team2SlotY + SLOT_H / 2, 14, 'left', '#cc0000', true);
-    }
-
-    // 勝者表示
-    if (fm.winnerId) {
-      const winner = allTeams.find(t => t.teamId === fm.winnerId);
-      if (winner) {
-        drawText(ctx, '優勝', finalLayout.x + SLOT_W / 2, finalLayout.team1SlotY - 20, 14, 'center', '#cc0000', true);
-        drawText(ctx, `${winner.teamName} (No.${winner.pairNumber})`, finalLayout.x + SLOT_W / 2, finalLayout.team1SlotY - 6, 11, 'center', '#cc0000', false);
-      }
-    }
-  }
-
-  // ---- チームスロット描画（線の上に重ねる）----
+  // ---- チーム枠の描画（線の上に重ねる）----
   for (const [, layout] of layoutMap) {
     const m = layout.match;
-    drawTeamSlot(ctx, { x: layout.x, y: layout.team1SlotY }, m.team1Id, m.team1Name, false, allTeams);
-
-    if (m.isBye) {
-      drawTeamSlot(ctx, { x: layout.x, y: layout.team2SlotY }, null, 'BYE', true, allTeams);
-    } else {
-      drawTeamSlot(ctx, { x: layout.x, y: layout.team2SlotY }, m.team2Id, m.team2Name, false, allTeams);
-    }
+    const isBye1 = !m.team1Id && m.team1Name === 'BYE';
+    const isBye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
+    drawSlot(ctx, layout.x, layout.t1y, m.team1Id, m.team1Name, isBye1, allTeams);
+    drawSlot(ctx, layout.x, layout.t2y, m.team2Id, m.team2Name, isBye2, allTeams);
   }
 
-  // ---- ドローサイズ表示 ----
-  drawText(
-    ctx,
-    `${totalSlots}ドロー`,
-    totalW / 2,
-    totalH - paddingY + 4,
-    11,
-    'center',
-    '#999999',
-    false,
-  );
+  // ---- フッター ----
+  const totalSlots = r1.length * 2;
+  fillText(ctx, `${totalSlots}ドロー`, totalW / 2, totalH - PADDING_Y + 5, 10, { align: 'center', color: '#999' });
 
-  // JPEG Data URL を返す
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 
-/**
- * トーナメント表をJPEGダウンロード
- */
-export async function exportBracketJpeg(
-  bracket: PlacementBracket,
-  allTeams: MixedTeam[],
-  tournamentName: string,
-) {
+/** JPEG ダウンロード */
+export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string) {
   const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName);
-  const categoryLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
+  const label = CATEGORY_LABELS[bracket.category] || bracket.category;
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = `${categoryLabel}.jpg`;
+  a.download = `${label}.jpg`;
   a.click();
 }
