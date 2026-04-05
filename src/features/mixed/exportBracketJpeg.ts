@@ -311,29 +311,38 @@ export async function generateBracketDataUrl(
         const leftP = parents.find(p => p.x < totalW / 2) || parents[0];
         const rightP = parents.find(p => p.x >= totalW / 2) || parents[1];
         const jx = totalW / 2;
-        const t1cy = leftP.y;  // 左山の出力Y
-        const t2cy = rightP.y; // 右山の出力Y
-        const cy = (t1cy + t2cy) / 2;
+        const topY = leftP.y;   // 左山の出力Y（上側）
+        const botY = rightP.y;  // 右山の出力Y（下側）
+        const cy = (topY + botY) / 2;
 
-        const w1 = fm.winnerId === fm.team1Id && fm.winnerId != null;
-        const w2 = fm.winnerId === fm.team2Id && fm.winnerId != null;
-        const hasW = w1 || w2;
+        // 左山のparentマッチのnextSlotから、左山がteam1/team2のどちらかを判定
+        const leftParentMatch = (rm.get(maxRound - 1) || []).find(pm => {
+          const p = jp.get(pm.matchId);
+          return p && p.x < totalW / 2;
+        });
+        const leftIsTeam1 = !leftParentMatch || leftParentMatch.nextSlot === 'team1';
 
-        // 左山→中央縦線位置
-        ln(ctx, leftP.x, t1cy, jx, t1cy, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-        // 右山→中央縦線位置
-        ln(ctx, rightP.x, t2cy, jx, t2cy, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
+        // 左山の勝者判定（leftPがteam1/team2のどちらに対応するか）
+        const leftWon = fm.winnerId != null && (
+          leftIsTeam1 ? fm.winnerId === fm.team1Id : fm.winnerId === fm.team2Id
+        );
+        const rightWon = fm.winnerId != null && !leftWon;
+
+        // 左山→中央（勝者なら赤、敗者なら黒）
+        ln(ctx, leftP.x, topY, jx, topY, leftWon ? WIN_COLOR : LINE_COLOR, leftWon ? WIN_W : LOSE_W);
+        // 右山→中央
+        ln(ctx, rightP.x, botY, jx, botY, rightWon ? WIN_COLOR : LINE_COLOR, rightWon ? WIN_W : LOSE_W);
         // 縦線（勝者側のみ赤）
-        if (hasW) {
-          if (w1) {
-            ln(ctx, jx, t1cy, jx, cy, WIN_COLOR, WIN_W);
-            ln(ctx, jx, cy, jx, t2cy, LINE_COLOR, LOSE_W);
+        if (fm.winnerId) {
+          if (leftWon) {
+            ln(ctx, jx, topY, jx, cy, WIN_COLOR, WIN_W);
+            ln(ctx, jx, cy, jx, botY, LINE_COLOR, LOSE_W);
           } else {
-            ln(ctx, jx, t1cy, jx, cy, LINE_COLOR, LOSE_W);
-            ln(ctx, jx, cy, jx, t2cy, WIN_COLOR, WIN_W);
+            ln(ctx, jx, topY, jx, cy, LINE_COLOR, LOSE_W);
+            ln(ctx, jx, cy, jx, botY, WIN_COLOR, WIN_W);
           }
         } else {
-          ln(ctx, jx, t1cy, jx, t2cy, LINE_COLOR, LOSE_W);
+          ln(ctx, jx, topY, jx, botY, LINE_COLOR, LOSE_W);
         }
 
         // 優勝者: 中央から上に線→スコア→名前（スコアは優勝者名の上のみ）
