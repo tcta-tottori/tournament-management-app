@@ -206,7 +206,7 @@ export async function generateBracketDataUrl(
     return nextMatch?.winnerId === m.winnerId;
   };
 
-  // R1描画: BYEも通常マッチも同じ構造でまっすぐ描画
+  // R1描画
   const drawR1 = (r1Arr: BracketMatch[], isLeft: boolean) => {
     for (let i = 0; i < r1Arr.length; i++) {
       const m = r1Arr[i];
@@ -219,37 +219,41 @@ export async function generateBracketDataUrl(
       const cy = (t1cy + t2cy) / 2;
 
       if (isLeft) {
-        drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-        drawTeamLeft(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
-        const slotR = PADDING_X + SLOT_W;
-        const exitX = slotR + gapX;
         if (bye) {
-          // BYE: チーム位置からまっすぐ水平に出力（曲げない）
+          // BYE: 非BYEチームをcy位置に描画（隙間を解消）
+          const teamY = cy - SLOT_H / 2;
+          if (!bye1) drawTeamLeft(ctx, PADDING_X, teamY, m.team1Id, m.team1Name, false, allTeams);
+          if (!bye2) drawTeamLeft(ctx, PADDING_X, teamY, m.team2Id, m.team2Name, false, allTeams);
+          const slotR = PADDING_X + SLOT_W;
+          const exitX = slotR + gapX;
           const adv = byeWinnerAdvanced(m);
-          const col = adv ? WIN_COLOR : LINE_COLOR;
-          const w = adv ? WIN_W : LOSE_W;
-          ln(ctx, slotR, cy, exitX, cy, col, w);
+          ln(ctx, slotR, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
         } else {
+          drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+          drawTeamLeft(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+          const slotR = PADDING_X + SLOT_W;
+          const exitX = slotR + gapX;
           const jx = slotR + gapX * 0.42;
           drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true);
         }
-        jp.set(m.matchId, { x: exitX, y: cy });
+        jp.set(m.matchId, { x: PADDING_X + SLOT_W + gapX, y: cy });
       } else {
         const rx = totalW - PADDING_X - SLOT_W;
-        drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-        drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
-        const slotL = rx;
-        const exitX = slotL - gapX;
         if (bye) {
+          const teamY = cy - SLOT_H / 2;
+          if (!bye1) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, m.team1Id, m.team1Name, false, allTeams);
+          if (!bye2) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, m.team2Id, m.team2Name, false, allTeams);
+          const exitX = rx - gapX;
           const adv = byeWinnerAdvanced(m);
-          const col = adv ? WIN_COLOR : LINE_COLOR;
-          const w = adv ? WIN_W : LOSE_W;
-          ln(ctx, slotL, cy, exitX, cy, col, w);
+          ln(ctx, rx, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
         } else {
-          const jx = slotL - gapX * 0.42;
-          drawBracketLines(ctx, t1cy, t2cy, cy, slotL, jx, exitX, m, false);
+          drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+          drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+          const exitX = rx - gapX;
+          const jx = rx - gapX * 0.42;
+          drawBracketLines(ctx, t1cy, t2cy, cy, rx, jx, exitX, m, false);
         }
-        jp.set(m.matchId, { x: exitX, y: cy });
+        jp.set(m.matchId, { x: rx - gapX, y: cy });
       }
     }
   };
