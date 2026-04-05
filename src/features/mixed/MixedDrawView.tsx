@@ -84,6 +84,60 @@ function formatScoreText(match: LeagueMatchScore, rowTeamId: string): string {
   return `${myScore}-${oppScore}`;
 }
 
+/** 順位バッジ — タップで順位変更可能 */
+function RankEditButton({ standing, totalTeams, leagueId }: {
+  standing: LeagueStanding;
+  totalTeams: number;
+  leagueId: string;
+}) {
+  const { setRankOverride } = useMixedStore();
+  const [showPicker, setShowPicker] = useState(false);
+
+  const rankColors = standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+    standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
+    standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500';
+
+  return (
+    <span className="relative">
+      <button
+        onClick={e => { e.stopPropagation(); setShowPicker(!showPicker); }}
+        className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${rankColors} hover:ring-2 hover:ring-blue-300 transition-all cursor-pointer`}
+      >
+        {standing.rank}
+      </button>
+      {showPicker && createPortal(
+        <div className="fixed inset-0 z-50" onClick={() => setShowPicker(false)}>
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-3 z-[60]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-[10px] text-gray-500 mb-2 text-center font-bold">順位変更: {standing.teamName}</div>
+            <div className="flex gap-1.5 justify-center">
+              {Array.from({ length: totalTeams }, (_, i) => i + 1).map(rank => (
+                <button
+                  key={rank}
+                  onClick={() => {
+                    setRankOverride(leagueId, standing.teamId, rank);
+                    setShowPicker(false);
+                  }}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                    standing.rank === rank
+                      ? 'bg-blue-500 text-white ring-2 ring-blue-300'
+                      : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  {rank}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </span>
+  );
+}
+
 /** 抽選ボタン — 同率ゲーム率のチームの順位を手動で決定 */
 function TiebreakLotteryButton({ standing, standings, leagueId }: {
   standing: LeagueStanding;
@@ -521,13 +575,11 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           </td>
                           <td className="px-1 sm:px-2 py-1.5 text-center border-l border-gray-200">
                             {isComplete && standing && standing.rank > 0 && (
-                              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold
-                                ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
-                                  standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-                                  standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
-                              `}>
-                                {standing.rank}
-                              </span>
+                              <RankEditButton
+                                standing={standing}
+                                totalTeams={league.teams.length}
+                                leagueId={league.leagueId}
+                              />
                             )}
                           </td>
                           {showTiebreak && (
