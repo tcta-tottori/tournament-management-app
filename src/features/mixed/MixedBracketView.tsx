@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList, Download, ImageIcon, Loader2, X } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList, Download, ImageIcon, Loader2, X, Printer } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -469,8 +469,9 @@ export default function MixedBracketView() {
         })}
       </div>
 
-      {/* ドロー編集 / プレビューボタン */}
+      {/* ドロー編集 / プレビュー / 賞状ボタン */}
       <div className="flex justify-end gap-2">
+        <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} tournamentName={tournamentInfo?.name || ''} />
         {currentBracket && (
           <BracketPreviewButton bracket={currentBracket} />
         )}
@@ -1729,6 +1730,213 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
               {dataUrl && !isLoading && (
                 <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />
               )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 賞状印刷機能
+// ---------------------------------------------------------------------------
+
+/** ブラケットから入賞者を取得 */
+function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[]): { rank: string; category: string; names: string }[] {
+  const results: { rank: string; category: string; names: string }[] = [];
+  const catLabels: Record<string, string> = { '1st': '1位', '2nd': '2位', '3rd': '3位', '4th': '4・5位' };
+  const familyN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
+
+  for (const b of brackets) {
+    const maxRound = Math.max(...b.matches.map(m => m.round));
+    const finalMatch = b.matches.find(m => m.round === maxRound);
+    if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winnerId) continue;
+
+    const cat = catLabels[b.category] || b.category;
+    const winner = allTeams.find(t => t.teamId === finalMatch.winnerId);
+    const loserId = finalMatch.winnerId === finalMatch.team1Id ? finalMatch.team2Id : finalMatch.team1Id;
+    const runnerUp = loserId ? allTeams.find(t => t.teamId === loserId) : null;
+
+    if (winner) results.push({ rank: '優勝', category: `${cat}トーナメント`, names: `${familyN(winner.male.name)}・${familyN(winner.female.name)}` });
+    if (runnerUp) results.push({ rank: '準優勝', category: `${cat}トーナメント`, names: `${familyN(runnerUp.male.name)}・${familyN(runnerUp.female.name)}` });
+
+    // 3位: 準決勝の敗者2名
+    const sfMatches = b.matches.filter(m => m.round === maxRound - 1 && m.status === 'finished' && m.winnerId);
+    for (const sf of sfMatches) {
+      const loserId2 = sf.winnerId === sf.team1Id ? sf.team2Id : sf.team1Id;
+      const third = loserId2 ? allTeams.find(t => t.teamId === loserId2) : null;
+      if (third) results.push({ rank: '3位', category: `${cat}トーナメント`, names: `${familyN(third.male.name)}・${familyN(third.female.name)}` });
+    }
+  }
+  return results;
+}
+
+/** 賞状1枚分の印刷HTML生成 */
+function buildCertificateHtml(entries: { rank: string; category: string; names: string }[], _tournamentName: string): string {
+  const pages = entries.map(e => `
+    <div class="page">
+      <div class="cert-content">
+        <div class="class-name">${e.category}　${e.rank}</div>
+        <div class="player-name">${e.names}</div>
+      </div>
+    </div>
+  `).join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>賞状印刷</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "游明朝", "Yu Mincho", "ヒラギノ明朝 ProN", "Hiragino Mincho ProN", serif; }
+  .page {
+    width: 297mm; height: 210mm;
+    display: flex; align-items: center; justify-content: center;
+    page-break-after: always;
+    position: relative;
+  }
+  .page:last-child { page-break-after: auto; }
+  .cert-content {
+    /* 表彰状の下〜大会名の上 の中間エリアに印刷 */
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 70%;
+  }
+  .class-name {
+    font-size: 20pt;
+    font-weight: bold;
+    letter-spacing: 0.3em;
+    margin-bottom: 18mm;
+    color: #1a1a1a;
+  }
+  .player-name {
+    font-size: 32pt;
+    font-weight: bold;
+    letter-spacing: 0.4em;
+    color: #000;
+  }
+  @media print {
+    body { -webkit-print-color-adjust: exact; }
+  }
+</style></head><body>${pages}</body></html>`;
+}
+
+/** 賞状印刷ボタン */
+function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
+  brackets: PlacementBracket[];
+  allTeams: MixedTeam[];
+  tournamentName: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [entries, setEntries] = useState<{ rank: string; category: string; names: string; selected: boolean }[]>([]);
+
+  const openDialog = () => {
+    const auto = getWinnersFromBrackets(brackets, allTeams);
+    setEntries(auto.map(e => ({ ...e, selected: true })));
+    setIsOpen(true);
+  };
+
+  const updateEntry = (idx: number, field: 'rank' | 'category' | 'names', value: string) => {
+    setEntries(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+  };
+  const toggleEntry = (idx: number) => {
+    setEntries(prev => prev.map((e, i) => i === idx ? { ...e, selected: !e.selected } : e));
+  };
+  const addEntry = () => {
+    setEntries(prev => [...prev, { rank: '優勝', category: '', names: '', selected: true }]);
+  };
+  const removeEntry = (idx: number) => {
+    setEntries(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handlePrint = () => {
+    const selected = entries.filter(e => e.selected && e.names.trim());
+    if (selected.length === 0) return;
+    const html = buildCertificateHtml(selected, tournamentName);
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 500);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={openDialog}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors"
+      >
+        <Printer size={12} />
+        賞状印刷
+      </button>
+
+      {isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[200]" onClick={() => setIsOpen(false)}>
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-[95vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col z-[210]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                <Printer size={16} className="text-amber-600" />
+                賞状印刷
+              </h3>
+              <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <p className="text-[10px] text-gray-500">決勝トーナメントの結果から自動取得しています。手動で追加・修正できます。印刷対象にチェックを入れてください。</p>
+
+              {entries.map((entry, idx) => (
+                <div key={idx} className={`border rounded-lg p-3 transition-colors ${entry.selected ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input type="checkbox" checked={entry.selected} onChange={() => toggleEntry(idx)} className="accent-amber-500" />
+                    <select value={entry.rank} onChange={e => updateEntry(idx, 'rank', e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1 font-bold">
+                      <option value="優勝">優勝</option>
+                      <option value="準優勝">準優勝</option>
+                      <option value="3位">3位</option>
+                    </select>
+                    <input
+                      type="text" value={entry.category} onChange={e => updateEntry(idx, 'category', e.target.value)}
+                      placeholder="例: 1位トーナメント"
+                      className="flex-1 text-xs border border-gray-200 rounded px-2 py-1"
+                    />
+                    <button onClick={() => removeEntry(idx)} className="text-gray-400 hover:text-red-500 p-0.5"><X size={14} /></button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 shrink-0">氏名:</span>
+                    <input
+                      type="text" value={entry.names} onChange={e => updateEntry(idx, 'names', e.target.value)}
+                      placeholder="例: 田中・山本"
+                      className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5 font-bold"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={addEntry} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-colors">
+                + 手動で追加
+              </button>
+            </div>
+
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex gap-2 shrink-0">
+              <button onClick={() => setIsOpen(false)} className="flex-1 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors">
+                キャンセル
+              </button>
+              <button
+                onClick={handlePrint}
+                disabled={!entries.some(e => e.selected && e.names.trim())}
+                className="flex-1 py-2 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Printer size={14} />
+                {entries.filter(e => e.selected && e.names.trim()).length}枚を印刷
+              </button>
             </div>
           </div>
         </div>,
