@@ -110,15 +110,19 @@ export default function CallPreviewDialog({
       const maleFN2 = t2Parts[0] || familyName(team2.male.name);
       const femaleFN2 = t2Parts[1] || familyName(team2.female.name);
 
-      // 苗字キーと全名キーの両方で辞書を検索
-      const familyKeys = [maleFN1, femaleFN1, maleFN2, femaleFN2].map(n => n.replace(/\s/g, ''));
+      // Playerテーブルからスペース付きふりがなを取得（苗字分割の信頼できるソース）
       const fullNameKeys = [
         team1.male.name, team1.female.name,
         team2.male.name, team2.female.name,
-      ].map(n => n.replace(/\s/g, ''));
-      const allKeys = [...new Set([...familyKeys, ...fullNameKeys])];
-      const nameFuriganas = await db.furiganaDict.where('name').anyOf(allKeys).toArray();
-      const nameMap = new Map(nameFuriganas.map(f => [f.name, f.furigana]));
+      ].map(n => n.replace(/\s+/g, ''));
+      const players = await db.players.toArray();
+      const playerMap = new Map(players.map(p => [p.name.replace(/\s+/g, ''), p.furigana]));
+
+      // ふりがな辞書も事前取得
+      const familyKeys = [maleFN1, femaleFN1, maleFN2, femaleFN2].map(n => n.replace(/\s/g, ''));
+      const allDictKeys = [...new Set([...familyKeys, ...fullNameKeys])];
+      const nameFuriganas = await db.furiganaDict.where('name').anyOf(allDictKeys).toArray();
+      const dictMap = new Map(nameFuriganas.map(f => [f.name, f.furigana]));
 
       const affKeys = [
         team1.male.affiliation, team1.female.affiliation,
@@ -127,23 +131,24 @@ export default function CallPreviewDialog({
       const affFuriganas = await db.affiliationFurigana.where('name').anyOf(affKeys).toArray();
       const affMap = new Map(affFuriganas.map(f => [f.name, f.furigana]));
 
-      // 苗字のふりがなを取得: 苗字キー→全名キー（スペース区切りで先頭部分）の順で検索
+      // 苗字のふりがなを取得: Playerテーブル（スペース付き）→辞書→漢字フォールバック
       const getFamilyFurigana = (familyNameKanji: string, fullName: string): string => {
-        const fnKey = familyNameKanji.replace(/\s/g, '');
-        const fnFurigana = nameMap.get(fnKey);
-        if (fnFurigana) {
-          // 苗字キーにフルネームのふりがなが入っている場合は先頭部分のみ取得
-          const parts = fnFurigana.trim().split(/[\s　]+/);
+        const fullKey = fullName.replace(/\s+/g, '');
+        // 1. Playerテーブル: スペース付きふりがなから苗字部分を取得
+        const playerFurigana = playerMap.get(fullKey);
+        if (playerFurigana) {
+          const parts = playerFurigana.trim().split(/[\s　]+/);
           if (parts.length > 1) return parts[0];
-          return fnFurigana;
         }
-        const fullKey = fullName.replace(/\s/g, '');
-        const fullFurigana = nameMap.get(fullKey);
-        if (fullFurigana) {
-          const parts = fullFurigana.trim().split(/[\s　]+/);
-          if (parts.length > 1) return parts[0];
-          return familyNameKanji;
+        // 2. ふりがな辞書: スペース付きなら先頭部分を取得
+        for (const key of [familyNameKanji.replace(/\s/g, ''), fullKey]) {
+          const dictFurigana = dictMap.get(key);
+          if (dictFurigana) {
+            const parts = dictFurigana.trim().split(/[\s　]+/);
+            if (parts.length > 1) return parts[0];
+          }
         }
+        // 3. フォールバック: 漢字の苗字をそのまま使用
         return familyNameKanji;
       };
 
