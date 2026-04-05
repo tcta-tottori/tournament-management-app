@@ -1772,8 +1772,8 @@ function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTea
   return results;
 }
 
-/** 賞状CSS（毛筆楷書風 Google Font: Kaisei HarunoUmi） */
-const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Kaisei+HarunoUmi:wght@400;700&display=swap';
+/** 賞状CSS（行書風 Google Font: Yuji Syuku） */
+const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap';
 
 function buildCertificateHtml(entries: { rank: string; category: string; names: string }[]): string {
   const pages = entries.map(e => `
@@ -1792,7 +1792,7 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
 <style>
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Kaisei HarunoUmi", "游明朝", "Yu Mincho", serif; }
+  body { font-family: "Yuji Syuku", "游明朝", "Yu Mincho", serif; color: #000; }
   .page {
     width: 210mm; height: 297mm;
     page-break-after: always; position: relative;
@@ -1803,22 +1803,22 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
     top: 35%; left: 50%;
     transform: translate(-50%, -50%);
     text-align: center; width: 80%;
-    height: 40mm;
+    height: 50mm;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
   }
   .class-name {
-    font-size: 20pt; font-weight: 700;
-    letter-spacing: 0.4em; color: #111;
+    font-size: 28pt; font-weight: 400;
+    letter-spacing: 0.4em; color: #000;
     margin-bottom: 5mm;
   }
   .rank-name {
-    font-size: 36pt; font-weight: 700;
+    font-size: 32pt; font-weight: 400;
     letter-spacing: 0.6em; color: #000;
     margin-bottom: 6mm;
   }
   .player-name {
-    font-size: 30pt; font-weight: 700;
+    font-size: 36pt; font-weight: 400;
     letter-spacing: 0.4em; color: #000;
   }
   @media print { body { -webkit-print-color-adjust: exact; } }
@@ -1942,18 +1942,18 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute inset-3 border border-amber-200/30 rounded" />
                     {/* 上部: 表彰状（印刷済み模擬） */}
                     <div className="absolute top-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Kaisei HarunoUmi", serif' }}>表　彰　状</span>
+                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>表　彰　状</span>
                     </div>
                     {/* 印刷対象エリア: A4中央より少し上、約3cm幅 */}
                     <div className="absolute left-0 right-0 flex flex-col items-center justify-center px-4" style={{ top: '35%', height: '11%' }}>
                       <div className="border-y-2 border-dashed border-amber-300/50 py-2 w-full flex flex-col items-center justify-center">
-                        <div className="text-[11px] text-gray-700 tracking-[0.3em] mb-1.5 font-bold" style={{ fontFamily: '"Kaisei HarunoUmi", serif' }}>
+                        <div className="text-sm text-black tracking-[0.3em] mb-1.5" style={{ fontFamily: '"Yuji Syuku", serif' }}>
                           {previewEntry.category || '（クラス未入力）'}
                         </div>
-                        <div className="text-lg text-black tracking-[0.5em] mb-1.5 font-bold" style={{ fontFamily: '"Kaisei HarunoUmi", serif' }}>
+                        <div className="text-base text-black tracking-[0.5em] mb-1.5" style={{ fontFamily: '"Yuji Syuku", serif' }}>
                           {previewEntry.rank}
                         </div>
-                        <div className="text-base text-black tracking-[0.35em] font-bold" style={{ fontFamily: '"Kaisei HarunoUmi", serif' }}>
+                        <div className="text-lg text-black tracking-[0.35em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>
                           {previewEntry.names || '（氏名未入力）'}
                         </div>
                       </div>
@@ -1962,7 +1962,7 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute right-1 text-[6px] text-amber-400" style={{ top: '34%' }}>印刷範囲↓</div>
                     {/* 下部: 鳥取市テニス協会（印刷済み模擬） */}
                     <div className="absolute bottom-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Kaisei HarunoUmi", serif' }}>鳥取市テニス協会</span>
+                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Yuji Syuku", serif' }}>鳥取市テニス協会</span>
                     </div>
                   </div>
                 ) : (
