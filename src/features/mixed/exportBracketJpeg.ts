@@ -316,20 +316,22 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
 }
 
 // ---------------------------------------------------------------------------
-// 結果画像（Web UI風：左→右ラウンド、ボックス型マッチ、勝者緑ライン）
+// 結果画像（Web UI風：左→右ラウンド、ボックス型マッチ）
 // ---------------------------------------------------------------------------
 const R_SCALE = 2;
-const R_MATCH_W = 260;
-const R_SLOT_H = 38;
-const R_MATCH_H = R_SLOT_H * 2; // 76 = スロット2つ分ぴったり
-const R_MATCH_GAP = 16;
-const R_ROUND_GAP = 44;
-const R_HEADER_H = 50;
-const R_PAD_X = 20;
-const R_PAD_Y = 16;
-const R_WIN_COLOR = '#059669'; // emerald-600
-const R_LINE_COLOR = '#d1d5db'; // gray-300
-const R_BORDER_COLOR = '#a7f3d0'; // emerald-200 統一枠色
+const R_MATCH_W = 280;
+const R_SLOT_H = 42;
+const R_MATCH_H = R_SLOT_H * 2;
+const R_MATCH_GAP = 18;
+const R_ROUND_GAP = 48;
+const R_HEADER_H = 56;
+const R_PAD_X = 24;
+const R_PAD_Y = 20;
+const R_LINE_COLOR = '#c9cdd3'; // 接続線: 統一グレー
+const R_BORDER_COLOR = '#d1d5db'; // 枠線: gray-300
+const R_WIN_BG = '#ecfdf5'; // 勝者背景: emerald-50
+const R_WIN_TEXT = '#065f46'; // 勝者テキスト
+const R_WIN_SCORE = '#059669'; // 勝者スコア
 
 function rTxt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, opts?: { align?: CanvasTextAlign; color?: string; bold?: boolean; maxW?: number }) {
   const { align = 'left', color = '#1a1a1a', bold = false, maxW } = opts || {};
@@ -361,45 +363,52 @@ function drawResultSlot(
 ) {
   // 勝者背景
   if (isWinner) {
-    ctx.fillStyle = '#ecfdf5'; // emerald-50
-    ctx.fillRect(x + 1, y, w - 2, R_SLOT_H);
+    ctx.fillStyle = R_WIN_BG;
+    ctx.fillRect(x + 1, y + 1, w - 2, R_SLOT_H - 1);
   }
 
   if (isBye || (!teamId && teamName === 'BYE')) {
-    rTxt(ctx, 'BYE', x + w / 2, y + R_SLOT_H / 2, 10, { align: 'center', color: '#ccc' });
+    rTxt(ctx, 'BYE', x + w / 2, y + R_SLOT_H / 2, 11, { align: 'center', color: '#d1d5db' });
     return;
   }
   if (!teamId) {
-    if (teamName) rTxt(ctx, teamName, x + 6, y + R_SLOT_H / 2, 9, { color: '#aaa', maxW: w - 12 });
+    if (teamName) rTxt(ctx, teamName, x + 8, y + R_SLOT_H / 2, 9, { color: '#aaa', maxW: w - 16 });
     return;
   }
   const team = allTeams.find(t => t.teamId === teamId);
   if (!team) {
-    rTxt(ctx, teamName || '―', x + 6, y + R_SLOT_H / 2, 9, { color: '#aaa' });
+    rTxt(ctx, teamName || '―', x + 8, y + R_SLOT_H / 2, 9, { color: '#aaa' });
     return;
   }
 
-  const textColor = isWinner ? '#065f46' : '#374151';
-  // ペア番号
-  rTxt(ctx, String(team.pairNumber), x + 14, y + R_SLOT_H / 2, 9, { align: 'center', color: '#9ca3af' });
-  // 名前（2行）
-  const nx = x + 28;
-  const nameW = 80;
-  rTxt(ctx, team.male.name.replace(/[\s\u3000]+/g, ''), nx, y + 12, 11, { bold: true, color: textColor, maxW: nameW });
-  rTxt(ctx, team.female.name.replace(/[\s\u3000]+/g, ''), nx, y + 27, 11, { bold: true, color: textColor, maxW: nameW });
-  // 所属
-  const ax = nx + nameW + 4;
-  const aw = w - (ax - x) - 36;
-  if (aw > 20) {
-    rTxt(ctx, team.male.affiliation, ax, y + 12, 8, { color: '#9ca3af', maxW: aw });
-    rTxt(ctx, team.female.affiliation, ax, y + 27, 8, { color: '#9ca3af', maxW: aw });
+  const textColor = isWinner ? R_WIN_TEXT : '#1f2937';
+  const subColor = isWinner ? '#6ee7b7' : '#9ca3af';
+  const scoreColor = isWinner ? R_WIN_SCORE : '#6b7280';
+
+  // ペア番号（縦中央、やや太め）
+  rTxt(ctx, String(team.pairNumber), x + 16, y + R_SLOT_H / 2, 10, { align: 'center', color: subColor, bold: true });
+
+  // 名前（2行、大きめ太字）
+  const nx = x + 32;
+  const nameW = 90;
+  const maleY = y + 14;
+  const femaleY = y + 29;
+  rTxt(ctx, team.male.name.replace(/[\s\u3000]+/g, ''), nx, maleY, 12, { bold: true, color: textColor, maxW: nameW });
+  rTxt(ctx, team.female.name.replace(/[\s\u3000]+/g, ''), nx, femaleY, 12, { bold: true, color: textColor, maxW: nameW });
+
+  // 所属（名前の右側）
+  const ax = nx + nameW + 6;
+  const aw = w - (ax - x) - 40;
+  if (aw > 15) {
+    rTxt(ctx, team.male.affiliation, ax, maleY, 8, { color: subColor, maxW: aw });
+    rTxt(ctx, team.female.affiliation, ax, femaleY, 8, { color: subColor, maxW: aw });
   }
-  // スコア
+
+  // スコア（右端、大きく太字）
   if (score !== null) {
-    const scoreColor = isWinner ? '#059669' : '#6b7280';
-    rTxt(ctx, String(score), x + w - 10, y + R_SLOT_H / 2, 16, { align: 'right', color: scoreColor, bold: true });
+    rTxt(ctx, String(score), x + w - 12, y + R_SLOT_H / 2, 18, { align: 'right', color: scoreColor, bold: true });
     if (isLoser && tiebreakScore != null) {
-      rTxt(ctx, `(${tiebreakScore})`, x + w - 4, y + 8, 8, { align: 'right', color: '#3b82f6' });
+      rTxt(ctx, `(${tiebreakScore})`, x + w - 5, y + 8, 8, { align: 'right', color: '#3b82f6' });
     }
   }
 }
@@ -424,18 +433,20 @@ export async function generateResultDataUrl(
 
   const GRID_UNIT = R_MATCH_H + R_MATCH_GAP;
   const r1Count = (roundMap.get(1) || []).length;
+  const ROUND_LABEL_H = 28; // ラウンドラベル用スペース
+  const contentTop = R_PAD_Y + R_HEADER_H + ROUND_LABEL_H;
 
   const getMatchY = (roundIdx: number, matchIdx: number) => {
     const spacing = Math.pow(2, roundIdx);
     const offset = (spacing - 1) * GRID_UNIT / 2;
-    return R_HEADER_H + 36 + matchIdx * spacing * GRID_UNIT + offset;
+    return contentTop + matchIdx * spacing * GRID_UNIT + offset;
   };
 
   const totalRounds = maxRound;
   const svgW = totalRounds * (R_MATCH_W + R_ROUND_GAP) - R_ROUND_GAP;
   const svgH = r1Count * GRID_UNIT;
   const totalW = R_PAD_X * 2 + svgW;
-  const totalH = R_PAD_Y * 2 + R_HEADER_H + 36 + svgH;
+  const totalH = contentTop + svgH + R_PAD_Y;
 
   const canvas = document.createElement('canvas');
   canvas.width = totalW * R_SCALE; canvas.height = totalH * R_SCALE;
@@ -445,16 +456,16 @@ export async function generateResultDataUrl(
 
   // ---- ヘッダー: 大会名（左）＋トーナメント名（右） ----
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
-  rTxt(ctx, tournamentName, R_PAD_X, R_PAD_Y + 16, 16, { bold: true, color: '#111' });
-  rTxt(ctx, catLabel, totalW - R_PAD_X, R_PAD_Y + 16, 16, { align: 'right', bold: true, color: '#111' });
-  rLn(ctx, R_PAD_X, R_PAD_Y + 34, totalW - R_PAD_X, R_PAD_Y + 34, '#e5e7eb', 1);
+  rTxt(ctx, tournamentName, R_PAD_X, R_PAD_Y + 18, 17, { bold: true, color: '#111' });
+  rTxt(ctx, catLabel, totalW - R_PAD_X, R_PAD_Y + 18, 17, { align: 'right', bold: true, color: '#111' });
+  rLn(ctx, R_PAD_X, R_PAD_Y + 38, totalW - R_PAD_X, R_PAD_Y + 38, '#d1d5db', 1);
 
   const matchesByRound: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) {
     matchesByRound.push(roundMap.get(r) || []);
   }
 
-  // 接続線を描画
+  // 接続線を描画（全てグレーで統一）
   for (let roundIdx = 0; roundIdx < matchesByRound.length - 1; roundIdx++) {
     const roundMatches = matchesByRound[roundIdx];
     const x1 = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP) + R_MATCH_W;
@@ -463,33 +474,14 @@ export async function generateResultDataUrl(
 
     for (let i = 0; i < roundMatches.length; i += 2) {
       if (i + 1 >= roundMatches.length) break;
-      const m1 = roundMatches[i];
-      const m2 = roundMatches[i + 1];
       const y1 = getMatchY(roundIdx, i) + R_MATCH_H / 2;
       const y2 = getMatchY(roundIdx, i + 1) + R_MATCH_H / 2;
       const yNext = getMatchY(roundIdx + 1, Math.floor(i / 2)) + R_MATCH_H / 2;
 
-      const nextMatch = matchesByRound[roundIdx + 1]?.[Math.floor(i / 2)];
-      const m1Winner = m1.winnerId;
-      const m1Adv = m1Winner && nextMatch && (nextMatch.team1Id === m1Winner || nextMatch.team2Id === m1Winner);
-      const m2Winner = m2.winnerId;
-      const m2Adv = m2Winner && nextMatch && (nextMatch.team1Id === m2Winner || nextMatch.team2Id === m2Winner);
-
-      rLn(ctx, x1, y1, xMid, y1, m1Adv ? R_WIN_COLOR : R_LINE_COLOR, m1Adv ? 2.5 : 1.5);
-      rLn(ctx, x1, y2, xMid, y2, m2Adv ? R_WIN_COLOR : R_LINE_COLOR, m2Adv ? 2.5 : 1.5);
-
-      if (m1Adv && !m2Adv) {
-        rLn(ctx, xMid, y1, xMid, yNext, R_WIN_COLOR, 2.5);
-        rLn(ctx, xMid, yNext, xMid, y2, R_LINE_COLOR, 1.5);
-      } else if (!m1Adv && m2Adv) {
-        rLn(ctx, xMid, y1, xMid, yNext, R_LINE_COLOR, 1.5);
-        rLn(ctx, xMid, yNext, xMid, y2, R_WIN_COLOR, 2.5);
-      } else {
-        rLn(ctx, xMid, y1, xMid, y2, R_LINE_COLOR, 1.5);
-      }
-
-      const nc = (m1Adv || m2Adv) ? R_WIN_COLOR : R_LINE_COLOR;
-      rLn(ctx, xMid, yNext, x2, yNext, nc, (m1Adv || m2Adv) ? 2.5 : 1.5);
+      rLn(ctx, x1, y1, xMid, y1, R_LINE_COLOR, 1.5);
+      rLn(ctx, x1, y2, xMid, y2, R_LINE_COLOR, 1.5);
+      rLn(ctx, xMid, y1, xMid, y2, R_LINE_COLOR, 1.5);
+      rLn(ctx, xMid, yNext, x2, yNext, R_LINE_COLOR, 1.5);
     }
   }
 
@@ -499,31 +491,27 @@ export async function generateResultDataUrl(
     const colX = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP);
 
     // ラウンドラベル
-    rTxt(ctx, getRoundLabelResult(round, maxRound), colX + R_MATCH_W / 2, R_PAD_Y + R_HEADER_H + 14, 11, { align: 'center', color: '#6b7280', bold: true });
+    rTxt(ctx, getRoundLabelResult(round, maxRound), colX + R_MATCH_W / 2, R_PAD_Y + R_HEADER_H + ROUND_LABEL_H / 2, 11, { align: 'center', color: '#6b7280', bold: true });
 
     for (let matchIdx = 0; matchIdx < matchesByRound[roundIdx].length; matchIdx++) {
       const match = matchesByRound[roundIdx][matchIdx];
       const matchY = getMatchY(roundIdx, matchIdx);
 
-      if (match.isBye) {
-        // BYE（シード）: 通常マッチと同じサイズ・枠線で統一表示
-        rRect2(ctx, colX, matchY, R_MATCH_W, R_MATCH_H, 6, '#fff', R_BORDER_COLOR, 1.5);
-        rLn(ctx, colX, matchY + R_SLOT_H, colX + R_MATCH_W, matchY + R_SLOT_H, '#f3f4f6', 1);
+      // 全マッチ共通の統一枠線
+      rRect2(ctx, colX, matchY, R_MATCH_W, R_MATCH_H, 6, '#fff', R_BORDER_COLOR, 1.5);
+      rLn(ctx, colX + 1, matchY + R_SLOT_H, colX + R_MATCH_W - 1, matchY + R_SLOT_H, '#e5e7eb', 0.5);
 
-        // 勝者（シード通過チーム）を上スロットに描画
+      if (match.isBye) {
+        // BYE（シード）: 上スロットにチーム、下スロットにBYE
         const winnerId = match.winnerId;
         drawResultSlot(ctx, colX, matchY, R_MATCH_W,
           winnerId, match.team1Id ? match.team1Name : match.team2Name, null,
           false, false, allTeams, null, false);
-        // 下スロットにBYE表示
-        rTxt(ctx, 'BYE', colX + R_MATCH_W / 2, matchY + R_SLOT_H + R_SLOT_H / 2, 10, { align: 'center', color: '#ccc' });
+        rTxt(ctx, 'BYE', colX + R_MATCH_W / 2, matchY + R_SLOT_H + R_SLOT_H / 2, 11, { align: 'center', color: '#d1d5db' });
         continue;
       }
 
-      // 通常マッチ: 統一枠線
-      rRect2(ctx, colX, matchY, R_MATCH_W, R_MATCH_H, 6, '#fff', R_BORDER_COLOR, 1.5);
-      rLn(ctx, colX, matchY + R_SLOT_H, colX + R_MATCH_W, matchY + R_SLOT_H, '#f3f4f6', 1);
-
+      // 通常マッチ
       const isBye1 = !match.team1Id && match.team1Name === 'BYE';
       const isBye2 = !match.team2Id && match.team2Name === 'BYE';
       const isW1 = match.winnerId === match.team1Id && match.winnerId != null;
