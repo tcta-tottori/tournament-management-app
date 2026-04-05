@@ -506,22 +506,22 @@ export async function generateResultDataUrl(
     // ペア番号
     setFont(ctx, 12, true);
     ctx.fillStyle = ac; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(t.pairNumber), bx + 22, by + SH / 2);
+    ctx.fillText(String(t.pairNumber), bx + 18, by + SH / 2);
 
-    // 名前（大きく、太字、2行）
-    const nx = bx + 42;
+    // 名前（太字、2行）
+    const nx = bx + 34;
     const ny1 = by + SH * 0.33;
     const ny2 = by + SH * 0.70;
     setFont(ctx, 15, true);
     ctx.fillStyle = tc; ctx.textAlign = 'left';
-    ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, ny1, 110);
-    ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, ny2, 110);
+    ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, ny1, 105);
+    ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, ny2, 105);
 
-    // 所属（大きめ）
-    const afX = nx + 115;
-    const afW = bw - (afX - bx) - 50;
+    // 所属（太字）
+    const afX = nx + 108;
+    const afW = bw - (afX - bx) - 42;
     if (afW > 10) {
-      setFont(ctx, 11, false);
+      setFont(ctx, 11, true);
       ctx.fillStyle = ac;
       ctx.fillText(t.male.affiliation, afX, ny1, afW);
       ctx.fillText(t.female.affiliation, afX, ny2, afW);
@@ -537,7 +537,7 @@ export async function generateResultDataUrl(
         setFont(ctx, 12, true);
         const tw2 = ctx.measureText(ts).width;
         const totalSW = sw2 + tw2 + 1;
-        const sRight = bx + bw - 12;
+        const sRight = bx + bw - 8;
         const sLeft = sRight - totalSW;
         setFont(ctx, 22, true);
         ctx.fillStyle = sc2; ctx.textAlign = 'left';
@@ -548,7 +548,7 @@ export async function generateResultDataUrl(
       } else {
         setFont(ctx, 22, true);
         ctx.fillStyle = sc2; ctx.textAlign = 'right';
-        ctx.fillText(String(score), bx + bw - 12, by + SH / 2);
+        ctx.fillText(String(score), bx + bw - 8, by + SH / 2);
       }
     }
   };
@@ -561,14 +561,14 @@ export async function generateResultDataUrl(
       const my2 = mY(ri, mi);
 
       if (m.isBye) {
-        // BYE: 1ペア分のみ枠付き表示
+        // BYE: 1ペア分のみ、通常マッチと同じ枠で表示
         const wId = m.winnerId;
         if (wId) {
           const byeH = SH;
           const byeY = my2 + (MH - byeH) / 2;
           _roundRect(ctx, cx, byeY, MW, byeH, 10);
           ctx.fillStyle = '#fff'; ctx.fill();
-          ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
           drawTeam(cx, byeY, MW, wId, '', null, false, null, false);
         }
         continue;
