@@ -588,20 +588,34 @@ export async function generateResultDataUrl(
         if (wId) {
           const byeH = SH;
           const byeY = my2 + (MH - byeH) / 2;
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.08)';
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 2;
           _roundRect(ctx, cx, byeY, MW, byeH, 10);
           ctx.fillStyle = '#fff'; ctx.fill();
+          ctx.restore();
+          _roundRect(ctx, cx, byeY, MW, byeH, 10);
           ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
           drawTeam(cx, byeY, MW, wId, '', null, false, null, false);
         }
         continue;
       }
 
-      // 通常マッチ: 太枠
+      // 通常マッチ: 影 + 太枠
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.08)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 2;
       _roundRect(ctx, cx, my2, MW, MH, 10);
       ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.restore();
+      _roundRect(ctx, cx, my2, MW, MH, 10);
       ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
 
-      // 中央区切り（太め）
+      // 中央区切り
       ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx + 6, my2 + SH); ctx.lineTo(cx + MW - 6, my2 + SH); ctx.stroke();
 
