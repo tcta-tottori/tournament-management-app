@@ -437,22 +437,22 @@ export async function generateResultDataUrl(
   ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, PY + HDR); ctx.lineTo(totalW, PY + HDR); ctx.stroke();
 
-  // トーナメント名（枠付き、太枠）
-  setFont(ctx, 22, true);
+  // トーナメント名（角丸枠付き、大きく）
+  setFont(ctx, 24, true);
   const catTW = ctx.measureText(catLabel).width;
-  const cbW = catTW + 32;
-  const cbH = 38;
+  const cbW = catTW + 36;
+  const cbH = 42;
   const cbX = PX + 4;
   const cbY = PY + (HDR - cbH) / 2;
-  ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5;
-  ctx.strokeRect(cbX, cbY, cbW, cbH);
+  _roundRect(ctx, cbX, cbY, cbW, cbH, 8);
+  ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.stroke();
   ctx.fillStyle = '#111827'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(catLabel, cbX + cbW / 2, cbY + cbH / 2);
 
-  // 大会名（やや小さめ）
+  // 大会名（右揃え）
   setFont(ctx, 16, true);
-  ctx.fillStyle = '#374151'; ctx.textAlign = 'left';
-  ctx.fillText(tournamentName || '', cbX + cbW + 18, cbY + cbH / 2);
+  ctx.fillStyle = '#374151'; ctx.textAlign = 'right';
+  ctx.fillText(tournamentName || '', totalW - PX, cbY + cbH / 2);
 
   const mbr: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) mbr.push(roundMap.get(r) || []);
