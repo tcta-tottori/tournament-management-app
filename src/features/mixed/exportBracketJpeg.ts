@@ -54,32 +54,22 @@ function drawTeamLeft(ctx: CanvasRenderingContext2D, x: number, y: number, teamI
   if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
 }
 
-// 右山チーム描画（右揃え: 名前+所属 → 番号の順、右端基準）
+// 右山チーム描画（名前+所属 → 番号の順、左から: 名前 所属 番号）
 function drawTeamRight(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
   if (isBye || (!teamId && teamName === 'BYE')) return;
   if (!teamId) return;
   const team = allTeams.find(t => t.teamId === teamId);
   if (!team) return;
-  const rightEdge = x + SLOT_W;
-  // 番号は右端
-  txt(ctx, String(team.pairNumber), rightEdge, y + SLOT_H / 2, 14, { align: 'right', bold: true });
-  // 名前+所属は番号の左側に右揃え
-  const nameRight = rightEdge - NUM_W;
-  // 所属を右端から描画、名前をその左
-  if (team.male.affiliation) {
-    const aw = Math.min(approxW(team.male.affiliation, 8), 60);
-    txt(ctx, team.male.affiliation, nameRight, y + 12, 8, { align: 'right', color: '#666' });
-    txt(ctx, team.male.name, nameRight - aw - 3, y + 12, 11, { align: 'right', bold: true });
-  } else {
-    txt(ctx, team.male.name, nameRight, y + 12, 11, { align: 'right', bold: true });
-  }
-  if (team.female.affiliation) {
-    const aw = Math.min(approxW(team.female.affiliation, 8), 60);
-    txt(ctx, team.female.affiliation, nameRight, y + 32, 8, { align: 'right', color: '#666' });
-    txt(ctx, team.female.name, nameRight - aw - 3, y + 32, 11, { align: 'right', bold: true });
-  } else {
-    txt(ctx, team.female.name, nameRight, y + 32, 11, { align: 'right', bold: true });
-  }
+  const mw = SLOT_W - NUM_W;
+  // 名前+所属（左寄せ）
+  txt(ctx, team.male.name, x, y + 12, 11, { bold: true, maxW: mw * 0.52 });
+  const mnw = Math.min(approxW(team.male.name, 11), mw * 0.52);
+  if (team.male.affiliation) txt(ctx, team.male.affiliation, x + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
+  txt(ctx, team.female.name, x, y + 32, 11, { bold: true, maxW: mw * 0.52 });
+  const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
+  if (team.female.affiliation) txt(ctx, team.female.affiliation, x + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
+  // 番号は右端（線の近く）
+  txt(ctx, String(team.pairNumber), x + SLOT_W, y + SLOT_H / 2, 14, { align: 'right', bold: true });
 }
 
 function familyName(name: string): string { return name.trim().split(/[\s　]+/)[0] || name; }
@@ -115,15 +105,22 @@ function drawBracketLines(
 
   ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
 
-  // スコア（横線を挟んで中央寄り：上のスコアは横線のすぐ下、下のスコアは横線のすぐ上）
+  // スコア（縦線の横、横線のすぐ内側に中央寄せ）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-    const so = 8; // 横線から中央方向へのオフセット
+    const mid = (t1cy + t2cy) / 2;
+    const s1y = mid - 8; // 上スコア: 中央の少し上
+    const s2y = mid + 8; // 下スコア: 中央の少し下
+    // タイブレーク表示
+    const tb = m.tiebreakScore;
+    const loserScore = tb != null ? (m.winnerId === m.team1Id ? `${m.score2}(${tb})` : `${m.score1}(${tb})`) : null;
+    const s1text = (m.winnerId !== m.team1Id && loserScore) ? loserScore : String(m.score1);
+    const s2text = (m.winnerId !== m.team2Id && loserScore) ? loserScore : String(m.score2);
     if (isLeft) {
-      txt(ctx, String(m.score1), jx + 2, t1cy + so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx + 2, t2cy - so, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, s1text, jx + 2, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, s2text, jx + 2, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
     } else {
-      txt(ctx, String(m.score1), jx - 2, t1cy + so, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx - 2, t2cy - so, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, s1text, jx - 2, s1y, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, s2text, jx - 2, s2y, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
     }
   }
 }
