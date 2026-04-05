@@ -517,7 +517,7 @@ export async function generateResultDataUrl(
   // ==== スロット描画 ====
   const drawTeam = (bx: number, by: number, bw: number, round: number,
     teamId: string | null, _name: string, score: number | null,
-    isWin: boolean, tb: number | null, isLose: boolean) => {
+    isWin: boolean, tb: number | null, isLose: boolean, defLabel?: string) => {
 
     if (isWin) {
       ctx.fillStyle = '#ecfdf5';
@@ -568,9 +568,14 @@ export async function generateResultDataUrl(
       ctx.fillText(fn2, nx, ny2);
     }
 
-    // スコア（常に右揃え同一位置）
-    if (score !== null) {
-      const scoreX = bx + bw - 8;
+    // スコア or 棄権ラベル
+    const scoreX = bx + bw - 8;
+    if (defLabel) {
+      // 棄権側: W.O or Ret 表示
+      setFont(ctx, 14, true);
+      ctx.fillStyle = '#dc2626'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillText(defLabel, scoreX, by + SH / 2);
+    } else if (score !== null) {
       setFont(ctx, 22, true);
       ctx.fillStyle = sc2; ctx.textAlign = 'right';
       ctx.fillText(String(score), scoreX, by + SH / 2);
@@ -620,8 +625,25 @@ export async function generateResultDataUrl(
       const w1 = m.winnerId === m.team1Id && m.winnerId != null;
       const w2 = m.winnerId === m.team2Id && m.winnerId != null;
 
-      drawTeam(cx, my2, mw, round, m.team1Id, m.team1Name, m.score1, w1, m.tiebreakScore, m.winnerId != null && !w1);
-      drawTeam(cx, my2 + SH, mw, round, m.team2Id, m.team2Name, m.score2, w2, m.tiebreakScore, m.winnerId != null && !w2);
+      // 棄権判定: W.O(0-0で棄権) / Ret(途中棄権=スコアの低い方が勝者)
+      let def1 = ''; // team1側のラベル
+      let def2 = ''; // team2側のラベル
+      if (m.winnerId && m.status === 'finished') {
+        const s1 = m.score1 ?? 0;
+        const s2 = m.score2 ?? 0;
+        if (s1 === 0 && s2 === 0) {
+          // 0-0で勝者あり → W.O（棄権側に表示）
+          if (w1) def2 = 'W.O';
+          else if (w2) def1 = 'W.O';
+        } else if ((w1 && s1 < s2) || (w2 && s2 < s1)) {
+          // スコア的に負けている方が勝者 → 途中棄権（敗者=棄権側にRet表示）
+          if (w1) def2 = 'Ret';
+          else if (w2) def1 = 'Ret';
+        }
+      }
+
+      drawTeam(cx, my2, mw, round, m.team1Id, m.team1Name, m.score1, w1, m.tiebreakScore, m.winnerId != null && !w1, def1 || undefined);
+      drawTeam(cx, my2 + SH, mw, round, m.team2Id, m.team2Name, m.score2, w2, m.tiebreakScore, m.winnerId != null && !w2, def2 || undefined);
     }
   }
 
