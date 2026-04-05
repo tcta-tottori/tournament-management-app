@@ -69,55 +69,35 @@ function printRefereeSheet(
     font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Meiryo', sans-serif;
     color: #222; -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .page { width: 241mm; height: 166mm; margin: auto; display: flex; flex-direction: column; }
-
-  /* ヘッダー */
+  .page { width: 241mm; margin: auto; }
   .title {
-    text-align: center; font-size: 28pt; font-weight: 900;
-    letter-spacing: 0.8em; padding: 2mm 0 1mm;
+    text-align: center; font-size: 26pt; font-weight: 900;
+    letter-spacing: 0.8em; padding: 2mm 0 0.5mm;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS PMincho', serif;
   }
   .meta {
     display: flex; justify-content: center; gap: 20mm;
-    font-size: 10pt; padding: 0 0 2mm; color: #555;
+    font-size: 9pt; padding: 0 0 1.5mm; color: #555;
   }
-  .meta-date { text-align: right; }
-
-  /* テーブル外枠 角丸 */
   .tbl-wrap {
-    flex: 1; border: 2px solid #444; border-radius: 10px;
-    overflow: hidden; display: flex; flex-direction: column;
+    border: 2px solid #444; border-radius: 10px; overflow: hidden;
   }
-  table { width: 100%; border-collapse: collapse; flex: 1; table-layout: fixed; }
-  td, th {
-    border: 1px solid #999; padding: 1.5mm 3mm;
-    font-size: 10pt; vertical-align: middle;
-  }
-
-  /* 左ラベル列 */
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1px solid #999; padding: 1.5mm 3mm; font-size: 10pt; vertical-align: middle; }
   .lbl {
-    width: 50px; text-align: center; font-weight: 700;
-    font-size: 10pt; letter-spacing: 0.15em;
-    background: #f7f7f7; color: #333;
+    width: 22mm; text-align: center; font-weight: 700; font-size: 9pt;
+    letter-spacing: 0.15em; background: #f7f7f7; color: #333;
   }
-
-  /* 値セル */
   .v-center { text-align: center; }
   .v-bold { font-weight: 700; font-size: 13pt; }
   .v-big { font-weight: 800; font-size: 20pt; font-family: 'Arial', sans-serif; }
-
-  /* 名前セル */
   .name {
-    font-size: 13pt; font-weight: 600; padding: 2mm 4mm; line-height: 1.7;
+    font-size: 13pt; font-weight: 600; padding: 3mm 4mm; line-height: 1.8;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   }
-  .aff { font-size: 9pt; padding: 2mm 3mm; line-height: 1.7; color: #555; white-space: nowrap; }
-
-  /* 二重線 (エントリーNoの上) */
+  .aff { font-size: 9pt; padding: 2mm 3mm; line-height: 1.8; color: #555; white-space: nowrap; }
   .dbl-top td, .dbl-top th { border-top: 3px double #444; }
-
-  /* スコア行 */
-  .score-row td { height: 28mm; text-align: center; vertical-align: middle; }
+  .score-row td { height: 30mm; text-align: center; vertical-align: middle; }
   .score-lbl { font-size: 10pt; font-weight: 700; letter-spacing: 0.2em; }
   .score-tb { font-size: 9pt; color: #666; margin-top: 2mm; }
   .score-box {
@@ -126,15 +106,9 @@ function printRefereeSheet(
   }
   .score-dash { font-size: 26pt; font-weight: 700; color: #444; }
   .tb-par { font-size: 12pt; color: #666; margin-top: 2mm; }
-
-  /* フッター行 */
   .ftr td { font-size: 9pt; height: 8mm; color: #444; }
   .uline { display: inline-block; border-bottom: 1px solid #888; min-width: 28mm; margin-left: 1mm; }
-
-  /* 備考 */
-  .note td { font-size: 9pt; height: 10mm; color: #999; vertical-align: top; padding-top: 2mm; }
-
-  /* クレジット */
+  .note td { font-size: 9pt; height: 8mm; color: #999; vertical-align: top; padding-top: 2mm; }
   .credit { text-align: right; font-size: 8pt; color: #999; padding: 1mm 2mm 0; }
 </style>
 </head><body>
@@ -142,16 +116,10 @@ function printRefereeSheet(
   <div class="title">審　判　用　紙</div>
   <div class="meta">
     <span>${tournamentInfo?.name || ''}</span>
-    <span class="meta-date">${dateStr}</span>
+    <span>${dateStr}</span>
   </div>
-
   <div class="tbl-wrap">
     <table>
-      <col style="width:50px">
-      <col><col>
-      <col style="width:50px">
-      <col><col>
-
       <tr>
         <th class="lbl">種　目</th>
         <td class="v-center v-bold" colspan="2">${bracketLabel}</td>
@@ -160,28 +128,26 @@ function printRefereeSheet(
       </tr>
       <tr>
         <th class="lbl">コートNo.</th>
-        <td class="v-center" contenteditable="true">&nbsp;</td>
-        <td class="v-center lbl" style="width:auto;">試合方法</td>
-        <td class="v-center" style="font-size:9pt;" contenteditable="true">${gameRule.replace(/\n/g, '<br>')}</td>
-        <td class="v-center lbl" style="width:auto;">開始時間</td>
-        <td class="v-center" contenteditable="true">&nbsp;</td>
+        <td class="v-center" style="width:14%;" contenteditable="true">&nbsp;</td>
+        <th class="lbl" style="width:auto;">試合方法</th>
+        <td class="v-center" style="font-size:8pt;" contenteditable="true">${gameRule.replace(/\n/g, '<br>')}</td>
+        <th class="lbl" style="width:auto;">開始時間</th>
+        <td class="v-center" style="width:14%;" contenteditable="true">&nbsp;</td>
       </tr>
-
       <tr class="dbl-top">
         <th class="lbl">エントリーNo.</th>
         <td class="v-center v-big" colspan="2">No.　${team1.pairNumber}</td>
         <td class="v-center v-big" colspan="3">No.　${team2.pairNumber}</td>
       </tr>
       <tr>
-        <th class="lbl" rowspan="1">選 手 氏 名</th>
+        <th class="lbl">選手氏名</th>
         <td class="name">${team1.male.name}<br>${team1.female.name}</td>
         <td class="aff">（ ${team1.male.affiliation} ）<br>（ ${team1.female.affiliation} ）</td>
         <td class="name" colspan="2">${team2.male.name}<br>${team2.female.name}</td>
         <td class="aff">（ ${team2.male.affiliation} ）<br>（ ${team2.female.affiliation} ）</td>
       </tr>
-
       <tr class="score-row">
-        <td style="vertical-align:middle;">
+        <td>
           <div class="score-lbl">ス コ ア</div>
           <div class="score-tb">（ＴＢ）</div>
         </td>
@@ -192,7 +158,6 @@ function printRefereeSheet(
         </td>
         <td colspan="2"><div class="score-box"></div></td>
       </tr>
-
       <tr class="ftr">
         <td colspan="2">コート：<span class="uline"></span></td>
         <td>開始時刻：<span class="uline"></span></td>
