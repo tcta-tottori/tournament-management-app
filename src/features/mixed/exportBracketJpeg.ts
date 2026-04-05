@@ -199,66 +199,68 @@ export async function generateBracketDataUrl(
   const top = PADDING_Y + HEADER_H + winnerAreaH;
   const jp = new Map<string, JP>();
 
-  // 左R1
-  for (let i = 0; i < leftR1.length; i++) {
-    const m = leftR1[i];
-    const p = getPos(i);
-    const bye1 = !m.team1Id && m.team1Name === 'BYE';
-    const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
-    const bye = isByeMatch(m);
-    const t1cy = top + p.t1y + SLOT_H / 2;
-    const t2cy = top + p.t2y + SLOT_H / 2;
-    const cy = (t1cy + t2cy) / 2;
+  // BYE選手が次ラウンドで勝ったかチェック（赤線判定用）
+  const byeWinnerAdvanced = (m: BracketMatch): boolean => {
+    if (!m.winnerId || !m.nextMatchId) return false;
+    const nextMatch = matches.find(nm => nm.matchId === m.nextMatchId);
+    return nextMatch?.winnerId === m.winnerId;
+  };
 
-    drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-    drawTeamLeft(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+  // R1描画ヘルパー
+  const drawR1 = (r1Arr: BracketMatch[], isLeft: boolean) => {
+    for (let i = 0; i < r1Arr.length; i++) {
+      const m = r1Arr[i];
+      const p = getPos(i);
+      const bye1 = !m.team1Id && m.team1Name === 'BYE';
+      const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
+      const bye = isByeMatch(m);
+      const t1cy = top + p.t1y + SLOT_H / 2;
+      const t2cy = top + p.t2y + SLOT_H / 2;
+      const cy = (t1cy + t2cy) / 2; // BYEでも通常マッチと同じcy
 
-    const slotR = PADDING_X + SLOT_W;
-    const exitX = slotR + gapX;
-
-    if (bye) {
-      // BYE: 勝者の線は赤で描画
-      const teamCy = bye2 ? t1cy : t2cy;
-      const hasW = m.winnerId != null;
-      ln(ctx, slotR, teamCy, exitX, teamCy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
-      jp.set(m.matchId, { x: exitX, y: teamCy });
-    } else {
-      const jx = slotR + gapX * 0.42;
-      drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true);
-      jp.set(m.matchId, { x: exitX, y: cy });
+      if (isLeft) {
+        drawTeamLeft(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+        drawTeamLeft(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+        const slotR = PADDING_X + SLOT_W;
+        const exitX = slotR + gapX;
+        if (bye) {
+          const teamCy = bye2 ? t1cy : t2cy;
+          // BYE: 次ラウンドで勝った場合のみ赤線
+          const adv = byeWinnerAdvanced(m);
+          ln(ctx, slotR, teamCy, slotR + gapX * 0.3, teamCy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          // cyに向かって縦に移動し、cyからexitへ水平に
+          ln(ctx, slotR + gapX * 0.3, teamCy, slotR + gapX * 0.3, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          ln(ctx, slotR + gapX * 0.3, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          jp.set(m.matchId, { x: exitX, y: cy });
+        } else {
+          const jx = slotR + gapX * 0.42;
+          drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true);
+          jp.set(m.matchId, { x: exitX, y: cy });
+        }
+      } else {
+        const rx = totalW - PADDING_X - SLOT_W;
+        drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+        drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+        const slotL = rx;
+        const exitX = slotL - gapX;
+        if (bye) {
+          const teamCy = bye2 ? t1cy : t2cy;
+          const adv = byeWinnerAdvanced(m);
+          ln(ctx, slotL, teamCy, slotL - gapX * 0.3, teamCy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          ln(ctx, slotL - gapX * 0.3, teamCy, slotL - gapX * 0.3, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          ln(ctx, slotL - gapX * 0.3, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
+          jp.set(m.matchId, { x: exitX, y: cy });
+        } else {
+          const jx = slotL - gapX * 0.42;
+          drawBracketLines(ctx, t1cy, t2cy, cy, slotL, jx, exitX, m, false);
+          jp.set(m.matchId, { x: exitX, y: cy });
+        }
+      }
     }
-  }
+  };
 
-  // 右R1（番号は左、線から間隔を取る）
-  for (let i = 0; i < rightR1.length; i++) {
-    const m = rightR1[i];
-    const p = getPos(i);
-    const bye1 = !m.team1Id && m.team1Name === 'BYE';
-    const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
-    const bye = isByeMatch(m);
-    const t1cy = top + p.t1y + SLOT_H / 2;
-    const t2cy = top + p.t2y + SLOT_H / 2;
-    const cy = (t1cy + t2cy) / 2;
-
-    const rx = totalW - PADDING_X - SLOT_W;
-    drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-    drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
-
-    const slotL = rx;
-    const exitX = slotL - gapX;
-
-    if (bye) {
-      // BYE: 勝者の線は赤で描画
-      const teamCy = bye2 ? t1cy : t2cy;
-      const hasW = m.winnerId != null;
-      ln(ctx, slotL, teamCy, exitX, teamCy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
-      jp.set(m.matchId, { x: exitX, y: teamCy });
-    } else {
-      const jx = slotL - gapX * 0.42;
-      drawBracketLines(ctx, t1cy, t2cy, cy, slotL, jx, exitX, m, false);
-      jp.set(m.matchId, { x: exitX, y: cy });
-    }
-  }
+  drawR1(leftR1, true);
+  drawR1(rightR1, false);
 
   // R2以降（決勝除く）
   for (let r = 2; r <= sideRounds; r++) {
@@ -275,7 +277,6 @@ export async function generateBracketDataUrl(
       if (parents.length < 2) {
         if (parents.length === 1) {
           const p = parents[0];
-          // BYEでも勝者がいれば赤線
           const hasW = m.winnerId != null;
           const exitX = p.x + (isLeft ? gapX : -gapX);
           ln(ctx, p.x, p.y, exitX, p.y, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
@@ -303,7 +304,7 @@ export async function generateBracketDataUrl(
     }
   }
 
-  // 決勝: 左右が中央でぴったり合うよう、同じ描画構造を使用
+  // 決勝: drawBracketLinesと同じ構造で中央に描画
   if (maxRound >= 2) {
     const finals = rm.get(maxRound) || [];
     if (finals.length > 0) {
@@ -317,30 +318,45 @@ export async function generateBracketDataUrl(
         const leftP = parents.find(p => p.x < totalW / 2) || parents[0];
         const rightP = parents.find(p => p.x >= totalW / 2) || parents[1];
         const jx = totalW / 2;
-
-        // 全体のブラケットエリアの中央Yを使う（左右が完全に同じY座標で合流）
-        const bracketCenterY = top + areaH / 2;
+        const t1cy = leftP.y;  // 左山の出力Y
+        const t2cy = rightP.y; // 右山の出力Y
+        const cy = (t1cy + t2cy) / 2;
 
         const w1 = fm.winnerId === fm.team1Id && fm.winnerId != null;
         const w2 = fm.winnerId === fm.team2Id && fm.winnerId != null;
+        const hasW = w1 || w2;
 
-        // 左山→中央（上側）: 水平に中央へ、縦にbracketCenterYへ
-        ln(ctx, leftP.x, leftP.y, jx, leftP.y, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-        ln(ctx, jx, leftP.y, jx, bracketCenterY, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-        // 右山→中央（下側）: 水平に中央へ、縦にbracketCenterYへ
-        ln(ctx, rightP.x, rightP.y, jx, rightP.y, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
-        ln(ctx, jx, rightP.y, jx, bracketCenterY, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
+        // 左山→中央縦線位置
+        ln(ctx, leftP.x, t1cy, jx, t1cy, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
+        // 右山→中央縦線位置
+        ln(ctx, rightP.x, t2cy, jx, t2cy, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
+        // 縦線（勝者側のみ赤）
+        if (hasW) {
+          if (w1) {
+            ln(ctx, jx, t1cy, jx, cy, WIN_COLOR, WIN_W);
+            ln(ctx, jx, cy, jx, t2cy, LINE_COLOR, LOSE_W);
+          } else {
+            ln(ctx, jx, t1cy, jx, cy, LINE_COLOR, LOSE_W);
+            ln(ctx, jx, cy, jx, t2cy, WIN_COLOR, WIN_W);
+          }
+        } else {
+          ln(ctx, jx, t1cy, jx, t2cy, LINE_COLOR, LOSE_W);
+        }
 
-        const meetY = bracketCenterY;
+        // スコア（中央寄せ）
+        if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
+          txt(ctx, String(fm.score1), jx + 4, cy - 9, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+          txt(ctx, String(fm.score2), jx + 4, cy + 9, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+        }
 
-        // 優勝者表示
+        // 優勝者: 中央から上に線→名前+スコア
         const winnerTeam = fm.winnerId ? allTeams.find(t => t.teamId === fm.winnerId) : null;
         const defaultWinnerName = winnerTeam ? `${familyName(winnerTeam.male.name)}・${familyName(winnerTeam.female.name)}` : '';
         const displayName = winnerOverride ?? defaultWinnerName;
 
         if (displayName) {
-          const lineTop = meetY - 25;
-          ln(ctx, jx, meetY, jx, lineTop, WIN_COLOR, WIN_W);
+          const lineTop = cy - 25;
+          ln(ctx, jx, cy, jx, lineTop, WIN_COLOR, WIN_W);
           txt(ctx, displayName, jx, lineTop - 14, 13, { align: 'center', bold: true });
           if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
             txt(ctx, `${fm.score1}−${fm.score2}`, jx, lineTop - 30, 11, { align: 'center', color: '#555' });
@@ -501,11 +517,12 @@ export async function generateResultDataUrl(
 
     const tc = isWin ? '#065f46' : '#111827';
     const sc2 = isWin ? '#059669' : '#374151';
-    const ac = isWin ? '#6ee7b7' : '#94a3b8';
+    const ac = isWin ? '#047857' : '#64748b'; // 所属: 勝者は濃い緑、敗者は濃いグレー
+    const numC = isWin ? '#6ee7b7' : '#94a3b8';
 
     // ペア番号
     setFont(ctx, 12, true);
-    ctx.fillStyle = ac; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = numC; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(t.pairNumber), bx + 18, by + SH / 2);
 
     // 名前（太字、2行）
@@ -517,15 +534,20 @@ export async function generateResultDataUrl(
     ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, ny1, 105);
     ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, ny2, 105);
 
-    // 所属（太字）
-    const afX = nx + 108;
-    const afW = bw - (afX - bx) - 42;
-    if (afW > 10) {
-      setFont(ctx, 11, true);
-      ctx.fillStyle = ac;
-      ctx.fillText(t.male.affiliation, afX, ny1, afW);
-      ctx.fillText(t.female.affiliation, afX, ny2, afW);
-    }
+    // 所属（太字、名前のすぐ右に配置）
+    setFont(ctx, 15, true);
+    const maleNW = ctx.measureText(t.male.name.replace(/[\s\u3000]+/g, '')).width;
+    const femaleNW = ctx.measureText(t.female.name.replace(/[\s\u3000]+/g, '')).width;
+    const maleAfX = nx + Math.min(maleNW, 105) + 6;
+    const femaleAfX = nx + Math.min(femaleNW, 105) + 6;
+    // スコアの幅を確保（約40px）
+    const scoreReserve = score !== null ? 40 : 8;
+    const maleAfW = bw - (maleAfX - bx) - scoreReserve;
+    const femaleAfW = bw - (femaleAfX - bx) - scoreReserve;
+    setFont(ctx, 11, true);
+    ctx.fillStyle = ac;
+    if (maleAfW > 10) ctx.fillText(t.male.affiliation, maleAfX, ny1, maleAfW);
+    if (femaleAfW > 10) ctx.fillText(t.female.affiliation, femaleAfX, ny2, femaleAfW);
 
     // スコア
     if (score !== null) {
