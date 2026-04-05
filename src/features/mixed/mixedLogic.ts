@@ -112,7 +112,7 @@ export function calculateLeagueStandings(
         losses: stats.losses,
         gamesWon: stats.gamesWon,
         gamesLost: stats.gamesLost,
-        gameRatio: stats.gamesLost === 0 ? (stats.gamesWon > 0 ? Infinity : 0) : stats.gamesWon / stats.gamesLost,
+        gameRatio: (stats.gamesWon + stats.gamesLost) === 0 ? 0 : stats.gamesWon / (stats.gamesWon + stats.gamesLost),
         headToHeadWin: 0,
       };
     });
@@ -142,17 +142,19 @@ export function calculateLeagueStandings(
 
       if (tiedTeams.length >= 3) {
         // 3チーム以上同率: 取得ゲーム率
-        const ratioA = a.gamesLost === 0 ? Infinity : a.gamesWon / a.gamesLost;
-        const ratioB = b.gamesLost === 0 ? Infinity : b.gamesWon / b.gamesLost;
+        const totalA = a.gamesWon + a.gamesLost;
+        const totalB = b.gamesWon + b.gamesLost;
+        const ratioA = totalA === 0 ? 0 : a.gamesWon / totalA;
+        const ratioB = totalB === 0 ? 0 : b.gamesWon / totalB;
         if (ratioA !== ratioB) {
-          a.tiebreakReason = `ゲーム率 ${ratioA === Infinity ? '∞' : ratioA.toFixed(3)}`;
-          b.tiebreakReason = `ゲーム率 ${ratioB === Infinity ? '∞' : ratioB.toFixed(3)}`;
+          a.tiebreakReason = `ゲーム率 ${ratioA.toFixed(3)}`;
+          b.tiebreakReason = `ゲーム率 ${ratioB.toFixed(3)}`;
           return ratioB - ratioA;
         }
       }
 
       // 最終: ゲーム率
-      return (b.gameRatio === Infinity ? 9999 : b.gameRatio) - (a.gameRatio === Infinity ? 9999 : a.gameRatio);
+      return b.gameRatio - a.gameRatio;
     });
 
     standings.forEach((s, i) => { s.rank = i + 1; });
@@ -178,19 +180,21 @@ export function calculateLeagueStandings(
         // ゲーム率が完全に同率のチーム群を検出
         const ratioGroups = new Map<string, LeagueStanding[]>();
         for (const s of tied) {
-          const ratioKey = s.gamesLost === 0 ? (s.gamesWon > 0 ? 'inf' : '0') : (s.gamesWon / s.gamesLost).toFixed(6);
+          const total = s.gamesWon + s.gamesLost;
+          const ratioKey = total === 0 ? '0' : (s.gamesWon / total).toFixed(6);
           if (!ratioGroups.has(ratioKey)) ratioGroups.set(ratioKey, []);
           ratioGroups.get(ratioKey)!.push(s);
         }
         for (const s of tied) {
           if (!s.tiebreakReason) {
-            const ratio = s.gamesLost === 0 ? Infinity : s.gamesWon / s.gamesLost;
-            const ratioKey = s.gamesLost === 0 ? (s.gamesWon > 0 ? 'inf' : '0') : ratio.toFixed(6);
+            const total = s.gamesWon + s.gamesLost;
+            const ratio = total === 0 ? 0 : s.gamesWon / total;
+            const ratioKey = ratio.toFixed(6);
             const sameRatioTeams = ratioGroups.get(ratioKey) || [];
             if (sameRatioTeams.length >= 2) {
-              s.tiebreakReason = `抽選（ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}）`;
+              s.tiebreakReason = `抽選（ゲーム率 ${ratio.toFixed(3)}）`;
             } else {
-              s.tiebreakReason = `ゲーム率 ${ratio === Infinity ? '∞' : ratio.toFixed(3)}`;
+              s.tiebreakReason = `ゲーム率 ${ratio.toFixed(3)}`;
             }
           }
         }

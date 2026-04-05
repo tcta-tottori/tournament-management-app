@@ -102,9 +102,11 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
   // 同じゲーム率のチーム群を特定
   const sameRatioTeams = standings.filter(s => {
     if (s.wins !== standing.wins) return false;
-    const r1 = s.gamesLost === 0 ? (s.gamesWon > 0 ? Infinity : 0) : s.gamesWon / s.gamesLost;
-    const r2 = standing.gamesLost === 0 ? (standing.gamesWon > 0 ? Infinity : 0) : standing.gamesWon / standing.gamesLost;
-    return Math.abs(r1 - r2) < 0.0001 || (r1 === Infinity && r2 === Infinity);
+    const t1 = s.gamesWon + s.gamesLost;
+    const t2 = standing.gamesWon + standing.gamesLost;
+    const r1 = t1 === 0 ? 0 : s.gamesWon / t1;
+    const r2 = t2 === 0 ? 0 : standing.gamesWon / t2;
+    return Math.abs(r1 - r2) < 0.0001;
   });
 
   const baseRank = Math.min(...sameRatioTeams.map(s => s.rank));

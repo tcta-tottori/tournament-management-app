@@ -18,12 +18,9 @@ export function GameRatioCell({ gamesWon, gamesLost, className = '', teamName, m
 }) {
   const [showDetail, setShowDetail] = useState(false);
 
-  const ratio = gamesLost === 0
-    ? (gamesWon > 0 ? Infinity : 0)
-    : gamesWon / gamesLost;
-  const displayText = gamesLost === 0
-    ? (gamesWon > 0 ? '∞' : '-')
-    : ratio.toFixed(3);
+  const totalGames = gamesWon + gamesLost;
+  const ratio = totalGames === 0 ? 0 : gamesWon / totalGames;
+  const displayText = totalGames === 0 ? '-' : ratio.toFixed(3);
 
   return (
     <>
@@ -72,16 +69,16 @@ export function GameRatioCell({ gamesWon, gamesLost, className = '', teamName, m
                 </div>
                 <div className="text-2xl font-bold text-gray-300">/</div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-red-500">{gamesLost}</div>
+                  <div className="text-3xl font-bold text-gray-600">{totalGames}</div>
                   <div className="text-[10px] text-gray-400 mt-0.5 flex items-center justify-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />失
+                    <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />総
                   </div>
                 </div>
               </div>
               <div className="text-center pt-3 border-t border-gray-200">
                 <span className="text-sm text-gray-500">= </span>
                 <span className="text-2xl font-bold text-blue-600 font-mono">
-                  {gamesLost === 0 ? (gamesWon > 0 ? '∞' : '0.000') : ratio.toFixed(3)}
+                  {totalGames === 0 ? '0.000' : ratio.toFixed(3)}
                 </span>
               </div>
             </div>
