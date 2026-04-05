@@ -1673,7 +1673,7 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [winnerName, setWinnerName] = useState('');
-  const [lineOv, setLineOv] = useState<Record<string, 'red' | 'black'>>({});
+  const [lineOv, setLineOv] = useState<Record<string, 't1red' | 't2red' | 'black'>>({});
   const allTeams = useMixedStore(s => s.allTeams);
   const tournamentName = useMixedStore(s => s.tournamentInfo?.name || '');
 
@@ -1750,25 +1750,29 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
                 <div className="mt-2 bg-white rounded-lg border border-gray-200 px-3 py-2 w-full max-w-3xl">
                   <div className="text-[10px] text-gray-500 mb-1">線の色を手動修正（クリックで切替）:</div>
                   <div className="flex flex-wrap gap-1">
-                    {bracket.matches.filter(m => !m.isBye && m.status === 'finished').map(m => {
+                    {bracket.matches.filter(m => m.status === 'finished' || m.isBye).map(m => {
                       const current = lineOv[m.matchId];
                       const label = `R${m.round}-${m.position}`;
+                      const states: (undefined | 't1red' | 't2red' | 'black')[] = [undefined, 't1red', 't2red', 'black'];
+                      const stateLabels: Record<string, string> = { t1red: '上赤', t2red: '下赤', black: '黒' };
                       return (
                         <button key={m.matchId}
                           onClick={() => setLineOv(prev => {
                             const next = { ...prev };
-                            if (!next[m.matchId]) next[m.matchId] = 'black';
-                            else if (next[m.matchId] === 'black') next[m.matchId] = 'red';
+                            const curIdx = states.indexOf(next[m.matchId]);
+                            const nextState = states[(curIdx + 1) % states.length];
+                            if (nextState) next[m.matchId] = nextState;
                             else delete next[m.matchId];
                             return next;
                           })}
                           className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
-                            current === 'red' ? 'bg-red-100 border-red-300 text-red-700' :
+                            current === 't1red' ? 'bg-red-100 border-red-300 text-red-700' :
+                            current === 't2red' ? 'bg-orange-100 border-orange-300 text-orange-700' :
                             current === 'black' ? 'bg-gray-200 border-gray-400 text-gray-700' :
                             'bg-white border-gray-200 text-gray-400'
                           }`}
                         >
-                          {label}{current === 'red' ? ' 赤' : current === 'black' ? ' 黒' : ''}
+                          {label}{current ? ` ${stateLabels[current]}` : ''}
                         </button>
                       );
                     })}

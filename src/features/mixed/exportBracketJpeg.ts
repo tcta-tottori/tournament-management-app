@@ -401,7 +401,7 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
 // ---------------------------------------------------------------------------
 
 /** 名前から名字を抽出。スペースがあれば分割、なければ全体の半分（2〜3文字）を名字とみなす */
-function _extractFamily(name: string): string {
+function extractFamily(name: string): string {
   const n = name.replace(/\u3000/g, ' ').trim();
   if (n.includes(' ')) return n.split(/\s+/)[0];
   // スペースなし: 漢字のみなら2文字、それ以外は3文字を名字とする
@@ -561,8 +561,8 @@ export async function generateResultDataUrl(
       // 2回戦以降: 名字のみ
       setFont(ctx, 15, true);
       ctx.fillStyle = tc; ctx.textAlign = 'left';
-      ctx.fillText(_extractFamily(t.male.name), nx, ny1);
-      ctx.fillText(_extractFamily(t.female.name), nx, ny2);
+      ctx.fillText(extractFamily(t.male.name), nx, ny1);
+      ctx.fillText(extractFamily(t.female.name), nx, ny2);
     }
 
     // スコア（常に右揃え同一位置）
