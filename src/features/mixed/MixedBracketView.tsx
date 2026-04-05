@@ -471,7 +471,7 @@ export default function MixedBracketView() {
 
       {/* ドロー編集 / プレビュー / 賞状ボタン */}
       <div className="flex justify-end gap-2">
-        <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} tournamentName={tournamentInfo?.name || ''} />
+        <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} />
         {currentBracket && (
           <BracketPreviewButton bracket={currentBracket} />
         )}
@@ -1442,7 +1442,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       {slot.score !== null && (
                         <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
                           {slot.score}
-                          {slot.isLoser && slot.tiebreakScore !== null && (
+                          {slot.isLoser && slot.tiebreakScore != null && (
                             <span className="text-[9px] text-blue-500 align-super ml-0.5">({slot.tiebreakScore})</span>
                           )}
                         </span>
@@ -1744,7 +1744,7 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
 // ---------------------------------------------------------------------------
 
 /** ブラケットから入賞者を取得 */
-function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[], tournamentName: string): { rank: string; category: string; names: string }[] {
+function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[]): { rank: string; category: string; names: string }[] {
   const results: { rank: string; category: string; names: string }[] = [];
   const catLabels: Record<string, string> = { '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント' };
   const familyN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
@@ -1755,19 +1755,18 @@ function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTea
     if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winnerId) continue;
 
     const cat = catLabels[b.category] || b.category;
-    const catWithName = tournamentName ? `${tournamentName} ${cat}` : cat;
     const winner = allTeams.find(t => t.teamId === finalMatch.winnerId);
     const loserId = finalMatch.winnerId === finalMatch.team1Id ? finalMatch.team2Id : finalMatch.team1Id;
     const runnerUp = loserId ? allTeams.find(t => t.teamId === loserId) : null;
 
-    if (winner) results.push({ rank: '優勝', category: catWithName, names: `${familyN(winner.male.name)}・${familyN(winner.female.name)}` });
-    if (runnerUp) results.push({ rank: '準優勝', category: catWithName, names: `${familyN(runnerUp.male.name)}・${familyN(runnerUp.female.name)}` });
+    if (winner) results.push({ rank: '優勝', category: cat, names: `${familyN(winner.male.name)}・${familyN(winner.female.name)}　組` });
+    if (runnerUp) results.push({ rank: '準優勝', category: cat, names: `${familyN(runnerUp.male.name)}・${familyN(runnerUp.female.name)}　組` });
 
     const sfMatches = b.matches.filter(m => m.round === maxRound - 1 && m.status === 'finished' && m.winnerId);
     for (const sf of sfMatches) {
       const loserId2 = sf.winnerId === sf.team1Id ? sf.team2Id : sf.team1Id;
       const third = loserId2 ? allTeams.find(t => t.teamId === loserId2) : null;
-      if (third) results.push({ rank: '3位', category: catWithName, names: `${familyN(third.male.name)}・${familyN(third.female.name)}` });
+      if (third) results.push({ rank: '第3位', category: cat, names: `${familyN(third.male.name)}・${familyN(third.female.name)}　組` });
     }
   }
   return results;
@@ -1796,45 +1795,47 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
   body { font-family: "Zen Old Mincho", "游明朝", "Yu Mincho", serif; }
   .page {
     width: 210mm; height: 297mm;
-    display: flex; align-items: center; justify-content: center;
     page-break-after: always; position: relative;
   }
   .page:last-child { page-break-after: auto; }
   .cert-content {
-    position: absolute; top: 50%; left: 50%;
+    position: absolute;
+    top: 42%; left: 50%;
     transform: translate(-50%, -50%);
-    text-align: center; width: 75%;
+    text-align: center; width: 80%;
+    height: 30mm;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
   }
   .class-name {
-    font-size: 16pt; font-weight: 700;
-    letter-spacing: 0.25em; color: #222;
-    margin-bottom: 10mm;
+    font-size: 14pt; font-weight: 700;
+    letter-spacing: 0.3em; color: #111;
+    margin-bottom: 3mm;
   }
   .rank-name {
-    font-size: 28pt; font-weight: 900;
+    font-size: 20pt; font-weight: 900;
     letter-spacing: 0.5em; color: #000;
-    margin-bottom: 12mm;
+    margin-bottom: 4mm;
   }
   .player-name {
-    font-size: 26pt; font-weight: 900;
-    letter-spacing: 0.4em; color: #000;
+    font-size: 18pt; font-weight: 900;
+    letter-spacing: 0.35em; color: #000;
   }
   @media print { body { -webkit-print-color-adjust: exact; } }
 </style></head><body>${pages}</body></html>`;
 }
 
 /** 賞状印刷ボタン */
-function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
+function CertificatePrintButton({ brackets, allTeams }: {
   brackets: PlacementBracket[];
   allTeams: MixedTeam[];
-  tournamentName: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [entries, setEntries] = useState<{ rank: string; category: string; names: string; selected: boolean }[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
 
   const openDialog = () => {
-    const auto = getWinnersFromBrackets(brackets, allTeams, tournamentName);
+    const auto = getWinnersFromBrackets(brackets, allTeams);
     setEntries(auto.map(e => ({ ...e, selected: true })));
     setPreviewIdx(0);
     setIsOpen(true);
@@ -1847,7 +1848,7 @@ function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
     setEntries(prev => prev.map((e, i) => i === idx ? { ...e, selected: !e.selected } : e));
   };
   const addEntry = () => {
-    setEntries(prev => [...prev, { rank: '優勝', category: tournamentName, names: '', selected: true }]);
+    setEntries(prev => [...prev, { rank: '優勝', category: '', names: '', selected: true }]);
   };
   const removeEntry = (idx: number) => {
     setEntries(prev => prev.filter((_, i) => i !== idx));
@@ -1905,7 +1906,7 @@ function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <input type="checkbox" checked={entry.selected} onChange={e => { e.stopPropagation(); toggleEntry(idx); }} className="accent-amber-500" />
                       <select value={entry.rank} onChange={e => updateEntry(idx, 'rank', e.target.value)} onClick={e => e.stopPropagation()} className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 font-bold bg-white">
-                        <option value="優勝">優勝</option><option value="準優勝">準優勝</option><option value="3位">3位</option>
+                        <option value="優勝">優勝</option><option value="準優勝">準優勝</option><option value="第3位">第3位</option>
                       </select>
                       <input type="text" value={entry.category} onChange={e => updateEntry(idx, 'category', e.target.value)} onClick={e => e.stopPropagation()}
                         placeholder="クラス名" className="flex-1 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 min-w-0" />
@@ -1925,28 +1926,30 @@ function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
                 {previewEntry ? (
                   <div className="bg-white shadow-lg border border-gray-300" style={{ width: '280px', height: '396px', position: 'relative' }}>
                     {/* 賞状の外枠イメージ */}
-                    <div className="absolute inset-2 border-2 border-amber-300/50 rounded" />
-                    <div className="absolute inset-3 border border-amber-200/40 rounded" />
+                    <div className="absolute inset-2 border-2 border-amber-300/40 rounded" />
+                    <div className="absolute inset-3 border border-amber-200/30 rounded" />
                     {/* 上部: 表彰状（印刷済み模擬） */}
-                    <div className="absolute top-[12%] left-0 right-0 text-center">
+                    <div className="absolute top-[10%] left-0 right-0 text-center">
                       <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>表　彰　状</span>
                     </div>
-                    {/* 中央: 印刷対象エリア */}
-                    <div className="absolute top-[30%] bottom-[30%] left-0 right-0 flex flex-col items-center justify-center px-4 border-y-2 border-dashed border-amber-200/60">
-                      <div className="text-[9px] text-gray-600 tracking-[0.2em] mb-3" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 700 }}>
-                        {previewEntry.category}
-                      </div>
-                      <div className="text-base text-black tracking-[0.4em] mb-3" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
-                        {previewEntry.rank}
-                      </div>
-                      <div className="text-sm text-black tracking-[0.3em]" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
-                        {previewEntry.names || '（氏名未入力）'}
+                    {/* 印刷対象エリア: A4中央より少し上、約3cm幅 */}
+                    <div className="absolute left-0 right-0 flex flex-col items-center justify-center px-4" style={{ top: '35%', height: '11%' }}>
+                      <div className="border-y-2 border-dashed border-amber-300/50 py-2 w-full flex flex-col items-center justify-center">
+                        <div className="text-[9px] text-gray-700 tracking-[0.25em] mb-1" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 700 }}>
+                          {previewEntry.category || '（クラス未入力）'}
+                        </div>
+                        <div className="text-sm text-black tracking-[0.4em] mb-1" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                          {previewEntry.rank}
+                        </div>
+                        <div className="text-xs text-black tracking-[0.3em]" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                          {previewEntry.names || '（氏名未入力）'}
+                        </div>
                       </div>
                     </div>
                     {/* 印刷エリア注釈 */}
-                    <div className="absolute right-1 top-[29%] text-[7px] text-amber-400">← 印刷範囲 →</div>
-                    {/* 下部: 大会名（印刷済み模擬） */}
-                    <div className="absolute bottom-[12%] left-0 right-0 text-center">
+                    <div className="absolute right-1 text-[6px] text-amber-400" style={{ top: '34%' }}>印刷範囲↓</div>
+                    {/* 下部: 鳥取市テニス協会（印刷済み模擬） */}
+                    <div className="absolute bottom-[10%] left-0 right-0 text-center">
                       <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>鳥取市テニス協会</span>
                     </div>
                   </div>
