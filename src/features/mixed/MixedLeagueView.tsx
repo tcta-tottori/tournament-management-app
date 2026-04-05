@@ -131,11 +131,18 @@ export default function MixedLeagueView() {
     const oppScore = isTeam1 ? match.score2 : match.score1;
     const won = match.winnerId === rowTeamId;
 
-    // DEF display: if scores are both 0 or null-like with a winner
-    const isDef = match.winnerId && (match.score1 === 0 && match.score2 === 0);
+    // 棄権判定
+    const s1 = match.score1 ?? 0;
+    const s2 = match.score2 ?? 0;
+    const isWO = match.winnerId && s1 === 0 && s2 === 0;
+    const isRet = match.winnerId && !isWO && ((match.winnerId === match.team1Id && s1 < s2) || (match.winnerId === match.team2Id && s2 < s1));
+    let text: string;
+    if (isWO) text = won ? 'W.O勝' : 'W.O';
+    else if (isRet) text = won ? `${myScore}-${oppScore}` : `${myScore}-${oppScore} Ret`;
+    else text = `${myScore}-${oppScore}`;
 
     return {
-      text: isDef ? (won ? 'DEF勝' : 'DEF負') : `${myScore}-${oppScore}`,
+      text,
       color: won ? 'text-emerald-700 font-bold' : 'text-red-600',
       bg: `${won ? 'bg-emerald-50' : 'bg-red-50'} cursor-pointer`,
       isCurrent: false,
@@ -439,9 +446,14 @@ export default function MixedLeagueView() {
                     <span className="font-bold">
                       {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
                     </span>
-                    {isFinished && match && (
-                      <span className="text-xs ml-1">({match.score1}-{match.score2})</span>
-                    )}
+                    {isFinished && match && (() => {
+                      const ms1 = match.score1 ?? 0; const ms2 = match.score2 ?? 0;
+                      const mWO = match.winnerId && ms1 === 0 && ms2 === 0;
+                      const mRet = match.winnerId && !mWO && ((match.winnerId === match.team1Id && ms1 < ms2) || (match.winnerId === match.team2Id && ms2 < ms1));
+                      if (mWO) return <span className="text-xs ml-1 text-gray-400">(W.O)</span>;
+                      if (mRet) return <span className="text-xs ml-1">({match.score1}-{match.score2} <span className="text-red-500">Ret</span>)</span>;
+                      return <span className="text-xs ml-1">({match.score1}-{match.score2})</span>;
+                    })()}
                     {isFinished ? <Check size={14} /> : isPlaying ? <Play size={14} /> : <Circle size={14} />}
                   </button>
                   {/* Court override badge */}

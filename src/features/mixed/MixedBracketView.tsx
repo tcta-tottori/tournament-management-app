@@ -1402,7 +1402,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 // 通常マッチ
                 const SLOT_HEIGHT = compact ? 22 : 42;
                 const STATUS_HEIGHT = compact ? 16 : 30;
-                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null }) => {
+                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null; defLabel?: string }) => {
                   // teamIdから探す。なければnameから逆引き
                   let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
                   if (!teamData && slot.name && slot.league) {
@@ -1442,7 +1442,11 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                         : slot.name ? <span className="text-[11px] truncate">{slot.name}</span>
                         : <span className="text-[10px] text-gray-400">―</span>}
                       </div>
-                      {slot.score !== null && (
+                      {slot.defLabel ? (
+                        <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.defLabel === 'W.O' ? 'text-gray-400' : 'text-red-500'}`}>
+                          {slot.defLabel}
+                        </span>
+                      ) : slot.score !== null && (
                         <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
                           {slot.score}
                           {slot.isLoser && slot.tiebreakScore != null && (
@@ -1466,8 +1470,21 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                       `}
                       style={{ height: MATCH_HEIGHT }}
                     >
-                      {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: match.winnerId === match.team1Id, isLoser: match.winnerId !== null && match.winnerId !== match.team1Id, tiebreakScore: match.tiebreakScore, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1') })}
-                      {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: match.winnerId === match.team2Id, isLoser: match.winnerId !== null && match.winnerId !== match.team2Id, tiebreakScore: match.tiebreakScore, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2') })}
+                      {(() => {
+                        // 棄権判定
+                        const s1 = match.score1 ?? 0; const s2 = match.score2 ?? 0;
+                        const mW1 = match.winnerId === match.team1Id && match.winnerId != null;
+                        const mW2 = match.winnerId === match.team2Id && match.winnerId != null;
+                        let def1 = ''; let def2 = '';
+                        if (match.winnerId && match.status === 'finished') {
+                          if (s1 === 0 && s2 === 0) { if (mW1) def2 = 'W.O'; else if (mW2) def1 = 'W.O'; }
+                          else if ((mW1 && s1 < s2) || (mW2 && s2 < s1)) { if (mW1) def2 = 'Ret'; else if (mW2) def1 = 'Ret'; }
+                        }
+                        return (<>
+                          {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: mW1, isLoser: match.winnerId !== null && !mW1, tiebreakScore: match.tiebreakScore, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1'), defLabel: def1 || undefined })}
+                          {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: mW2, isLoser: match.winnerId !== null && !mW2, tiebreakScore: match.tiebreakScore, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2'), defLabel: def2 || undefined })}
+                        </>);
+                      })()}
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
                         <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
