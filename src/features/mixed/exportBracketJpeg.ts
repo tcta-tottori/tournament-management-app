@@ -334,3 +334,255 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
   a.download = `${CATEGORY_LABELS[bracket.category] || bracket.category}.jpg`;
   a.click();
 }
+
+// ---------------------------------------------------------------------------
+// 結果画像（Web UI風：左→右ラウンド、ボックス型マッチ、勝者緑ライン）
+// ---------------------------------------------------------------------------
+const R_SCALE = 2;
+const R_MATCH_W = 260;
+const R_MATCH_H = 90;
+const R_MATCH_GAP = 16;
+const R_ROUND_GAP = 44;
+const R_HEADER_H = 40;
+const R_PAD_X = 20;
+const R_PAD_Y = 16;
+const R_SLOT_H = 38;
+const R_WIN_COLOR = '#059669'; // emerald-600
+const R_LINE_COLOR = '#d1d5db'; // gray-300
+
+function rTxt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, opts?: { align?: CanvasTextAlign; color?: string; bold?: boolean; maxW?: number }) {
+  const { align = 'left', color = '#1a1a1a', bold = false, maxW } = opts || {};
+  ctx.fillStyle = color;
+  ctx.font = `${bold ? 'bold ' : ''}${size}px "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif`;
+  ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (maxW) ctx.fillText(text, x, y, maxW); else ctx.fillText(text, x, y);
+}
+
+function rLn(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, w: number) {
+  ctx.strokeStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+}
+
+function rRect2(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string, stroke: string, sw: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke();
+}
+
+function drawResultSlot(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number,
+  teamId: string | null, teamName: string, score: number | null,
+  isWinner: boolean, isBye: boolean, allTeams: MixedTeam[],
+  tiebreakScore: number | null, isLoser: boolean
+) {
+  // 背景
+  if (isWinner) {
+    ctx.fillStyle = '#ecfdf5'; // emerald-50
+    ctx.fillRect(x, y, w, R_SLOT_H);
+  }
+
+  if (isBye || (!teamId && teamName === 'BYE')) {
+    rTxt(ctx, 'BYE', x + w / 2, y + R_SLOT_H / 2, 10, { align: 'center', color: '#ccc' });
+    return;
+  }
+  if (!teamId) {
+    if (teamName) rTxt(ctx, teamName, x + 6, y + R_SLOT_H / 2, 9, { color: '#aaa', maxW: w - 12 });
+    return;
+  }
+  const team = allTeams.find(t => t.teamId === teamId);
+  if (!team) {
+    rTxt(ctx, teamName || '―', x + 6, y + R_SLOT_H / 2, 9, { color: '#aaa' });
+    return;
+  }
+
+  const textColor = isWinner ? '#065f46' : '#374151';
+  // ペア番号
+  rTxt(ctx, String(team.pairNumber), x + 14, y + R_SLOT_H / 2, 9, { align: 'center', color: '#9ca3af', bold: false });
+  // 名前（2行）
+  const nx = x + 28;
+  const nameW = 80;
+  rTxt(ctx, team.male.name.replace(/[\s\u3000]+/g, ''), nx, y + 12, 11, { bold: true, color: textColor, maxW: nameW });
+  rTxt(ctx, team.female.name.replace(/[\s\u3000]+/g, ''), nx, y + 27, 11, { bold: true, color: textColor, maxW: nameW });
+  // 所属
+  const ax = nx + nameW + 4;
+  const aw = w - (ax - x) - 36;
+  if (aw > 20) {
+    rTxt(ctx, team.male.affiliation, ax, y + 12, 8, { color: '#9ca3af', maxW: aw });
+    rTxt(ctx, team.female.affiliation, ax, y + 27, 8, { color: '#9ca3af', maxW: aw });
+  }
+  // スコア
+  if (score !== null) {
+    const scoreColor = isWinner ? '#059669' : '#6b7280';
+    rTxt(ctx, String(score), x + w - 10, y + R_SLOT_H / 2, 16, { align: 'right', color: scoreColor, bold: true });
+    if (isLoser && tiebreakScore != null) {
+      rTxt(ctx, `(${tiebreakScore})`, x + w - 4, y + 8, 8, { align: 'right', color: '#3b82f6' });
+    }
+  }
+}
+
+function getRoundLabelResult(round: number, maxRound: number): string {
+  if (round === maxRound) return '決勝';
+  if (round === maxRound - 1) return '準決勝';
+  if (round === maxRound - 2) return '準々決勝';
+  return `${round}回戦`;
+}
+
+export async function generateResultDataUrl(
+  bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
+): Promise<string> {
+  const matches = bracket.matches;
+  if (matches.length === 0) throw new Error('No matches');
+
+  const maxRound = Math.max(...matches.map(m => m.round));
+  const roundMap = new Map<number, BracketMatch[]>();
+  for (const m of matches) { if (!roundMap.has(m.round)) roundMap.set(m.round, []); roundMap.get(m.round)!.push(m); }
+  for (const [, arr] of roundMap) arr.sort((a, b) => a.position - b.position);
+
+  // グリッド計算（Web UIと同じロジック）
+  const GRID_UNIT = R_MATCH_H + R_MATCH_GAP;
+  const r1Count = (roundMap.get(1) || []).length;
+
+  const getMatchY = (roundIdx: number, matchIdx: number) => {
+    const spacing = Math.pow(2, roundIdx);
+    const offset = (spacing - 1) * GRID_UNIT / 2;
+    return R_HEADER_H + 36 + matchIdx * spacing * GRID_UNIT + offset;
+  };
+
+  const totalRounds = maxRound;
+  const svgW = totalRounds * (R_MATCH_W + R_ROUND_GAP) - R_ROUND_GAP;
+  const svgH = r1Count * GRID_UNIT;
+  const totalW = R_PAD_X * 2 + svgW;
+  const totalH = R_PAD_Y * 2 + R_HEADER_H + 36 + svgH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = totalW * R_SCALE; canvas.height = totalH * R_SCALE;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(R_SCALE, R_SCALE);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, totalW, totalH);
+
+  // ヘッダー
+  const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
+  rTxt(ctx, tournamentName, R_PAD_X, R_PAD_Y + 14, 14, { bold: true, color: '#333' });
+  rTxt(ctx, catLabel, totalW - R_PAD_X, R_PAD_Y + 14, 14, { align: 'right', bold: true, color: '#333' });
+
+  const matchesByRound: BracketMatch[][] = [];
+  for (let r = 1; r <= totalRounds; r++) {
+    matchesByRound.push(roundMap.get(r) || []);
+  }
+
+  // 接続線を描画
+  for (let roundIdx = 0; roundIdx < matchesByRound.length - 1; roundIdx++) {
+    const roundMatches = matchesByRound[roundIdx];
+    const x1 = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP) + R_MATCH_W;
+    const x2 = R_PAD_X + (roundIdx + 1) * (R_MATCH_W + R_ROUND_GAP);
+    const xMid = (x1 + x2) / 2;
+
+    for (let i = 0; i < roundMatches.length; i += 2) {
+      if (i + 1 >= roundMatches.length) break;
+      const m1 = roundMatches[i];
+      const m2 = roundMatches[i + 1];
+      const y1 = getMatchY(roundIdx, i) + R_MATCH_H / 2;
+      const y2 = getMatchY(roundIdx, i + 1) + R_MATCH_H / 2;
+      const yNext = getMatchY(roundIdx + 1, Math.floor(i / 2)) + R_MATCH_H / 2;
+
+      // 次のラウンドのマッチを取得して勝者チェック
+      const nextMatch = matchesByRound[roundIdx + 1]?.[Math.floor(i / 2)];
+
+      // m1の勝者が次に進んだか
+      const m1Winner = m1.winnerId;
+      const m1WinAdvanced = m1Winner && nextMatch && (nextMatch.team1Id === m1Winner || nextMatch.team2Id === m1Winner);
+      // m2の勝者が次に進んだか
+      const m2Winner = m2.winnerId;
+      const m2WinAdvanced = m2Winner && nextMatch && (nextMatch.team1Id === m2Winner || nextMatch.team2Id === m2Winner);
+
+      const c1 = m1WinAdvanced ? R_WIN_COLOR : R_LINE_COLOR;
+      const w1 = m1WinAdvanced ? 2.5 : 1.5;
+      const c2 = m2WinAdvanced ? R_WIN_COLOR : R_LINE_COLOR;
+      const w2 = m2WinAdvanced ? 2.5 : 1.5;
+
+      // 上マッチ→中間
+      rLn(ctx, x1, y1, xMid, y1, c1, w1);
+      // 下マッチ→中間
+      rLn(ctx, x1, y2, xMid, y2, c2, w2);
+
+      // 縦線（勝者色で分割）
+      if (m1WinAdvanced && !m2WinAdvanced) {
+        rLn(ctx, xMid, y1, xMid, yNext, R_WIN_COLOR, 2.5);
+        rLn(ctx, xMid, yNext, xMid, y2, R_LINE_COLOR, 1.5);
+      } else if (!m1WinAdvanced && m2WinAdvanced) {
+        rLn(ctx, xMid, y1, xMid, yNext, R_LINE_COLOR, 1.5);
+        rLn(ctx, xMid, yNext, xMid, y2, R_WIN_COLOR, 2.5);
+      } else {
+        const vc = (m1WinAdvanced || m2WinAdvanced) ? R_WIN_COLOR : R_LINE_COLOR;
+        rLn(ctx, xMid, y1, xMid, y2, vc, (m1WinAdvanced || m2WinAdvanced) ? 2.5 : 1.5);
+      }
+
+      // 中間→次マッチ
+      const nc = (m1WinAdvanced || m2WinAdvanced) ? R_WIN_COLOR : R_LINE_COLOR;
+      const nw = (m1WinAdvanced || m2WinAdvanced) ? 2.5 : 1.5;
+      rLn(ctx, xMid, yNext, x2, yNext, nc, nw);
+    }
+  }
+
+  // 各マッチのボックスを描画
+  for (let roundIdx = 0; roundIdx < matchesByRound.length; roundIdx++) {
+    const round = roundIdx + 1;
+    const colX = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP);
+
+    // ラウンドラベル
+    const labelText = getRoundLabelResult(round, maxRound);
+    rTxt(ctx, labelText, colX + R_MATCH_W / 2, R_PAD_Y + R_HEADER_H + 14, 11, { align: 'center', color: '#6b7280', bold: true });
+
+    for (let matchIdx = 0; matchIdx < matchesByRound[roundIdx].length; matchIdx++) {
+      const match = matchesByRound[roundIdx][matchIdx];
+      const matchY = getMatchY(roundIdx, matchIdx);
+
+      if (match.isBye) {
+        // BYE: 小さいボックス
+        const byeH = 36;
+        const byeY = matchY + (R_MATCH_H - byeH) / 2;
+        rRect2(ctx, colX, byeY, R_MATCH_W, byeH, 6, '#fafafa', '#e5e7eb', 1);
+        const winnerId = match.winnerId;
+        const winTeam = winnerId ? allTeams.find(t => t.teamId === winnerId) : null;
+        if (winTeam) {
+          rTxt(ctx, `${winTeam.pairNumber}`, colX + 14, byeY + byeH / 2, 9, { align: 'center', color: '#9ca3af' });
+          rTxt(ctx, winTeam.male.name.replace(/[\s\u3000]+/g, ''), colX + 28, byeY + byeH / 2 - 6, 10, { bold: true, color: '#374151' });
+          rTxt(ctx, winTeam.female.name.replace(/[\s\u3000]+/g, ''), colX + 28, byeY + byeH / 2 + 6, 10, { bold: true, color: '#374151' });
+        } else {
+          rTxt(ctx, 'BYE', colX + R_MATCH_W / 2, byeY + byeH / 2, 10, { align: 'center', color: '#ccc' });
+        }
+        continue;
+      }
+
+      // 通常マッチ: ボックス
+      const isFinished = match.status === 'finished';
+      const borderColor = isFinished ? '#6ee7b7' : (match.team1Id && match.team2Id) ? '#93c5fd' : '#e5e7eb';
+      rRect2(ctx, colX, matchY, R_MATCH_W, R_MATCH_H, 6, '#fff', borderColor, isFinished ? 2 : 1);
+
+      // 中央の区切り線
+      rLn(ctx, colX, matchY + R_SLOT_H, colX + R_MATCH_W, matchY + R_SLOT_H, '#f3f4f6', 1);
+
+      const isBye1 = !match.team1Id && match.team1Name === 'BYE';
+      const isBye2 = !match.team2Id && match.team2Name === 'BYE';
+      const isW1 = match.winnerId === match.team1Id && match.winnerId != null;
+      const isW2 = match.winnerId === match.team2Id && match.winnerId != null;
+      const isL1 = match.winnerId != null && !isW1;
+      const isL2 = match.winnerId != null && !isW2;
+
+      // 上スロット
+      drawResultSlot(ctx, colX, matchY, R_MATCH_W,
+        match.team1Id, match.team1Name, match.score1,
+        isW1, isBye1, allTeams, match.tiebreakScore, isL1);
+      // 下スロット
+      drawResultSlot(ctx, colX, matchY + R_SLOT_H + 1, R_MATCH_W,
+        match.team2Id, match.team2Name, match.score2,
+        isW2, isBye2, allTeams, match.tiebreakScore, isL2);
+
+      // 残り高さにステータスバー的な要素は描画しない（「完了」等は非表示）
+    }
+  }
+
+  return canvas.toDataURL('image/jpeg', 0.95);
+}

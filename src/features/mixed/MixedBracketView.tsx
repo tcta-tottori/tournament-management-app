@@ -5,7 +5,7 @@ import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import CallPreviewDialog from './CallPreviewDialog';
-import { generateBracketDataUrl } from './exportBracketJpeg';
+import { generateBracketDataUrl, generateResultDataUrl } from './exportBracketJpeg';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -473,7 +473,10 @@ export default function MixedBracketView() {
       <div className="flex justify-end gap-2">
         <CertificatePrintButton brackets={brackets} allTeams={useMixedStore.getState().allTeams} selectedCategory={selectedBracketCategory} />
         {currentBracket && (
-          <BracketPreviewButton bracket={currentBracket} />
+          <>
+            <ResultPreviewButton bracket={currentBracket} />
+            <BracketPreviewButton bracket={currentBracket} />
+          </>
         )}
         <button
           onClick={() => setDrawEditMode(!drawEditMode)}
@@ -1741,6 +1744,72 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
             <div className="flex-1 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
               {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
               {dataUrl && !isLoading && <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 結果画像プレビュー/DL
+// ---------------------------------------------------------------------------
+function ResultPreviewButton({ bracket }: { bracket: PlacementBracket }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const allTeams = useMixedStore(s => s.allTeams);
+  const tournamentName = useMixedStore(s => s.tournamentInfo?.name || '');
+
+  const regen = useCallback(() => {
+    setDataUrl(null);
+    setIsLoading(true);
+    generateResultDataUrl(bracket, allTeams, tournamentName)
+      .then(url => { setDataUrl(url); setIsLoading(false); })
+      .catch(() => setIsLoading(false));
+  }, [bracket, allTeams, tournamentName]);
+
+  useEffect(() => { if (isOpen) regen(); }, [isOpen, regen]);
+
+  const handleDownload = () => {
+    if (!dataUrl) return;
+    const labels: Record<string, string> = { '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント' };
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `${labels[bracket.category] || bracket.category}_結果.jpg`;
+    a.click();
+  };
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
+        <ClipboardList size={12} /> 結果画像
+      </button>
+      {isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/60 z-[200]" onClick={() => setIsOpen(false)}>
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-[95vw] max-w-6xl max-h-[90vh] z-[210]" onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                <ClipboardList size={16} className="text-blue-500" /> 結果画像プレビュー
+              </h3>
+              <div className="flex items-center gap-3">
+                {dataUrl && (
+                  <button onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg shadow hover:bg-blue-600 transition-colors active:scale-95">
+                    <Download size={14} /> ダウンロード
+                  </button>
+                )}
+                <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
+              {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
+              {dataUrl && !isLoading && <img src={dataUrl} alt="結果画像" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />}
             </div>
           </div>
         </div>,
