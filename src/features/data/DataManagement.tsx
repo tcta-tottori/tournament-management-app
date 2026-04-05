@@ -13,6 +13,28 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedExcelViewer from '../mixed/MixedExcelViewer';
 
+/** 予備日を含む文字列から選択肢を生成 */
+function parseReserveDayOptions(value: string, type: 'date' | 'venue'): string[] {
+  if (!value) return [];
+  const options: string[] = [];
+  if (type === 'date') {
+    // "令和8年4月5日（日）予備日4月11日（土）" → ["令和8年4月5日（日）", full original]
+    const mainDate = value.split(/予備日[：:]?/)[0].trim();
+    if (mainDate && mainDate !== value) {
+      options.push(mainDate);
+      options.push(value); // 元のフルテキストも選択肢に
+    }
+  } else {
+    // "ヤマタスポーツパーク（予備日千代テニス場）" → ["ヤマタスポーツパーク", full original]
+    const mainVenue = value.replace(/[（(]予備日[^）)]*[）)]/g, '').split(/予備日/)[0].trim();
+    if (mainVenue && mainVenue !== value) {
+      options.push(mainVenue);
+      options.push(value);
+    }
+  }
+  return options;
+}
+
 /** ミックス大会情報表示・編集セクション */
 function MixedTournamentInfoSection() {
   const { tournamentInfo, updateTournamentInfo, leagues, allTeams } = useMixedStore();
@@ -32,6 +54,11 @@ function MixedTournamentInfoSection() {
       setEditingField(null);
     }
   };
+
+  const hasReserveDate = /予備日/.test(tournamentInfo.date);
+  const hasReserveVenue = /予備日/.test(tournamentInfo.venue);
+  const dateOptions = parseReserveDayOptions(tournamentInfo.date, 'date');
+  const venueOptions = parseReserveDayOptions(tournamentInfo.venue, 'venue');
 
   const entryCount = allTeams.filter(t => t.status === 'entry').length;
   const defCount = allTeams.filter(t => t.status === 'def').length;
@@ -85,10 +112,24 @@ function MixedTournamentInfoSection() {
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
-                {tournamentInfo.date || '(未設定)'}
-                <Pencil size={10} className="opacity-40" />
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                  {tournamentInfo.date || '(未設定)'}
+                  <Pencil size={10} className="opacity-40" />
+                </button>
+                {hasReserveDate && dateOptions.length > 0 && (
+                  <select
+                    onChange={e => { if (e.target.value) updateTournamentInfo('date', e.target.value); }}
+                    defaultValue=""
+                    className="text-xs border border-amber-300 bg-amber-50 text-amber-700 rounded-lg px-2 py-1 cursor-pointer"
+                  >
+                    <option value="" disabled>予備日を除去...</option>
+                    {dateOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -109,10 +150,24 @@ function MixedTournamentInfoSection() {
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
-                {tournamentInfo.venue || '(未設定)'}
-                <Pencil size={10} className="opacity-40" />
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                  {tournamentInfo.venue || '(未設定)'}
+                  <Pencil size={10} className="opacity-40" />
+                </button>
+                {hasReserveVenue && venueOptions.length > 0 && (
+                  <select
+                    onChange={e => { if (e.target.value) updateTournamentInfo('venue', e.target.value); }}
+                    defaultValue=""
+                    className="text-xs border border-amber-300 bg-amber-50 text-amber-700 rounded-lg px-2 py-1 cursor-pointer"
+                  >
+                    <option value="" disabled>予備日を除去...</option>
+                    {venueOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -8,6 +8,16 @@ function stripReserveDate(dateStr: string): string {
   return dateStr.split(/予備日[：:]?/)[0].trim();
 }
 
+/** 会場文字列から「予備日」「（予備日...）」を除去 */
+function stripReserveVenue(venueStr: string): string {
+  if (!venueStr) return '';
+  // （予備日...）や (予備日...) のカッコごと除去
+  let result = venueStr.replace(/[（(]予備日[^）)]*[）)]/g, '').trim();
+  // カッコなしの「予備日...」以降を除去
+  result = result.split(/予備日/)[0].trim();
+  return result;
+}
+
 /** ルールテキスト配列から構造化ゲームルールを自動抽出 */
 function extractGameRules(rules: string[]): Record<string, string> {
   let league4 = '';
@@ -272,6 +282,7 @@ function parseTournamentInfo(wb: XLSX.WorkBook, leagueSheetName: string): Tourna
     }
     // 予備日を除去して本戦日のみ
     date = stripReserveDate(date);
+    venue = stripReserveVenue(venue);
 
     const rules: string[] = [];
     for (let r = 20; r <= 40; r++) {
