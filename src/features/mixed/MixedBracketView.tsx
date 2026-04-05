@@ -216,6 +216,16 @@ export default function MixedBracketView() {
   const [drawEditMode, setDrawEditMode] = useState(false);
 
   const bracketGameRule = tournamentInfo?.bracketGameRule || '';
+  // ドロー表のルールから初期値を自動設定
+  useEffect(() => {
+    if (!bracketGameRule && tournamentInfo?.rules) {
+      const ruleFromDraw = tournamentInfo.rules.find(r => /ゲームマッチ|ノーアド|タイブレ|セットマッチ/.test(r));
+      if (ruleFromDraw) {
+        const cleaned = ruleFromDraw.replace(/^（[０-９\d]+）\s*/, '').trim();
+        if (cleaned) updateBracketGameRule(cleaned);
+      }
+    }
+  }, [tournamentInfo?.rules]);
   const winGames = useMemo(() => {
     // bracketGameRuleが設定されていればそれからゲーム数を抽出
     if (bracketGameRule) {
@@ -456,15 +466,36 @@ export default function MixedBracketView() {
         </button>
       </div>
 
-      {/* 決勝トーナメント用ゲームルール設定 */}
-      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-        <label className="text-xs font-bold text-gray-500 whitespace-nowrap">ゲームルール:</label>
+      {/* 決勝トーナメント用ゲームルール設定（選択式＋記述式） */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+        <label className="text-xs font-bold text-gray-500 block mb-1.5">ゲームルール:</label>
+        <div className="flex flex-wrap gap-1.5 mb-1.5">
+          {[
+            'ノーアド・6ゲームマッチ（6-6タイブレーク）',
+            'ノーアド・4ゲームマッチ（4-4タイブレーク）',
+            'デュースあり・6ゲームマッチ（6-6タイブレーク）',
+            '1セットマッチ（6-6タイブレーク）',
+            '8ゲームマッチ（8-8タイブレーク）',
+          ].map(preset => (
+            <button
+              key={preset}
+              onClick={() => updateBracketGameRule(preset)}
+              className={`px-2 py-1 text-[10px] rounded-lg border transition-colors ${
+                bracketGameRule === preset
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
         <input
           type="text"
           value={bracketGameRule}
           onChange={e => updateBracketGameRule(e.target.value)}
-          placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
-          className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+          placeholder="上記から選択、または直接入力"
+          className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
         />
       </div>
 

@@ -103,15 +103,28 @@ export default function CallPreviewDialog({
 
   useEffect(() => {
     const init = async () => {
-      // 苗字は必ず male.name / female.name のスペース区切りから取得（teamNameはフルネームの場合がある）
-      const maleFN1 = familyName(team1.male.name);
-      const femaleFN1 = familyName(team1.female.name);
-      const maleFN2 = familyName(team2.male.name);
-      const femaleFN2 = familyName(team2.female.name);
-
-      // Playerテーブルからスペース付きふりがなを取得（カタカナ "タケヤス シュウヘイ" 形式）
+      // Playerテーブルからスペース付き名前とふりがなを取得
       const players = await db.players.toArray();
-      const playerMap = new Map(players.map(p => [p.name.replace(/\s+/g, ''), p.furigana]));
+      // キー: スペース除去した名前 → { name: スペース付き名前, furigana: カタカナふりがな }
+      const playerMap = new Map(players.map(p => [p.name.replace(/\s+/g, ''), { name: p.name, furigana: p.furigana }]));
+
+      // Playerテーブルのスペース付き名前から苗字漢字を取得
+      const getKanjiFamily = (mixedName: string): string => {
+        const key = mixedName.replace(/\s+/g, '');
+        const player = playerMap.get(key);
+        if (player) {
+          // Playerテーブルの名前はスペース区切り（"岸本 健悟"）
+          const parts = player.name.trim().split(/[\s　]+/);
+          if (parts.length > 1) return parts[0];
+        }
+        // MixedPlayer名にスペースがある場合
+        return familyName(mixedName);
+      };
+
+      const maleFN1 = getKanjiFamily(team1.male.name);
+      const femaleFN1 = getKanjiFamily(team1.female.name);
+      const maleFN2 = getKanjiFamily(team2.male.name);
+      const femaleFN2 = getKanjiFamily(team2.female.name);
 
       const affKeys = [
         team1.male.affiliation, team1.female.affiliation,
@@ -121,19 +134,18 @@ export default function CallPreviewDialog({
       const affMap = new Map(affFuriganas.map(f => [f.name, f.furigana]));
 
       // 苗字のひらがな読みを取得
-      // 1. Playerテーブルのスペース付きふりがな（カタカナ）→ひらがな変換→苗字部分
-      // 2. フォールバック: 漢字の苗字
-      const getFamilyFurigana = (fullName: string): string => {
-        const fullKey = fullName.replace(/\s+/g, '');
-        const playerFurigana = playerMap.get(fullKey);
-        if (playerFurigana) {
-          const hira = kataToHira(playerFurigana);
+      const getFamilyFurigana = (mixedName: string): string => {
+        const key = mixedName.replace(/\s+/g, '');
+        const player = playerMap.get(key);
+        if (player?.furigana) {
+          const hira = kataToHira(player.furigana);
           const parts = hira.trim().split(/[\s　]+/);
           if (parts.length > 1) return parts[0];
-          // スペースなしの場合もそのまま返す（手動修正されたひらがなの可能性）
+          // スペースなしだがPlayerふりがなが存在する場合はそのまま返す
           return hira;
         }
-        return familyName(fullName);
+        // フォールバック: 漢字の苗字
+        return getKanjiFamily(mixedName);
       };
 
       setEntries([
