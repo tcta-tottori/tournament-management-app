@@ -116,23 +116,36 @@ function drawBracketLines(
 
   // スコア（縦線の横、中央寄せ、線から余裕を持たせる）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
-    const mid = (t1cy + t2cy) / 2;
-    const s1y = mid - 9;
-    const s2y = mid + 9;
-    const tb = m.tiebreakScore;
-    const t1isLoser = m.winnerId != null && m.winnerId !== m.team1Id;
-    const t2isLoser = m.winnerId != null && m.winnerId !== m.team2Id;
-    const xOff = isLeft ? jx + 4 : jx - 4;
-    const align: CanvasTextAlign = isLeft ? 'left' : 'right';
+    const s1 = m.score1 ?? 0;
+    const s2 = m.score2 ?? 0;
+    const isWO = s1 === 0 && s2 === 0 && m.winnerId != null;
 
-    txt(ctx, String(m.score1), xOff, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
-    if (t1isLoser && tb != null) {
-      txt(ctx, `(${tb})`, xOff, s1y - 12, 10, { color: SCORE_COLOR, align });
-    }
+    if (isWO) {
+      // W.O.: 敗者側にW.O.を表示、勝者側はスコアなし
+      const mid = (t1cy + t2cy) / 2;
+      const xOff = isLeft ? jx + 4 : jx - 4;
+      const align: CanvasTextAlign = isLeft ? 'left' : 'right';
+      const loserY = w1 ? mid + 9 : mid - 9;
+      txt(ctx, 'W.O', xOff, loserY, 10, { color: '#999', align });
+    } else {
+      const mid = (t1cy + t2cy) / 2;
+      const s1y = mid - 9;
+      const s2y = mid + 9;
+      const tb = m.tiebreakScore;
+      const t1isLoser = m.winnerId != null && m.winnerId !== m.team1Id;
+      const t2isLoser = m.winnerId != null && m.winnerId !== m.team2Id;
+      const xOff = isLeft ? jx + 4 : jx - 4;
+      const align: CanvasTextAlign = isLeft ? 'left' : 'right';
 
-    txt(ctx, String(m.score2), xOff, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
-    if (t2isLoser && tb != null) {
-      txt(ctx, `(${tb})`, xOff, s2y + 12, 10, { color: SCORE_COLOR, align });
+      txt(ctx, String(m.score1), xOff, s1y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
+      if (t1isLoser && tb != null) {
+        txt(ctx, `(${tb})`, xOff, s1y - 12, 10, { color: SCORE_COLOR, align });
+      }
+
+      txt(ctx, String(m.score2), xOff, s2y, SCORE_SIZE, { color: SCORE_COLOR, bold: true, align });
+      if (t2isLoser && tb != null) {
+        txt(ctx, `(${tb})`, xOff, s2y + 12, 10, { color: SCORE_COLOR, align });
+      }
     }
   }
 }
@@ -663,8 +676,12 @@ export async function generateResultDataUrl(
         }
       }
 
-      drawTeam(cx, my2, mw, round, m.team1Id, m.team1Name, m.score1, w1, m.tiebreakScore, m.winnerId != null && !w1, def1 || undefined);
-      drawTeam(cx, my2 + SH, mw, round, m.team2Id, m.team2Name, m.score2, w2, m.tiebreakScore, m.winnerId != null && !w2, def2 || undefined);
+      // W.O.の場合、勝者側のスコアは表示しない
+      const isWO = def1 === 'W.O' || def2 === 'W.O';
+      const s1Display = (isWO && w1) ? null : m.score1;
+      const s2Display = (isWO && w2) ? null : m.score2;
+      drawTeam(cx, my2, mw, round, m.team1Id, m.team1Name, s1Display, w1, m.tiebreakScore, m.winnerId != null && !w1, def1 || undefined);
+      drawTeam(cx, my2 + SH, mw, round, m.team2Id, m.team2Name, s2Display, w2, m.tiebreakScore, m.winnerId != null && !w2, def2 || undefined);
     }
   }
 
