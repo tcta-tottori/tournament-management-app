@@ -1661,22 +1661,43 @@ function WaitingList({ waitingMatches, leagues }: {
   );
 }
 
+/** 苗字取得ヘルパー */
+const getFN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
+
 /** トーナメント表プレビュー＋ダウンロードボタン */
 function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [winnerName, setWinnerName] = useState('');
   const allTeams = useMixedStore(s => s.allTeams);
   const tournamentName = useMixedStore(s => s.tournamentInfo?.name || '');
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const getDefaultWinner = useCallback(() => {
+    const maxRound = Math.max(...bracket.matches.map(m => m.round));
+    const fm = bracket.matches.find(m => m.round === maxRound);
+    if (fm?.winnerId) {
+      const w = allTeams.find(t => t.teamId === fm.winnerId);
+      if (w) return `${getFN(w.male.name)}・${getFN(w.female.name)}`;
+    }
+    return '';
+  }, [bracket, allTeams]);
+
+  const regen = useCallback(() => {
     setDataUrl(null);
     setIsLoading(true);
-    generateBracketDataUrl(bracket, allTeams, tournamentName)
+    generateBracketDataUrl(bracket, allTeams, tournamentName, winnerName || undefined)
       .then(url => { setDataUrl(url); setIsLoading(false); })
       .catch(() => setIsLoading(false));
-  }, [isOpen, bracket, allTeams, tournamentName]);
+  }, [bracket, allTeams, tournamentName, winnerName]);
+
+  useEffect(() => {
+    if (isOpen) setWinnerName(getDefaultWinner());
+  }, [isOpen, getDefaultWinner]);
+
+  useEffect(() => {
+    if (isOpen) regen();
+  }, [isOpen, regen]);
 
   const handleDownload = () => {
     if (!dataUrl) return;
@@ -1689,47 +1710,37 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-      >
-        <ImageIcon size={12} />
-        画像DL
+      <button onClick={() => setIsOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors">
+        <ImageIcon size={12} /> 画像DL
       </button>
       {isOpen && createPortal(
         <div className="fixed inset-0 bg-black/60 z-[200]" onClick={() => setIsOpen(false)}>
-          <div
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-[95vw] max-w-5xl max-h-[90vh] z-[210]"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-[95vw] max-w-5xl max-h-[90vh] z-[210]" onClick={e => e.stopPropagation()}>
             <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <ImageIcon size={16} className="text-gray-500" />
-                トーナメント表プレビュー
+                <ImageIcon size={16} className="text-gray-500" /> トーナメント表プレビュー
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-500 shrink-0">優勝者:</span>
+                  <input type="text" value={winnerName} onChange={e => setWinnerName(e.target.value)}
+                    placeholder="苗字・苗字" className="text-xs border border-gray-300 rounded px-2 py-1 w-28 focus:border-blue-400 outline-none" />
+                </div>
                 {dataUrl && (
                   <button onClick={handleDownload}
                     className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 text-white text-xs font-bold rounded-lg shadow hover:bg-emerald-600 transition-colors active:scale-95">
                     <Download size={14} /> ダウンロード
                   </button>
                 )}
-                <button onClick={() => setIsOpen(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                   <X size={18} />
                 </button>
               </div>
             </div>
             <div className="flex-1 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
-              {isLoading && (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <Loader2 size={32} className="animate-spin" />
-                  <span className="text-sm">画像を生成中...</span>
-                </div>
-              )}
-              {dataUrl && !isLoading && (
-                <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />
-              )}
+              {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
+              {dataUrl && !isLoading && <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />}
             </div>
           </div>
         </div>,

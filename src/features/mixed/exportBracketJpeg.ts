@@ -12,12 +12,13 @@ const NUM_W = 28;
 const PADDING_X = 32;
 const PADDING_Y = 30;
 const HEADER_H = 44;
+const RIGHT_MARGIN = 10; // 右山のチーム情報と線の間
 
 const WIN_COLOR = '#cc0000';
 const LINE_COLOR = '#222';
 const WIN_W = 2.8;
 const LOSE_W = 0.8;
-const SCORE_COLOR = '#222'; // 黒
+const SCORE_COLOR = '#222';
 const SCORE_SIZE = 12;
 
 function setFont(ctx: CanvasRenderingContext2D, size: number, bold = false) {
@@ -36,7 +37,8 @@ function approxW(t: string, fs: number): number {
   let w = 0; for (const c of t) w += c.charCodeAt(0) > 0x2fff ? fs : c === ' ' ? fs * 0.3 : fs * 0.6; return w;
 }
 
-function drawTeamLeft(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
+// 共通チーム描画（番号は常に左）
+function drawTeamEntry(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
   if (isBye || (!teamId && teamName === 'BYE')) return;
   if (!teamId) return;
   const team = allTeams.find(t => t.teamId === teamId);
@@ -50,23 +52,6 @@ function drawTeamLeft(ctx: CanvasRenderingContext2D, x: number, y: number, teamI
   txt(ctx, team.female.name, nx, y + 32, 11, { bold: true, maxW: mw * 0.52 });
   const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
   if (team.female.affiliation) txt(ctx, team.female.affiliation, nx + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
-}
-
-function drawTeamRight(ctx: CanvasRenderingContext2D, x: number, y: number, teamId: string | null, teamName: string, isBye: boolean, allTeams: MixedTeam[]) {
-  if (isBye || (!teamId && teamName === 'BYE')) return;
-  if (!teamId) return;
-  const team = allTeams.find(t => t.teamId === teamId);
-  if (!team) return;
-  // 名前+所属を左側、番号を右端（線から離す）
-  const mw = SLOT_W - NUM_W - 8;
-  txt(ctx, team.male.name, x, y + 12, 11, { bold: true, maxW: mw * 0.52 });
-  const mnw = Math.min(approxW(team.male.name, 11), mw * 0.52);
-  if (team.male.affiliation) txt(ctx, team.male.affiliation, x + mnw + 3, y + 12, 8, { color: '#666', maxW: mw - mnw - 6 });
-  txt(ctx, team.female.name, x, y + 32, 11, { bold: true, maxW: mw * 0.52 });
-  const fnw = Math.min(approxW(team.female.name, 11), mw * 0.52);
-  if (team.female.affiliation) txt(ctx, team.female.affiliation, x + fnw + 3, y + 32, 8, { color: '#666', maxW: mw - fnw - 6 });
-  // 番号は右端に配置（線と被らないよう）
-  txt(ctx, String(team.pairNumber), x + SLOT_W - 2, y + SLOT_H / 2, 14, { align: 'right', bold: true });
 }
 
 function familyName(name: string): string { return name.trim().split(/[\s　]+/)[0] || name; }
@@ -102,14 +87,16 @@ function drawBracketLines(
 
   ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
 
-  // スコア（黒、横線のすぐそば）
+  // スコア（横線のすぐ内側、中央寄せ）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
+    // スコアは縦線のすぐ横、上下の横線より中央寄りに配置
+    const scoreOffY = (t2cy - t1cy) * 0.15; // 中央寄せのオフセット
     if (isLeft) {
-      txt(ctx, String(m.score1), jx + 2, t1cy - 1, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx + 2, t2cy - 1, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score1), jx + 2, t1cy + scoreOffY, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score2), jx + 2, t2cy - scoreOffY, SCORE_SIZE, { color: SCORE_COLOR, bold: true });
     } else {
-      txt(ctx, String(m.score1), jx - 2, t1cy - 1, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
-      txt(ctx, String(m.score2), jx - 2, t2cy - 1, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score1), jx - 2, t1cy + scoreOffY, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
+      txt(ctx, String(m.score2), jx - 2, t2cy - scoreOffY, SCORE_SIZE, { align: 'right', color: SCORE_COLOR, bold: true });
     }
   }
 }
@@ -118,6 +105,7 @@ interface JP { x: number; y: number }
 
 export async function generateBracketDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
+  winnerOverride?: string, // 優勝者名の手動上書き
 ): Promise<string> {
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
@@ -133,38 +121,29 @@ export async function generateBracketDataUrl(
   const rightR1 = r1.slice(half);
   const sideRounds = maxRound >= 2 ? maxRound - 1 : maxRound;
 
-  // BYEマッチはスペースを小さくする
-  const normalSlotGap = 14;
-  const byeSlotH = 16; // BYEスロットの高さを小さく
+  const byeSlotH = 16;
+  const normalGap = 14;
 
-  // R1の各マッチのY位置を計算（BYEは小さく）
-  function calcR1Positions(r1Matches: BracketMatch[]) {
-    const positions: { t1y: number; t2y: number; cy: number }[] = [];
+  function calcPositions(r1Matches: BracketMatch[]) {
+    const pos: { t1y: number; t2y: number }[] = [];
     let curY = 0;
     for (const m of r1Matches) {
-      const bye = isByeMatch(m);
-      const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
       const bye1 = !m.team1Id && m.team1Name === 'BYE';
-      const h1 = (bye1 ? byeSlotH : SLOT_H);
-      const h2 = (bye2 ? byeSlotH : SLOT_H);
-      const gap = bye ? 4 : normalSlotGap;
-      const t1y = curY;
-      const t2y = t1y + h1 + gap;
-      const t1cy = t1y + h1 / 2;
-      const t2cy = t2y + h2 / 2;
-      const cy = (t1cy + t2cy) / 2;
-      positions.push({ t1y, t2y, cy });
-      curY = t2y + h2 + 30; // マッチ間の間隔
+      const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
+      const h1 = bye1 ? byeSlotH : SLOT_H;
+      const h2 = bye2 ? byeSlotH : SLOT_H;
+      const gap = isByeMatch(m) ? 4 : normalGap;
+      pos.push({ t1y: curY, t2y: curY + h1 + gap });
+      curY += h1 + gap + h2 + 28;
     }
-    return positions;
+    return pos;
   }
 
-  const leftPos = calcR1Positions(leftR1);
-  const rightPos = calcR1Positions(rightR1);
-  const areaH = Math.max(
-    leftPos.length > 0 ? leftPos[leftPos.length - 1].t2y + SLOT_H + 10 : 200,
-    rightPos.length > 0 ? rightPos[rightPos.length - 1].t2y + SLOT_H + 10 : 200,
-  );
+  const leftPos = calcPositions(leftR1);
+  const rightPos = calcPositions(rightR1);
+  const lastLeft = leftPos.length > 0 ? leftPos[leftPos.length - 1] : { t1y: 0, t2y: 0 };
+  const lastRight = rightPos.length > 0 ? rightPos[rightPos.length - 1] : { t1y: 0, t2y: 0 };
+  const areaH = Math.max(lastLeft.t2y + SLOT_H + 10, lastRight.t2y + SLOT_H + 10, 200);
 
   const gapX = 75;
   const sideW = SLOT_W + (sideRounds > 1 ? (sideRounds - 1) * gapX : 0);
@@ -179,15 +158,13 @@ export async function generateBracketDataUrl(
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- ヘッダー: トーナメント名(左上) + 大会名(右上) ----
+  // ヘッダー
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
   const cw = approxW(catLabel, 16) + 30;
   ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
   ctx.strokeRect(PADDING_X, PADDING_Y, cw, 30);
   txt(ctx, catLabel, PADDING_X + cw / 2, PADDING_Y + 15, 16, { align: 'center', bold: true });
   txt(ctx, tournamentName, totalW - PADDING_X, PADDING_Y + 15, 14, { align: 'right', bold: true, color: '#333' });
-
-  // ヘッダー下線
   ln(ctx, PADDING_X, PADDING_Y + 38, totalW - PADDING_X, PADDING_Y + 38, '#ddd', 0.5);
 
   const top = PADDING_Y + HEADER_H + winnerAreaH;
@@ -196,18 +173,18 @@ export async function generateBracketDataUrl(
   // 左R1
   for (let i = 0; i < leftR1.length; i++) {
     const m = leftR1[i];
-    const pos = leftPos[i];
+    const p = leftPos[i];
     const bye1 = !m.team1Id && m.team1Name === 'BYE';
     const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
     const bye = isByeMatch(m);
     const h1 = bye1 ? byeSlotH : SLOT_H;
     const h2 = bye2 ? byeSlotH : SLOT_H;
-    const t1cy = top + pos.t1y + h1 / 2;
-    const t2cy = top + pos.t2y + h2 / 2;
+    const t1cy = top + p.t1y + h1 / 2;
+    const t2cy = top + p.t2y + h2 / 2;
     const cy = (t1cy + t2cy) / 2;
 
-    drawTeamLeft(ctx, PADDING_X, top + pos.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-    drawTeamLeft(ctx, PADDING_X, top + pos.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+    drawTeamEntry(ctx, PADDING_X, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+    drawTeamEntry(ctx, PADDING_X, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
 
     const slotR = PADDING_X + SLOT_W;
     const exitX = slotR + gapX;
@@ -223,22 +200,23 @@ export async function generateBracketDataUrl(
     }
   }
 
-  // 右R1
+  // 右R1（番号は左、線から間隔を取る）
   for (let i = 0; i < rightR1.length; i++) {
     const m = rightR1[i];
-    const pos = rightPos[i];
+    const p = rightPos[i];
     const bye1 = !m.team1Id && m.team1Name === 'BYE';
     const bye2 = m.isBye || (!m.team2Id && m.team2Name === 'BYE');
     const bye = isByeMatch(m);
     const h1 = bye1 ? byeSlotH : SLOT_H;
     const h2 = bye2 ? byeSlotH : SLOT_H;
-    const t1cy = top + pos.t1y + h1 / 2;
-    const t2cy = top + pos.t2y + h2 / 2;
+    const t1cy = top + p.t1y + h1 / 2;
+    const t2cy = top + p.t2y + h2 / 2;
     const cy = (t1cy + t2cy) / 2;
 
+    // 右山: 線から RIGHT_MARGIN 離してチーム情報を配置（番号は左）
     const rx = totalW - PADDING_X - SLOT_W;
-    drawTeamRight(ctx, rx, top + pos.t1y, m.team1Id, m.team1Name, bye1, allTeams);
-    drawTeamRight(ctx, rx, top + pos.t2y, m.team2Id, m.team2Name, bye2, allTeams);
+    drawTeamEntry(ctx, rx + RIGHT_MARGIN, top + p.t1y, m.team1Id, m.team1Name, bye1, allTeams);
+    drawTeamEntry(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
 
     const slotL = rx;
     const exitX = slotL - gapX;
@@ -310,33 +288,29 @@ export async function generateBracketDataUrl(
         const leftP = parents.find(p => p.x < totalW / 2) || parents[0];
         const rightP = parents.find(p => p.x >= totalW / 2) || parents[1];
         const jx = totalW / 2;
+        const meetY = (leftP.y + rightP.y) / 2;
 
         const w1 = fm.winnerId === fm.team1Id && fm.winnerId != null;
         const w2 = fm.winnerId === fm.team2Id && fm.winnerId != null;
 
-        // 左右の中間Y（ぴったり合わせる）
-        const meetY = (leftP.y + rightP.y) / 2;
-
-        // 左山 → 中央: まず水平に中央へ、次に縦にmeetYへ
-        // 勝者側のみ赤線
+        // 左山→中央: 水平→縦
         ln(ctx, leftP.x, leftP.y, jx, leftP.y, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
         ln(ctx, jx, leftP.y, jx, meetY, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
-
-        // 右山 → 中央
+        // 右山→中央: 水平→縦
         ln(ctx, rightP.x, rightP.y, jx, rightP.y, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
         ln(ctx, jx, rightP.y, jx, meetY, w2 ? WIN_COLOR : LINE_COLOR, w2 ? WIN_W : LOSE_W);
 
-        // 優勝者: meetYから上に線を伸ばし、その上に名前+スコア
-        if (fm.winnerId) {
-          const w = allTeams.find(t => t.teamId === fm.winnerId);
-          if (w) {
-            const lineTop = meetY - 30;
-            ln(ctx, jx, meetY, jx, lineTop, WIN_COLOR, WIN_W);
-            const nameStr = `${familyName(w.male.name)}・${familyName(w.female.name)}`;
-            txt(ctx, nameStr, jx, lineTop - 14, 13, { align: 'center', bold: true });
-            if (fm.score1 != null && fm.score2 != null) {
-              txt(ctx, `${fm.score1}−${fm.score2}`, jx, lineTop - 30, 11, { align: 'center', color: '#555' });
-            }
+        // 優勝者表示
+        const winnerTeam = fm.winnerId ? allTeams.find(t => t.teamId === fm.winnerId) : null;
+        const defaultWinnerName = winnerTeam ? `${familyName(winnerTeam.male.name)}・${familyName(winnerTeam.female.name)}` : '';
+        const displayName = winnerOverride ?? defaultWinnerName;
+
+        if (displayName) {
+          const lineTop = meetY - 25;
+          ln(ctx, jx, meetY, jx, lineTop, WIN_COLOR, WIN_W);
+          txt(ctx, displayName, jx, lineTop - 14, 13, { align: 'center', bold: true });
+          if (fm.status === 'finished' && fm.score1 != null && fm.score2 != null) {
+            txt(ctx, `${fm.score1}−${fm.score2}`, jx, lineTop - 30, 11, { align: 'center', color: '#555' });
           }
         }
       }
@@ -347,8 +321,8 @@ export async function generateBracketDataUrl(
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 
-export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string) {
-  const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName);
+export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string, winnerOverride?: string) {
+  const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName, winnerOverride);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${CATEGORY_LABELS[bracket.category] || bracket.category}.jpg`;
