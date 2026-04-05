@@ -84,7 +84,7 @@ function printRefereeSheet(
     letter-spacing: 0.8em; padding: 1mm 0 0;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS PMincho', serif;
   }
-  .meta { display: flex; justify-content: center; gap: 16mm; font-size: 9pt; padding: 0 0 1mm; color: #444; }
+  .meta { display: flex; justify-content: center; gap: 16mm; font-size: 11pt; padding: 0 0 1mm; color: #333; }
 
   .tbl-wrap { flex: 1; border: 2px solid #333; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
   table { width: 100%; border-collapse: collapse; }
@@ -92,11 +92,11 @@ function printRefereeSheet(
   .lbl { width: 24mm; text-align: center; font-weight: 700; font-size: 10pt; letter-spacing: 0.1em; background: #fafafa; }
 
   /* 種目行 */
-  .r-event td, .r-event th { height: 12mm; }
+  .r-event td, .r-event th { height: 16mm; }
   .val { font-weight: 700; font-size: 14pt; text-align: center; }
 
   /* コートNo行 */
-  .r-court td, .r-court th { height: 16mm; }
+  .r-court td, .r-court th { height: 20mm; }
   .r-court td { text-align: center; }
 
   /* 50/50分割行用 */
@@ -106,14 +106,12 @@ function printRefereeSheet(
   .split-half:first-child { border-right: 1px solid #888; }
 
   /* エントリーNo行 */
-  .r-entry { border-top: 3px double #333; }
-  .r-entry td, .r-entry th { height: 14mm; }
+  .r-entry td, .r-entry th { height: 16mm; }
   .entry-num { font-weight: 800; font-size: 22pt; font-family: 'Arial', sans-serif; }
 
   /* 選手氏名行 */
-  .r-name td, .r-name th { height: 36mm; }
-  .name-half { display: flex; align-items: center; gap: 3mm; padding: 2mm 4mm !important; justify-content: flex-start; }
-  .name-half:first-child { border-right: 1px solid #888; }
+  .r-name td, .r-name th { height: 34mm; }
+  .name-half { display: flex; align-items: center; justify-content: center; gap: 3mm; padding: 2mm 4mm !important; height: 100%; }
   .p-name {
     font-size: 14pt; font-weight: 600; line-height: 1.9; white-space: nowrap;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
@@ -129,8 +127,8 @@ function printRefereeSheet(
   .score-half:first-child { border-right: none; }
   .score-center { display: flex; flex-direction: column; align-items: center; justify-content: center; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
   .score-area { position: relative; height: 100%; }
-  .score-lbl { font-size: 11pt; font-weight: 700; letter-spacing: 0.3em; }
-  .score-tb { font-size: 9pt; color: #555; }
+  .score-lbl { font-size: 11pt; font-weight: 700; letter-spacing: 0.3em; white-space: nowrap; }
+  .score-tb { font-size: 9pt; color: #555; white-space: nowrap; }
   .score-dash { font-size: 28pt; font-weight: 700; color: #333; }
   .tb-par { font-size: 13pt; color: #555; margin-top: 4mm; }
 
@@ -146,7 +144,7 @@ function printRefereeSheet(
 <div class="page">
   <div class="title">審　判　用　紙</div>
   <div class="meta">
-    <span>（${tournamentInfo?.name || ''}）</span>
+    <span>${tournamentInfo?.name || ''}</span>
     <span>${dateStr}</span>
   </div>
   <div class="tbl-wrap">
@@ -167,59 +165,21 @@ function printRefereeSheet(
       </tr>
     </table>
 
-    <table style="border-top: 3px double #333; flex:1; display:flex; flex-direction:column;">
-      <tr class="r-entry" style="display:table; width:100%; table-layout:fixed;">
+    <table style="border-top:3px double #333; flex:1; height:100%;">
+      <colgroup><col style="width:24mm"><col style="width:calc(50% - 12mm)"><col></colgroup>
+      <tr class="r-entry">
         <th class="lbl">エントリーNo.</th>
-        <td class="split-cell" colspan="1" style="width:calc(50% - 12mm)">
-          <div style="display:flex;align-items:center;justify-content:center;height:100%;">
-            <span class="entry-num" contenteditable="true">No.　${team1.pairNumber}</span>
-          </div>
-        </td>
-        <td class="split-cell" colspan="1">
-          <div style="display:flex;align-items:center;justify-content:center;height:100%;">
-            <span class="entry-num" contenteditable="true">No.　${team2.pairNumber}</span>
-          </div>
-        </td>
+        <td style="text-align:center;"><span class="entry-num" contenteditable="true">No.　${team1.pairNumber}</span></td>
+        <td style="text-align:center;"><span class="entry-num" contenteditable="true">No.　${team2.pairNumber}</span></td>
       </tr>
-      <tr class="r-name" style="display:table; width:100%; table-layout:fixed;">
+      <tr class="r-name">
         <th class="lbl">選手氏名</th>
-        <td class="split-cell" style="width:calc(50% - 12mm)">
-          <div class="name-half" style="border-right:none;">
-            <div>
-              <div class="p-name" contenteditable="true">${team1.male.name}</div>
-              <div class="p-name" contenteditable="true">${team1.female.name}</div>
-            </div>
-            <div>
-              <div class="p-aff" contenteditable="true">（${team1.male.affiliation}）</div>
-              <div class="p-aff" contenteditable="true">（${team1.female.affiliation}）</div>
-            </div>
-          </div>
-        </td>
-        <td class="split-cell">
-          <div class="name-half" style="border-right:none;">
-            <div>
-              <div class="p-name" contenteditable="true">${team2.male.name}</div>
-              <div class="p-name" contenteditable="true">${team2.female.name}</div>
-            </div>
-            <div>
-              <div class="p-aff" contenteditable="true">（${team2.male.affiliation}）</div>
-              <div class="p-aff" contenteditable="true">（${team2.female.affiliation}）</div>
-            </div>
-          </div>
-        </td>
+        <td style="padding:0;"><div class="name-half"><div><div class="p-name" contenteditable="true">${team1.male.name}</div><div class="p-name" contenteditable="true">${team1.female.name}</div></div><div><div class="p-aff" contenteditable="true">（${team1.male.affiliation}）</div><div class="p-aff" contenteditable="true">（${team1.female.affiliation}）</div></div></div></td>
+        <td style="padding:0;"><div class="name-half"><div><div class="p-name" contenteditable="true">${team2.male.name}</div><div class="p-name" contenteditable="true">${team2.female.name}</div></div><div><div class="p-aff" contenteditable="true">（${team2.male.affiliation}）</div><div class="p-aff" contenteditable="true">（${team2.female.affiliation}）</div></div></div></td>
       </tr>
-      <tr style="display:table; width:100%; table-layout:fixed; flex:1;">
-        <th class="lbl" style="vertical-align:middle;">
-          <div class="score-lbl">ス コ ア</div>
-          <div style="margin-top:10mm;" class="score-tb">（ＴＢ）</div>
-        </th>
-        <td style="width:calc(50% - 12mm); text-align:center; vertical-align:middle;">&nbsp;</td>
-        <td style="text-align:center; vertical-align:middle; border-left:none;">
-          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
-            <div class="score-dash">―</div>
-            <div class="tb-par">（　　　）</div>
-          </div>
-        </td>
+      <tr>
+        <th class="lbl" style="vertical-align:middle;"><div class="score-lbl">スコア</div><div style="margin-top:10mm;" class="score-tb">（ＴＢ）</div></th>
+        <td colspan="2" style="text-align:center; vertical-align:middle;"><div class="score-dash">―</div><div class="tb-par">（　　　）</div></td>
       </tr>
     </table>
   </div>
