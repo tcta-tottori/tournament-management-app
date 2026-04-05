@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, VolumeX, Square, ClipboardList } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
@@ -165,7 +165,7 @@ function printRefereeSheet(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, shuffleBracketSeeds, rebuildBracketFromSlots, tournamentInfo, leagues } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, rebuildBracketFromSlots, tournamentInfo, leagues } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -408,7 +408,6 @@ export default function MixedBracketView() {
       {is1stBracket && noMatchesStarted && currentBracket && (
         <RouletteDrawPanel
           bracket={currentBracket}
-          onShuffle={shuffleBracketSeeds}
           onRebuild={rebuildBracketFromSlots}
         />
       )}
@@ -770,10 +769,9 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
 }
 
 /** ルーレット抽選パネル（改善版: 全ペア表示・個別選択・手動配置） */
-function RouletteDrawPanel({ bracket, onShuffle, onRebuild }: {
+function RouletteDrawPanel({ bracket, onRebuild }: {
   bracket: PlacementBracket;
-  onShuffle: (category: PlacementCategory, newOrder: string[]) => void;
-  onRebuild: (category: PlacementCategory, slots: (string | null)[]) => void;
+  onRebuild: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
 }) {
   const [spinning, setSpinning] = useState(false);
   const [currentHighlight, setCurrentHighlight] = useState(-1);
