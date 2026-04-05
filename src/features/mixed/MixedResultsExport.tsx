@@ -167,9 +167,9 @@ export default function MixedResultsExport() {
       const results = getBracketResults(cat);
       if (results?.winner) {
         tourneyData.push([]);
-        tourneyData.push(['優勝', results.winner.teamName, `${results.winner.male.name} / ${results.winner.female.name}`]);
+        tourneyData.push(['優勝', results.winner.teamName, `${results.winner.male.affiliation} / ${results.winner.female.affiliation}`]);
         if (results.runnerUp) {
-          tourneyData.push(['準優勝', results.runnerUp.teamName, `${results.runnerUp.male.name} / ${results.runnerUp.female.name}`]);
+          tourneyData.push(['準優勝', results.runnerUp.teamName, `${results.runnerUp.male.affiliation} / ${results.runnerUp.female.affiliation}`]);
         }
       }
       tourneyData.push([]);
@@ -280,16 +280,14 @@ export default function MixedResultsExport() {
                         <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
                           <div className="text-xs text-yellow-600 font-medium mb-1">優勝</div>
                           <div className="font-bold text-gray-800">{results.winner.teamName}</div>
-                          <div className="text-xs text-gray-500 mt-1">{results.winner.male.name} / {results.winner.female.name}</div>
-                          <div className="text-xs text-gray-400">{results.winner.male.affiliation}</div>
+                          <div className="text-xs text-gray-400 mt-1">{results.winner.male.affiliation} / {results.winner.female.affiliation}</div>
                         </div>
                       )}
                       {results.runnerUp && (
                         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
                           <div className="text-xs text-gray-500 font-medium mb-1">準優勝</div>
                           <div className="font-bold text-gray-800">{results.runnerUp.teamName}</div>
-                          <div className="text-xs text-gray-500 mt-1">{results.runnerUp.male.name} / {results.runnerUp.female.name}</div>
-                          <div className="text-xs text-gray-400">{results.runnerUp.male.affiliation}</div>
+                          <div className="text-xs text-gray-400 mt-1">{results.runnerUp.male.affiliation} / {results.runnerUp.female.affiliation}</div>
                         </div>
                       )}
                       {results.sfLosers.length > 0 && (
@@ -298,7 +296,7 @@ export default function MixedResultsExport() {
                           {results.sfLosers.map((team, i) => team && (
                             <div key={i} className={i > 0 ? 'mt-2 pt-2 border-t border-orange-200' : ''}>
                               <div className="font-bold text-gray-800">{team.teamName}</div>
-                              <div className="text-xs text-gray-500">{team.male.name} / {team.female.name}</div>
+                              <div className="text-xs text-gray-400">{team.male.affiliation} / {team.female.affiliation}</div>
                             </div>
                           ))}
                         </div>

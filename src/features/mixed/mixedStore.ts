@@ -227,9 +227,44 @@ export const useMixedStore = create<MixedState>()(
             const winnerName = winnerTeam?.teamName || '';
             const winnerLeague = winnerTeam?.leagueId || '';
 
+            // 次の試合の既存のチームIDを確認（スコア修正時に勝者が変わったか判定）
+            const nextMatch = b.matches.find(m => m.matchId === match.nextMatchId);
+            const prevTeamInSlot = nextMatch && match.nextSlot === 'team1' ? nextMatch.team1Id : nextMatch?.team2Id;
+            const winnerChanged = prevTeamInSlot !== null && prevTeamInSlot !== match.winnerId;
+
+            // 勝者が変わった場合、下流の全試合をリセットする対象を収集
+            const matchesToReset = new Set<string>();
+            if (winnerChanged && nextMatch) {
+              // 次の試合以降で、旧勝者に依存する試合を再帰的にリセット
+              const collectDownstream = (mid: string) => {
+                matchesToReset.add(mid);
+                const m = b.matches.find(mm => mm.matchId === mid);
+                if (m?.nextMatchId) collectDownstream(m.nextMatchId);
+              };
+              collectDownstream(nextMatch.matchId);
+            }
+
             return {
               ...b,
               matches: b.matches.map(m => {
+                // 下流試合をリセット（スコア修正で勝者変更時）
+                if (matchesToReset.has(m.matchId)) {
+                  const isNextMatch = m.matchId === match.nextMatchId;
+                  if (isNextMatch) {
+                    // 次の試合: 勝者スロットを更新、スコアとステータスをリセット
+                    if (match.nextSlot === 'team1') {
+                      return { ...m, team1Id: match.winnerId, team1Name: winnerName, team1League: winnerLeague,
+                        score1: null, score2: null, winnerId: null, status: m.team2Id ? 'ready' as const : 'waiting' as const };
+                    } else {
+                      return { ...m, team2Id: match.winnerId, team2Name: winnerName, team2League: winnerLeague,
+                        score1: null, score2: null, winnerId: null, status: m.team1Id ? 'ready' as const : 'waiting' as const };
+                    }
+                  }
+                  // さらに下流: 完全リセット（チーム情報もクリア）
+                  return { ...m, team1Id: null, team2Id: null, team1Name: '', team2Name: '', team1League: '', team2League: '',
+                    score1: null, score2: null, winnerId: null, status: 'waiting' as const };
+                }
+                // 通常の勝者進出（勝者が変わっていない場合）
                 if (m.matchId !== match.nextMatchId) return m;
                 if (match.nextSlot === 'team1') {
                   return { ...m, team1Id: match.winnerId, team1Name: winnerName, team1League: winnerLeague, status: m.team2Id ? 'ready' as const : m.status };
