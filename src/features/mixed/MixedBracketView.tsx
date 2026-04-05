@@ -89,7 +89,7 @@ function printRefereeSheet(
   .tbl-wrap { flex: 1; border: 2px solid #333; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
   table { width: 100%; border-collapse: collapse; }
   td, th { border: 1px solid #888; padding: 1mm 3mm; font-size: 10pt; vertical-align: middle; }
-  .lbl { width: 24mm; text-align: center; font-weight: 700; font-size: 10pt; letter-spacing: 0.1em; background: #fafafa; }
+  .lbl { width: 24mm; text-align: center; font-weight: 700; font-size: 9pt; letter-spacing: 0.1em; background: #fafafa; white-space: nowrap; }
 
   /* 種目行 */
   .r-event td, .r-event th { height: 16mm; }
@@ -113,7 +113,7 @@ function printRefereeSheet(
   .r-name td, .r-name th { height: 34mm; }
   .name-half { display: flex; align-items: center; justify-content: center; gap: 3mm; padding: 2mm 4mm !important; height: 100%; }
   .p-name {
-    font-size: 14pt; font-weight: 600; line-height: 1.9; white-space: nowrap;
+    font-size: 16pt; font-weight: 600; line-height: 1.9; white-space: nowrap;
     font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   }
   .p-aff { font-size: 9pt; line-height: 1.9; color: #444; white-space: nowrap; }
