@@ -354,8 +354,6 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
 // ---------------------------------------------------------------------------
 // 結果画像
 // ---------------------------------------------------------------------------
-// 結果画像
-// ---------------------------------------------------------------------------
 
 function _rlabel(r: number, mx: number): string {
   if (r === mx) return '決勝';
@@ -364,20 +362,26 @@ function _rlabel(r: number, mx: number): string {
   return `${r}回戦`;
 }
 
+function _roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
 export async function generateResultDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
 ): Promise<string> {
-  // レイアウト定数
   const SC = 2;
-  const MW = 310;      // マッチ幅
-  const SH = 50;       // スロット高さ
+  const MW = 340;      // マッチ幅（広め）
+  const SH = 56;       // スロット高さ（大きめ）
   const MH = SH * 2;   // マッチ高さ
-  const MGAP = 22;     // マッチ間隔
-  const RGAP = 56;     // ラウンド間隔
-  const PX = 30;
-  const PY = 28;
-  const HDR = 64;      // ヘッダー高さ
-  const RLBL = 32;     // ラウンドラベル高さ
+  const MGAP = 10;     // マッチ間隔（狭く）
+  const RGAP = 40;     // ラウンド間隔（狭く）
+  const PX = 16;       // 横パディング（狭く）
+  const PY = 12;       // 縦パディング（狭く）
+  const HDR = 52;      // ヘッダー高さ
+  const RLBL = 26;     // ラウンドラベル
 
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
@@ -405,50 +409,48 @@ export async function generateResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(SC, SC);
 
-  // ---- 背景（薄いグラデーション風） ----
-  ctx.fillStyle = '#fafbfc';
+  // 背景
+  ctx.fillStyle = '#f8fafc';
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- ヘッダー ----
+  // ==== ヘッダー ====
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
   // ヘッダー背景
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, totalW, PY + HDR);
-  // 下線
-  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1.5;
+  // 下線（太め）
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, PY + HDR); ctx.lineTo(totalW, PY + HDR); ctx.stroke();
 
-  // トーナメント名（左上、枠付き、大きく）
-  setFont(ctx, 20, true);
-  const catTxtW = ctx.measureText(catLabel).width;
-  const catBoxW = catTxtW + 28;
-  const catBoxH = 34;
-  const catBoxX = PX;
-  const catBoxY = PY + (HDR - catBoxH) / 2;
-  // 枠
-  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2;
-  ctx.strokeRect(catBoxX, catBoxY, catBoxW, catBoxH);
+  // トーナメント名（枠付き、太枠）
+  setFont(ctx, 22, true);
+  const catTW = ctx.measureText(catLabel).width;
+  const cbW = catTW + 32;
+  const cbH = 38;
+  const cbX = PX + 4;
+  const cbY = PY + (HDR - cbH) / 2;
+  ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5;
+  ctx.strokeRect(cbX, cbY, cbW, cbH);
   ctx.fillStyle = '#111827'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(catLabel, catBoxX + catBoxW / 2, catBoxY + catBoxH / 2);
+  ctx.fillText(catLabel, cbX + cbW / 2, cbY + cbH / 2);
 
-  // 大会名（トーナメント名の右、やや小さめ）
-  setFont(ctx, 15, true);
-  ctx.fillStyle = '#374151'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(tournamentName || '', catBoxX + catBoxW + 20, catBoxY + catBoxH / 2);
+  // 大会名（やや小さめ）
+  setFont(ctx, 16, true);
+  ctx.fillStyle = '#374151'; ctx.textAlign = 'left';
+  ctx.fillText(tournamentName || '', cbX + cbW + 18, cbY + cbH / 2);
 
   const mbr: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) mbr.push(roundMap.get(r) || []);
 
-  // ---- ラウンドラベル ----
+  // ==== ラウンドラベル ====
   for (let ri = 0; ri < mbr.length; ri++) {
     const cx = PX + ri * (MW + RGAP) + MW / 2;
-    const ly = PY + HDR + RLBL / 2;
     setFont(ctx, 12, true);
-    ctx.fillStyle = '#6b7280'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(_rlabel(ri + 1, maxRound), cx, ly);
+    ctx.fillStyle = '#64748b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(_rlabel(ri + 1, maxRound), cx, PY + HDR + RLBL / 2);
   }
 
-  // ---- 接続線（グレー統一） ----
+  // ==== 接続線 ====
   for (let ri = 0; ri < mbr.length - 1; ri++) {
     const x1 = PX + ri * (MW + RGAP) + MW;
     const x2 = PX + (ri + 1) * (MW + RGAP);
@@ -465,12 +467,11 @@ export async function generateResultDataUrl(
     }
   }
 
-  // ---- スロット描画関数 ----
+  // ==== スロット描画 ====
   const drawTeam = (bx: number, by: number, bw: number,
     teamId: string | null, name: string, score: number | null,
     isWin: boolean, tb: number | null, isLose: boolean) => {
 
-    // 勝者背景
     if (isWin) {
       ctx.fillStyle = '#ecfdf5';
       ctx.fillRect(bx + 2, by + 1, bw - 4, SH - 2);
@@ -478,7 +479,7 @@ export async function generateResultDataUrl(
 
     if (!teamId) {
       if (name && name !== 'BYE') {
-        setFont(ctx, 10, false);
+        setFont(ctx, 11, false);
         ctx.fillStyle = '#aaa'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
         ctx.fillText(name, bx + 10, by + SH / 2);
       }
@@ -487,65 +488,61 @@ export async function generateResultDataUrl(
     const t = allTeams.find(tm => tm.teamId === teamId);
     if (!t) return;
 
-    const tc = isWin ? '#065f46' : '#1f2937';
-    const sc2 = isWin ? '#059669' : '#4b5563';
+    const tc = isWin ? '#065f46' : '#111827';
+    const sc2 = isWin ? '#059669' : '#374151';
     const ac = isWin ? '#6ee7b7' : '#94a3b8';
 
     // ペア番号
-    setFont(ctx, 11, true);
+    setFont(ctx, 12, true);
     ctx.fillStyle = ac; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(t.pairNumber), bx + 20, by + SH / 2);
+    ctx.fillText(String(t.pairNumber), bx + 22, by + SH / 2);
 
-    // 名前（2行）
-    const nx = bx + 40;
-    const y1 = by + SH * 0.32;
-    const y2 = by + SH * 0.7;
-    setFont(ctx, 14, true);
+    // 名前（大きく、太字、2行）
+    const nx = bx + 42;
+    const ny1 = by + SH * 0.33;
+    const ny2 = by + SH * 0.70;
+    setFont(ctx, 15, true);
     ctx.fillStyle = tc; ctx.textAlign = 'left';
-    ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, y1, 100);
-    ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, y2, 100);
+    ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, ny1, 110);
+    ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, ny2, 110);
 
-    // 所属（名前の右）
-    const afX = nx + 105;
+    // 所属（大きめ）
+    const afX = nx + 115;
     const afW = bw - (afX - bx) - 50;
     if (afW > 10) {
-      setFont(ctx, 10, false);
+      setFont(ctx, 11, false);
       ctx.fillStyle = ac;
-      ctx.fillText(t.male.affiliation, afX, y1, afW);
-      ctx.fillText(t.female.affiliation, afX, y2, afW);
+      ctx.fillText(t.male.affiliation, afX, ny1, afW);
+      ctx.fillText(t.female.affiliation, afX, ny2, afW);
     }
 
-    // スコア + タイブレーク
+    // スコア
     if (score !== null) {
-      // タイブレーク付きスコア表示
       if (isLose && tb != null) {
-        // 敗者側: "3(5)" のように表示
-        const scoreStr = `${score}`;
-        const tbStr = `(${tb})`;
-        setFont(ctx, 20, true);
-        const scoreW = ctx.measureText(scoreStr).width;
-        setFont(ctx, 11, true);
-        const tbW = ctx.measureText(tbStr).width;
-        const totalScoreW = scoreW + tbW + 1;
-        const scoreRight = bx + bw - 14;
-        const scoreLeft = scoreRight - totalScoreW;
-        // スコア本体
-        setFont(ctx, 20, true);
+        const ss = `${score}`;
+        const ts = `(${tb})`;
+        setFont(ctx, 22, true);
+        const sw2 = ctx.measureText(ss).width;
+        setFont(ctx, 12, true);
+        const tw2 = ctx.measureText(ts).width;
+        const totalSW = sw2 + tw2 + 1;
+        const sRight = bx + bw - 12;
+        const sLeft = sRight - totalSW;
+        setFont(ctx, 22, true);
         ctx.fillStyle = sc2; ctx.textAlign = 'left';
-        ctx.fillText(scoreStr, scoreLeft, by + SH / 2);
-        // TB部分（上付き）
-        setFont(ctx, 11, true);
+        ctx.fillText(ss, sLeft, by + SH / 2);
+        setFont(ctx, 12, true);
         ctx.fillStyle = '#3b82f6';
-        ctx.fillText(tbStr, scoreLeft + scoreW + 1, by + SH * 0.3);
+        ctx.fillText(ts, sLeft + sw2 + 1, by + SH * 0.28);
       } else {
-        setFont(ctx, 20, true);
+        setFont(ctx, 22, true);
         ctx.fillStyle = sc2; ctx.textAlign = 'right';
-        ctx.fillText(String(score), bx + bw - 14, by + SH / 2);
+        ctx.fillText(String(score), bx + bw - 12, by + SH / 2);
       }
     }
   };
 
-  // ---- 各マッチ描画 ----
+  // ==== マッチ描画 ====
   for (let ri = 0; ri < mbr.length; ri++) {
     const cx = PX + ri * (MW + RGAP);
     for (let mi = 0; mi < mbr[ri].length; mi++) {
@@ -553,36 +550,27 @@ export async function generateResultDataUrl(
       const my2 = mY(ri, mi);
 
       if (m.isBye) {
-        // BYE: 1チーム分のみ表示（枠付き、半分の高さ）
-        const winnerId = m.winnerId;
-        if (winnerId) {
-          const byeBoxH = SH;
-          const byeY = my2 + (MH - byeBoxH) / 2;
-          // 角丸枠
-          ctx.beginPath();
-          ctx.moveTo(cx + 8, byeY); ctx.arcTo(cx + MW, byeY, cx + MW, byeY + byeBoxH, 8);
-          ctx.arcTo(cx + MW, byeY + byeBoxH, cx, byeY + byeBoxH, 8);
-          ctx.arcTo(cx, byeY + byeBoxH, cx, byeY, 8);
-          ctx.arcTo(cx, byeY, cx + MW, byeY, 8); ctx.closePath();
+        // BYE: 1ペア分のみ枠付き表示
+        const wId = m.winnerId;
+        if (wId) {
+          const byeH = SH;
+          const byeY = my2 + (MH - byeH) / 2;
+          _roundRect(ctx, cx, byeY, MW, byeH, 10);
           ctx.fillStyle = '#fff'; ctx.fill();
-          ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1; ctx.stroke();
-          drawTeam(cx, byeY, MW, winnerId, '', null, false, null, false);
+          ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1.5; ctx.stroke();
+          drawTeam(cx, byeY, MW, wId, '', null, false, null, false);
         }
         continue;
       }
 
-      // 通常マッチ: 角丸枠
-      ctx.beginPath();
-      ctx.moveTo(cx + 8, my2); ctx.arcTo(cx + MW, my2, cx + MW, my2 + MH, 8);
-      ctx.arcTo(cx + MW, my2 + MH, cx, my2 + MH, 8);
-      ctx.arcTo(cx, my2 + MH, cx, my2, 8);
-      ctx.arcTo(cx, my2, cx + MW, my2, 8); ctx.closePath();
+      // 通常マッチ: 太枠
+      _roundRect(ctx, cx, my2, MW, MH, 10);
       ctx.fillStyle = '#fff'; ctx.fill();
-      ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
 
-      // 中央区切り
-      ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.moveTo(cx + 4, my2 + SH); ctx.lineTo(cx + MW - 4, my2 + SH); ctx.stroke();
+      // 中央区切り（太め）
+      ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx + 6, my2 + SH); ctx.lineTo(cx + MW - 6, my2 + SH); ctx.stroke();
 
       const w1 = m.winnerId === m.team1Id && m.winnerId != null;
       const w2 = m.winnerId === m.team2Id && m.winnerId != null;
