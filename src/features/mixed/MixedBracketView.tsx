@@ -1772,8 +1772,8 @@ function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTea
   return results;
 }
 
-/** 賞状CSS（筆文字風 Google Font: Zen Old Mincho） */
-const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@700;900&display=swap';
+/** 賞状CSS（筆ペン風 Google Font: Yuji Boku） */
+const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap';
 
 function buildCertificateHtml(entries: { rank: string; category: string; names: string }[]): string {
   const pages = entries.map(e => `
@@ -1792,7 +1792,7 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
 <style>
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Zen Old Mincho", "游明朝", "Yu Mincho", serif; }
+  body { font-family: "Yuji Boku", "游明朝", "Yu Mincho", serif; }
   .page {
     width: 210mm; height: 297mm;
     page-break-after: always; position: relative;
@@ -1800,7 +1800,7 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
   .page:last-child { page-break-after: auto; }
   .cert-content {
     position: absolute;
-    top: 42%; left: 50%;
+    top: 35%; left: 50%;
     transform: translate(-50%, -50%);
     text-align: center; width: 80%;
     height: 30mm;
@@ -1808,17 +1808,17 @@ function buildCertificateHtml(entries: { rank: string; category: string; names: 
     align-items: center; justify-content: center;
   }
   .class-name {
-    font-size: 14pt; font-weight: 700;
+    font-size: 14pt; font-weight: 400;
     letter-spacing: 0.3em; color: #111;
     margin-bottom: 3mm;
   }
   .rank-name {
-    font-size: 20pt; font-weight: 900;
+    font-size: 22pt; font-weight: 400;
     letter-spacing: 0.5em; color: #000;
     margin-bottom: 4mm;
   }
   .player-name {
-    font-size: 18pt; font-weight: 900;
+    font-size: 20pt; font-weight: 400;
     letter-spacing: 0.35em; color: #000;
   }
   @media print { body { -webkit-print-color-adjust: exact; } }
@@ -1833,6 +1833,18 @@ function CertificatePrintButton({ brackets, allTeams }: {
   const [isOpen, setIsOpen] = useState(false);
   const [entries, setEntries] = useState<{ rank: string; category: string; names: string; selected: boolean }[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
+
+  // Yuji Bokuフォントを動的にロード
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = 'yuji-boku-font';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = CERT_FONT_URL;
+    document.head.appendChild(link);
+  }, [isOpen]);
 
   const openDialog = () => {
     const auto = getWinnersFromBrackets(brackets, allTeams);
@@ -1930,18 +1942,18 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute inset-3 border border-amber-200/30 rounded" />
                     {/* 上部: 表彰状（印刷済み模擬） */}
                     <div className="absolute top-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>表　彰　状</span>
+                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Yuji Boku", serif' }}>表　彰　状</span>
                     </div>
                     {/* 印刷対象エリア: A4中央より少し上、約3cm幅 */}
                     <div className="absolute left-0 right-0 flex flex-col items-center justify-center px-4" style={{ top: '35%', height: '11%' }}>
                       <div className="border-y-2 border-dashed border-amber-300/50 py-2 w-full flex flex-col items-center justify-center">
-                        <div className="text-[9px] text-gray-700 tracking-[0.25em] mb-1" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 700 }}>
+                        <div className="text-[9px] text-gray-700 tracking-[0.25em] mb-1" style={{ fontFamily: '"Yuji Boku", serif' }}>
                           {previewEntry.category || '（クラス未入力）'}
                         </div>
-                        <div className="text-sm text-black tracking-[0.4em] mb-1" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                        <div className="text-sm text-black tracking-[0.4em] mb-1" style={{ fontFamily: '"Yuji Boku", serif' }}>
                           {previewEntry.rank}
                         </div>
-                        <div className="text-xs text-black tracking-[0.3em]" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                        <div className="text-xs text-black tracking-[0.3em]" style={{ fontFamily: '"Yuji Boku", serif' }}>
                           {previewEntry.names || '（氏名未入力）'}
                         </div>
                       </div>
@@ -1950,7 +1962,7 @@ function CertificatePrintButton({ brackets, allTeams }: {
                     <div className="absolute right-1 text-[6px] text-amber-400" style={{ top: '34%' }}>印刷範囲↓</div>
                     {/* 下部: 鳥取市テニス協会（印刷済み模擬） */}
                     <div className="absolute bottom-[10%] left-0 right-0 text-center">
-                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>鳥取市テニス協会</span>
+                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Yuji Boku", serif' }}>鳥取市テニス協会</span>
                     </div>
                   </div>
                 ) : (
