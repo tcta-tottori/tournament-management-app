@@ -81,7 +81,8 @@ function drawBracketLines(
   t1cy: number, t2cy: number, cy: number,
   fromX: number, jx: number, exitX: number,
   m: BracketMatch, isLeft: boolean,
-  lineOv?: LineOverrides
+  lineOv?: LineOverrides,
+  exitBlack?: boolean, // 準決勝用: 出力線を強制黒にする
 ) {
   const ov = lineOv?.[m.matchId];
   let w1 = m.winnerId === m.team1Id && m.winnerId != null;
@@ -106,7 +107,12 @@ function drawBracketLines(
     ln(ctx, jx, t1cy, jx, t2cy, LINE_COLOR, LOSE_W);
   }
 
-  ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
+  // 出力水平線（exitBlack=trueなら強制黒）
+  if (exitBlack) {
+    ln(ctx, jx, cy, exitX, cy, LINE_COLOR, LOSE_W);
+  } else {
+    ln(ctx, jx, cy, exitX, cy, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
+  }
 
   // スコア（縦線の横、中央寄せ、線から余裕を持たせる）
   if (m.status === 'finished' && m.score1 != null && m.score2 != null) {
@@ -282,8 +288,10 @@ export async function generateBracketDataUrl(
       if (parents.length < 2) {
         if (parents.length === 1) {
           const p = parents[0];
+          const isSF1p = r === sideRounds && maxRound >= 2;
           const ov1p = lineOverrides?.[m.matchId];
-          const hasW = ov1p === 't1red' || ov1p === 't2red' ? true : ov1p === 'black' ? false : m.winnerId != null;
+          // 準決勝の出力線は常に黒
+          const hasW = isSF1p ? false : (ov1p === 't1red' || ov1p === 't2red' ? true : ov1p === 'black' ? false : m.winnerId != null);
           const exitX = p.x + (isLeft ? gapX : -gapX);
           ln(ctx, p.x, p.y, exitX, p.y, hasW ? WIN_COLOR : LINE_COLOR, hasW ? WIN_W : LOSE_W);
           jp.set(m.matchId, { x: exitX, y: p.y });
@@ -295,16 +303,18 @@ export async function generateBracketDataUrl(
       const lowerY = Math.max(parents[0].y, parents[1].y);
       const cy = (upperY + lowerY) / 2;
       const baseX = parents[0].x;
+      // 準決勝の出力線は常に黒（決勝の赤線は後で上書き）
+      const isSemiFinal = r === sideRounds && maxRound >= 2;
 
       if (isLeft) {
         const jx = baseX + gapX * 0.42;
         const exitX = baseX + gapX;
-        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, true, lineOverrides);
+        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, true, lineOverrides, isSemiFinal);
         jp.set(m.matchId, { x: exitX, y: cy });
       } else {
         const jx = baseX - gapX * 0.42;
         const exitX = baseX - gapX;
-        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, false, lineOverrides);
+        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, false, lineOverrides, isSemiFinal);
         jp.set(m.matchId, { x: exitX, y: cy });
       }
     }
@@ -347,6 +357,17 @@ export async function generateBracketDataUrl(
             leftIsTeam1 ? fm.winnerId === fm.team1Id : fm.winnerId === fm.team2Id
           );
           rightWon = fm.winnerId != null && !leftWon;
+        }
+
+        // 準決勝の出力線を決勝勝者側のみ赤で上書き描画
+        // （準決勝のdrawBracketLinesではexitBlack=trueで黒で描画済み）
+        if (leftWon) {
+          // 左山勝者: 準決勝出力線を赤で上書き
+          ln(ctx, leftP.x - gapX * 0.58, topY, leftP.x, topY, WIN_COLOR, WIN_W);
+        }
+        if (rightWon) {
+          // 右山勝者: 準決勝出力線を赤で上書き
+          ln(ctx, rightP.x + gapX * 0.58, botY, rightP.x, botY, WIN_COLOR, WIN_W);
         }
 
         // 左山→中央（勝者なら赤、敗者なら黒）
@@ -571,9 +592,9 @@ export async function generateResultDataUrl(
     // スコア or 棄権ラベル
     const scoreX = bx + bw - 8;
     if (defLabel) {
-      // 棄権側: W.O or Ret 表示
       setFont(ctx, 14, true);
-      ctx.fillStyle = '#dc2626'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = defLabel === 'W.O' ? '#9ca3af' : '#dc2626'; // W.O=グレー, Ret=赤
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
       ctx.fillText(defLabel, scoreX, by + SH / 2);
     } else if (score !== null) {
       setFont(ctx, 22, true);
