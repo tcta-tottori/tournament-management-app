@@ -344,104 +344,10 @@ export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: Mix
 }
 
 // ---------------------------------------------------------------------------
-// 結果画像（Web UI風：左→右ラウンド、ボックス型マッチ）
+// 結果画像
 // ---------------------------------------------------------------------------
-const R_SCALE = 2;
-const R_MATCH_W = 280;
-const R_SLOT_H = 42;
-const R_MATCH_H = R_SLOT_H * 2;
-const R_MATCH_GAP = 18;
-const R_ROUND_GAP = 48;
-const R_HEADER_H = 56;
-const R_PAD_X = 24;
-const R_PAD_Y = 20;
-const R_LINE_COLOR = '#c9cdd3'; // 接続線: 統一グレー
-const R_BORDER_COLOR = '#d1d5db'; // 枠線: gray-300
-const R_WIN_BG = '#ecfdf5'; // 勝者背景: emerald-50
-const R_WIN_TEXT = '#065f46'; // 勝者テキスト
-const R_WIN_SCORE = '#059669'; // 勝者スコア
 
-function rTxt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, opts?: { align?: CanvasTextAlign; color?: string; bold?: boolean; maxW?: number }) {
-  const { align = 'left', color = '#1a1a1a', bold = false, maxW } = opts || {};
-  ctx.fillStyle = color;
-  ctx.font = `${bold ? 'bold ' : ''}${size}px "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif`;
-  ctx.textAlign = align; ctx.textBaseline = 'middle';
-  if (maxW) ctx.fillText(text, x, y, maxW); else ctx.fillText(text, x, y);
-}
-
-function rLn(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, w: number) {
-  ctx.strokeStyle = color; ctx.lineWidth = w;
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-}
-
-function rRect2(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string, stroke: string, sw: number) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
-  ctx.fillStyle = fill; ctx.fill();
-  ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke();
-}
-
-/** 1スロット分のチーム情報を描画（通常マッチ・BYEマッチ共通） */
-function drawResultSlot(
-  ctx: CanvasRenderingContext2D, x: number, y: number, w: number,
-  teamId: string | null, teamName: string, score: number | null,
-  isWinner: boolean, isBye: boolean, allTeams: MixedTeam[],
-  tiebreakScore: number | null, isLoser: boolean
-) {
-  // 勝者背景
-  if (isWinner) {
-    ctx.fillStyle = R_WIN_BG;
-    ctx.fillRect(x + 1, y + 1, w - 2, R_SLOT_H - 1);
-  }
-
-  if (isBye || (!teamId && teamName === 'BYE')) {
-    rTxt(ctx, 'BYE', x + w / 2, y + R_SLOT_H / 2, 11, { align: 'center', color: '#d1d5db' });
-    return;
-  }
-  if (!teamId) {
-    if (teamName) rTxt(ctx, teamName, x + 8, y + R_SLOT_H / 2, 9, { color: '#aaa', maxW: w - 16 });
-    return;
-  }
-  const team = allTeams.find(t => t.teamId === teamId);
-  if (!team) {
-    rTxt(ctx, teamName || '―', x + 8, y + R_SLOT_H / 2, 9, { color: '#aaa' });
-    return;
-  }
-
-  const textColor = isWinner ? R_WIN_TEXT : '#1f2937';
-  const subColor = isWinner ? '#6ee7b7' : '#9ca3af';
-  const scoreColor = isWinner ? R_WIN_SCORE : '#6b7280';
-
-  // ペア番号（縦中央、やや太め）
-  rTxt(ctx, String(team.pairNumber), x + 16, y + R_SLOT_H / 2, 10, { align: 'center', color: subColor, bold: true });
-
-  // 名前（2行、大きめ太字）
-  const nx = x + 32;
-  const nameW = 90;
-  const maleY = y + 14;
-  const femaleY = y + 29;
-  rTxt(ctx, team.male.name.replace(/[\s\u3000]+/g, ''), nx, maleY, 12, { bold: true, color: textColor, maxW: nameW });
-  rTxt(ctx, team.female.name.replace(/[\s\u3000]+/g, ''), nx, femaleY, 12, { bold: true, color: textColor, maxW: nameW });
-
-  // 所属（名前の右側）
-  const ax = nx + nameW + 6;
-  const aw = w - (ax - x) - 40;
-  if (aw > 15) {
-    rTxt(ctx, team.male.affiliation, ax, maleY, 8, { color: subColor, maxW: aw });
-    rTxt(ctx, team.female.affiliation, ax, femaleY, 8, { color: subColor, maxW: aw });
-  }
-
-  // スコア（右端、大きく太字）
-  if (score !== null) {
-    rTxt(ctx, String(score), x + w - 12, y + R_SLOT_H / 2, 18, { align: 'right', color: scoreColor, bold: true });
-    if (isLoser && tiebreakScore != null) {
-      rTxt(ctx, `(${tiebreakScore})`, x + w - 5, y + 8, 8, { align: 'right', color: '#3b82f6' });
-    }
-  }
-}
-
-function getRoundLabelResult(round: number, maxRound: number): string {
+function getRoundLabelR(round: number, maxRound: number): string {
   if (round === maxRound) return '決勝';
   if (round === maxRound - 1) return '準決勝';
   if (round === maxRound - 2) return '準々決勝';
@@ -451,6 +357,19 @@ function getRoundLabelResult(round: number, maxRound: number): string {
 export async function generateResultDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
 ): Promise<string> {
+  const SC = 2;
+  const MW = 300;       // マッチ幅
+  const SH = 48;        // スロット高さ
+  const MH = SH * 2;    // マッチ高さ
+  const MGAP = 20;      // マッチ間隔
+  const RGAP = 52;      // ラウンド間隔
+  const PX = 28;        // 横パディング
+  const PY = 24;        // 縦パディング
+  const HDR = 60;       // ヘッダー高さ
+  const RLBL = 30;      // ラウンドラベル高さ
+  const LINE_C = '#c9cdd3';
+  const BORDER_C = '#d1d5db';
+
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
 
@@ -459,98 +378,157 @@ export async function generateResultDataUrl(
   for (const m of matches) { if (!roundMap.has(m.round)) roundMap.set(m.round, []); roundMap.get(m.round)!.push(m); }
   for (const [, arr] of roundMap) arr.sort((a, b) => a.position - b.position);
 
-  const GRID_UNIT = R_MATCH_H + R_MATCH_GAP;
+  const GRID = MH + MGAP;
   const r1Count = (roundMap.get(1) || []).length;
-  const ROUND_LABEL_H = 28; // ラウンドラベル用スペース
-  const contentTop = R_PAD_Y + R_HEADER_H + ROUND_LABEL_H;
+  const TOP = PY + HDR + RLBL; // コンテンツ開始Y
 
-  const getMatchY = (roundIdx: number, matchIdx: number) => {
-    const spacing = Math.pow(2, roundIdx);
-    const offset = (spacing - 1) * GRID_UNIT / 2;
-    return contentTop + matchIdx * spacing * GRID_UNIT + offset;
+  const matchY = (ri: number, mi: number) => {
+    const sp = Math.pow(2, ri);
+    return TOP + mi * sp * GRID + (sp - 1) * GRID / 2;
   };
 
   const totalRounds = maxRound;
-  const svgW = totalRounds * (R_MATCH_W + R_ROUND_GAP) - R_ROUND_GAP;
-  const svgH = r1Count * GRID_UNIT;
-  const totalW = R_PAD_X * 2 + svgW;
-  const totalH = contentTop + svgH + R_PAD_Y;
+  const totalW = PX * 2 + totalRounds * (MW + RGAP) - RGAP;
+  const totalH = TOP + r1Count * GRID + PY;
 
   const canvas = document.createElement('canvas');
-  canvas.width = totalW * R_SCALE; canvas.height = totalH * R_SCALE;
+  canvas.width = totalW * SC; canvas.height = totalH * SC;
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(R_SCALE, R_SCALE);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, totalW, totalH);
+  ctx.scale(SC, SC);
 
-  // ---- ヘッダー: 大会名（左）＋トーナメント名（右） ----
+  // 背景
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, totalW, totalH);
+
+  // ==== ヘッダー（確実に描画） ====
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
-  rTxt(ctx, tournamentName, R_PAD_X, R_PAD_Y + 18, 17, { bold: true, color: '#111' });
-  rTxt(ctx, catLabel, totalW - R_PAD_X, R_PAD_Y + 18, 17, { align: 'right', bold: true, color: '#111' });
-  rLn(ctx, R_PAD_X, R_PAD_Y + 38, totalW - R_PAD_X, R_PAD_Y + 38, '#d1d5db', 1);
+  // ヘッダー背景帯
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, totalW, PY + HDR);
+  // 大会名（左）
+  setFont(ctx, 18, true);
+  ctx.fillStyle = '#111827'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(tournamentName || '大会名', PX, PY + HDR / 2);
+  // トーナメント名（右）
+  ctx.textAlign = 'right';
+  ctx.fillText(catLabel, totalW - PX, PY + HDR / 2);
+  // 区切り線
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PX, PY + HDR); ctx.lineTo(totalW - PX, PY + HDR); ctx.stroke();
 
-  const matchesByRound: BracketMatch[][] = [];
-  for (let r = 1; r <= totalRounds; r++) {
-    matchesByRound.push(roundMap.get(r) || []);
+  const mbr: BracketMatch[][] = [];
+  for (let r = 1; r <= totalRounds; r++) mbr.push(roundMap.get(r) || []);
+
+  // ==== ラウンドラベル ====
+  for (let ri = 0; ri < mbr.length; ri++) {
+    const cx = PX + ri * (MW + RGAP) + MW / 2;
+    setFont(ctx, 12, true);
+    ctx.fillStyle = '#6b7280'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(getRoundLabelR(ri + 1, maxRound), cx, PY + HDR + RLBL / 2);
   }
 
-  // 接続線を描画（全てグレーで統一）
-  for (let roundIdx = 0; roundIdx < matchesByRound.length - 1; roundIdx++) {
-    const roundMatches = matchesByRound[roundIdx];
-    const x1 = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP) + R_MATCH_W;
-    const x2 = R_PAD_X + (roundIdx + 1) * (R_MATCH_W + R_ROUND_GAP);
-    const xMid = (x1 + x2) / 2;
-
-    for (let i = 0; i < roundMatches.length; i += 2) {
-      if (i + 1 >= roundMatches.length) break;
-      const y1 = getMatchY(roundIdx, i) + R_MATCH_H / 2;
-      const y2 = getMatchY(roundIdx, i + 1) + R_MATCH_H / 2;
-      const yNext = getMatchY(roundIdx + 1, Math.floor(i / 2)) + R_MATCH_H / 2;
-
-      rLn(ctx, x1, y1, xMid, y1, R_LINE_COLOR, 1.5);
-      rLn(ctx, x1, y2, xMid, y2, R_LINE_COLOR, 1.5);
-      rLn(ctx, xMid, y1, xMid, y2, R_LINE_COLOR, 1.5);
-      rLn(ctx, xMid, yNext, x2, yNext, R_LINE_COLOR, 1.5);
+  // ==== 接続線（グレー統一） ====
+  ctx.strokeStyle = LINE_C; ctx.lineWidth = 1.5;
+  for (let ri = 0; ri < mbr.length - 1; ri++) {
+    const x1 = PX + ri * (MW + RGAP) + MW;
+    const x2 = PX + (ri + 1) * (MW + RGAP);
+    const xm = (x1 + x2) / 2;
+    for (let i = 0; i + 1 < mbr[ri].length; i += 2) {
+      const y1 = matchY(ri, i) + MH / 2;
+      const y2 = matchY(ri, i + 1) + MH / 2;
+      const yn = matchY(ri + 1, Math.floor(i / 2)) + MH / 2;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(xm, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1, y2); ctx.lineTo(xm, y2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xm, y1); ctx.lineTo(xm, y2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xm, yn); ctx.lineTo(x2, yn); ctx.stroke();
     }
   }
 
-  // 各マッチのボックスを描画
-  for (let roundIdx = 0; roundIdx < matchesByRound.length; roundIdx++) {
-    const round = roundIdx + 1;
-    const colX = R_PAD_X + roundIdx * (R_MATCH_W + R_ROUND_GAP);
+  // ==== マッチボックス描画 ====
+  const drawSlot = (bx: number, by: number, bw: number,
+    teamId: string | null, name: string, score: number | null,
+    isWin: boolean, isByeSlot: boolean, tb: number | null, isLose: boolean) => {
 
-    // ラウンドラベル
-    rTxt(ctx, getRoundLabelResult(round, maxRound), colX + R_MATCH_W / 2, R_PAD_Y + R_HEADER_H + ROUND_LABEL_H / 2, 11, { align: 'center', color: '#6b7280', bold: true });
+    if (isWin) {
+      ctx.fillStyle = '#ecfdf5';
+      ctx.fillRect(bx + 1, by + 1, bw - 2, SH - 2);
+    }
+    if (isByeSlot || (!teamId && name === 'BYE')) return;
+    if (!teamId) return;
+    const t = allTeams.find(tm => tm.teamId === teamId);
+    if (!t) return;
 
-    for (let matchIdx = 0; matchIdx < matchesByRound[roundIdx].length; matchIdx++) {
-      const match = matchesByRound[roundIdx][matchIdx];
-      const matchY = getMatchY(roundIdx, matchIdx);
+    const tc = isWin ? '#065f46' : '#1f2937';
+    const sc = isWin ? '#059669' : '#6b7280';
+    const ac = isWin ? '#34d399' : '#9ca3af';
 
-      // 全マッチ共通の統一枠線
-      rRect2(ctx, colX, matchY, R_MATCH_W, R_MATCH_H, 6, '#fff', R_BORDER_COLOR, 1.5);
-      rLn(ctx, colX + 1, matchY + R_SLOT_H, colX + R_MATCH_W - 1, matchY + R_SLOT_H, '#e5e7eb', 0.5);
+    // ペア番号
+    setFont(ctx, 11, true);
+    ctx.fillStyle = ac; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(t.pairNumber), bx + 18, by + SH / 2);
 
-      if (match.isBye) {
-        // BYE（シード）: 上スロットにチーム、下スロットにBYE
-        const winnerId = match.winnerId;
-        drawResultSlot(ctx, colX, matchY, R_MATCH_W,
-          winnerId, match.team1Id ? match.team1Name : match.team2Name, null,
-          false, false, allTeams, null, false);
-        rTxt(ctx, 'BYE', colX + R_MATCH_W / 2, matchY + R_SLOT_H + R_SLOT_H / 2, 11, { align: 'center', color: '#d1d5db' });
-        continue;
+    // 名前（2行、大きめ）
+    const nx = bx + 36;
+    const my = by + SH * 0.33;
+    const fy = by + SH * 0.7;
+    setFont(ctx, 13, true);
+    ctx.fillStyle = tc; ctx.textAlign = 'left';
+    ctx.fillText(t.male.name.replace(/[\s\u3000]+/g, ''), nx, my, 95);
+    ctx.fillText(t.female.name.replace(/[\s\u3000]+/g, ''), nx, fy, 95);
+
+    // 所属
+    const ax = nx + 100;
+    const aw = bw - (ax - bx) - 44;
+    if (aw > 10) {
+      setFont(ctx, 10, false);
+      ctx.fillStyle = ac;
+      ctx.fillText(t.male.affiliation, ax, my, aw);
+      ctx.fillText(t.female.affiliation, ax, fy, aw);
+    }
+
+    // スコア
+    if (score !== null) {
+      setFont(ctx, 20, true);
+      ctx.fillStyle = sc; ctx.textAlign = 'right';
+      ctx.fillText(String(score), bx + bw - 14, by + SH / 2);
+      if (isLose && tb != null) {
+        setFont(ctx, 9, false);
+        ctx.fillStyle = '#3b82f6'; ctx.textAlign = 'right';
+        ctx.fillText(`(${tb})`, bx + bw - 6, by + 10);
       }
+    }
+  };
 
-      // 通常マッチ
-      const isBye1 = !match.team1Id && match.team1Name === 'BYE';
-      const isBye2 = !match.team2Id && match.team2Name === 'BYE';
-      const isW1 = match.winnerId === match.team1Id && match.winnerId != null;
-      const isW2 = match.winnerId === match.team2Id && match.winnerId != null;
+  for (let ri = 0; ri < mbr.length; ri++) {
+    const cx = PX + ri * (MW + RGAP);
+    for (let mi = 0; mi < mbr[ri].length; mi++) {
+      const m = mbr[ri][mi];
+      const my = matchY(ri, mi);
 
-      drawResultSlot(ctx, colX, matchY, R_MATCH_W,
-        match.team1Id, match.team1Name, match.score1,
-        isW1, isBye1, allTeams, match.tiebreakScore, match.winnerId != null && !isW1);
-      drawResultSlot(ctx, colX, matchY + R_SLOT_H, R_MATCH_W,
-        match.team2Id, match.team2Name, match.score2,
-        isW2, isBye2, allTeams, match.tiebreakScore, match.winnerId != null && !isW2);
+      // BYEマッチはボックスを描画しない
+      if (m.isBye) continue;
+
+      // 枠（角丸）
+      ctx.beginPath();
+      const r = 8;
+      ctx.moveTo(cx + r, my); ctx.arcTo(cx + MW, my, cx + MW, my + MH, r);
+      ctx.arcTo(cx + MW, my + MH, cx, my + MH, r);
+      ctx.arcTo(cx, my + MH, cx, my, r);
+      ctx.arcTo(cx, my, cx + MW, my, r); ctx.closePath();
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.strokeStyle = BORDER_C; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // 中央区切り線
+      ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(cx + 2, my + SH); ctx.lineTo(cx + MW - 2, my + SH); ctx.stroke();
+
+      const w1 = m.winnerId === m.team1Id && m.winnerId != null;
+      const w2 = m.winnerId === m.team2Id && m.winnerId != null;
+      const b1 = !m.team1Id && m.team1Name === 'BYE';
+      const b2 = !m.team2Id && m.team2Name === 'BYE';
+
+      drawSlot(cx, my, MW, m.team1Id, m.team1Name, m.score1, w1, b1, m.tiebreakScore, m.winnerId != null && !w1);
+      drawSlot(cx, my + SH, MW, m.team2Id, m.team2Name, m.score2, w2, b2, m.tiebreakScore, m.winnerId != null && !w2);
     }
   }
 
