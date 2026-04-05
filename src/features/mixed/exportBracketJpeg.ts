@@ -76,10 +76,14 @@ function drawBracketLines(
   ctx: CanvasRenderingContext2D,
   t1cy: number, t2cy: number, cy: number,
   fromX: number, jx: number, exitX: number,
-  m: BracketMatch, isLeft: boolean
+  m: BracketMatch, isLeft: boolean,
+  lineOv?: Record<string, 'red' | 'black'>
 ) {
-  const w1 = m.winnerId === m.team1Id && m.winnerId != null;
-  const w2 = m.winnerId === m.team2Id && m.winnerId != null;
+  const ov = lineOv?.[m.matchId];
+  let w1 = m.winnerId === m.team1Id && m.winnerId != null;
+  let w2 = m.winnerId === m.team2Id && m.winnerId != null;
+  if (ov === 'black') { w1 = false; w2 = false; }
+  if (ov === 'red' && !w1 && !w2) { w1 = true; }
   const hasW = w1 || w2;
 
   ln(ctx, fromX, t1cy, jx, t1cy, w1 ? WIN_COLOR : LINE_COLOR, w1 ? WIN_W : LOSE_W);
@@ -126,7 +130,8 @@ interface JP { x: number; y: number }
 
 export async function generateBracketDataUrl(
   bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string,
-  winnerOverride?: string, // 優勝者名の手動上書き
+  winnerOverride?: string,
+  lineOverrides?: Record<string, 'red' | 'black'>,
 ): Promise<string> {
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
@@ -214,10 +219,10 @@ export async function generateBracketDataUrl(
 
       if (isLeft) {
         if (bye) {
-          // BYE: 非BYEチームをcy位置に描画（隙間を解消）
+          // BYE: 勝者チームをcy位置に描画
           const teamY = cy - SLOT_H / 2;
-          if (!bye1) drawTeamLeft(ctx, PADDING_X, teamY, m.team1Id, m.team1Name, false, allTeams);
-          if (!bye2) drawTeamLeft(ctx, PADDING_X, teamY, m.team2Id, m.team2Name, false, allTeams);
+          const wId = m.winnerId || (bye2 ? m.team1Id : m.team2Id);
+          if (wId) drawTeamLeft(ctx, PADDING_X, teamY, wId, '', false, allTeams);
           const slotR = PADDING_X + SLOT_W;
           const exitX = slotR + gapX;
           const adv = byeWinnerAdvanced(m);
@@ -228,15 +233,15 @@ export async function generateBracketDataUrl(
           const slotR = PADDING_X + SLOT_W;
           const exitX = slotR + gapX;
           const jx = slotR + gapX * 0.42;
-          drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true);
+          drawBracketLines(ctx, t1cy, t2cy, cy, slotR, jx, exitX, m, true, lineOverrides);
         }
         jp.set(m.matchId, { x: PADDING_X + SLOT_W + gapX, y: cy });
       } else {
         const rx = totalW - PADDING_X - SLOT_W;
         if (bye) {
           const teamY = cy - SLOT_H / 2;
-          if (!bye1) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, m.team1Id, m.team1Name, false, allTeams);
-          if (!bye2) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, m.team2Id, m.team2Name, false, allTeams);
+          const wId = m.winnerId || (bye2 ? m.team1Id : m.team2Id);
+          if (wId) drawTeamRight(ctx, rx + RIGHT_MARGIN, teamY, wId, '', false, allTeams);
           const exitX = rx - gapX;
           const adv = byeWinnerAdvanced(m);
           ln(ctx, rx, cy, exitX, cy, adv ? WIN_COLOR : LINE_COLOR, adv ? WIN_W : LOSE_W);
@@ -245,7 +250,7 @@ export async function generateBracketDataUrl(
           drawTeamRight(ctx, rx + RIGHT_MARGIN, top + p.t2y, m.team2Id, m.team2Name, bye2, allTeams);
           const exitX = rx - gapX;
           const jx = rx - gapX * 0.42;
-          drawBracketLines(ctx, t1cy, t2cy, cy, rx, jx, exitX, m, false);
+          drawBracketLines(ctx, t1cy, t2cy, cy, rx, jx, exitX, m, false, lineOverrides);
         }
         jp.set(m.matchId, { x: rx - gapX, y: cy });
       }
@@ -286,12 +291,12 @@ export async function generateBracketDataUrl(
       if (isLeft) {
         const jx = baseX + gapX * 0.42;
         const exitX = baseX + gapX;
-        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, true);
+        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, true, lineOverrides);
         jp.set(m.matchId, { x: exitX, y: cy });
       } else {
         const jx = baseX - gapX * 0.42;
         const exitX = baseX - gapX;
-        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, false);
+        drawBracketLines(ctx, upperY, lowerY, cy, baseX, jx, exitX, m, false, lineOverrides);
         jp.set(m.matchId, { x: exitX, y: cy });
       }
     }
@@ -367,8 +372,8 @@ export async function generateBracketDataUrl(
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 
-export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string, winnerOverride?: string) {
-  const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName, winnerOverride);
+export async function exportBracketJpeg(bracket: PlacementBracket, allTeams: MixedTeam[], tournamentName: string, winnerOverride?: string, lineOverrides?: Record<string, 'red' | 'black'>) {
+  const dataUrl = await generateBracketDataUrl(bracket, allTeams, tournamentName, winnerOverride, lineOverrides);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${CATEGORY_LABELS[bracket.category] || bracket.category}.jpg`;

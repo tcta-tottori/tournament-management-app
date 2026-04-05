@@ -1673,6 +1673,7 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [winnerName, setWinnerName] = useState('');
+  const [lineOv, setLineOv] = useState<Record<string, 'red' | 'black'>>({});
   const allTeams = useMixedStore(s => s.allTeams);
   const tournamentName = useMixedStore(s => s.tournamentInfo?.name || '');
 
@@ -1689,10 +1690,10 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
   const regen = useCallback(() => {
     setDataUrl(null);
     setIsLoading(true);
-    generateBracketDataUrl(bracket, allTeams, tournamentName, winnerName || undefined)
+    generateBracketDataUrl(bracket, allTeams, tournamentName, winnerName || undefined, Object.keys(lineOv).length > 0 ? lineOv : undefined)
       .then(url => { setDataUrl(url); setIsLoading(false); })
       .catch(() => setIsLoading(false));
-  }, [bracket, allTeams, tournamentName, winnerName]);
+  }, [bracket, allTeams, tournamentName, winnerName, lineOv]);
 
   useEffect(() => {
     if (isOpen) setWinnerName(getDefaultWinner());
@@ -1741,9 +1742,39 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
-              {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
-              {dataUrl && !isLoading && <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: '100%' }} />}
+            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex flex-col items-center">
+              {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400 mt-8"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
+              {dataUrl && !isLoading && <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: 'calc(100% - 50px)' }} />}
+              {/* 線の色手動修正 */}
+              {!isLoading && bracket.matches.filter(m => !m.isBye && m.status === 'finished').length > 0 && (
+                <div className="mt-2 bg-white rounded-lg border border-gray-200 px-3 py-2 w-full max-w-3xl">
+                  <div className="text-[10px] text-gray-500 mb-1">線の色を手動修正（クリックで切替）:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {bracket.matches.filter(m => !m.isBye && m.status === 'finished').map(m => {
+                      const current = lineOv[m.matchId];
+                      const label = `R${m.round}-${m.position}`;
+                      return (
+                        <button key={m.matchId}
+                          onClick={() => setLineOv(prev => {
+                            const next = { ...prev };
+                            if (!next[m.matchId]) next[m.matchId] = 'black';
+                            else if (next[m.matchId] === 'black') next[m.matchId] = 'red';
+                            else delete next[m.matchId];
+                            return next;
+                          })}
+                          className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
+                            current === 'red' ? 'bg-red-100 border-red-300 text-red-700' :
+                            current === 'black' ? 'bg-gray-200 border-gray-400 text-gray-700' :
+                            'bg-white border-gray-200 text-gray-400'
+                          }`}
+                        >
+                          {label}{current === 'red' ? ' 赤' : current === 'black' ? ' 黒' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>,
