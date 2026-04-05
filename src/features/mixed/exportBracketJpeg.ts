@@ -502,9 +502,9 @@ export async function generateResultDataUrl(
     if (!t) return;
 
     const tc = isWin ? '#065f46' : '#111827';
-    const sc2 = isWin ? '#059669' : '#374151';
+    const sc2 = isWin ? '#cc0000' : '#374151'; // 勝者スコア: 赤
     const ac = isWin ? '#047857' : '#64748b';
-    const numC = isWin ? '#6ee7b7' : '#94a3b8';
+    const numC = isWin ? '#065f46' : '#94a3b8'; // 勝者番号: 濃い緑
     const isR1 = round === 1;
 
     // ペア番号
@@ -532,11 +532,14 @@ export async function generateResultDataUrl(
         ctx.fillText(t.female.affiliation, afX, ny2, afW);
       }
     } else {
-      // 2回戦以降: 名字のみ
+      // 2回戦以降: 名字のみ（teamNameの「姓・姓」から取得、fallbackはスペース分割）
+      const parts = t.teamName.split('・');
+      const maleFN = parts[0] || t.male.name.trim().split(/[\s\u3000]+/)[0];
+      const femaleFN = parts[1] || t.female.name.trim().split(/[\s\u3000]+/)[0];
       setFont(ctx, 15, true);
       ctx.fillStyle = tc; ctx.textAlign = 'left';
-      ctx.fillText(t.male.name.trim().split(/[\s\u3000]+/)[0], nx, ny1);
-      ctx.fillText(t.female.name.trim().split(/[\s\u3000]+/)[0], nx, ny2);
+      ctx.fillText(maleFN, nx, ny1);
+      ctx.fillText(femaleFN, nx, ny2);
     }
 
     // スコア（常に右揃え同一位置）
