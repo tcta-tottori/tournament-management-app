@@ -1744,9 +1744,9 @@ function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
 // ---------------------------------------------------------------------------
 
 /** ブラケットから入賞者を取得 */
-function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[]): { rank: string; category: string; names: string }[] {
+function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTeam[], tournamentName: string): { rank: string; category: string; names: string }[] {
   const results: { rank: string; category: string; names: string }[] = [];
-  const catLabels: Record<string, string> = { '1st': '1位', '2nd': '2位', '3rd': '3位', '4th': '4・5位' };
+  const catLabels: Record<string, string> = { '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント' };
   const familyN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
 
   for (const b of brackets) {
@@ -1755,71 +1755,71 @@ function getWinnersFromBrackets(brackets: PlacementBracket[], allTeams: MixedTea
     if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winnerId) continue;
 
     const cat = catLabels[b.category] || b.category;
+    const catWithName = tournamentName ? `${tournamentName} ${cat}` : cat;
     const winner = allTeams.find(t => t.teamId === finalMatch.winnerId);
     const loserId = finalMatch.winnerId === finalMatch.team1Id ? finalMatch.team2Id : finalMatch.team1Id;
     const runnerUp = loserId ? allTeams.find(t => t.teamId === loserId) : null;
 
-    if (winner) results.push({ rank: '優勝', category: `${cat}トーナメント`, names: `${familyN(winner.male.name)}・${familyN(winner.female.name)}` });
-    if (runnerUp) results.push({ rank: '準優勝', category: `${cat}トーナメント`, names: `${familyN(runnerUp.male.name)}・${familyN(runnerUp.female.name)}` });
+    if (winner) results.push({ rank: '優勝', category: catWithName, names: `${familyN(winner.male.name)}・${familyN(winner.female.name)}` });
+    if (runnerUp) results.push({ rank: '準優勝', category: catWithName, names: `${familyN(runnerUp.male.name)}・${familyN(runnerUp.female.name)}` });
 
-    // 3位: 準決勝の敗者2名
     const sfMatches = b.matches.filter(m => m.round === maxRound - 1 && m.status === 'finished' && m.winnerId);
     for (const sf of sfMatches) {
       const loserId2 = sf.winnerId === sf.team1Id ? sf.team2Id : sf.team1Id;
       const third = loserId2 ? allTeams.find(t => t.teamId === loserId2) : null;
-      if (third) results.push({ rank: '3位', category: `${cat}トーナメント`, names: `${familyN(third.male.name)}・${familyN(third.female.name)}` });
+      if (third) results.push({ rank: '3位', category: catWithName, names: `${familyN(third.male.name)}・${familyN(third.female.name)}` });
     }
   }
   return results;
 }
 
-/** 賞状1枚分の印刷HTML生成 */
-function buildCertificateHtml(entries: { rank: string; category: string; names: string }[], _tournamentName: string): string {
+/** 賞状CSS（筆文字風 Google Font: Zen Old Mincho） */
+const CERT_FONT_URL = 'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@700;900&display=swap';
+
+function buildCertificateHtml(entries: { rank: string; category: string; names: string }[]): string {
   const pages = entries.map(e => `
     <div class="page">
       <div class="cert-content">
-        <div class="class-name">${e.category}　${e.rank}</div>
+        <div class="class-name">${e.category}</div>
+        <div class="rank-name">${e.rank}</div>
         <div class="player-name">${e.names}</div>
       </div>
     </div>
   `).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>賞状印刷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="${CERT_FONT_URL}" rel="stylesheet">
 <style>
-  @page { size: A4 landscape; margin: 0; }
+  @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "游明朝", "Yu Mincho", "ヒラギノ明朝 ProN", "Hiragino Mincho ProN", serif; }
+  body { font-family: "Zen Old Mincho", "游明朝", "Yu Mincho", serif; }
   .page {
-    width: 297mm; height: 210mm;
+    width: 210mm; height: 297mm;
     display: flex; align-items: center; justify-content: center;
-    page-break-after: always;
-    position: relative;
+    page-break-after: always; position: relative;
   }
   .page:last-child { page-break-after: auto; }
   .cert-content {
-    /* 表彰状の下〜大会名の上 の中間エリアに印刷 */
-    position: absolute;
-    top: 50%; left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    text-align: center;
-    width: 70%;
+    text-align: center; width: 75%;
   }
   .class-name {
-    font-size: 20pt;
-    font-weight: bold;
-    letter-spacing: 0.3em;
-    margin-bottom: 18mm;
-    color: #1a1a1a;
+    font-size: 16pt; font-weight: 700;
+    letter-spacing: 0.25em; color: #222;
+    margin-bottom: 10mm;
+  }
+  .rank-name {
+    font-size: 28pt; font-weight: 900;
+    letter-spacing: 0.5em; color: #000;
+    margin-bottom: 12mm;
   }
   .player-name {
-    font-size: 32pt;
-    font-weight: bold;
-    letter-spacing: 0.4em;
-    color: #000;
+    font-size: 26pt; font-weight: 900;
+    letter-spacing: 0.4em; color: #000;
   }
-  @media print {
-    body { -webkit-print-color-adjust: exact; }
-  }
+  @media print { body { -webkit-print-color-adjust: exact; } }
 </style></head><body>${pages}</body></html>`;
 }
 
@@ -1831,10 +1831,12 @@ function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [entries, setEntries] = useState<{ rank: string; category: string; names: string; selected: boolean }[]>([]);
+  const [previewIdx, setPreviewIdx] = useState(0);
 
   const openDialog = () => {
-    const auto = getWinnersFromBrackets(brackets, allTeams);
+    const auto = getWinnersFromBrackets(brackets, allTeams, tournamentName);
     setEntries(auto.map(e => ({ ...e, selected: true })));
+    setPreviewIdx(0);
     setIsOpen(true);
   };
 
@@ -1845,98 +1847,113 @@ function CertificatePrintButton({ brackets, allTeams, tournamentName }: {
     setEntries(prev => prev.map((e, i) => i === idx ? { ...e, selected: !e.selected } : e));
   };
   const addEntry = () => {
-    setEntries(prev => [...prev, { rank: '優勝', category: '', names: '', selected: true }]);
+    setEntries(prev => [...prev, { rank: '優勝', category: tournamentName, names: '', selected: true }]);
   };
   const removeEntry = (idx: number) => {
     setEntries(prev => prev.filter((_, i) => i !== idx));
+    if (previewIdx >= entries.length - 1) setPreviewIdx(Math.max(0, entries.length - 2));
   };
 
   const handlePrint = () => {
     const selected = entries.filter(e => e.selected && e.names.trim());
     if (selected.length === 0) return;
-    const html = buildCertificateHtml(selected, tournamentName);
-    const win = window.open('', '_blank', 'width=1000,height=700');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.focus();
-      setTimeout(() => win.print(), 500);
-    }
+    const html = buildCertificateHtml(selected);
+    const win = window.open('', '_blank', 'width=800,height=1000');
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 800); }
   };
+
+  const selectedEntries = entries.filter(e => e.selected && e.names.trim());
+  const previewEntry = entries[previewIdx] || entries[0];
 
   return (
     <>
-      <button
-        onClick={openDialog}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors"
-      >
-        <Printer size={12} />
-        賞状印刷
+      <button onClick={openDialog}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors">
+        <Printer size={12} /> 賞状印刷
       </button>
 
       {isOpen && createPortal(
         <div className="fixed inset-0 bg-black/50 z-[200]" onClick={() => setIsOpen(false)}>
-          <div
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-[95vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col z-[210]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between shrink-0">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-[210]" onClick={e => e.stopPropagation()}>
+            {/* ヘッダー */}
+            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <Printer size={16} className="text-amber-600" />
-                賞状印刷
+                <Printer size={16} className="text-amber-600" /> 賞状印刷
               </h3>
-              <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-colors">
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handlePrint} disabled={selectedEntries.length === 0}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg shadow hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-95">
+                  <Printer size={14} /> {selectedEntries.length}枚を印刷
+                </button>
+                <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              <p className="text-[10px] text-gray-500">決勝トーナメントの結果から自動取得しています。手動で追加・修正できます。印刷対象にチェックを入れてください。</p>
-
-              {entries.map((entry, idx) => (
-                <div key={idx} className={`border rounded-lg p-3 transition-colors ${entry.selected ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={entry.selected} onChange={() => toggleEntry(idx)} className="accent-amber-500" />
-                    <select value={entry.rank} onChange={e => updateEntry(idx, 'rank', e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1 font-bold">
-                      <option value="優勝">優勝</option>
-                      <option value="準優勝">準優勝</option>
-                      <option value="3位">3位</option>
-                    </select>
-                    <input
-                      type="text" value={entry.category} onChange={e => updateEntry(idx, 'category', e.target.value)}
-                      placeholder="例: 1位トーナメント"
-                      className="flex-1 text-xs border border-gray-200 rounded px-2 py-1"
-                    />
-                    <button onClick={() => removeEntry(idx)} className="text-gray-400 hover:text-red-500 p-0.5"><X size={14} /></button>
+            {/* 本体: 左=編集リスト、右=プレビュー */}
+            <div className="flex-1 overflow-hidden flex">
+              {/* 左: エントリーリスト */}
+              <div className="w-[45%] border-r border-gray-200 overflow-y-auto p-3 space-y-2">
+                <p className="text-[10px] text-gray-500 mb-1">クリックでプレビュー表示。チェックで印刷対象を選択。</p>
+                {entries.map((entry, idx) => (
+                  <div key={idx}
+                    onClick={() => setPreviewIdx(idx)}
+                    className={`border rounded-lg p-2.5 cursor-pointer transition-all ${
+                      previewIdx === idx ? 'ring-2 ring-amber-400 border-amber-300' : ''
+                    } ${entry.selected ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <input type="checkbox" checked={entry.selected} onChange={e => { e.stopPropagation(); toggleEntry(idx); }} className="accent-amber-500" />
+                      <select value={entry.rank} onChange={e => updateEntry(idx, 'rank', e.target.value)} onClick={e => e.stopPropagation()} className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 font-bold bg-white">
+                        <option value="優勝">優勝</option><option value="準優勝">準優勝</option><option value="3位">3位</option>
+                      </select>
+                      <input type="text" value={entry.category} onChange={e => updateEntry(idx, 'category', e.target.value)} onClick={e => e.stopPropagation()}
+                        placeholder="クラス名" className="flex-1 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 min-w-0" />
+                      <button onClick={e => { e.stopPropagation(); removeEntry(idx); }} className="text-gray-400 hover:text-red-500 p-0.5"><X size={12} /></button>
+                    </div>
+                    <input type="text" value={entry.names} onChange={e => updateEntry(idx, 'names', e.target.value)} onClick={e => e.stopPropagation()}
+                      placeholder="氏名（例: 田中・山本）" className="w-full text-xs border border-gray-200 rounded px-2 py-1 font-bold" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-400 shrink-0">氏名:</span>
-                    <input
-                      type="text" value={entry.names} onChange={e => updateEntry(idx, 'names', e.target.value)}
-                      placeholder="例: 田中・山本"
-                      className="flex-1 text-sm border border-gray-200 rounded px-2 py-1.5 font-bold"
-                    />
+                ))}
+                <button onClick={addEntry} className="w-full py-1.5 border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-colors">
+                  + 手動で追加
+                </button>
+              </div>
+
+              {/* 右: A4プレビュー */}
+              <div className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-4">
+                {previewEntry ? (
+                  <div className="bg-white shadow-lg border border-gray-300" style={{ width: '280px', height: '396px', position: 'relative' }}>
+                    {/* 賞状の外枠イメージ */}
+                    <div className="absolute inset-2 border-2 border-amber-300/50 rounded" />
+                    <div className="absolute inset-3 border border-amber-200/40 rounded" />
+                    {/* 上部: 表彰状（印刷済み模擬） */}
+                    <div className="absolute top-[12%] left-0 right-0 text-center">
+                      <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>表　彰　状</span>
+                    </div>
+                    {/* 中央: 印刷対象エリア */}
+                    <div className="absolute top-[30%] bottom-[30%] left-0 right-0 flex flex-col items-center justify-center px-4 border-y-2 border-dashed border-amber-200/60">
+                      <div className="text-[9px] text-gray-600 tracking-[0.2em] mb-3" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 700 }}>
+                        {previewEntry.category}
+                      </div>
+                      <div className="text-base text-black tracking-[0.4em] mb-3" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                        {previewEntry.rank}
+                      </div>
+                      <div className="text-sm text-black tracking-[0.3em]" style={{ fontFamily: '"Zen Old Mincho", serif', fontWeight: 900 }}>
+                        {previewEntry.names || '（氏名未入力）'}
+                      </div>
+                    </div>
+                    {/* 印刷エリア注釈 */}
+                    <div className="absolute right-1 top-[29%] text-[7px] text-amber-400">← 印刷範囲 →</div>
+                    {/* 下部: 大会名（印刷済み模擬） */}
+                    <div className="absolute bottom-[12%] left-0 right-0 text-center">
+                      <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Zen Old Mincho", serif' }}>鳥取市テニス協会</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-
-              <button onClick={addEntry} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-colors">
-                + 手動で追加
-              </button>
-            </div>
-
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex gap-2 shrink-0">
-              <button onClick={() => setIsOpen(false)} className="flex-1 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors">
-                キャンセル
-              </button>
-              <button
-                onClick={handlePrint}
-                disabled={!entries.some(e => e.selected && e.names.trim())}
-                className="flex-1 py-2 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Printer size={14} />
-                {entries.filter(e => e.selected && e.names.trim()).length}枚を印刷
-              </button>
+                ) : (
+                  <div className="text-sm text-gray-400">エントリーを追加してください</div>
+                )}
+              </div>
             </div>
           </div>
         </div>,
