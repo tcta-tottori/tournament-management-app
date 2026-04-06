@@ -13,6 +13,8 @@ import { useMixedStore } from '../../features/mixed/mixedStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
+import SyncStatusBadge from '../ui/SyncStatusBadge';
+import { useFirestoreAutoSync } from '../../hooks/useFirestoreSync';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -81,6 +83,9 @@ export default function AppLayout() {
   const mixedLeagues = useMixedStore((s) => s.leagues);
   const mixedBrackets = useMixedStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+
+  // Firestore リアルタイム同期を起動（Firebase 未設定時は何もしない）
+  useFirestoreAutoSync();
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
@@ -320,8 +325,9 @@ export default function AppLayout() {
           })()}
         </div>
 
-        {/* 右側: リンク & バージョン */}
+        {/* 右側: 同期ステータス・リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
+          <SyncStatusBadge />
           <a
             href="https://www.tottori-tenis.net/"
             target="_blank"
