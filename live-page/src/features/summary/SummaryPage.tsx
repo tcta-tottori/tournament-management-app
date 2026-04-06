@@ -1,6 +1,5 @@
 /**
  * L-01 トップ / 大会サマリー
- * 直近の大会一覧・進行ステータスを表示
  */
 import { Link } from 'react-router-dom';
 import { Trophy, Calendar, MapPin } from 'lucide-react';
@@ -12,7 +11,6 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 export default function SummaryPage() {
   const { data: tournaments, loading } = useTournaments();
 
-  // 日付の新しい順にソート
   const sorted = [...tournaments].sort((a, b) => {
     if (a.date && b.date) return b.date.localeCompare(a.date);
     return b.createdAt - a.createdAt;
@@ -20,7 +18,6 @@ export default function SummaryPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* ヘッダー */}
       <div className="text-center mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-300 to-yellow-500 bg-clip-text text-transparent">
           鳥取市テニス協会

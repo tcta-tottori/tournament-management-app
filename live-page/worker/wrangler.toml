@@ -1,0 +1,14 @@
+name = "live-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespace バインディング
+# 事前に `wrangler kv:namespace create LIVE_DATA` で作成し、id を設定する
+[[kv_namespaces]]
+binding = "LIVE_DATA"
+id = "YOUR_KV_NAMESPACE_ID"  # ← wrangler kv:namespace create で取得した ID に置換
+
+# 環境変数（シークレット）
+# wrangler secret put API_KEY で設定する
+# [vars]
+# API_KEY は wrangler secret で管理（ソースに含めない）

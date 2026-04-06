@@ -6,7 +6,7 @@ import {
   Calendar, MapPin, ListOrdered, BarChart2,
   Grid3X3, Trophy, Clock,
 } from 'lucide-react';
-import { useTournament, useEvents, useAllMatches } from '../../lib/useFirestore';
+import { useTournamentSnapshot } from '../../lib/useFirestore';
 import { formatDate } from '../../lib/utils';
 import LastUpdated from '../../components/ui/LastUpdated';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -14,13 +14,30 @@ import { useMemo } from 'react';
 
 export default function TournamentPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: tournament, loading: tLoading } = useTournament(id);
-  const { data: events, loading: eLoading } = useEvents(id);
+  const { snapshot, loading } = useTournamentSnapshot(id);
 
-  const eventIds = useMemo(() => events.map((e) => e.eventId), [events]);
-  const { data: allMatches } = useAllMatches(eventIds);
+  const tournament = snapshot?.tournament;
+  const events = snapshot?.events || [];
+  const allMatches = snapshot?.matches || [];
 
-  const loading = tLoading || eLoading;
+  const eventStats = useMemo(() =>
+    events.map((event) => {
+      const matches = allMatches.filter((m) => m.eventId === event.eventId);
+      const total = matches.length;
+      const finished = matches.filter(
+        (m) => m.status === 'finished' || m.status === 'walkover',
+      ).length;
+      const playing = matches.filter((m) => m.status === 'playing').length;
+
+      let phase = '開始前';
+      if (total > 0 && finished === total) phase = '終了';
+      else if (playing > 0) phase = '試合中';
+      else if (finished > 0) phase = '進行中';
+
+      return { event, total, finished, playing, phase };
+    }),
+    [events, allMatches],
+  );
 
   if (loading) return <LoadingSpinner />;
   if (!tournament) {
@@ -34,26 +51,8 @@ export default function TournamentPage() {
     );
   }
 
-  // 種目ごとの進行状況を計算
-  const eventStats = events.map((event) => {
-    const matches = allMatches.filter((m) => m.eventId === event.eventId);
-    const total = matches.length;
-    const finished = matches.filter(
-      (m) => m.status === 'finished' || m.status === 'walkover',
-    ).length;
-    const playing = matches.filter((m) => m.status === 'playing').length;
-
-    let phase = '開始前';
-    if (total > 0 && finished === total) phase = '終了';
-    else if (playing > 0) phase = '試合中';
-    else if (finished > 0) phase = '進行中';
-
-    return { event, total, finished, playing, phase };
-  });
-
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* 大会情報 */}
       <div className="mb-6">
         <Link to="/live/" className="text-xs text-gray-500 hover:text-gray-300">
           &larr; 大会一覧に戻る
@@ -143,9 +142,7 @@ export default function TournamentPage() {
               {total > 0 && (
                 <div className="mt-2">
                   <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>
-                      {finished}/{total}試合完了
-                    </span>
+                    <span>{finished}/{total}試合完了</span>
                     {playing > 0 && (
                       <span className="text-orange-400">{playing}試合進行中</span>
                     )}

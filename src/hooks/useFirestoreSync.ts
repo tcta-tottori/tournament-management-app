@@ -1,26 +1,22 @@
 /**
- * Firestore 同期カスタムフック
+ * ライブ公開フック（方式B: 30秒間隔 JSON アップロード）
  *
- * Dexie のデータ変更を監視し、Firestore へ自動的に書き込む。
- * Firebase 未設定時は何も行わない。
+ * 30秒ごとに Dexie からデータを収集し、Cloudflare Workers にアップロードする。
+ * 環境変数未設定時は何も行わない。
  */
 import { useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { db as dexieDb, type Tournament, type Event as TEvent, type Match, type Court, type Draw } from '../db/database';
-import { isFirebaseEnabled } from '../lib/firebase';
+import { db as dexieDb } from '../db/database';
+import { isLiveEnabled } from '../lib/liveConfig';
 import {
-  syncTournament,
-  syncEvent,
-  syncMatch,
-  syncCourt,
-  syncLiveState,
-  syncDraw,
-  syncFullSnapshot,
-  syncMixedData,
+  publishSnapshot,
   getSyncStatus,
   onSyncStatusChange,
   type SyncStatus,
-} from '../lib/firestoreSync';
+} from '../lib/livePublisher';
 import { useAppStore } from '../stores/appStore';
+
+/** 公開間隔（ミリ秒） */
+const PUBLISH_INTERVAL = 30_000;
 
 // ───────── 同期ステータス購読 ─────────
 
@@ -40,158 +36,83 @@ export function useSyncStatus(): { status: SyncStatus; message?: string } {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
-// ───────── Dexie 変更監視 & 自動同期 ─────────
+// ───────── 定期公開 ─────────
+
+/** Dexie から大会データを収集して JSON を公開する */
+async function collectAndPublish(tournamentId: string): Promise<void> {
+  const tournament = await dexieDb.tournaments
+    .where('tournamentId')
+    .equals(tournamentId)
+    .first();
+  if (!tournament) return;
+
+  const events = await dexieDb.events
+    .where('tournamentId')
+    .equals(tournamentId)
+    .toArray();
+
+  const eventIds = events.map((e) => e.eventId);
+
+  const [entries, matches, draws, courts] = await Promise.all([
+    eventIds.length > 0
+      ? dexieDb.entries.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    eventIds.length > 0
+      ? dexieDb.matches.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    eventIds.length > 0
+      ? dexieDb.draws.where('eventId').anyOf(eventIds).toArray()
+      : [],
+    dexieDb.courts
+      .where('tournamentId')
+      .equals(tournamentId)
+      .toArray(),
+  ]);
+
+  await publishSnapshot({
+    tournament,
+    events,
+    entries,
+    matches,
+    draws,
+    courts,
+  });
+}
 
 /**
- * Dexie テーブルの変更を監視し、Firestore に自動同期するフック。
- * コンポーネントツリーのルート付近（AppLayout等）で1回だけ呼び出す。
+ * 30秒間隔で大会データを JSON として公開するフック。
+ * AppLayout で1回だけ呼び出す。
  */
-export function useFirestoreAutoSync(): void {
+export function useLivePublisher(): void {
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
 
   useEffect(() => {
-    if (!isFirebaseEnabled || !currentTournamentId) return;
+    if (!isLiveEnabled || !currentTournamentId) return;
 
-    // Dexie updating フックの関数参照を保持
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    type DexieUpdatingHook = (mods: any, primKey: any, obj: any) => void;
+    // 初回は即座に公開
+    collectAndPublish(currentTournamentId).catch(console.error);
 
-    const tournamentHook: DexieUpdatingHook = (_mods, _primKey, obj: Tournament) => {
-      if (obj.tournamentId === currentTournamentId) {
-        syncTournament(obj).catch(console.error);
-      }
-    };
+    // 30秒間隔で定期公開
+    const timer = setInterval(() => {
+      collectAndPublish(currentTournamentId).catch(console.error);
+    }, PUBLISH_INTERVAL);
 
-    const eventHook: DexieUpdatingHook = (_mods, _primKey, obj: TEvent) => {
-      if (obj.tournamentId === currentTournamentId) {
-        syncEvent(obj).catch(console.error);
-      }
-    };
-
-    const matchHook: DexieUpdatingHook = (_mods, _primKey, obj: Match) => {
-      syncMatch(obj).catch(console.error);
-      dexieDb.matches
-        .where('status')
-        .equals('playing')
-        .toArray()
-        .then((playing) => {
-          syncLiveState(currentTournamentId, {
-            activeMatchIds: playing.map((m) => m.matchId),
-          }).catch(console.error);
-        });
-    };
-
-    const courtHook: DexieUpdatingHook = (_mods, _primKey, obj: Court) => {
-      if (obj.tournamentId === currentTournamentId) {
-        syncCourt(obj).catch(console.error);
-      }
-    };
-
-    const drawHook: DexieUpdatingHook = (_mods, _primKey, obj: Draw) => {
-      syncDraw(obj).catch(console.error);
-    };
-
-    // フック登録
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dexieDb.tournaments.hook('updating', tournamentHook as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dexieDb.events.hook('updating', eventHook as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dexieDb.matches.hook('updating', matchHook as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dexieDb.courts.hook('updating', courtHook as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dexieDb.draws.hook('updating', drawHook as any);
-
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dexieDb.tournaments.hook('updating').unsubscribe(tournamentHook as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dexieDb.events.hook('updating').unsubscribe(eventHook as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dexieDb.matches.hook('updating').unsubscribe(matchHook as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dexieDb.courts.hook('updating').unsubscribe(courtHook as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dexieDb.draws.hook('updating').unsubscribe(drawHook as any);
-    };
+    return () => clearInterval(timer);
   }, [currentTournamentId]);
 }
 
-// ───────── 手動同期 ─────────
+// ───────── 手動公開 ─────────
 
 /**
- * 現在の大会データを全て Firestore に手動同期するフック。
- * 初回同期や「同期リフレッシュ」ボタン用。
+ * 手動で即座に公開するフック（ボタン押下用）
  */
 export function useManualSync() {
   const currentTournamentId = useAppStore((s) => s.currentTournamentId);
 
   const triggerFullSync = useCallback(async () => {
-    if (!isFirebaseEnabled || !currentTournamentId) return;
-
-    const tournament = await dexieDb.tournaments
-      .where('tournamentId')
-      .equals(currentTournamentId)
-      .first();
-    if (!tournament) return;
-
-    const events = await dexieDb.events
-      .where('tournamentId')
-      .equals(currentTournamentId)
-      .toArray();
-
-    const eventIds = events.map((e) => e.eventId);
-
-    const [entries, matches, draws, courts, players] = await Promise.all([
-      eventIds.length > 0
-        ? dexieDb.entries.where('eventId').anyOf(eventIds).toArray()
-        : [],
-      eventIds.length > 0
-        ? dexieDb.matches.where('eventId').anyOf(eventIds).toArray()
-        : [],
-      eventIds.length > 0
-        ? dexieDb.draws.where('eventId').anyOf(eventIds).toArray()
-        : [],
-      dexieDb.courts
-        .where('tournamentId')
-        .equals(currentTournamentId)
-        .toArray(),
-      dexieDb.players.toArray(),
-    ]);
-
-    await syncFullSnapshot({
-      tournament,
-      events,
-      entries,
-      matches,
-      draws,
-      courts,
-      players,
-    });
+    if (!isLiveEnabled || !currentTournamentId) return;
+    await collectAndPublish(currentTournamentId);
   }, [currentTournamentId]);
 
   return { triggerFullSync };
-}
-
-// ───────── ミックスダブルス同期 ─────────
-
-/**
- * ミックスダブルスの store 変更を Firestore に同期するフック。
- */
-export function useMixedSync(
-  tournamentId: string | null,
-  mixedStoreData: Record<string, unknown> | null,
-): void {
-  const prevDataRef = useRef<string>('');
-
-  useEffect(() => {
-    if (!isFirebaseEnabled || !tournamentId || !mixedStoreData) return;
-
-    const serialized = JSON.stringify(mixedStoreData);
-    if (serialized === prevDataRef.current) return;
-    prevDataRef.current = serialized;
-
-    syncMixedData(tournamentId, mixedStoreData).catch(console.error);
-  }, [tournamentId, mixedStoreData]);
 }

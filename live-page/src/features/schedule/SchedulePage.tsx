@@ -1,55 +1,45 @@
 /**
  * L-02 タイムテーブル
- * 時刻 x コートのグリッドで試合予定を表示
  */
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
-import {
-  useTournament,
-  useEvents,
-  useAllMatches,
-  useCourts,
-} from '../../lib/useFirestore';
-import { statusLabel } from '../../lib/utils';
+import { useTournamentSnapshot } from '../../lib/useFirestore';
 import StatusBadge from '../../components/ui/StatusBadge';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import LastUpdated from '../../components/ui/LastUpdated';
 
 export default function SchedulePage() {
   const { id } = useParams<{ id: string }>();
-  const { data: tournament, loading: tLoading } = useTournament(id);
-  const { data: events } = useEvents(id);
-  const { data: courts, loading: cLoading } = useCourts(id);
-  const eventIds = useMemo(() => events.map((e) => e.eventId), [events]);
-  const { data: allMatches, loading: mLoading } = useAllMatches(eventIds);
+  const { snapshot, loading } = useTournamentSnapshot(id);
   const [courtFilter, setCourtFilter] = useState<string | null>(null);
 
-  const loading = tLoading || cLoading || mLoading;
+  const tournament = snapshot?.tournament;
+  const events = snapshot?.events || [];
+  const allMatches = snapshot?.matches || [];
+  const courts = snapshot?.courts || [];
 
-  // 時刻でグループ化
-  const scheduledMatches = useMemo(() => {
-    return allMatches
+  const scheduledMatches = useMemo(() =>
+    allMatches
       .filter((m) => m.scheduledTime)
-      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
-  }, [allMatches]);
+      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '')),
+    [allMatches],
+  );
 
-  // 時刻一覧
   const timeSlots = useMemo(() => {
     const set = new Set(scheduledMatches.map((m) => m.scheduledTime!));
     return Array.from(set).sort();
   }, [scheduledMatches]);
 
-  // コート一覧
-  const sortedCourts = useMemo(() => {
-    return [...courts].sort((a, b) => a.order - b.order);
-  }, [courts]);
+  const sortedCourts = useMemo(
+    () => [...courts].sort((a, b) => a.order - b.order),
+    [courts],
+  );
 
   const filteredCourts = courtFilter
     ? sortedCourts.filter((c) => c.courtId === courtFilter)
     : sortedCourts;
 
-  // 現在時刻に近い時刻を判定
   const nowTime = useMemo(() => {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -57,7 +47,6 @@ export default function SchedulePage() {
 
   if (loading) return <LoadingSpinner />;
 
-  // イベント名マップ
   const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]));
 
   return (
@@ -73,15 +62,12 @@ export default function SchedulePage() {
         <LastUpdated />
       </div>
 
-      {/* コートフィルタ */}
       {sortedCourts.length > 1 && (
         <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
           <button
             onClick={() => setCourtFilter(null)}
             className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${
-              !courtFilter
-                ? 'bg-blue-500/30 text-blue-300'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              !courtFilter ? 'bg-blue-500/30 text-blue-300' : 'bg-white/5 text-gray-400 hover:bg-white/10'
             }`}
           >
             全コート
@@ -91,9 +77,7 @@ export default function SchedulePage() {
               key={c.courtId}
               onClick={() => setCourtFilter(c.courtId)}
               className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${
-                courtFilter === c.courtId
-                  ? 'bg-blue-500/30 text-blue-300'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                courtFilter === c.courtId ? 'bg-blue-500/30 text-blue-300' : 'bg-white/5 text-gray-400 hover:bg-white/10'
               }`}
             >
               {c.name}
@@ -119,52 +103,29 @@ export default function SchedulePage() {
             </thead>
             <tbody>
               {timeSlots.map((time) => {
-                const isNear =
-                  time >= nowTime &&
-                  time <= `${String(Number(nowTime.split(':')[0])).padStart(2, '0')}:${String(Number(nowTime.split(':')[1]) + 30).padStart(2, '0')}`;
+                const isNear = time >= nowTime && time <= nowTime.replace(/:\d+$/, `:${String(Number(nowTime.split(':')[1]) + 30).padStart(2, '0')}`);
                 return (
-                  <tr
-                    key={time}
-                    className={`border-b border-white/5 ${isNear ? 'bg-orange-500/10' : ''}`}
-                  >
-                    <td className="py-2 px-3 font-mono text-gray-300 whitespace-nowrap">
-                      {time}
-                    </td>
+                  <tr key={time} className={`border-b border-white/5 ${isNear ? 'bg-orange-500/10' : ''}`}>
+                    <td className="py-2 px-3 font-mono text-gray-300 whitespace-nowrap">{time}</td>
                     {filteredCourts.map((court) => {
                       const match = scheduledMatches.find(
                         (m) => m.scheduledTime === time && m.courtId === court.courtId,
                       );
-                      if (!match) {
-                        return <td key={court.courtId} className="py-2 px-3 text-gray-600">-</td>;
-                      }
+                      if (!match) return <td key={court.courtId} className="py-2 px-3 text-gray-600">-</td>;
                       return (
                         <td key={court.courtId} className="py-2 px-3">
-                          <div
-                            className={`rounded-lg p-2 ${
-                              match.status === 'playing'
-                                ? 'bg-orange-500/15 border border-orange-500/30'
-                                : match.status === 'finished' || match.status === 'walkover'
-                                  ? 'bg-white/5 opacity-60'
-                                  : 'bg-white/5'
-                            }`}
-                          >
-                            <div className="text-xs text-gray-500 truncate">
-                              {eventNameMap.get(match.eventId) || ''}
-                            </div>
-                            <div className="font-medium text-xs mt-0.5 truncate">
-                              {match.player1Name || 'TBD'}
-                            </div>
+                          <div className={`rounded-lg p-2 ${
+                            match.status === 'playing' ? 'bg-orange-500/15 border border-orange-500/30'
+                              : match.status === 'finished' || match.status === 'walkover' ? 'bg-white/5 opacity-60'
+                              : 'bg-white/5'
+                          }`}>
+                            <div className="text-xs text-gray-500 truncate">{eventNameMap.get(match.eventId) || ''}</div>
+                            <div className="font-medium text-xs mt-0.5 truncate">{match.player1Name || 'TBD'}</div>
                             <div className="text-xs text-gray-400">vs</div>
-                            <div className="font-medium text-xs truncate">
-                              {match.player2Name || 'TBD'}
-                            </div>
+                            <div className="font-medium text-xs truncate">{match.player2Name || 'TBD'}</div>
                             <div className="mt-1 flex items-center justify-between">
                               <StatusBadge status={match.status} />
-                              {match.score && (
-                                <span className="text-xs font-mono text-amber-300">
-                                  {match.score}
-                                </span>
-                              )}
+                              {match.score && <span className="text-xs font-mono text-amber-300">{match.score}</span>}
                             </div>
                           </div>
                         </td>

@@ -1,17 +1,10 @@
 /**
  * L-03 予選リーグ表
- * ラウンドロビン表・勝敗数・順位を表示
  */
 import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Grid3X3 } from 'lucide-react';
-import {
-  useTournament,
-  useEvents,
-  useMatches,
-  useEntries,
-  useDraw,
-} from '../../lib/useFirestore';
+import { useTournamentSnapshot } from '../../lib/useFirestore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import LastUpdated from '../../components/ui/LastUpdated';
 
@@ -28,19 +21,18 @@ interface PlayerRecord {
 
 export default function LeaguePage() {
   const { id, eventId } = useParams<{ id: string; eventId: string }>();
-  const { data: tournament } = useTournament(id);
-  const { data: events } = useEvents(id);
-  const { data: matches, loading: mLoading } = useMatches(eventId);
-  const { data: entries, loading: entLoading } = useEntries(eventId);
-  const { data: draw, loading: dLoading } = useDraw(eventId);
+  const { snapshot, loading } = useTournamentSnapshot(id);
+
+  const tournament = snapshot?.tournament;
+  const events = snapshot?.events || [];
+  const allMatches = snapshot?.matches || [];
 
   const event = events.find((e) => e.eventId === eventId);
-  const loading = mLoading || entLoading || dLoading;
+  const matches = useMemo(
+    () => allMatches.filter((m) => m.eventId === eventId),
+    [allMatches, eventId],
+  );
 
-  // ラウンドロビンの試合のみ（round=1 かつ drawType が roundRobin）
-  const isRoundRobin = draw?.drawType === 'roundRobin';
-
-  // エントリー名マップ
   const entryNameMap = useMemo(() => {
     const map = new Map<string, { name: string; affiliation: string }>();
     for (const m of matches) {
@@ -50,55 +42,30 @@ export default function LeaguePage() {
     return map;
   }, [matches]);
 
-  // ラウンドロビン成績を計算
   const standings = useMemo(() => {
     const records = new Map<string, PlayerRecord>();
-
-    // 選手一覧を初期化
     for (const [entryId, info] of entryNameMap) {
       records.set(entryId, {
-        entryId,
-        name: info.name,
-        affiliation: info.affiliation,
-        wins: 0,
-        losses: 0,
-        gamesWon: 0,
-        gamesLost: 0,
-        results: new Map(),
+        entryId, name: info.name, affiliation: info.affiliation,
+        wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, results: new Map(),
       });
     }
-
-    // 試合結果を集計
     for (const match of matches) {
       if (match.status !== 'finished' && match.status !== 'walkover') continue;
       if (!match.player1EntryId || !match.player2EntryId) continue;
-
       const p1 = records.get(match.player1EntryId);
       const p2 = records.get(match.player2EntryId);
       if (!p1 || !p2) continue;
-
       const p1Won = match.winnerEntryId === match.player1EntryId;
-
-      if (p1Won) {
-        p1.wins++;
-        p2.losses++;
-      } else {
-        p2.wins++;
-        p1.losses++;
-      }
-
-      // スコアからゲーム数を抽出
+      if (p1Won) { p1.wins++; p2.losses++; } else { p2.wins++; p1.losses++; }
       const scoreParts = match.score.split(/\s+/);
       for (const part of scoreParts) {
         const m = part.match(/^(\d+)-(\d+)/);
         if (m) {
-          p1.gamesWon += parseInt(m[1]);
-          p1.gamesLost += parseInt(m[2]);
-          p2.gamesWon += parseInt(m[2]);
-          p2.gamesLost += parseInt(m[1]);
+          p1.gamesWon += parseInt(m[1]); p1.gamesLost += parseInt(m[2]);
+          p2.gamesWon += parseInt(m[2]); p2.gamesLost += parseInt(m[1]);
         }
       }
-
       p1.results.set(match.player2EntryId, { score: match.score, won: p1Won });
       p2.results.set(match.player1EntryId, {
         score: match.score.split(/\s+/).map((s) => {
@@ -108,13 +75,11 @@ export default function LeaguePage() {
         won: !p1Won,
       });
     }
-
-    // 順位ソート
     return Array.from(records.values()).sort((a, b) => {
       if (b.wins !== a.wins) return b.wins - a.wins;
-      const aRatio = a.gamesLost === 0 ? Infinity : a.gamesWon / a.gamesLost;
-      const bRatio = b.gamesLost === 0 ? Infinity : b.gamesWon / b.gamesLost;
-      return bRatio - aRatio;
+      const aR = a.gamesLost === 0 ? Infinity : a.gamesWon / a.gamesLost;
+      const bR = b.gamesLost === 0 ? Infinity : b.gamesWon / b.gamesLost;
+      return bR - aR;
     });
   }, [matches, entryNameMap]);
 
@@ -157,13 +122,9 @@ export default function LeaguePage() {
                       <div className="font-medium">{p.name}</div>
                       <div className="text-xs text-gray-500">{p.affiliation}</div>
                     </td>
-                    <td className="py-2 px-3 text-center text-emerald-400 font-medium">
-                      {p.wins}
-                    </td>
+                    <td className="py-2 px-3 text-center text-emerald-400 font-medium">{p.wins}</td>
                     <td className="py-2 px-3 text-center text-red-400 font-medium">{p.losses}</td>
-                    <td className="py-2 px-3 text-center font-mono text-xs">
-                      {p.gamesWon}-{p.gamesLost}
-                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-xs">{p.gamesWon}-{p.gamesLost}</td>
                   </tr>
                 ))}
               </tbody>
@@ -178,10 +139,7 @@ export default function LeaguePage() {
                 <tr>
                   <th className="py-1 px-2 border border-white/10 bg-white/5" />
                   {standings.map((p) => (
-                    <th
-                      key={p.entryId}
-                      className="py-1 px-2 border border-white/10 bg-white/5 font-medium min-w-[80px]"
-                    >
+                    <th key={p.entryId} className="py-1 px-2 border border-white/10 bg-white/5 font-medium min-w-[80px]">
                       {p.name}
                     </th>
                   ))}
@@ -190,25 +148,16 @@ export default function LeaguePage() {
               <tbody>
                 {standings.map((row) => (
                   <tr key={row.entryId}>
-                    <td className="py-1 px-2 border border-white/10 bg-white/5 font-medium whitespace-nowrap">
-                      {row.name}
-                    </td>
+                    <td className="py-1 px-2 border border-white/10 bg-white/5 font-medium whitespace-nowrap">{row.name}</td>
                     {standings.map((col) => {
                       if (row.entryId === col.entryId) {
-                        return (
-                          <td key={col.entryId} className="py-1 px-2 border border-white/10 bg-white/3 text-center">
-                            -
-                          </td>
-                        );
+                        return <td key={col.entryId} className="py-1 px-2 border border-white/10 bg-white/3 text-center">-</td>;
                       }
                       const result = row.results.get(col.entryId);
                       return (
-                        <td
-                          key={col.entryId}
-                          className={`py-1 px-2 border border-white/10 text-center font-mono ${
-                            result?.won ? 'bg-emerald-500/10 text-emerald-300' : result ? 'bg-red-500/10 text-red-300' : ''
-                          }`}
-                        >
+                        <td key={col.entryId} className={`py-1 px-2 border border-white/10 text-center font-mono ${
+                          result?.won ? 'bg-emerald-500/10 text-emerald-300' : result ? 'bg-red-500/10 text-red-300' : ''
+                        }`}>
                           {result ? result.score : ''}
                         </td>
                       );

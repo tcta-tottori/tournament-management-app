@@ -1,19 +1,11 @@
 /**
- * Firestore リアルタイムリスナーフック
- * onSnapshot で購読し、データ変更時に自動更新する
+ * データ取得フック（方式B: 静的 JSON ポーリング）
+ *
+ * Cloudflare Workers KV から JSON を定期取得し、UI を自動更新する。
+ * Firebase SDK 不要。fetch のみで動作。
  */
-import { useState, useEffect } from 'react';
-import {
-  collection,
-  doc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  type DocumentData,
-  type Query,
-} from 'firebase/firestore';
-import { db } from './firebase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { API_BASE_URL, POLL_INTERVAL } from './firebase';
 import type {
   Tournament,
   Event,
@@ -25,7 +17,21 @@ import type {
   MixedData,
 } from './types';
 
-/** 接続状態 */
+/** ライブスナップショット全体の型 */
+export interface LiveSnapshot {
+  publishedAt: string;
+  tournament: Tournament;
+  events: Event[];
+  entries: Entry[];
+  matches: Match[];
+  draws: Draw[];
+  courts: Court[];
+  liveState: LiveState;
+  mixedData?: MixedData;
+}
+
+// ───────── 接続状態 ─────────
+
 export function useConnectionStatus(): boolean {
   const [connected, setConnected] = useState(true);
 
@@ -44,270 +50,158 @@ export function useConnectionStatus(): boolean {
   return connected;
 }
 
-/** 汎用コレクション購読 */
-function useCollection<T>(q: Query<DocumentData> | null): { data: T[]; loading: boolean } {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+// ───────── 汎用ポーリングフック ─────────
 
-  useEffect(() => {
-    if (!q) {
-      setData([]);
+function usePolling<T>(
+  url: string | null,
+  interval: number = POLL_INTERVAL,
+): { data: T | null; loading: boolean; error: string | null; lastUpdated: Date | null } {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const prevJson = useRef<string>('');
+
+  const fetchData = useCallback(async () => {
+    if (!url) {
       setLoading(false);
       return;
     }
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const items = snap.docs.map((d) => d.data() as T);
-        setData(items);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore]', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [q]);
 
-  return { data, loading };
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) {
+        if (res.status === 404) {
+          // データ未公開
+          setData(null);
+          setLoading(false);
+          return;
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.text();
+      // 変更があった場合のみ state を更新（不要な再レンダリング抑制）
+      if (json !== prevJson.current) {
+        prevJson.current = json;
+        setData(JSON.parse(json) as T);
+        setLastUpdated(new Date());
+      }
+      setError(null);
+      setLoading(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'fetch error';
+      console.error('[LivePage]', msg);
+      setError(msg);
+      setLoading(false);
+    }
+  }, [url]);
+
+  useEffect(() => {
+    fetchData();
+    if (!url) return;
+    const timer = setInterval(fetchData, interval);
+    return () => clearInterval(timer);
+  }, [fetchData, url, interval]);
+
+  return { data, loading, error, lastUpdated };
 }
 
-/** 全大会を購読 */
+// ───────── 大会一覧 ─────────
+
+interface TournamentListResponse {
+  publishedAt: string;
+  tournaments: Tournament[];
+}
+
 export function useTournaments(): { data: Tournament[]; loading: boolean } {
-  const [q] = useState(() => collection(db, 'tournaments'));
-  return useCollection<Tournament>(q);
+  const url = API_BASE_URL ? `${API_BASE_URL}/api/tournaments` : null;
+  const { data, loading } = usePolling<TournamentListResponse>(url);
+  return {
+    data: data?.tournaments || [],
+    loading,
+  };
 }
 
-/** 特定の大会を購読 */
-export function useTournament(tournamentId: string | undefined): {
-  data: Tournament | null;
+// ───────── 大会スナップショット ─────────
+
+/**
+ * 特定の大会の全データを取得するフック。
+ * 1つの JSON に全データが含まれるため、個別の useMatches 等は不要。
+ */
+export function useTournamentSnapshot(tournamentId: string | undefined): {
+  snapshot: LiveSnapshot | null;
   loading: boolean;
+  error: string | null;
+  lastUpdated: Date | null;
 } {
-  const [data, setData] = useState<Tournament | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!tournamentId) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    const ref = doc(db, 'tournaments', tournamentId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        setData(snap.exists() ? (snap.data() as Tournament) : null);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore]', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [tournamentId]);
-
-  return { data, loading };
+  const url =
+    API_BASE_URL && tournamentId
+      ? `${API_BASE_URL}/api/publish/${tournamentId}`
+      : null;
+  const { data, loading, error, lastUpdated } = usePolling<LiveSnapshot>(url);
+  return { snapshot: data, loading, error, lastUpdated };
 }
 
-/** 大会に紐づく種目を購読 */
-export function useEvents(tournamentId: string | undefined): {
-  data: Event[];
-  loading: boolean;
-} {
-  const [q, setQ] = useState<Query<DocumentData> | null>(null);
+// ───────── 便利なデータアクセサ ─────────
 
-  useEffect(() => {
-    if (!tournamentId) {
-      setQ(null);
-      return;
-    }
-    setQ(query(collection(db, 'events'), where('tournamentId', '==', tournamentId)));
-  }, [tournamentId]);
-
-  return useCollection<Event>(q);
+/** スナップショットから特定の大会情報を取得 */
+export function useTournament(tournamentId: string | undefined) {
+  const { snapshot, loading } = useTournamentSnapshot(tournamentId);
+  return {
+    data: snapshot?.tournament || null,
+    loading,
+  };
 }
 
-/** 種目に紐づく試合を購読 */
-export function useMatches(eventId: string | undefined): {
-  data: Match[];
-  loading: boolean;
-} {
-  const [q, setQ] = useState<Query<DocumentData> | null>(null);
-
-  useEffect(() => {
-    if (!eventId) {
-      setQ(null);
-      return;
-    }
-    setQ(
-      query(
-        collection(db, 'matches'),
-        where('eventId', '==', eventId),
-        orderBy('round'),
-        orderBy('position'),
-      ),
-    );
-  }, [eventId]);
-
-  return useCollection<Match>(q);
+/** スナップショットから種目一覧を取得 */
+export function useEvents(tournamentId: string | undefined) {
+  const { snapshot, loading } = useTournamentSnapshot(tournamentId);
+  return {
+    data: snapshot?.events || [],
+    loading,
+  };
 }
 
-/** 大会の全試合を購読（複数種目） */
-export function useAllMatches(eventIds: string[]): {
-  data: Match[];
-  loading: boolean;
-} {
-  const [q, setQ] = useState<Query<DocumentData> | null>(null);
-
-  useEffect(() => {
-    if (eventIds.length === 0) {
-      setQ(null);
-      return;
-    }
-    // Firestore 'in' は最大30件
-    const ids = eventIds.slice(0, 30);
-    setQ(query(collection(db, 'matches'), where('eventId', 'in', ids)));
-  }, [eventIds.join(',')]);
-
-  return useCollection<Match>(q);
+/** スナップショットから全試合を取得 */
+export function useAllMatches(_eventIds: string[], snapshot: LiveSnapshot | null) {
+  return {
+    data: snapshot?.matches || [],
+    loading: false,
+  };
 }
 
-/** コートを購読 */
-export function useCourts(tournamentId: string | undefined): {
-  data: Court[];
-  loading: boolean;
-} {
-  const [q, setQ] = useState<Query<DocumentData> | null>(null);
-
-  useEffect(() => {
-    if (!tournamentId) {
-      setQ(null);
-      return;
-    }
-    setQ(
-      query(
-        collection(db, 'courts'),
-        where('tournamentId', '==', tournamentId),
-        orderBy('order'),
-      ),
-    );
-  }, [tournamentId]);
-
-  return useCollection<Court>(q);
+/** スナップショットから特定種目の試合を取得 */
+export function useMatches(eventId: string | undefined, snapshot: LiveSnapshot | null) {
+  const matches = (snapshot?.matches || [])
+    .filter((m) => m.eventId === eventId)
+    .sort((a, b) => a.round - b.round || a.position - b.position);
+  return { data: matches, loading: false };
 }
 
-/** ドローを購読 */
-export function useDraw(eventId: string | undefined): {
-  data: Draw | null;
-  loading: boolean;
-} {
-  const [data, setData] = useState<Draw | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!eventId) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    const ref = doc(db, 'draws', eventId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        setData(snap.exists() ? (snap.data() as Draw) : null);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore]', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [eventId]);
-
-  return { data, loading };
+/** スナップショットからコート一覧を取得 */
+export function useCourts(snapshot: LiveSnapshot | null) {
+  const courts = (snapshot?.courts || []).sort((a, b) => a.order - b.order);
+  return { data: courts, loading: false };
 }
 
-/** エントリーを購読 */
-export function useEntries(eventId: string | undefined): {
-  data: Entry[];
-  loading: boolean;
-} {
-  const [q, setQ] = useState<Query<DocumentData> | null>(null);
-
-  useEffect(() => {
-    if (!eventId) {
-      setQ(null);
-      return;
-    }
-    setQ(query(collection(db, 'entries'), where('eventId', '==', eventId)));
-  }, [eventId]);
-
-  return useCollection<Entry>(q);
+/** スナップショットからドローを取得 */
+export function useDraw(eventId: string | undefined, snapshot: LiveSnapshot | null) {
+  const draw = (snapshot?.draws || []).find((d) => d.eventId === eventId) || null;
+  return { data: draw, loading: false };
 }
 
-/** ライブステートを購読 */
-export function useLiveState(tournamentId: string | undefined): {
-  data: LiveState | null;
-  loading: boolean;
-} {
-  const [data, setData] = useState<LiveState | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!tournamentId) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    const ref = doc(db, 'liveState', tournamentId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        setData(snap.exists() ? (snap.data() as LiveState) : null);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore]', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [tournamentId]);
-
-  return { data, loading };
+/** スナップショットからエントリーを取得 */
+export function useEntries(eventId: string | undefined, snapshot: LiveSnapshot | null) {
+  const entries = (snapshot?.entries || []).filter((e) => e.eventId === eventId);
+  return { data: entries, loading: false };
 }
 
-/** ミックスダブルスデータを購読 */
-export function useMixedData(tournamentId: string | undefined): {
-  data: MixedData | null;
-  loading: boolean;
-} {
-  const [data, setData] = useState<MixedData | null>(null);
-  const [loading, setLoading] = useState(true);
+/** スナップショットからライブステートを取得 */
+export function useLiveState(snapshot: LiveSnapshot | null) {
+  return { data: snapshot?.liveState || null, loading: false };
+}
 
-  useEffect(() => {
-    if (!tournamentId) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    const ref = doc(db, 'mixedData', tournamentId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        setData(snap.exists() ? (snap.data() as MixedData) : null);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore]', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [tournamentId]);
-
-  return { data, loading };
+/** スナップショットからミックスダブルスデータを取得 */
+export function useMixedData(snapshot: LiveSnapshot | null) {
+  return { data: (snapshot?.mixedData as MixedData) || null, loading: false };
 }

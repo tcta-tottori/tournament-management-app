@@ -1,17 +1,13 @@
 /**
- * Firebase 初期化 — 公開ライブページ（読み取り専用）
+ * ライブデータ取得設定
+ *
+ * Cloudflare Workers から JSON をポーリングで取得する。
+ * Firebase は使用しない。
  */
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+/** データ取得元の API URL */
+export const API_BASE_URL =
+  (import.meta.env.VITE_LIVE_API_URL as string) || '';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+/** ポーリング間隔（ミリ秒） */
+export const POLL_INTERVAL = 15_000;

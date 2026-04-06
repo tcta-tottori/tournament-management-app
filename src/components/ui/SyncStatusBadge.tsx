@@ -1,13 +1,13 @@
 /**
- * Firestore 同期ステータスバッジ
+ * ライブ公開ステータスバッジ
  *
- * ヘッダー右上に表示し、リアルタイム同期の状態を視覚的に通知する。
- * Firebase 未設定時（disabled）は非表示。
+ * ヘッダー右上に表示し、JSON 公開の状態を視覚的に通知する。
+ * ライブ公開未設定時（disabled）は非表示。
  */
 import { useState, useCallback } from 'react';
 import { Wifi, WifiOff, RefreshCw, CloudOff, Cloud } from 'lucide-react';
 import { useSyncStatus, useManualSync } from '../../hooks/useFirestoreSync';
-import { isFirebaseEnabled } from '../../lib/firebase';
+import { isLiveEnabled } from '../../lib/liveConfig';
 
 export default function SyncStatusBadge() {
   const { status, message } = useSyncStatus();
@@ -24,8 +24,8 @@ export default function SyncStatusBadge() {
     }
   }, [triggerFullSync, isSyncing]);
 
-  // Firebase 未設定時は非表示
-  if (!isFirebaseEnabled) return null;
+  // ライブ公開未設定時は非表示
+  if (!isLiveEnabled) return null;
 
   const configs: Record<
     string,
@@ -33,20 +33,20 @@ export default function SyncStatusBadge() {
   > = {
     idle: {
       icon: Cloud,
-      label: 'LIVE 同期中',
+      label: 'LIVE 公開中',
       color: 'text-emerald-300',
       bg: 'bg-emerald-500/20',
     },
     syncing: {
       icon: RefreshCw,
-      label: '同期中...',
+      label: '公開中...',
       color: 'text-emerald-300',
       bg: 'bg-emerald-500/20',
       pulse: true,
     },
     error: {
       icon: CloudOff,
-      label: '同期エラー',
+      label: '公開エラー',
       color: 'text-amber-300',
       bg: 'bg-amber-500/20',
     },
@@ -58,7 +58,7 @@ export default function SyncStatusBadge() {
     },
     disabled: {
       icon: CloudOff,
-      label: '同期無効',
+      label: '公開無効',
       color: 'text-gray-400',
       bg: 'bg-gray-500/20',
     },

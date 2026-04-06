@@ -14,7 +14,7 @@ import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
 import SyncStatusBadge from '../ui/SyncStatusBadge';
-import { useFirestoreAutoSync } from '../../hooks/useFirestoreSync';
+import { useLivePublisher } from '../../hooks/useFirestoreSync';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -84,8 +84,8 @@ export default function AppLayout() {
   const mixedBrackets = useMixedStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
 
-  // Firestore リアルタイム同期を起動（Firebase 未設定時は何もしない）
-  useFirestoreAutoSync();
+  // ライブ公開を起動（30秒間隔で JSON をアップロード。未設定時は何もしない）
+  useLivePublisher();
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
