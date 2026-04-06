@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedScoreView from '../mixed/MixedScoreView';
+import { useTeamStore } from '../team/teamStore';
+import TeamScoreView from '../team/TeamScoreView';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -112,10 +114,13 @@ type ViewMode = 'bracket' | 'table';
 // ---------------------------------------------------------------------------
 export default function Scoreboard() {
   const isMixedImported = useMixedStore(s => s.isImported);
+  const isTeamImported = useTeamStore(s => s.isImported);
 
-  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
   if (isMixedImported) {
     return <MixedScoreView />;
+  }
+  if (isTeamImported) {
+    return <TeamScoreView />;
   }
 
   return <NormalScoreboard />;

@@ -12,6 +12,8 @@ import { useAppStore } from '../../stores/appStore';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedExcelViewer from '../mixed/MixedExcelViewer';
+import { useTeamStore } from '../team/teamStore';
+import TeamImportView from '../team/TeamImportView';
 
 /** 予備日を含む文字列から選択肢を生成 */
 function parseReserveDayOptions(value: string, type: 'date' | 'venue'): string[] {
@@ -204,6 +206,7 @@ export default function DataManagement() {
   const [, setGdriveVersion] = useState(0);
   const gdriveConnected = !!getSavedClientId() && gdriveIsTokenValid();
   const isMixedImported = useMixedStore(s => s.isImported);
+  const isTeamImported = useTeamStore(s => s.isImported);
 
   // セクション開閉状態
   const [dataImportOpen, setDataImportOpen] = useState(true);
@@ -270,6 +273,8 @@ export default function DataManagement() {
       useAppStore.getState().setAllScheduleMatches([]);
       // ミックス大会データもリセット
       useMixedStore.getState().resetAll();
+      // 団体戦データもリセット
+      useTeamStore.getState().resetAll();
       setResetDone(true);
       setTimeout(() => setResetDone(false), 3000);
     } catch (err) {
@@ -301,6 +306,9 @@ export default function DataManagement() {
 
       {/* Excelデータビューア */}
       {isMixedImported && <MixedExcelViewer />}
+
+      {/* 団体戦データ読込 */}
+      {!isMixedImported && <TeamImportView />}
 
       {/* Google ドライブ連携（接続 + 一括読込 + フォルダ + 大会/時間割読込） */}
       <DataSync

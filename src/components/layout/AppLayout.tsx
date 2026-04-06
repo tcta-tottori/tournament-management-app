@@ -10,6 +10,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../../features/mixed/mixedStore';
+import { useTeamStore } from '../../features/team/teamStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
@@ -32,7 +33,7 @@ const ALL_MAIN_TABS = [
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
 
-/** ミックスダブルス読込時に非表示にするパス */
+/** ミックスダブルス/団体戦 読込時に非表示にするパス */
 const MIXED_HIDDEN_PATHS = ['/referee', '/schedule-sheet', '/draw-lot', '/court-bracket'];
 
 // 金の微粒子 — 空気中に漂う細かい金色パーティクル
@@ -80,6 +81,11 @@ export default function AppLayout() {
   const mixedLeagueMatches = useMixedStore((s) => s.leagueMatches);
   const mixedLeagues = useMixedStore((s) => s.leagues);
   const mixedBrackets = useMixedStore((s) => s.brackets);
+  const isTeamImported = useTeamStore((s) => s.isImported);
+  const teamTournamentInfo = useTeamStore((s) => s.tournamentInfo);
+  const teamLeagueMatches = useTeamStore((s) => s.leagueMatches);
+  const teamLeagues = useTeamStore((s) => s.leagues);
+  const teamBrackets = useTeamStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
 
   // 現在の大会情報を取得
@@ -197,17 +203,47 @@ export default function AppLayout() {
     return items;
   }, [isMixedImported, mixedLeagueMatches, mixedLeagues, mixedBrackets]);
 
+  // 団体戦用ティッカー
+  const teamTickerItems = useMemo(() => {
+    if (!isTeamImported || teamLeagueMatches.length === 0) return [];
+    const items: string[] = [];
+    const finished = teamLeagueMatches.filter(m => m.status === 'finished').length;
+    const total = teamLeagueMatches.length;
+    const pct = Math.round((finished / total) * 100);
+    items.push(`予選リーグ: ${finished}/${total}対戦完了 (${pct}%)`);
+
+    const completedLeagues = teamLeagues.filter(l => {
+      const lm = teamLeagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+    if (completedLeagues.length > 0) {
+      items.push(`${completedLeagues.length}/${teamLeagues.length}リーグ完了 (${completedLeagues.map(l => l.leagueId.trim()).join(',')})`);
+    }
+
+    const allLeaguesComplete = teamLeagues.every(l => {
+      const lm = teamLeagueMatches.filter(m => m.leagueId === l.leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    });
+    if (teamBrackets.length > 0 && allLeaguesComplete) {
+      const bracketFinished = teamBrackets.reduce((sum, b) => sum + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
+      const bracketTotal = teamBrackets.reduce((sum, b) => sum + b.matches.length, 0);
+      items.push(`決勝トーナメント: ${bracketFinished}/${bracketTotal}対戦完了`);
+    }
+
+    return items;
+  }, [isTeamImported, teamLeagueMatches, teamLeagues, teamBrackets]);
+
   // ミックス読込時は対戦順・タイムテーブル等を非表示
   const allTabs = useMemo(() => {
     let tabs = ALL_MAIN_TABS;
 
     // 大会データ未読み込み時: データ・マニュアル・バックアップのみ表示
-    if (!currentTournamentId && !isMixedImported) {
+    if (!currentTournamentId && !isMixedImported && !isTeamImported) {
       return tabs.filter(t => ['/data', '/manual', '/backup'].includes(t.path));
     }
 
-    // ミックスダブルス読込時: 不要なタブを非表示 + ラベル変更
-    if (isMixedImported) {
+    // ミックスダブルス or 団体戦 読込時: 不要なタブを非表示 + ラベル変更
+    if (isMixedImported || isTeamImported) {
       tabs = tabs.filter((t) => !MIXED_HIDDEN_PATHS.includes(t.path));
       tabs = tabs.map(t => {
         if (t.path === '/draw-table') return { ...t, label: '予選リーグ' };
@@ -226,7 +262,7 @@ export default function AppLayout() {
       }
     }
     return tabs;
-  }, [events, isMixedImported]);
+  }, [events, isMixedImported, isTeamImported]);
 
 
   // モバイル用: 全タブ表示
@@ -302,7 +338,7 @@ export default function AppLayout() {
         <div className="min-w-0 flex-1">
           {(() => {
             // 大会名が確定していたらヘッダーに大会名を表示
-            const tName = isMixedImported ? mixedTournamentInfo?.name : tournament?.name;
+            const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
             if (tName) {
               // 「令和○年度」「第○回」等のプレフィックスを抽出
               const prefixMatch = tName.match(/^((?:令和|平成|昭和)[\d０-９]+年度\s*|第[\d０-９]+回\s*)/);
@@ -409,11 +445,13 @@ export default function AppLayout() {
       </nav>
 
       {/* ===== 大会情報バー ===== */}
-      {(tournament || (isMixedImported && mixedTournamentInfo)) && (() => {
+      {(tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo)) && (() => {
         const displayName = isMixedImported && mixedTournamentInfo
           ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
-          : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
-        const activeTickerItems = isMixedImported ? mixedTickerItems : tickerItems;
+          : isTeamImported && teamTournamentInfo
+            ? teamTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+            : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
+        const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
         return (
           <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
             <div className="flex-1 overflow-hidden relative h-full info-ticker-area">

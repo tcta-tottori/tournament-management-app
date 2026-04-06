@@ -10,6 +10,9 @@ import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
+import { parseTeamExcel } from '../team/teamExcelParser';
+import type { TeamTournamentInfo, TeamLeague, TeamLeagueMatch } from '../team/types';
+import { useTeamStore } from '../team/teamStore';
 import { useNavigate } from 'react-router-dom';
 
 // ドロー会議システムのイベントコード → 大会運営システムの種目定義
@@ -537,6 +540,16 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     fileName: string;
   } | null>(null);
   const [mixedEditName, setMixedEditName] = useState('');
+  // 団体戦確認ダイアログ
+  const [teamPending, setTeamPending] = useState<{
+    info: TeamTournamentInfo;
+    leagues: TeamLeague[];
+    matches: TeamLeagueMatch[];
+    fileName: string;
+  } | null>(null);
+  const [teamEditName, setTeamEditName] = useState('');
+  const [teamEditDate, setTeamEditDate] = useState('');
+  const [teamEditVenue, setTeamEditVenue] = useState('');
   const [mixedEditDate, setMixedEditDate] = useState('');
   const [mixedEditVenue, setMixedEditVenue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -591,6 +604,17 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             setMixedEditName(mixedResult.info.name);
             setMixedEditDate(mixedResult.info.date);
             setMixedEditVenue(mixedResult.info.venue);
+            return;
+          }
+        } catch { /* fall through */ }
+        // 団体戦フォーマットを試行
+        try {
+          const teamResult = parseTeamExcel(arrayBuffer);
+          if (teamResult.leagues.length > 0) {
+            setTeamPending({ info: teamResult.info, leagues: teamResult.leagues, matches: teamResult.matches, fileName });
+            setTeamEditName(teamResult.info.name);
+            setTeamEditDate(teamResult.info.date);
+            setTeamEditVenue(teamResult.info.venue);
             return;
           }
         } catch { /* fall through */ }
@@ -721,7 +745,20 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
               return;
             }
           } catch {
-            // ミックスパーサーも失敗 → 元のエラーを表示
+            // ミックスパーサーも失敗
+          }
+          // 団体戦フォーマットを試行
+          try {
+            const teamResult = parseTeamExcel(arrayBuffer);
+            if (teamResult.leagues.length > 0) {
+              setTeamPending({ info: teamResult.info, leagues: teamResult.leagues, matches: teamResult.matches, fileName: file.name });
+              setTeamEditName(teamResult.info.name);
+              setTeamEditDate(teamResult.info.date);
+              setTeamEditVenue(teamResult.info.venue);
+              return;
+            }
+          } catch {
+            // 団体戦パーサーも失敗 → 元のエラーを表示
           }
           setImportResult({ success: false, message: 'Excelファイルからドロー情報を検出できませんでした。ドロー表のExcelファイルを選択してください。' });
           return;
@@ -1349,7 +1386,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const hasPreview = parsedData && summary;
   const hasExcelPreview = parsedExcel;
   const isMixedImported = useMixedStore(s => s.isImported);
-  const showButtons = !hasPreview && !hasExcelPreview && !mixedPending;
+  const showButtons = !hasPreview && !hasExcelPreview && !mixedPending && !teamPending;
 
   return (
     <div className="space-y-4">
@@ -1454,6 +1491,126 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                   navigate('/entry');
                 }}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-md transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                確定してエントリーへ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 団体戦 確認セクション（インライン表示） */}
+      {teamPending && (
+        <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                <h3 className="font-bold text-sm">団体戦 大会情報の確認</h3>
+              </div>
+              <button onClick={() => setTeamPending(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-gray-500">大会情報を確認・修正してから確定してください。</p>
+
+            {/* 大会名 */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-500 mb-1 block">大会名</label>
+              <input
+                type="text"
+                value={teamEditName}
+                onChange={e => setTeamEditName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* 日付・会場 横並び */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />開催日</label>
+                <input
+                  type="text"
+                  value={teamEditDate}
+                  onChange={e => setTeamEditDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="例: 令和７年11月23日"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />会場</label>
+                <input
+                  type="text"
+                  value={teamEditVenue}
+                  onChange={e => setTeamEditVenue(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="例: ヤマタスポーツパーク"
+                />
+              </div>
+            </div>
+
+            {/* 読込概要 */}
+            <div className="flex gap-3 text-center">
+              <div className="flex-1 bg-blue-50 rounded-lg p-2 border border-blue-100">
+                <div className="text-lg font-bold text-blue-700">{teamPending.leagues.length}</div>
+                <div className="text-[10px] text-gray-500">リーグ</div>
+              </div>
+              <div className="flex-1 bg-indigo-50 rounded-lg p-2 border border-indigo-100">
+                <div className="text-lg font-bold text-indigo-700">{teamPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
+                <div className="text-[10px] text-gray-500">チーム</div>
+              </div>
+              <div className="flex-1 bg-violet-50 rounded-lg p-2 border border-violet-100">
+                <div className="text-lg font-bold text-violet-700">{teamPending.matches.length}</div>
+                <div className="text-[10px] text-gray-500">対戦</div>
+              </div>
+            </div>
+
+            {/* リーグ詳細 */}
+            <div className="grid grid-cols-5 gap-2">
+              {teamPending.leagues.map(l => (
+                <div key={l.leagueId} className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                  <div className="text-xs font-bold text-blue-600">{l.leagueId}リーグ</div>
+                  <div className="text-[10px] text-gray-500">{l.teams.length}チーム</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ルール */}
+            {teamPending.info.rules.length > 0 && (
+              <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-[10px] font-medium text-amber-600 mb-0.5">ゲームルール</div>
+                <div className="text-[11px] text-amber-700">
+                  {teamPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
+                </div>
+              </div>
+            )}
+
+            {/* ボタン */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setTeamPending(null)}
+                className="flex-shrink-0 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  const info: TeamTournamentInfo = {
+                    ...teamPending!.info,
+                    name: teamEditName,
+                    date: teamEditDate,
+                    venue: teamEditVenue,
+                  };
+                  const teamStore = useTeamStore.getState();
+                  teamStore.importData(info, teamPending!.leagues, teamPending!.matches);
+                  teamStore.setImportFileName(teamPending!.fileName);
+                  setTeamPending(null);
+                  navigate('/entry');
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl hover:from-blue-600 hover:to-indigo-700 shadow-md transition-all"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 確定してエントリーへ

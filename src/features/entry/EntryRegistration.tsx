@@ -7,6 +7,8 @@ import ProcessingModal, { type ProcessingStep } from '../../components/ui/Proces
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedEntryView from '../mixed/MixedEntryView';
+import { useTeamStore } from '../team/teamStore';
+import TeamEntryView from '../team/TeamEntryView';
 
 // 略称→正式名マッピング（時間割の略称がストアに残っている場合のフォールバック用）
 const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
@@ -105,10 +107,15 @@ type CheckInSlot = {
 
 export default function EntryRegistration() {
   const isMixedImported = useMixedStore(s => s.isImported);
+  const isTeamImported = useTeamStore(s => s.isImported);
 
-  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
+  // ミックスダブルスモード
   if (isMixedImported) {
     return <MixedEntryView />;
+  }
+  // 団体戦モード
+  if (isTeamImported) {
+    return <TeamEntryView />;
   }
 
   return <NormalEntryRegistration />;

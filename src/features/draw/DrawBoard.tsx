@@ -15,6 +15,8 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { Trophy, Save, AlertCircle, Download, LayoutGrid, GitBranch, Image, FileSpreadsheet } from 'lucide-react';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedDrawView from '../mixed/MixedDrawView';
+import { useTeamStore } from '../team/teamStore';
+import TeamDrawView from '../team/TeamDrawView';
 
 export type DrawSlotData = {
   position: number;
@@ -43,10 +45,13 @@ export type MatchResult = {
 
 export default function DrawBoard() {
   const isMixedImported = useMixedStore(s => s.isImported);
+  const isTeamImported = useTeamStore(s => s.isImported);
 
-  // ミックスダブルスモード — 別コンポーネントとして返すことでHooks順序を保持
   if (isMixedImported) {
     return <MixedDrawView />;
+  }
+  if (isTeamImported) {
+    return <TeamDrawView />;
   }
 
   return <NormalDrawBoard />;
