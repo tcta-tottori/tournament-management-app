@@ -19,12 +19,20 @@ interface Props {
   subMatches: (SubMatchScore | BracketSubMatchScore)[];
   onClose: () => void;
   isBracket?: boolean;
+  /** team1の選手苗字候補リスト */
+  team1Roster?: string[];
+  /** team2の選手苗字候補リスト */
+  team2Roster?: string[];
 }
 
 interface SubMatchState {
   score1: string;
   score2: string;
   tiebreakScore: string;
+  p1a: string;
+  p1b: string;
+  p2a: string;
+  p2b: string;
 }
 
 /** Default winning game count for team matches */
@@ -32,9 +40,10 @@ const WIN_GAMES = 6;
 
 export default function TeamScoreInput({
   matchId, team1Id, team2Id, team1Name, team2Name, subMatches, onClose, isBracket = false,
+  team1Roster = [], team2Roster = [],
 }: Props) {
   const {
-    updateSubMatchScore, clearSubMatchScore,
+    updateSubMatchScore, clearSubMatchScore, updateSubMatchPlayers,
     updateBracketSubMatchScore, clearBracketSubMatchScore,
   } = useTeamStore();
 
@@ -47,10 +56,18 @@ export default function TeamScoreInput({
         score1: sm?.score1 !== null && sm?.score1 !== undefined && sm.score1 >= 0 ? sm.score1.toString() : '',
         score2: sm?.score2 !== null && sm?.score2 !== undefined && sm.score2 >= 0 ? sm.score2.toString() : '',
         tiebreakScore: sm?.tiebreakScore?.toString() ?? '',
+        p1a: sm?.players1?.[0] ?? '',
+        p1b: sm?.players1?.[1] ?? '',
+        p2a: sm?.players2?.[0] ?? '',
+        p2b: sm?.players2?.[1] ?? '',
       };
     }
     return init;
   });
+
+  const handlePlayerChange = useCallback((mt: MatchType, key: 'p1a'|'p1b'|'p2a'|'p2b', value: string) => {
+    setScores(prev => ({ ...prev, [mt]: { ...prev[mt], [key]: value } }));
+  }, []);
 
   // Refs for all inputs: 3 match types x 3 inputs (score1, score2, tiebreak)
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -252,9 +269,19 @@ export default function TeamScoreInput({
       updateFn(matchId, mt, s1, s2, tb);
     }
 
+    // 選手名は団体戦リーグのみ保存
+    if (!isBracket) {
+      for (const mt of MATCH_TYPE_ORDER) {
+        const s = scores[mt];
+        const p1 = [s.p1a, s.p1b].map(x => x.trim()).filter(Boolean);
+        const p2 = [s.p2a, s.p2b].map(x => x.trim()).filter(Boolean);
+        updateSubMatchPlayers(matchId, mt, p1, p2);
+      }
+    }
+
     onClose();
   }, [scores, matchId, isBracket, subMatches, onClose, validate,
-      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore]);
+      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore, updateSubMatchPlayers]);
 
   const handleClearAll = useCallback(() => {
     const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
@@ -351,6 +378,20 @@ export default function TeamScoreInput({
                 ? 'bg-slate-50'
                 : 'bg-white';
 
+              const renderPlayerInput = (
+                key: 'p1a'|'p1b'|'p2a'|'p2b',
+                listId: string,
+                placeholder: string
+              ) => (
+                <input
+                  type="text"
+                  value={s[key]}
+                  onChange={e => handlePlayerChange(mt, key, e.target.value)}
+                  list={listId}
+                  placeholder={placeholder}
+                  className="w-full text-[11px] border border-gray-200 rounded-md px-1.5 py-1 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                />
+              );
               return (
                 <div key={mt} className={`rounded-xl border border-gray-200 p-3 ${rowBg} transition-all`}>
                   {/* Match type label */}
@@ -469,10 +510,36 @@ export default function TeamScoreInput({
                       </div>
                     )}
                   </div>
+
+                  {/* 選手名入力 */}
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <div className="text-[9px] text-slate-500 font-bold truncate">{team1Name}</div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {renderPlayerInput('p1a', `roster-${team1Id}`, '苗字')}
+                        {renderPlayerInput('p1b', `roster-${team1Id}`, '苗字')}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[9px] text-slate-500 font-bold truncate">{team2Name}</div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {renderPlayerInput('p2a', `roster-${team2Id}`, '苗字')}
+                        {renderPlayerInput('p2b', `roster-${team2Id}`, '苗字')}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
+
+          {/* 選手名候補 datalist */}
+          <datalist id={`roster-${team1Id}`}>
+            {team1Roster.map(n => <option key={n} value={n} />)}
+          </datalist>
+          <datalist id={`roster-${team2Id}`}>
+            {team2Roster.map(n => <option key={n} value={n} />)}
+          </datalist>
 
           {/* Save button */}
           <button
