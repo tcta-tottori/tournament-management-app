@@ -87,7 +87,7 @@ function TeamEditModal({
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black text-pink-600 bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-md">F</span>
+                <span className="text-[10px] font-black text-pink-600 bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-md">W</span>
                 <span className="text-xs font-bold text-slate-600">女子</span>
                 <span className="text-[10px] text-slate-400">({femaleMembers.length}名)</span>
               </div>
@@ -248,7 +248,7 @@ function CompactTeamCard({
       >
         {femaleCount > 0 && (
           <div className="flex items-start gap-1">
-            <span className="text-[8px] font-black text-pink-600 bg-pink-50 border border-pink-100 px-1 py-0.5 rounded shrink-0 mt-0.5">F{femaleCount}</span>
+            <span className="text-[8px] font-black text-pink-600 bg-pink-50 border border-pink-100 px-1 py-0.5 rounded shrink-0 mt-0.5">W{femaleCount}</span>
             <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
               {femaleFamilies.slice(0, 4).join('・')}
               {femaleFamilies.length > 4 && <span className="text-slate-400"> 他{femaleFamilies.length - 4}名</span>}
