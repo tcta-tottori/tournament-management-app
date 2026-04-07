@@ -18,10 +18,24 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Cloud,
   RefreshCw,
   FileJson,
+  Shield,
+  Trophy,
+  Calendar,
 } from 'lucide-react';
+
+/** Google ドライブのカラーSVGロゴ */
+const GoogleDriveLogo = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+  </svg>
+);
 
 const MIXED_STORAGE_KEY = 'mixed-tournament-storage';
 
@@ -282,152 +296,208 @@ export default function BackupPage() {
   // レンダリング
   // ================================================================
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
-      {/* ヘッダー */}
-      <header className="bg-white p-4 rounded-xl card-tottori">
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <HardDrive className="w-6 h-6 text-primary-500" />
-          バックアップ
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          大会の全データ（エントリー・予選リーグ・決勝トーナメント・選手情報など）を1つのファイルで保存・復元します。
-        </p>
-      </header>
-
-      {/* 現在の大会情報 */}
-      {tournamentName && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-          <span className="font-bold text-gray-800">{tournamentName}</span>
-          {mixedStore.tournamentInfo?.date && (
-            <span className="text-gray-500">({mixedStore.tournamentInfo.date})</span>
-          )}
-        </div>
-      )}
-
-      {/* ローカルバックアップ */}
-      <section className="bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <FileJson className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">ローカル保存</h2>
-        </div>
-        <div className="p-4 space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleExport}
-              disabled={isExporting || isImporting}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              バックアップ保存
-            </button>
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isExporting || isImporting}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              バックアップ復元
-            </button>
-            <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+    <div className="min-h-full bg-gradient-to-b from-slate-50 via-white to-slate-50">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+        {/* ヘッダー */}
+        <header className="relative overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl shadow-lg">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white blur-3xl" />
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white blur-3xl" />
           </div>
-
-          {status && (
-            <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
-              status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              {status.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-              <span>{status.message}</span>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Google ドライブ */}
-      <section className="bg-white rounded-xl card-tottori overflow-hidden">
-        <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
-          <Cloud className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">Google ドライブ</h2>
-        </div>
-        <div className="p-4 space-y-4">
-          {!isGdriveConnected ? (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>データページからGoogle ドライブに接続してください</span>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDriveUpload}
-                  disabled={isUploading || isDownloading !== null}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  ドライブに保存
-                </button>
-
-                <button
-                  onClick={handleDriveListFiles}
-                  disabled={isLoadingFiles || isUploading || isDownloading !== null}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoadingFiles ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                  ファイル一覧
-                </button>
+          <div className="relative px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm">
+                <Shield className="w-7 h-7 text-white" />
               </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white tracking-tight">バックアップ</h1>
+                <p className="text-sm text-emerald-50 mt-0.5">大会データをまとめて安全に保存・復元</p>
+              </div>
+            </div>
+          </div>
+        </header>
 
-              {driveFiles.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-medium text-gray-600">ファイル名</th>
-                        <th className="text-left py-2 px-3 font-medium text-gray-600">更新日時</th>
-                        <th className="text-right py-2 px-3 font-medium text-gray-600">サイズ</th>
-                        <th className="text-right py-2 px-3 font-medium text-gray-600">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {driveFiles.map(file => (
-                        <tr key={file.id} className="border-b border-gray-100">
-                          <td className="py-2 px-3 text-gray-700 truncate max-w-[200px]">
-                            <span className="flex items-center gap-1">
-                              <FileJson className="w-4 h-4 text-gray-400 shrink-0" />
-                              {file.name}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{new Date(file.modifiedTime).toLocaleString('ja-JP')}</td>
-                          <td className="py-2 px-3 text-right text-gray-500 whitespace-nowrap">{file.size ? `${(Number(file.size) / 1024).toFixed(1)} KB` : '-'}</td>
-                          <td className="py-2 px-3 text-right">
-                            <button
-                              onClick={() => handleDriveRestore(file)}
-                              disabled={isDownloading !== null || isUploading}
-                              className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              {isDownloading === file.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                              復元
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+        {/* 現在の大会情報カード */}
+        {tournamentName && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 flex items-center gap-3">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-100 text-amber-600 shrink-0">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">現在の大会</div>
+                <div className="font-bold text-slate-800 truncate">{tournamentName}</div>
+                {mixedStore.tournamentInfo?.date && (
+                  <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                    <Calendar className="w-3 h-3" />
+                    {mixedStore.tournamentInfo.date}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-              {driveStatus && (
-                <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
-                  driveStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
-                  {driveStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                  <span>{driveStatus.message}</span>
-                </div>
-              )}
-            </>
-          )}
+        {/* データ内容 説明 */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4">
+          <div className="text-xs text-slate-500 mb-2 font-medium">バックアップに含まれるデータ</div>
+          <div className="flex flex-wrap gap-2">
+            {['エントリー', '予選リーグ', '決勝トーナメント', '選手情報', 'ふりがな', '試合結果'].map(item => (
+              <span key={item} className="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-xs text-slate-600 font-medium">{item}</span>
+            ))}
+          </div>
         </div>
-      </section>
+
+        {/* ローカル保存 */}
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600">
+              <HardDrive className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800">ローカル保存</h2>
+              <p className="text-xs text-slate-500">お使いの端末にJSONファイルとして保存</p>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={handleExport}
+                disabled={isExporting || isImporting}
+                className="group relative overflow-hidden flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+              >
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-center gap-2.5">
+                  {isExporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                  <span>バックアップ保存</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isExporting || isImporting}
+                className="group relative overflow-hidden flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-white border-2 border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-600 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+              >
+                {isImporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                <span>バックアップ復元</span>
+              </button>
+              <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+            </div>
+
+            {status && (
+              <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm border ${
+                status.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+              }`}>
+                {status.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                <span className="flex-1">{status.message}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Google ドライブ */}
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm">
+              <GoogleDriveLogo size={22} />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-bold text-slate-800">Google ドライブ</h2>
+              <p className="text-xs text-slate-500">クラウドに自動保管、どこからでも復元可能</p>
+            </div>
+            {isGdriveConnected && (
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-emerald-700">接続中</span>
+              </div>
+            )}
+          </div>
+          <div className="p-5 space-y-4">
+            {!isGdriveConnected ? (
+              <div className="flex items-center gap-3 px-4 py-4 rounded-xl bg-amber-50 border border-amber-200">
+                <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
+                <div className="text-sm text-amber-800">
+                  <div className="font-medium">Google ドライブに未接続</div>
+                  <div className="text-xs text-amber-600 mt-0.5">データページから接続設定を行ってください</div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={handleDriveUpload}
+                    disabled={isUploading || isDownloading !== null}
+                    className="group relative overflow-hidden flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                  >
+                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="relative flex items-center gap-2.5">
+                      {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                      <span>ドライブに保存</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={handleDriveListFiles}
+                    disabled={isLoadingFiles || isUploading || isDownloading !== null}
+                    className="flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-white border-2 border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-600 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                  >
+                    {isLoadingFiles ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                    <span>ファイル一覧を更新</span>
+                  </button>
+                </div>
+
+                {driveFiles.length > 0 && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                      <GoogleDriveLogo size={14} />
+                      <span className="text-xs font-bold text-slate-600">保存済みバックアップ ({driveFiles.length}件)</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                      {driveFiles.map(file => (
+                        <div key={file.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <FileJson className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-slate-800 truncate">{file.name}</div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                              <span>{new Date(file.modifiedTime).toLocaleString('ja-JP')}</span>
+                              {file.size && <><span>•</span><span>{(Number(file.size) / 1024).toFixed(1)} KB</span></>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDriveRestore(file)}
+                            disabled={isDownloading !== null || isUploading}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shrink-0"
+                          >
+                            {isDownloading === file.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            復元
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {driveStatus && (
+                  <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm border ${
+                    driveStatus.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {driveStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                    <span className="flex-1">{driveStatus.message}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* フッター注意書き */}
+        <div className="flex items-start gap-2 px-4 py-3 text-xs text-slate-500">
+          <Shield className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
+          <p>バックアップには大会の全データが含まれます。復元すると現在のデータは上書きされるのでご注意ください。</p>
+        </div>
+      </div>
     </div>
   );
 }
