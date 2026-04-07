@@ -358,34 +358,32 @@ function parseRoster(
         }
       }
 
-      // メンバーを読み取り（チーム番号行の下のセルからメンバーリストを取得）
-      // 名簿では列方向にチームが並んでいる
-      // 各チームのメンバーはチーム番号行の次の行から始まる
-      // 女性メンバーが先、男性メンバーが後（セル位置で判断）
+      // メンバーを読み取り（チーム番号列を縦にスキャン）
+      // 名簿はチーム1列につき全メンバーが縦に並ぶ（性別による列分割なし）
       team.members = [];
-
-      // 名簿の列位置を特定（チーム番号のカラム）
-      const memberColStart = c;
-      const memberColEnd = c + 4; // 名前+所属で2列分 × 2（男女）
-
-      // 女性メンバー（チーム番号の列 c）
-      for (let mr = r + 1; mr <= Math.min(r + 5, range.e.r); mr++) {
-        const fname = cellStr(ws, colLetter(memberColStart) + (mr + 1));
-        if (!fname || circledNumbers.includes(fname.charAt(0))) break;
+      const seen = new Set<string>();
+      let emptyRun = 0;
+      for (let mr = r + 1; mr <= range.e.r && mr <= r + 20; mr++) {
+        // チーム番号列とその近傍を探索（結合セル対応）
+        let name = '';
+        for (const dc of [0, 1, -1, 2]) {
+          const v = cellStr(ws, colLetter(c + dc) + (mr + 1));
+          if (v) { name = v; break; }
+        }
+        if (!name) {
+          emptyRun++;
+          if (emptyRun >= 2) break;
+          continue;
+        }
+        // 次のチーム番号に到達したら終了
+        if (circledNumbers.includes(name.charAt(0))) break;
+        emptyRun = 0;
+        const cleaned = name.replace(/\s+/g, '\u3000').trim();
+        if (!cleaned || seen.has(cleaned)) continue;
+        seen.add(cleaned);
         team.members.push({
-          player: { name: fname.replace(/\s+/g, '\u3000').trim(), affiliation: '' },
+          player: { name: cleaned, affiliation: '' },
           gender: 'F',
-        });
-      }
-
-      // 男性メンバー（右の列）
-      const maleColOffset = 5; // 名簿構造に依存
-      for (let mr = r + 1; mr <= Math.min(r + 5, range.e.r); mr++) {
-        const mname = cellStr(ws, colLetter(memberColStart + maleColOffset) + (mr + 1));
-        if (!mname || circledNumbers.includes(mname.charAt(0))) break;
-        team.members.push({
-          player: { name: mname.replace(/\s+/g, '\u3000').trim(), affiliation: '' },
-          gender: 'M',
         });
       }
     }
