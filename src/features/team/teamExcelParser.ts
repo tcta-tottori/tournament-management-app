@@ -331,56 +331,85 @@ function parseRoster(
   teamNumberMap: Map<number, TeamEntry>
 ) {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AO40');
-
-  // チーム番号とチーム名を行ごとにスキャン
   const circledNumbers = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒';
 
+  // 1) 全チーム番号セルの位置を収集
+  type Header = { teamNum: number; r: number; c: number };
+  const headers: Header[] = [];
   for (let r = range.s.r; r <= range.e.r; r++) {
     for (let c = range.s.c; c <= range.e.c; c++) {
       const val = cellStr(ws, colLetter(c) + (r + 1));
       if (!val) continue;
-
-      const numIdx = circledNumbers.indexOf(val);
-      if (numIdx < 0) continue;
-      const teamNum = numIdx + 1;
-      const team = teamNumberMap.get(teamNum);
-      if (!team) continue;
-
-      // チーム名（番号の2セル右）
-      const nameRef = colLetter(c + 2) + (r + 1);
-      const nameVal = cellStr(ws, nameRef);
-      if (nameVal) {
-        team.teamName = nameVal.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        // leagues内のチーム名も更新
-        for (const league of leagues) {
-          const lt = league.teams.find(t => t.teamId === team.teamId);
-          if (lt) lt.teamName = team.teamName;
-        }
+      // セル内に含まれる最初の丸数字を検出（"① プラセール ルナ" のような結合セル対応）
+      let numIdx = -1;
+      for (let i = 0; i < val.length; i++) {
+        const idx = circledNumbers.indexOf(val.charAt(i));
+        if (idx >= 0) { numIdx = idx; break; }
       }
+      if (numIdx < 0) continue;
+      headers.push({ teamNum: numIdx + 1, r, c });
+    }
+  }
 
-      // メンバーを読み取り（チーム番号列を縦にスキャン）
-      // 名簿はチーム1列につき全メンバーが縦に並ぶ（性別による列分割なし）
-      team.members = [];
-      const seen = new Set<string>();
-      let emptyRun = 0;
-      for (let mr = r + 1; mr <= range.e.r && mr <= r + 20; mr++) {
-        // チーム番号列とその近傍を探索（結合セル対応）
-        let name = '';
-        for (const dc of [0, 1, -1, 2]) {
-          const v = cellStr(ws, colLetter(c + dc) + (mr + 1));
-          if (v) { name = v; break; }
-        }
-        if (!name) {
-          emptyRun++;
-          if (emptyRun >= 2) break;
-          continue;
-        }
-        // 次のチーム番号に到達したら終了
-        if (circledNumbers.includes(name.charAt(0))) break;
-        emptyRun = 0;
-        const cleaned = name.replace(/\s+/g, '\u3000').trim();
-        if (!cleaned || seen.has(cleaned)) continue;
-        seen.add(cleaned);
+  // 重複排除（同じチーム番号が複数回現れた場合は最初のものを採用）
+  const seenTeams = new Set<number>();
+  const uniqHeaders = headers.filter(h => {
+    if (seenTeams.has(h.teamNum)) return false;
+    seenTeams.add(h.teamNum);
+    return true;
+  });
+
+  // 2) 各チームの列範囲（同じ行の次のチームまで）・行範囲（次のチーム行まで）を決定
+  const rowsWithHeaders = Array.from(new Set(uniqHeaders.map(h => h.r))).sort((a, b) => a - b);
+  const nextHeaderRow = (r: number) => {
+    const idx = rowsWithHeaders.indexOf(r);
+    return idx >= 0 && idx < rowsWithHeaders.length - 1 ? rowsWithHeaders[idx + 1] : range.e.r + 1;
+  };
+
+  for (const h of uniqHeaders) {
+    const team = teamNumberMap.get(h.teamNum);
+    if (!team) continue;
+
+    // 同じ行のヘッダーを列順にソート
+    const sameRowHeaders = uniqHeaders.filter(x => x.r === h.r).sort((a, b) => a.c - b.c);
+    const myIdx = sameRowHeaders.findIndex(x => x.c === h.c && x.teamNum === h.teamNum);
+    const colStart = h.c;
+    const colEnd = myIdx + 1 < sameRowHeaders.length ? sameRowHeaders[myIdx + 1].c - 1 : range.e.c;
+
+    const rowStart = h.r + 1;
+    const rowEnd = Math.min(range.e.r, nextHeaderRow(h.r) - 1, h.r + 20);
+
+    // チーム名: ヘッダー行内の列範囲を走査して丸数字以外の最初の文字列を採用
+    let teamName = '';
+    for (let cc = colStart; cc <= colEnd; cc++) {
+      const v = cellStr(ws, colLetter(cc) + (h.r + 1));
+      if (!v) continue;
+      // 丸数字を除去
+      const cleaned = v.replace(new RegExp(`[${circledNumbers}]`, 'g'), '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleaned) { teamName = cleaned; break; }
+    }
+    if (teamName) {
+      team.teamName = teamName;
+      for (const league of leagues) {
+        const lt = league.teams.find(t => t.teamId === team.teamId);
+        if (lt) lt.teamName = teamName;
+      }
+    }
+
+    // 3) 列範囲 × 行範囲の矩形からメンバー名を収集
+    team.members = [];
+    const seenNames = new Set<string>();
+    for (let mr = rowStart; mr <= rowEnd; mr++) {
+      for (let cc = colStart; cc <= colEnd; cc++) {
+        const v = cellStr(ws, colLetter(cc) + (mr + 1));
+        if (!v) continue;
+        // 丸数字セルはスキップ
+        if ([...v].some(ch => circledNumbers.includes(ch))) continue;
+        const cleaned = v.replace(/\n/g, ' ').replace(/\s+/g, '\u3000').trim();
+        if (!cleaned || seenNames.has(cleaned)) continue;
+        // 明らかに人名ではない文字列はスキップ（長すぎる・記号のみ）
+        if (cleaned.length > 20) continue;
+        seenNames.add(cleaned);
         team.members.push({
           player: { name: cleaned, affiliation: '' },
           gender: 'F',
