@@ -167,11 +167,28 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
       if (val.includes('令和') && val.includes('年度') && !info.name) {
         info.name = val.replace(/\s+/g, ' ').trim();
       }
-      if (val.includes('日　時') || val.includes('日 時') || val.includes('日時')) {
-        info.date = val.replace(/日\s*時\s*[：:]\s*/, '').trim();
+      if (!info.date && (val.includes('日　時') || val.includes('日 時') || val.includes('日時') || val.includes('開催日'))) {
+        const stripped = val.replace(/^(日\s*時|開催日)\s*[：:]?\s*/, '').trim();
+        if (stripped && stripped !== val.trim()) {
+          info.date = stripped;
+        } else {
+          // ラベルのみ → 右・下の隣接セルから値を取得
+          for (const adj of [colLetter(c + 1) + (r + 1), colLetter(c + 2) + (r + 1), colLetter(c) + (r + 2)]) {
+            const v = cellStr(ws, adj);
+            if (v && !/^(日\s*時|開催日|会\s*場|会場)/.test(v)) { info.date = v.trim(); break; }
+          }
+        }
       }
-      if (val.includes('会　場') || val.includes('会 場') || val.includes('会場')) {
-        info.venue = val.replace(/会\s*場\s*[：:]\s*/, '').trim();
+      if (!info.venue && (val.includes('会　場') || val.includes('会 場') || val.includes('会場'))) {
+        const stripped = val.replace(/^会\s*場\s*[：:]?\s*/, '').trim();
+        if (stripped && stripped !== val.trim()) {
+          info.venue = stripped;
+        } else {
+          for (const adj of [colLetter(c + 1) + (r + 1), colLetter(c + 2) + (r + 1), colLetter(c) + (r + 2)]) {
+            const v = cellStr(ws, adj);
+            if (v && !/^(日\s*時|開催日|会\s*場|会場)/.test(v)) { info.venue = v.trim(); break; }
+          }
+        }
       }
       // ルール文
       if (/ゲームマッチ|ノーアド|タイブレ|ゲーム先取|リーグ戦/.test(val)) {
