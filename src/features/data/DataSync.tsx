@@ -12,6 +12,9 @@ import {
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
+import { parseTeamExcel } from '../team/teamExcelParser';
+import { useTeamStore } from '../team/teamStore';
+import type { TeamTournamentInfo, TeamLeague as ITeamLeague, TeamLeagueMatch as ITeamLeagueMatch } from '../team/types';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useNavigate } from 'react-router-dom';
@@ -300,6 +303,13 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     info: TournamentInfo;
     leagues: MixedLeague[];
     matches: LeagueMatchScore[];
+    fileName: string;
+    arrayBuffer: ArrayBuffer;
+  } | null>(null);
+  const [wizardTeamPending, setWizardTeamPending] = useState<{
+    info: TeamTournamentInfo;
+    leagues: ITeamLeague[];
+    matches: ITeamLeagueMatch[];
     fileName: string;
     arrayBuffer: ArrayBuffer;
   } | null>(null);
@@ -706,8 +716,53 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       // Excelを解析して確認画面用のデータを構築
       let isMixedOrTeam = false;
       try {
+        // 団体戦フォーマットを最初に試行（ファイル名に「団体」が含まれる場合）
+        const isTeamFile = /団体/.test(file.name);
+        if (isTeamFile) {
+          try {
+            const teamResult = parseTeamExcel(arrayBuffer);
+            if (teamResult.leagues.length > 0) {
+              setWizardTeamPending({ info: teamResult.info, leagues: teamResult.leagues, matches: teamResult.matches, fileName: file.name, arrayBuffer });
+              setWizardMixedPending(null);
+              setWizardParsedExcel(null);
+              setWizardEditName(teamResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
+              setWizardEditDate(teamResult.info.date || '');
+              setWizardEditVenue(teamResult.info.venue || '');
+              if (teamResult.info.date) setWizardSourceDate(teamResult.info.date);
+              if (teamResult.info.venue) setWizardSourceVenue(teamResult.info.venue);
+              setWizardDateMode('normal');
+              setWizardVenueMode('normal');
+              isMixedOrTeam = true;
+              setWizardPhase('confirm-tournament');
+              setWizardLoadingFileId(null);
+              return;
+            }
+          } catch { /* fall through */ }
+        }
+
         const result = parseDrawExcel(arrayBuffer, file.name);
         if (!result.events || result.events.length === 0) {
+          // 団体戦フォーマットを試行（ファイル名に「団体」がなくても）
+          try {
+            const teamResult = parseTeamExcel(arrayBuffer);
+            if (teamResult.leagues.length > 0) {
+              setWizardTeamPending({ info: teamResult.info, leagues: teamResult.leagues, matches: teamResult.matches, fileName: file.name, arrayBuffer });
+              setWizardMixedPending(null);
+              setWizardParsedExcel(null);
+              setWizardEditName(teamResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
+              setWizardEditDate(teamResult.info.date || '');
+              setWizardEditVenue(teamResult.info.venue || '');
+              if (teamResult.info.date) setWizardSourceDate(teamResult.info.date);
+              if (teamResult.info.venue) setWizardSourceVenue(teamResult.info.venue);
+              setWizardDateMode('normal');
+              setWizardVenueMode('normal');
+              isMixedOrTeam = true;
+              setWizardPhase('confirm-tournament');
+              setWizardLoadingFileId(null);
+              return;
+            }
+          } catch { /* fall through */ }
+
           // ミックス大会フォーマットを試行
           try {
             const mixedResult = parseMixedExcel(arrayBuffer);
@@ -717,6 +772,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                 useMixedStore.getState().setRawExcelSheets(sheets);
               } catch { /* ignore */ }
               setWizardMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName: file.name, arrayBuffer });
+              setWizardTeamPending(null);
               setWizardEditName(mixedResult.info.name);
               setWizardEditDate(mixedResult.info.date);
               setWizardEditVenue(mixedResult.info.venue);
@@ -761,7 +817,24 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const handleWizardConfirmTournament = useCallback(async () => {
     setWizardIsImporting(true);
     try {
-      if (wizardMixedPending) {
+      if (wizardTeamPending) {
+        // 団体戦: teamStoreにインポート
+        const info: TeamTournamentInfo = {
+          ...wizardTeamPending.info,
+          name: wizardEditName,
+          date: wizardEditDate,
+          venue: wizardEditVenue,
+        };
+        const teamStore = useTeamStore.getState();
+        teamStore.importData(info, wizardTeamPending.leagues, wizardTeamPending.matches);
+        teamStore.setImportFileName(wizardTeamPending.fileName);
+        setWizardResult({ success: true, message: '一括読込が完了しました' });
+        setWizardPhase('done');
+        setTimeout(() => {
+          setWizardOpen(false);
+          navigate('/entry');
+        }, 500);
+      } else if (wizardMixedPending) {
         // ミックス大会: mixedStoreにインポート
         const info: TournamentInfo = {
           ...wizardMixedPending.info,
@@ -805,7 +878,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     } finally {
       setWizardIsImporting(false);
     }
-  }, [wizardMixedPending, wizardTournamentArrayBuffer, wizardTournamentFileName, wizardEditName, wizardEditDate, wizardEditVenue, wizardEditReserveDate, wizardIsMixedOrTeam, wizardScheduleFiles, onWizardTournamentConfirmed, navigate]);
+  }, [wizardTeamPending, wizardMixedPending, wizardTournamentArrayBuffer, wizardTournamentFileName, wizardEditName, wizardEditDate, wizardEditVenue, wizardEditReserveDate, wizardIsMixedOrTeam, wizardScheduleFiles, onWizardTournamentConfirmed, navigate]);
 
   // ウィザード内: 時間割ファイル選択→ダウンロード→完了
   const handleWizardSelectSchedule = useCallback(async (file: GoogleDriveFile) => {
@@ -1278,14 +1351,28 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-white">
-                          {wizardMixedPending ? 'ミックス大会情報の確認' : '大会データ読込'}
+                          {wizardTeamPending ? '団体戦大会情報の確認' : wizardMixedPending ? 'ミックス大会情報の確認' : '大会データ読込'}
                         </h3>
                         <p className="text-[11px] text-white/60 mt-0.5 truncate max-w-[200px]">{wizardTournamentFileName}</p>
                       </div>
                     </div>
                     {/* 統計バッジ */}
                     <div className="flex gap-2 mt-3 relative">
-                      {wizardMixedPending ? (
+                      {wizardTeamPending ? (
+                        <>
+                          {[
+                            { icon: Trophy, value: wizardTeamPending.leagues.length, label: 'リーグ' },
+                            { icon: Users, value: wizardTeamPending.leagues.reduce((s, l) => s + l.teams.length, 0), label: 'チーム' },
+                            { icon: Dices, value: wizardTeamPending.matches.length, label: '試合' },
+                          ].map(({ icon: Icon, value, label }) => (
+                            <div key={label} className="flex-1 bg-white/10 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center text-white">
+                              <Icon className="w-3.5 h-3.5 mx-auto mb-0.5 text-white/70" />
+                              <p className="text-base font-bold leading-none">{value}</p>
+                              <p className="text-[9px] text-white/50 mt-0.5">{label}</p>
+                            </div>
+                          ))}
+                        </>
+                      ) : wizardMixedPending ? (
                         <>
                           {[
                             { icon: Trophy, value: wizardMixedPending.leagues.length, label: 'リーグ' },
@@ -1344,8 +1431,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         </button>
                       </div>
                     </div>
-                    {wizardMixedPending ? (
-                      /* ミックス: シンプルな日程・会場入力 */
+                    {(wizardMixedPending || wizardTeamPending) ? (
+                      /* ミックス・団体戦: シンプルな日程・会場入力 */
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-[11px] font-medium text-gray-500 block mb-1">
@@ -1410,7 +1497,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
 
                   {/* アクション */}
                   <div className="px-5 pb-4 flex items-center gap-2.5">
-                    <button onClick={() => { setWizardPhase('select-tournament'); setWizardParsedExcel(null); setWizardMixedPending(null); }}
+                    <button onClick={() => { setWizardPhase('select-tournament'); setWizardParsedExcel(null); setWizardMixedPending(null); setWizardTeamPending(null); }}
                       className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-all">
                       戻る
                     </button>
@@ -1418,7 +1505,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       disabled={wizardIsImporting}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all">
                       <Upload className="w-4 h-4" />
-                      {wizardIsImporting ? 'インポート中...' : wizardMixedPending ? '確定してエントリーへ' : 'インポート'}
+                      {wizardIsImporting ? 'インポート中...' : (wizardMixedPending || wizardTeamPending) ? '確定してエントリーへ' : 'インポート'}
                     </button>
                   </div>
                 </div>
