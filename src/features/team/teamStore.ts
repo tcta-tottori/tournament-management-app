@@ -4,7 +4,7 @@ import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
   TeamPhase, TeamTournamentInfo, ExcelSheetData, SubMatchScore,
-  MatchType, BracketSubMatchScore
+  MatchType, BracketSubMatchScore, TeamMember
 } from './types';
 import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER } from './teamLogic';
 
@@ -51,6 +51,8 @@ interface TeamState {
   setTeamStatus: (teamId: string, status: 'none' | 'entry' | 'def') => void;
   setLeagueAllStatus: (leagueId: string, status: 'none' | 'entry' | 'def') => void;
   setAllTeamsStatus: (status: 'none' | 'entry' | 'def') => void;
+  setTeamMembers: (teamId: string, members: TeamMember[]) => void;
+  updateTeamName: (teamId: string, name: string) => void;
 
   // Navigation
   setCurrentPhase: (phase: TeamPhase) => void;
@@ -348,6 +350,26 @@ export const useTeamStore = create<TeamState>()(
           leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(t => ({ ...t, status })) })),
           allTeams: state.allTeams.map(t => ({ ...t, status })),
         }));
+      },
+
+      setTeamMembers: (teamId, members) => {
+        set(state => {
+          const update = (t: TeamEntry): TeamEntry => t.teamId === teamId ? { ...t, members } : t;
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(update) })),
+            allTeams: state.allTeams.map(update),
+          };
+        });
+      },
+
+      updateTeamName: (teamId, name) => {
+        set(state => {
+          const update = (t: TeamEntry): TeamEntry => t.teamId === teamId ? { ...t, teamName: name } : t;
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(update) })),
+            allTeams: state.allTeams.map(update),
+          };
+        });
       },
 
       setCurrentPhase: (phase) => set({ currentPhase: phase }),
