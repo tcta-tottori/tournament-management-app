@@ -4,9 +4,9 @@ import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
   TeamPhase, TeamTournamentInfo, ExcelSheetData, SubMatchScore,
-  MatchType, BracketSubMatchScore, TeamMember
+  MatchType, BracketSubMatchScore, TeamMember, TiebreakRuleId
 } from './types';
-import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER } from './teamLogic';
+import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
 
 interface TeamState {
   // Data
@@ -26,6 +26,7 @@ interface TeamState {
   rankOverrides: Record<string, Record<string, number>>;
   bracketCourtAssignments: Record<string, { courtName: string; startedAt: number }>;
   lastStandingsHash: string;
+  tiebreakOrder: TiebreakRuleId[];
 
   // Actions: Import
   importData: (info: TeamTournamentInfo, leagues: TeamLeague[], matches: TeamLeagueMatch[]) => void;
@@ -34,8 +35,10 @@ interface TeamState {
 
   // Actions: League
   updateSubMatchScore: (matchId: string, matchType: MatchType, score1: number, score2: number, tiebreakScore?: number | null) => void;
+  updateSubMatchPlayers: (matchId: string, matchType: MatchType, players1: string[], players2: string[]) => void;
   clearSubMatchScore: (matchId: string, matchType: MatchType) => void;
   setLeagueMatchStatus: (matchId: string, status: TeamLeagueMatch['status']) => void;
+  setTiebreakOrder: (order: TiebreakRuleId[]) => void;
 
   // Actions: Standings & Brackets
   getStandings: () => Map<string, TeamLeagueStanding[]>;
@@ -91,6 +94,23 @@ export const useTeamStore = create<TeamState>()(
       rankOverrides: {},
       bracketCourtAssignments: {},
       lastStandingsHash: '',
+      tiebreakOrder: DEFAULT_TIEBREAK_ORDER,
+
+      setTiebreakOrder: (order) => set({ tiebreakOrder: order }),
+
+      updateSubMatchPlayers: (matchId, matchType, players1, players2) => {
+        set(state => ({
+          leagueMatches: state.leagueMatches.map(m => {
+            if (m.matchId !== matchId) return m;
+            return {
+              ...m,
+              subMatches: m.subMatches.map(sm =>
+                sm.type === matchType ? { ...sm, players1, players2 } : sm
+              ),
+            };
+          }),
+        }));
+      },
 
       importData: (info, leagues, matches) => {
         try { localStorage.removeItem('team-tournament-storage'); } catch {}
@@ -189,13 +209,13 @@ export const useTeamStore = create<TeamState>()(
       },
 
       getStandings: () => {
-        const { leagues, leagueMatches, rankOverrides } = get();
-        return calculateTeamStandings(leagues, leagueMatches, rankOverrides);
+        const { leagues, leagueMatches, rankOverrides, tiebreakOrder } = get();
+        return calculateTeamStandings(leagues, leagueMatches, rankOverrides, tiebreakOrder);
       },
 
       generateBrackets: () => {
         const { leagues, leagueMatches, allTeams, tournamentInfo, rankOverrides } = get();
-        const standings = calculateTeamStandings(leagues, leagueMatches, rankOverrides);
+        const standings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, get().tiebreakOrder);
         const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
         set({ brackets, currentPhase: 'tournament' });
       },
@@ -581,7 +601,7 @@ export const useTeamStore = create<TeamState>()(
       autoPopulateBrackets: () => {
         const { leagues, leagueMatches, allTeams } = get();
         if (leagues.length === 0) return;
-        const baseStandings = calculateTeamStandings(leagues, leagueMatches, get().rankOverrides);
+        const baseStandings = calculateTeamStandings(leagues, leagueMatches, get().rankOverrides, get().tiebreakOrder);
         const completedStandings = new Map<string, TeamLeagueStanding[]>();
         for (const [leagueId, stds] of baseStandings) {
           const lMatches = leagueMatches.filter(m => m.leagueId === leagueId);
@@ -594,7 +614,7 @@ export const useTeamStore = create<TeamState>()(
 
       regenerateBrackets: () => {
         const { leagues, leagueMatches, allTeams, brackets: oldBrackets, tournamentInfo, rankOverrides, bracketCourtAssignments } = get();
-        const baseStandings = calculateTeamStandings(leagues, leagueMatches, rankOverrides);
+        const baseStandings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, get().tiebreakOrder);
         const completedStandings = new Map<string, TeamLeagueStanding[]>();
         for (const [leagueId, stds] of baseStandings) {
           const lMatches = leagueMatches.filter(m => m.leagueId === leagueId);

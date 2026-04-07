@@ -48,6 +48,10 @@ export interface SubMatchScore {
   score2: number | null;    // team2の取得ゲーム数
   tiebreakScore: number | null;
   winnerId: string | null;
+  /** team1側の選手苗字（最大2名） */
+  players1?: string[];
+  /** team2側の選手苗字（最大2名） */
+  players2?: string[];
 }
 
 /** リーグ戦の1対戦（3種目セット） */
@@ -90,7 +94,12 @@ export interface BracketSubMatchScore {
   score2: number | null;
   tiebreakScore: number | null;
   winnerId: string | null;
+  players1?: string[];
+  players2?: string[];
 }
+
+/** タイブレーク判定ルール */
+export type TiebreakRuleId = 'points' | 'gameRatio' | 'headToHead';
 
 /** トーナメント1試合 */
 export interface TeamBracketMatch {

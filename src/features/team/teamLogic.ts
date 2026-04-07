@@ -1,8 +1,19 @@
 import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
-  MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType
+  MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType,
+  TiebreakRuleId
 } from './types';
+
+/** タイブレークルール定義 */
+export const TIEBREAK_RULE_LABELS: Record<TiebreakRuleId, string> = {
+  points: '取得ポイント（種目勝利数）',
+  gameRatio: 'ゲーム率',
+  headToHead: '直接対決',
+};
+
+/** デフォルト判定順序 */
+export const DEFAULT_TIEBREAK_ORDER: TiebreakRuleId[] = ['points', 'gameRatio', 'headToHead'];
 
 /** 種目の対戦順（固定） */
 export const MATCH_TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
@@ -129,7 +140,8 @@ export function determineTeamWinner(
 export function calculateTeamStandings(
   leagues: TeamLeague[],
   matches: TeamLeagueMatch[],
-  rankOverrides?: Record<string, Record<string, number>>
+  rankOverrides?: Record<string, Record<string, number>>,
+  tiebreakOrder: TiebreakRuleId[] = DEFAULT_TIEBREAK_ORDER
 ): Map<string, TeamLeagueStanding[]> {
   const result = new Map<string, TeamLeagueStanding[]>();
 
@@ -189,43 +201,44 @@ export function calculateTeamStandings(
       };
     });
 
-    // ソート: 勝数 → ポイント → ゲーム率 → 直接対決
+    // ソート: 勝数 → ユーザー設定の優先順位に従ってタイブレーク
     standings.sort((a, b) => {
-      // 1. 勝数降順
+      // 0. 勝数降順（常に最優先）
       if (a.wins !== b.wins) return b.wins - a.wins;
 
       const tiedTeams = standings.filter(s => s.wins === a.wins);
 
-      // 2. 取得ポイント
-      if (a.pointsWon !== b.pointsWon) {
-        a.tiebreakReason = `ポイント ${a.pointsWon}`;
-        b.tiebreakReason = `ポイント ${b.pointsWon}`;
-        return b.pointsWon - a.pointsWon;
-      }
-
-      // 3. ゲーム率
-      const totalA = a.gamesWon + a.gamesLost;
-      const totalB = b.gamesWon + b.gamesLost;
-      const ratioA = totalA === 0 ? 0 : a.gamesWon / totalA;
-      const ratioB = totalB === 0 ? 0 : b.gamesWon / totalB;
-      if (Math.abs(ratioA - ratioB) > 0.0001) {
-        a.tiebreakReason = `ゲーム率 ${ratioA.toFixed(3)}`;
-        b.tiebreakReason = `ゲーム率 ${ratioB.toFixed(3)}`;
-        return ratioB - ratioA;
-      }
-
-      // 4. 直接対決（2チームのみ）
-      if (tiedTeams.length === 2) {
-        const h2h = leagueMatches.find(m =>
-          (m.team1Id === a.teamId && m.team2Id === b.teamId) ||
-          (m.team1Id === b.teamId && m.team2Id === a.teamId)
-        );
-        if (h2h && h2h.winnerId) {
-          const winner = h2h.winnerId === a.teamId ? a : b;
-          const loser = h2h.winnerId === a.teamId ? b : a;
-          winner.tiebreakReason = '直接対決勝ち';
-          loser.tiebreakReason = '直接対決負け';
-          return h2h.winnerId === a.teamId ? -1 : 1;
+      for (const rule of tiebreakOrder) {
+        if (rule === 'points') {
+          if (a.pointsWon !== b.pointsWon) {
+            a.tiebreakReason = `ポイント ${a.pointsWon}`;
+            b.tiebreakReason = `ポイント ${b.pointsWon}`;
+            return b.pointsWon - a.pointsWon;
+          }
+        } else if (rule === 'gameRatio') {
+          const totalA = a.gamesWon + a.gamesLost;
+          const totalB = b.gamesWon + b.gamesLost;
+          const ratioA = totalA === 0 ? 0 : a.gamesWon / totalA;
+          const ratioB = totalB === 0 ? 0 : b.gamesWon / totalB;
+          if (Math.abs(ratioA - ratioB) > 0.0001) {
+            a.tiebreakReason = `ゲーム率 ${ratioA.toFixed(3)}`;
+            b.tiebreakReason = `ゲーム率 ${ratioB.toFixed(3)}`;
+            return ratioB - ratioA;
+          }
+        } else if (rule === 'headToHead') {
+          if (tiedTeams.length === 2) {
+            const h2h = leagueMatches.find(m =>
+              (m.team1Id === a.teamId && m.team2Id === b.teamId) ||
+              (m.team1Id === b.teamId && m.team2Id === a.teamId)
+            );
+            if (h2h && h2h.winnerId) {
+              const winner = h2h.winnerId === a.teamId ? a : b;
+              const loser = h2h.winnerId === a.teamId ? b : a;
+              winner.tiebreakReason = '直接対決勝ち';
+              loser.tiebreakReason = '直接対決負け';
+              return h2h.winnerId === a.teamId ? -1 : 1;
+            }
+          }
         }
       }
 
