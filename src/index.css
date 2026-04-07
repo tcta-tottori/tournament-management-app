@@ -480,7 +480,9 @@
 
 /* ティッカーアニメーション — 右端→左端へ完全に流れてからリスタート */
 .info-ticker {
-  animation: ticker-marquee 18s linear infinite;
+  display: inline-flex !important;
+  width: max-content;
+  animation: ticker-marquee 24s linear infinite;
   padding-left: 100%;
 }
 .info-ticker:hover {
@@ -489,6 +491,15 @@
 @keyframes ticker-marquee {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-100%); }
+}
+
+/* リーグ対戦中ハイライト（点滅） */
+@keyframes league-match-highlight {
+  0%, 100% { background-color: rgba(253, 224, 71, 0.22); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.35); }
+  50%      { background-color: rgba(253, 224, 71, 0.55); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.7); }
+}
+.league-match-blink {
+  animation: league-match-highlight 1.5s ease-in-out infinite;
 }
 
 /* ティッカーアイテム */
