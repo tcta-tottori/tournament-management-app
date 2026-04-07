@@ -38,32 +38,43 @@ const GoogleDriveLogo = ({ size = 20 }: { size?: number }) => (
 );
 
 const MIXED_STORAGE_KEY = 'mixed-tournament-storage';
+const TEAM_STORAGE_KEY = 'team-tournament-storage';
 
-/** DB + ミックスダブルスを統合した軽量バックアップを生成 */
+/** LocalStorageから軽量化したZustand state を取得 */
+function extractStoreState(key: string): { state: any; tournamentName: string; tournamentDate: string } | null {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const state = parsed?.state || parsed;
+    return {
+      state: { ...state, rawExcelSheets: [] },
+      tournamentName: state?.tournamentInfo?.name || '',
+      tournamentDate: state?.tournamentInfo?.date || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** DB + ミックスダブルス + 団体戦を統合した軽量バックアップを生成 */
 async function buildUnifiedBackup() {
   const dbData = await exportFullBackup();
-  const mixedRaw = localStorage.getItem(MIXED_STORAGE_KEY);
-  let mixedState: any = null;
-  let tournamentName = '';
-  let tournamentDate = '';
-  if (mixedRaw) {
-    try {
-      const parsed = JSON.parse(mixedRaw);
-      const state = parsed?.state || parsed;
-      tournamentName = state?.tournamentInfo?.name || '';
-      tournamentDate = state?.tournamentInfo?.date || '';
-      // rawExcelSheetsを除外して軽量化
-      mixedState = { ...state, rawExcelSheets: [] };
-    } catch { /* ignore */ }
-  }
+  const mixed = extractStoreState(MIXED_STORAGE_KEY);
+  const team = extractStoreState(TEAM_STORAGE_KEY);
+
+  const tournamentName = mixed?.tournamentName || team?.tournamentName || '';
+  const tournamentDate = mixed?.tournamentDate || team?.tournamentDate || '';
+
   return {
     _type: 'unified-backup',
-    _version: 2,
+    _version: 3,
     createdAt: new Date().toISOString(),
     tournamentName,
     tournamentDate,
     db: dbData,
-    mixed: mixedState,
+    mixed: mixed?.state || null,
+    team: team?.state || null,
   };
 }
 
@@ -101,6 +112,17 @@ async function restoreUnifiedBackup(data: any): Promise<{ imported: number; erro
       imported += 1;
     } catch (e) {
       errors.push(`ミックスダブルス: ${(e as Error).message}`);
+    }
+  }
+
+  // 団体戦復元
+  if (data.team) {
+    try {
+      const persistData = { state: data.team, version: 1 };
+      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(persistData));
+      imported += 1;
+    } catch (e) {
+      errors.push(`団体戦: ${(e as Error).message}`);
     }
   }
 
