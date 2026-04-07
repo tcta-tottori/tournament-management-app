@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Medal, Award, Target } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Medal, Award, Target, Info } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT } from './teamLogic';
@@ -18,6 +18,13 @@ const LEAGUE_COLORS = [
 ];
 
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
+
+/** 種目カラー */
+const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  MIX: { bg: 'bg-violet-100', text: 'text-violet-700' },
+  WD:  { bg: 'bg-pink-100',   text: 'text-pink-700' },
+  MD:  { bg: 'bg-sky-100',    text: 'text-sky-700' },
+};
 
 /** 順位アイコン */
 function RankBadge({ rank }: { rank: number }) {
@@ -192,109 +199,116 @@ export default function TeamLeagueView() {
         </div>
       </div>
 
-      {/* 順位表（コンパクト） */}
-      {standings.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-bold text-slate-700">現在の順位</span>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {standings.map(s => {
-              const team = selectedLeague.teams.find(t => t.teamId === s.teamId);
-              return (
-                <div key={s.teamId} className="flex items-center gap-2.5 px-4 py-2.5">
-                  <RankBadge rank={s.rank || 0} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-slate-800 truncate">{team?.teamName}</div>
-                    {s.tiebreakReason && (
-                      <div className="text-[10px] text-slate-400 truncate">{s.tiebreakReason}</div>
-                    )}
-                  </div>
-                  <div className="text-sm font-black tabular-nums text-slate-700">
-                    {s.wins}<span className="text-slate-300 mx-0.5">-</span>{s.losses}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* 成績表 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 bg-gradient-to-b from-white to-slate-50/60">
           <Target className="w-4 h-4 text-slate-500" />
-          <span className="text-sm font-bold text-slate-700">成績表</span>
-          <span className="ml-auto text-[10px] text-slate-400">タップで入力</span>
+          <span className="text-sm font-bold text-slate-700 tracking-wide">成績表</span>
+          <span className="ml-auto text-[10px] text-slate-400 tracking-wider">タップで入力</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="px-2 py-2 text-left min-w-[100px] font-bold text-slate-600 border-b border-slate-200">チーム</th>
-                <th className="px-1 py-2 w-[36px] text-center font-bold text-slate-600 border-b border-slate-200">種目</th>
+              <tr className="bg-slate-50/80">
+                <th className="px-2 py-2 text-left min-w-[110px] font-bold text-slate-600 border-b border-slate-200">チーム</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] text-[10px] font-bold text-slate-600 border-b border-slate-200">
+                  <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[88px] text-[10px] font-bold text-slate-600 border-b border-slate-200">
                     {t.teamName.split(' ')[0]}
                   </th>
                 ))}
-                <th className="px-2 py-2 text-center min-w-[50px] font-bold text-slate-600 border-b border-slate-200">成績</th>
+                <th className="px-2 py-2 text-center min-w-[58px] font-bold text-slate-600 border-b border-slate-200">成績</th>
+                {leagueComplete && (
+                  <>
+                    <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-600 border-b border-slate-200">順位</th>
+                    <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-600 border-b border-slate-200">判定</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {selectedLeague.teams.map(rowTeam => {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
-                return MATCH_TYPE_ORDER.map((matchType, si) => (
-                  <tr key={`${rowTeam.teamId}-${matchType}`} className={si === 0 ? 'border-t-2 border-slate-200' : ''}>
-                    {si === 0 && (
-                      <td rowSpan={3} className="px-2 py-1 font-bold text-xs bg-slate-50/50 align-middle border-r border-slate-100">
-                        <div className="truncate max-w-[140px]" title={rowTeam.teamName}>{rowTeam.teamName}</div>
-                      </td>
-                    )}
-                    <td className="px-1 py-0.5 text-center text-[9px] font-bold text-slate-400 border-r border-slate-100">
-                      {MATCH_TYPE_SHORT[matchType]}
+                return (
+                  <tr key={rowTeam.teamId} className="border-t border-slate-100">
+                    <td className="px-2 py-1.5 font-bold text-xs bg-slate-50/40 align-middle border-r border-slate-100">
+                      <div className="truncate max-w-[150px]" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                     </td>
                     {selectedLeague.teams.map(colTeam => {
                       if (rowTeam.teamId === colTeam.teamId) {
-                        return si === 0 ? (
-                          <td key={colTeam.teamId} rowSpan={3} className="bg-slate-100 border-r border-slate-100" />
-                        ) : null;
+                        return <td key={colTeam.teamId} className="bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100" />;
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
-                      const sub = match?.subMatches.find(sm => sm.type === matchType);
-                      const isTeam1 = match?.team1Id === rowTeam.teamId;
-                      const myScore = isTeam1 ? sub?.score1 : sub?.score2;
-                      const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
-                      const won = sub?.winnerId === rowTeam.teamId;
-                      const hasScore = myScore !== null && myScore !== undefined && oppScore !== null && oppScore !== undefined;
-                      const isCurrent = currentMatchNumber && match?.matchNumber === currentMatchNumber;
+                      if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
+                      const isTeam1 = match.team1Id === rowTeam.teamId;
+                      const isCurrent = currentMatchNumber && match.matchNumber === currentMatchNumber;
+                      const isFinished = match.status === 'finished';
+                      const cellWonAll = isFinished && match.winnerId === rowTeam.teamId;
+                      const cellLostAll = isFinished && match.winnerId === colTeam.teamId;
 
                       return (
                         <td
                           key={colTeam.teamId}
-                          className={`px-1.5 py-1 text-center text-xs cursor-pointer transition-colors border-r border-slate-100 ${
-                            hasScore
-                              ? won ? 'bg-blue-50 text-blue-700 font-black' : 'bg-red-50/50 text-red-500'
-                              : isCurrent && si === 0 ? 'league-match-blink' : 'hover:bg-blue-50 active:bg-blue-100'
+                          className={`p-0 text-center cursor-pointer transition-all border-r border-slate-100 align-middle group ${
+                            cellWonAll ? 'bg-gradient-to-br from-blue-50 to-indigo-50/60' :
+                            cellLostAll ? 'bg-gradient-to-br from-rose-50/60 to-rose-50/30' :
+                            isCurrent ? 'league-match-blink' :
+                            'hover:bg-slate-50 active:bg-slate-100'
                           }`}
-                          onClick={() => match && setEditingMatch(match)}
+                          onClick={() => setEditingMatch(match)}
                         >
-                          {hasScore ? `${myScore}-${oppScore}` : ''}
+                          <div className="flex flex-col gap-0.5 px-1.5 py-1.5 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md">
+                            {MATCH_TYPE_ORDER.map(matchType => {
+                              const sub = match.subMatches.find(sm => sm.type === matchType);
+                              const myScore = isTeam1 ? sub?.score1 : sub?.score2;
+                              const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
+                              const won = sub?.winnerId === rowTeam.teamId;
+                              const hasScore = myScore !== null && myScore !== undefined && oppScore !== null && oppScore !== undefined;
+                              const tag = MATCH_TYPE_COLORS[matchType];
+                              return (
+                                <div key={matchType} className="flex items-center gap-1 justify-center text-[10px] tabular-nums">
+                                  <span className={`inline-flex items-center justify-center w-6 h-3.5 rounded text-[8px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
+                                    {MATCH_TYPE_SHORT[matchType]}
+                                  </span>
+                                  {hasScore ? (
+                                    <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-500'}`}>
+                                      {myScore}-{oppScore}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-bold">-</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </td>
                       );
                     })}
-                    {si === 0 && (
-                      <td rowSpan={3} className="px-2 py-1 text-center font-black text-sm align-middle bg-slate-50/50">
-                        {standing ? (
-                          <div className="tabular-nums">
-                            {standing.wins}<span className="text-slate-300">-</span>{standing.losses}
-                          </div>
-                        ) : '-'}
-                      </td>
+                    <td className="px-2 py-1 text-center font-black text-sm align-middle bg-slate-50/40">
+                      {standing ? (
+                        <div className="tabular-nums">
+                          {standing.wins}<span className="text-slate-300">-</span>{standing.losses}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    {leagueComplete && (
+                      <>
+                        <td className="px-2 py-1 text-center align-middle bg-slate-50/40">
+                          {standing && <RankBadge rank={standing.rank || 0} />}
+                        </td>
+                        <td className="px-2 py-1 text-center align-middle bg-slate-50/40">
+                          {standing?.tiebreakReason ? (
+                            <div className="inline-flex items-center gap-0.5 text-[9px] text-slate-500 font-medium" title={standing.tiebreakReason}>
+                              <Info className="w-2.5 h-2.5" />
+                              <span className="truncate max-w-[80px]">{standing.tiebreakReason}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">—</span>
+                          )}
+                        </td>
+                      </>
                     )}
                   </tr>
-                ));
+                );
               })}
             </tbody>
           </table>

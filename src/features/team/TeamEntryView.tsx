@@ -37,12 +37,12 @@ function TeamEditModal({
   const [teamName, setTeamName] = useState(team.teamName);
   const color = getColor(colorIndex);
 
-  const addMember = (gender: 'M' | 'F') => {
-    setMembers([...members, { player: { name: '', affiliation: '' }, gender }]);
+  const addMember = () => {
+    setMembers([...members, { player: { name: '', affiliation: '' }, gender: 'F' }]);
   };
 
-  const updateMember = (idx: number, field: 'name' | 'affiliation', value: string) => {
-    setMembers(prev => prev.map((m, i) => i === idx ? { ...m, player: { ...m.player, [field]: value } } : m));
+  const updateMember = (idx: number, value: string) => {
+    setMembers(prev => prev.map((m, i) => i === idx ? { ...m, player: { ...m.player, name: value } } : m));
   };
 
   const removeMember = (idx: number) => {
@@ -54,9 +54,6 @@ function TeamEditModal({
     setTeamMembers(team.teamId, members.filter(m => m.player.name.trim()));
     onClose();
   };
-
-  const femaleMembers = members.map((m, i) => ({ m, i })).filter(({ m }) => m.gender === 'F');
-  const maleMembers = members.map((m, i) => ({ m, i })).filter(({ m }) => m.gender === 'M');
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
@@ -82,99 +79,42 @@ function TeamEditModal({
         </div>
 
         {/* メンバー編集 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* 女子 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black text-pink-600 bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded-md">W</span>
-                <span className="text-xs font-bold text-slate-600">女子</span>
-                <span className="text-[10px] text-slate-400">({femaleMembers.length}名)</span>
-              </div>
-              <button
-                onClick={() => addMember('F')}
-                className="flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold text-pink-600 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-lg transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                追加
-              </button>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-xs font-bold text-slate-600">メンバー</span>
+              <span className="text-[10px] text-slate-400">({members.length}名)</span>
             </div>
-            <div className="space-y-1.5">
-              {femaleMembers.map(({ m, i }) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={m.player.name}
-                    onChange={e => updateMember(i, 'name', e.target.value)}
-                    placeholder="選手名"
-                    className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
-                  />
-                  <input
-                    type="text"
-                    value={m.player.affiliation}
-                    onChange={e => updateMember(i, 'affiliation', e.target.value)}
-                    placeholder="所属"
-                    className="flex-1 min-w-0 text-xs text-slate-500 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
-                  />
-                  <button
-                    onClick={() => removeMember(i)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              {femaleMembers.length === 0 && (
-                <div className="text-center py-3 text-xs text-slate-300 italic">女子メンバーなし</div>
-              )}
-            </div>
+            <button
+              onClick={addMember}
+              className={`flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold ${color.text} ${color.bg} hover:brightness-95 border ${color.border} rounded-lg transition-all`}
+            >
+              <Plus className="w-3 h-3" />
+              追加
+            </button>
           </div>
-
-          {/* 男子 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md">M</span>
-                <span className="text-xs font-bold text-slate-600">男子</span>
-                <span className="text-[10px] text-slate-400">({maleMembers.length}名)</span>
+          <div className="space-y-1.5">
+            {members.map((m, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={m.player.name}
+                  onChange={e => updateMember(i, e.target.value)}
+                  placeholder="選手名"
+                  className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                />
+                <button
+                  onClick={() => removeMember(i)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => addMember('M')}
-                className="flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                追加
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              {maleMembers.map(({ m, i }) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={m.player.name}
-                    onChange={e => updateMember(i, 'name', e.target.value)}
-                    placeholder="選手名"
-                    className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <input
-                    type="text"
-                    value={m.player.affiliation}
-                    onChange={e => updateMember(i, 'affiliation', e.target.value)}
-                    placeholder="所属"
-                    className="flex-1 min-w-0 text-xs text-slate-500 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <button
-                    onClick={() => removeMember(i)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              {maleMembers.length === 0 && (
-                <div className="text-center py-3 text-xs text-slate-300 italic">男子メンバーなし</div>
-              )}
-            </div>
+            ))}
+            {members.length === 0 && (
+              <div className="text-center py-3 text-xs text-slate-300 italic">メンバーなし</div>
+            )}
           </div>
         </div>
 
@@ -212,10 +152,8 @@ function CompactTeamCard({
   onClick: () => void;
 }) {
   const color = getColor(colorIndex);
-  const femaleCount = team.members.filter(m => m.gender === 'F').length;
-  const maleCount = team.members.filter(m => m.gender === 'M').length;
-  const femaleFamilies = team.members.filter(m => m.gender === 'F').map(m => familyName(m.player.name)).filter(Boolean);
-  const maleFamilies = team.members.filter(m => m.gender === 'M').map(m => familyName(m.player.name)).filter(Boolean);
+  const memberCount = team.members.length;
+  const families = team.members.map(m => familyName(m.player.name)).filter(Boolean);
 
   const statusStyles =
     team.status === 'entry'
@@ -246,21 +184,12 @@ function CompactTeamCard({
         onClick={onClick}
         className="w-full px-2.5 py-1.5 space-y-1 hover:bg-slate-50/80 active:bg-slate-100 transition-colors text-left"
       >
-        {femaleCount > 0 && (
+        {memberCount > 0 && (
           <div className="flex items-start gap-1">
-            <span className="text-[8px] font-black text-pink-600 bg-pink-50 border border-pink-100 px-1 py-0.5 rounded shrink-0 mt-0.5">W{femaleCount}</span>
+            <span className={`text-[8px] font-black ${color.text} ${color.bg} border ${color.border} px-1 py-0.5 rounded shrink-0 mt-0.5`}>{memberCount}名</span>
             <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
-              {femaleFamilies.slice(0, 4).join('・')}
-              {femaleFamilies.length > 4 && <span className="text-slate-400"> 他{femaleFamilies.length - 4}名</span>}
-            </div>
-          </div>
-        )}
-        {maleCount > 0 && (
-          <div className="flex items-start gap-1">
-            <span className="text-[8px] font-black text-blue-600 bg-blue-50 border border-blue-100 px-1 py-0.5 rounded shrink-0 mt-0.5">M{maleCount}</span>
-            <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
-              {maleFamilies.slice(0, 4).join('・')}
-              {maleFamilies.length > 4 && <span className="text-slate-400"> 他{maleFamilies.length - 4}名</span>}
+              {families.slice(0, 6).join('・')}
+              {families.length > 6 && <span className="text-slate-400"> 他{families.length - 6}名</span>}
             </div>
           </div>
         )}
