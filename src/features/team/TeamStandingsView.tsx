@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Trophy, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import { calculateTeamStandings } from './teamLogic';
 
@@ -11,59 +10,47 @@ const LEAGUE_COLORS = [
   { header: 'from-amber-500 to-orange-600', badge: 'bg-amber-100 text-amber-700' },
 ];
 
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1) {
+    return (
+      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 text-white font-extrabold text-sm shadow-md shadow-amber-300/50 ring-2 ring-white">
+        1
+      </span>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 via-gray-300 to-slate-500 text-white font-extrabold text-sm shadow-md shadow-slate-300/50 ring-2 ring-white">
+        2
+      </span>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-300 via-orange-500 to-amber-700 text-white font-extrabold text-sm shadow-md shadow-orange-300/50 ring-2 ring-white">
+        3
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold text-sm">
+      {rank}
+    </span>
+  );
+}
+
 export default function TeamStandingsView() {
-  const { leagues, leagueMatches, rankOverrides, generateBrackets, currentPhase } = useTeamStore();
+  const { leagues, leagueMatches, rankOverrides } = useTeamStore();
 
   const allStandings = useMemo(
     () => calculateTeamStandings(leagues, leagueMatches, rankOverrides),
     [leagues, leagueMatches, rankOverrides]
   );
 
-  // 全リーグ完了チェック
-  const allComplete = useMemo(() => {
-    return leagues.every(l => {
-      const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-      return lm.length > 0 && lm.every(m => m.status === 'finished');
-    });
-  }, [leagues, leagueMatches]);
-
-  const incompleteLeagues = useMemo(() => {
-    return leagues.filter(l => {
-      const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-      return lm.length === 0 || lm.some(m => m.status !== 'finished');
-    });
-  }, [leagues, leagueMatches]);
-
   return (
     <div className="space-y-4">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">リーグ順位表</h2>
-        <button
-          onClick={() => generateBrackets()}
-          disabled={!allComplete}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${
-            allComplete
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:scale-105'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          <Trophy size={18} />
-          決勝トーナメント生成
-          <ArrowRight size={16} />
-        </button>
-      </div>
-
-      {/* 未完了リーグ警告 */}
-      {!allComplete && incompleteLeagues.length > 0 && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm text-amber-700">
-          <AlertTriangle size={16} />
-          <span>
-            未完了リーグ: {incompleteLeagues.map(l => l.leagueId).join(', ')}
-            — 全リーグ完了後に決勝トーナメントを生成できます
-          </span>
-        </div>
-      )}
+      <h2 className="text-lg font-bold text-gray-800">リーグ順位表</h2>
 
       {/* 各リーグの順位表 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -97,14 +84,7 @@ export default function TeamStandingsView() {
                   {standings.map(s => (
                     <tr key={s.teamId} className="border-t hover:bg-gray-50">
                       <td className="px-3 py-1.5">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
-                          s.rank === 1 ? 'bg-yellow-100 text-yellow-800' :
-                          s.rank === 2 ? 'bg-gray-200 text-gray-700' :
-                          s.rank === 3 ? 'bg-orange-100 text-orange-700' :
-                          'bg-gray-100 text-gray-500'
-                        }`}>
-                          {s.rank}位
-                        </span>
+                        <RankBadge rank={s.rank} />
                       </td>
                       <td className="px-3 py-1.5 font-medium">{s.teamName}</td>
                       <td className="px-3 py-1.5 text-center font-bold">
