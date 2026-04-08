@@ -4,6 +4,7 @@ import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
+import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
 
 /** 判定ルール詳細 */
@@ -264,7 +265,7 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
 }
 
 export default function TeamLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers } = useTeamStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
@@ -393,6 +394,19 @@ export default function TeamLeagueView() {
               </div>
             </div>
           </div>
+
+          {/* 結果プレビュー（全試合完了時のみ） */}
+          {leagueComplete && (
+            <div className="mt-3 flex justify-end">
+              <TeamLeagueResultPreview
+                league={selectedLeague}
+                standings={standings}
+                matches={leagueMatchList}
+                allTeams={allTeams}
+                tournamentName={tournamentInfo?.name || ''}
+              />
+            </div>
+          )}
 
           {/* プログレスバー */}
           <div className="mt-3 h-1.5 bg-white/20 rounded-full overflow-hidden">
