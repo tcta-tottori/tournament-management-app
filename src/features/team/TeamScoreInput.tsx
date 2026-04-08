@@ -59,15 +59,59 @@ const MATCH_TYPE_THEME: Record<MatchType, MatchTheme> = {
   },
 };
 
+/** 対戦チーム別テーマ（左=オレンジ、右=グリーン） */
+interface TeamTheme {
+  bg: string;
+  bgStrong: string;
+  border: string;
+  borderStrong: string;
+  text: string;
+  textStrong: string;
+  grad: string;
+  btnBg: string;
+  btnBorder: string;
+  btnText: string;
+}
+
+const TEAM_THEME: Record<1 | 2, TeamTheme> = {
+  1: {
+    bg: 'bg-orange-50',
+    bgStrong: 'bg-orange-100',
+    border: 'border-orange-300',
+    borderStrong: 'border-orange-500',
+    text: 'text-orange-700',
+    textStrong: 'text-orange-800',
+    grad: 'from-orange-500 to-amber-500',
+    btnBg: 'bg-white hover:bg-orange-50',
+    btnBorder: 'border-orange-300',
+    btnText: 'text-orange-700',
+  },
+  2: {
+    bg: 'bg-emerald-50',
+    bgStrong: 'bg-emerald-100',
+    border: 'border-emerald-300',
+    borderStrong: 'border-emerald-500',
+    text: 'text-emerald-700',
+    textStrong: 'text-emerald-800',
+    grad: 'from-emerald-500 to-teal-500',
+    btnBg: 'bg-white hover:bg-emerald-50',
+    btnBorder: 'border-emerald-300',
+    btnText: 'text-emerald-700',
+  },
+};
+
 /** 選手名選択ポップアップ */
 function PlayerPickerPopup({
-  title, teamName, roster, current, theme, onSelect, onClose,
+  title, teamName, roster, current, theme, teamTheme, usedPlayers, onSelect, onClose,
 }: {
   title: string;
   teamName: string;
   roster: string[];
   current: string;
   theme: MatchTheme;
+  teamTheme: TeamTheme;
+  /** 同チームの他スロットで既に選択済みの選手名（現在編集中のスロットは除外） */
+  usedPlayers: string[];
   onSelect: (name: string) => void;
   onClose: () => void;
 }) {
@@ -77,8 +121,14 @@ function PlayerPickerPopup({
   const uniqueName = `player-manual-${reactId.replace(/:/g, '')}`;
   const manualInputRef = useRef<HTMLInputElement | null>(null);
 
+  const usedSet = useMemo(() => new Set(usedPlayers), [usedPlayers]);
+  const manualTrim = manual.trim();
+  const manualIsDuplicate = manualTrim.length > 0 && usedSet.has(manualTrim) && manualTrim !== current;
+
   const commit = (name: string) => {
-    onSelect(name.trim());
+    const trimmed = name.trim();
+    if (trimmed && usedSet.has(trimmed) && trimmed !== current) return;
+    onSelect(trimmed);
     onClose();
   };
 
@@ -94,8 +144,8 @@ function PlayerPickerPopup({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* ヘッダー */}
-        <div className={`bg-gradient-to-br ${theme.grad} px-4 py-3 text-white flex items-center justify-between shrink-0`}>
+        {/* ヘッダー（対戦チーム別カラー） */}
+        <div className={`bg-gradient-to-br ${teamTheme.grad} px-4 py-3 text-white flex items-center justify-between shrink-0`}>
           <div className="min-w-0">
             <div className="text-[10px] opacity-90 font-bold uppercase tracking-wider">{title}</div>
             <div className="text-sm font-black truncate">{teamName}</div>
@@ -116,25 +166,37 @@ function PlayerPickerPopup({
               <div className="grid grid-cols-2 gap-2">
                 {roster.map(name => {
                   const isSelected = name === current;
+                  const isUsed = !isSelected && usedSet.has(name);
                   return (
                     <button
                       key={name}
                       type="button"
-                      onClick={() => commit(name)}
-                      className={`px-3 py-3 rounded-xl border-2 text-base font-bold transition-all active:scale-95 text-left ${
-                        isSelected
-                          ? `${theme.bg} ${theme.accentBorder} ${theme.text} shadow-sm`
-                          : `${theme.btn}`
+                      disabled={isUsed}
+                      onClick={() => !isUsed && commit(name)}
+                      className={`px-3 py-3 rounded-xl border-2 text-base font-bold transition-all text-left ${
+                        isUsed
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                          : isSelected
+                          ? `${teamTheme.bgStrong} ${teamTheme.borderStrong} ${teamTheme.textStrong} shadow-sm`
+                          : `${teamTheme.btnBg} ${teamTheme.btnBorder} ${teamTheme.btnText} active:scale-95`
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
                         {isSelected && <Check className="w-4 h-4 shrink-0" />}
-                        <span className="truncate">{name}</span>
+                        <span className={`truncate ${isUsed ? 'line-through' : ''}`}>{name}</span>
+                        {isUsed && (
+                          <span className="ml-auto text-[9px] font-bold text-slate-400 shrink-0">出場済み</span>
+                        )}
                       </div>
                     </button>
                   );
                 })}
               </div>
+              {usedSet.size > 0 && (
+                <p className="mt-3 text-[10px] text-slate-400 px-1 leading-snug">
+                  ※ 同じ対戦内で既に出場した選手は選択できません。
+                </p>
+              )}
             </div>
           ) : (
             <div className="p-6 text-center text-sm text-slate-400">
@@ -148,40 +210,49 @@ function PlayerPickerPopup({
           {manualMode ? (
             <form
               autoComplete="off"
-              onSubmit={e => { e.preventDefault(); if (manual.trim()) commit(manual); }}
-              className="flex gap-1.5"
+              onSubmit={e => { e.preventDefault(); if (manualTrim && !manualIsDuplicate) commit(manual); }}
+              className="space-y-1.5"
             >
-              <input
-                ref={manualInputRef}
-                type="text"
-                value={manual}
-                onChange={e => setManual(e.target.value)}
-                placeholder="苗字を入力"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                name={uniqueName}
-                data-lpignore="true"
-                data-form-type="other"
-                data-1p-ignore="true"
-                enterKeyHint="done"
-                className={`flex-1 px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 ${theme.ring}`}
-              />
-              <button
-                type="submit"
-                disabled={!manual.trim()}
-                className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${theme.grad} disabled:opacity-30 active:scale-95`}
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => { setManualMode(false); setManual(current || ''); }}
-                className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex gap-1.5">
+                <input
+                  ref={manualInputRef}
+                  type="text"
+                  value={manual}
+                  onChange={e => setManual(e.target.value)}
+                  placeholder="苗字を入力"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  name={uniqueName}
+                  data-lpignore="true"
+                  data-form-type="other"
+                  data-1p-ignore="true"
+                  enterKeyHint="done"
+                  className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
+                    manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={!manualTrim || manualIsDuplicate}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${teamTheme.grad} disabled:opacity-30 active:scale-95`}
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setManualMode(false); setManual(current || ''); }}
+                  className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {manualIsDuplicate && (
+                <div className="text-[10px] font-bold text-rose-500 px-1">
+                  「{manualTrim}」は既にこの対戦で出場済みです。
+                </div>
+              )}
             </form>
           ) : (
             <button
@@ -211,21 +282,21 @@ function PlayerPickerPopup({
 
 /** 選手名ボタン（タップでピッカー表示） */
 function PlayerPickerButton({
-  value, placeholder, theme, onClick,
+  value, placeholder, teamTheme, onClick,
 }: {
   value: string;
   placeholder: string;
-  theme: MatchTheme;
+  teamTheme: TeamTheme;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-1 text-[11px] border rounded-md px-2 py-1.5 transition-all active:scale-[0.97] ${
+      className={`w-full flex items-center justify-between gap-1 text-[11px] border-2 rounded-md px-2 py-1.5 transition-all active:scale-[0.97] ${
         value
-          ? `bg-white ${theme.accentBorder} ${theme.text} font-bold`
-          : 'bg-white border-slate-200 text-slate-400'
+          ? `bg-white ${teamTheme.border} ${teamTheme.text} font-bold`
+          : `bg-white ${teamTheme.border} text-slate-400`
       }`}
     >
       <span className="truncate">{value || placeholder}</span>
@@ -553,12 +624,14 @@ export default function TeamScoreInput({
           onSubmit={e => { e.preventDefault(); handleSave(); }}
           className="p-4"
         >
-          {/* Team names */}
+          {/* Team names（対戦チーム別カラー: 左=オレンジ, 右=グリーン） */}
           <div className="flex items-center gap-3 mb-4">
             <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${
-              overallWinner === 1 ? 'bg-amber-50 border-amber-400' : 'bg-gray-50 border-gray-200'
+              overallWinner === 1
+                ? 'bg-amber-50 border-amber-400'
+                : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
-              <div className="font-bold text-sm text-gray-800 truncate">{team1Name}</div>
+              <div className={`font-bold text-sm truncate ${TEAM_THEME[1].textStrong}`}>{team1Name}</div>
               {overallWinner === 1 && (
                 <div className="flex items-center justify-center gap-1 mt-1">
                   <Trophy size={12} className="text-amber-500" />
@@ -568,9 +641,11 @@ export default function TeamScoreInput({
             </div>
             <div className="text-lg font-bold text-gray-300 flex-shrink-0">VS</div>
             <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${
-              overallWinner === 2 ? 'bg-amber-50 border-amber-400' : 'bg-gray-50 border-gray-200'
+              overallWinner === 2
+                ? 'bg-amber-50 border-amber-400'
+                : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
             }`}>
-              <div className="font-bold text-sm text-gray-800 truncate">{team2Name}</div>
+              <div className={`font-bold text-sm truncate ${TEAM_THEME[2].textStrong}`}>{team2Name}</div>
               {overallWinner === 2 && (
                 <div className="flex items-center justify-center gap-1 mt-1">
                   <Trophy size={12} className="text-amber-500" />
@@ -751,38 +826,38 @@ export default function TeamScoreInput({
                     )}
                   </div>
 
-                  {/* 選手名選択 */}
+                  {/* 選手名選択（対戦チーム別カラー: 左=オレンジ, 右=グリーン） */}
                   <div className="mt-3 pt-2.5 border-t border-white/60 grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <div className={`text-[9px] font-black truncate ${theme.text} uppercase tracking-wider`}>{team1Name}</div>
+                    <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[1].bg}`}>
+                      <div className={`text-[9px] font-black truncate ${TEAM_THEME[1].textStrong} uppercase tracking-wider`}>{team1Name}</div>
                       <div className="grid grid-cols-2 gap-1">
                         <PlayerPickerButton
                           value={s.p1a}
                           placeholder="選手1"
-                          theme={theme}
+                          teamTheme={TEAM_THEME[1]}
                           onClick={() => setPicker({ mt, key: 'p1a', side: 1 })}
                         />
                         <PlayerPickerButton
                           value={s.p1b}
                           placeholder="選手2"
-                          theme={theme}
+                          teamTheme={TEAM_THEME[1]}
                           onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
                         />
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className={`text-[9px] font-black truncate ${theme.text} uppercase tracking-wider`}>{team2Name}</div>
+                    <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[2].bg}`}>
+                      <div className={`text-[9px] font-black truncate ${TEAM_THEME[2].textStrong} uppercase tracking-wider`}>{team2Name}</div>
                       <div className="grid grid-cols-2 gap-1">
                         <PlayerPickerButton
                           value={s.p2a}
                           placeholder="選手1"
-                          theme={theme}
+                          teamTheme={TEAM_THEME[2]}
                           onClick={() => setPicker({ mt, key: 'p2a', side: 2 })}
                         />
                         <PlayerPickerButton
                           value={s.p2b}
                           placeholder="選手2"
-                          theme={theme}
+                          teamTheme={TEAM_THEME[2]}
                           onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
                         />
                       </div>
@@ -837,7 +912,21 @@ export default function TeamScoreInput({
         const roster = isTeam1 ? team1Roster : team2Roster;
         const tName = isTeam1 ? team1Name : team2Name;
         const theme = MATCH_TYPE_THEME[pickerState.mt];
+        const teamTheme = TEAM_THEME[pickerState.side];
         const current = scores[pickerState.mt][pickerState.key];
+
+        // 同チームの他スロットで既に使っている選手名を集める
+        // （現在編集中のスロット自体は除外することで、再選択・クリアが自然に動く）
+        const usedPlayers: string[] = [];
+        const sameSideKeys: Array<'p1a'|'p1b'|'p2a'|'p2b'> = isTeam1 ? ['p1a', 'p1b'] : ['p2a', 'p2b'];
+        for (const mt of MATCH_TYPE_ORDER) {
+          for (const k of sameSideKeys) {
+            if (mt === pickerState.mt && k === pickerState.key) continue;
+            const val = scores[mt][k].trim();
+            if (val) usedPlayers.push(val);
+          }
+        }
+
         return (
           <PlayerPickerPopup
             title={`${MATCH_TYPE_LABELS[pickerState.mt]} 選手選択`}
@@ -845,6 +934,8 @@ export default function TeamScoreInput({
             roster={roster}
             current={current}
             theme={theme}
+            teamTheme={teamTheme}
+            usedPlayers={usedPlayers}
             onSelect={(name) => handlePlayerChange(pickerState.mt, pickerState.key, name)}
             onClose={() => setPicker(null)}
           />
