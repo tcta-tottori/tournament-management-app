@@ -252,6 +252,24 @@ function cleanTournamentName(name: string): string {
     .trim();
 }
 
+/** 開催日を「M/D（曜）」形式に正規化 */
+function formatJpDate(input: string): string {
+  if (!input) return '';
+  // 全角→半角数字
+  const half = input.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  // 月日抽出: yyyy/m/d, m/d, m月d日, etc.
+  const m1 = half.match(/(?:(\d{4})[\/\.年])?\s*(\d{1,2})\s*[\/\.月]\s*(\d{1,2})/);
+  if (!m1) return input;
+  const year = m1[1] ? parseInt(m1[1]) : new Date().getFullYear();
+  const month = parseInt(m1[2]);
+  const day = parseInt(m1[3]);
+  if (!month || !day || month > 12 || day > 31) return input;
+  const d = new Date(year, month - 1, day);
+  if (isNaN(d.getTime())) return input;
+  const wd = '日月火水木金土'[d.getDay()];
+  return `${month}/${day}（${wd}）`;
+}
+
 interface DataSyncProps {
   onConnectionChange?: () => void;
   onDataLoaded?: () => void;
@@ -726,8 +744,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               setWizardMixedPending(null);
               setWizardParsedExcel(null);
               setWizardEditName(teamResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
-              setWizardEditDate(teamResult.info.date || '');
-              setWizardEditVenue(teamResult.info.venue || '');
+              setWizardEditDate(formatJpDate(teamResult.info.date || ''));
+              setWizardEditVenue(teamResult.info.venue || 'ヤマタスポーツパーク');
               if (teamResult.info.date) setWizardSourceDate(teamResult.info.date);
               if (teamResult.info.venue) setWizardSourceVenue(teamResult.info.venue);
               setWizardDateMode('normal');
@@ -750,8 +768,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               setWizardMixedPending(null);
               setWizardParsedExcel(null);
               setWizardEditName(teamResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
-              setWizardEditDate(teamResult.info.date || '');
-              setWizardEditVenue(teamResult.info.venue || '');
+              setWizardEditDate(formatJpDate(teamResult.info.date || ''));
+              setWizardEditVenue(teamResult.info.venue || 'ヤマタスポーツパーク');
               if (teamResult.info.date) setWizardSourceDate(teamResult.info.date);
               if (teamResult.info.venue) setWizardSourceVenue(teamResult.info.venue);
               setWizardDateMode('normal');
@@ -774,8 +792,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               setWizardMixedPending({ info: mixedResult.info, leagues: mixedResult.leagues, matches: mixedResult.matches, fileName: file.name, arrayBuffer });
               setWizardTeamPending(null);
               setWizardEditName(mixedResult.info.name);
-              setWizardEditDate(mixedResult.info.date);
-              setWizardEditVenue(mixedResult.info.venue);
+              setWizardEditDate(formatJpDate(mixedResult.info.date));
+              setWizardEditVenue(mixedResult.info.venue || 'ヤマタスポーツパーク');
               isMixedOrTeam = true;
               setWizardParsedExcel(null);
             }
@@ -1438,7 +1456,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           <label className="text-[11px] font-medium text-gray-500 block mb-1">
                             <Calendar className="w-3 h-3 inline mr-0.5 -mt-0.5" />開催日
                           </label>
-                          <input type="text" value={wizardEditDate} onChange={e => setWizardEditDate(e.target.value)} placeholder="例: 3/15"
+                          <input type="text" value={wizardEditDate}
+                            onChange={e => setWizardEditDate(e.target.value)}
+                            onBlur={e => setWizardEditDate(formatJpDate(e.target.value))}
+                            placeholder="例: 11/3（日）"
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
                         </div>
                         <div>
