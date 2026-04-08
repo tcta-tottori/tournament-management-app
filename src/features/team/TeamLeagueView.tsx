@@ -141,7 +141,7 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
 }
 
 export default function TeamLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder } = useTeamStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
@@ -283,6 +283,23 @@ export default function TeamLeagueView() {
 
       {/* 判定ルール設定 */}
       <TiebreakRuleSettings />
+
+      {/* テスト入力ボタン */}
+      <button
+        onClick={() => {
+          if (!confirm(`${selectedLeague.leagueId}リーグの全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+          for (const m of leagueMatchList) {
+            for (const mt of MATCH_TYPE_ORDER) {
+              updateSubMatchScore(m.matchId, mt, 6, 4, null);
+              updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+            }
+          }
+        }}
+        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
+      >
+        <Target className="w-3.5 h-3.5" />
+        テスト入力（{selectedLeague.leagueId}リーグ全試合 6-4 / 田中・山本）
+      </button>
 
       {/* 成績表 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden">
