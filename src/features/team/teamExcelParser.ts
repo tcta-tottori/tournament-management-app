@@ -153,20 +153,27 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
   if (!coverSheetName) return info;
   const ws = wb.Sheets[coverSheetName];
 
-  // シート全体をスキャンして情報を取得
+  // 候補を収集
+  let yearText = '';
+  let titleText = '';
+
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z50');
   for (let r = range.s.r; r <= Math.min(range.e.r, 50); r++) {
     for (let c = range.s.c; c <= range.e.c; c++) {
       const ref = colLetter(c) + (r + 1);
       const val = cellStr(ws, ref);
       if (!val) continue;
+      const clean = val.replace(/\s+/g, ' ').trim();
 
-      if (val.includes('テニス大会') || val.includes('会長杯')) {
-        if (!info.name) info.name = val.replace(/\s+/g, ' ').trim();
+      // 年度行（令和〜年度）— 最も長いものを採用
+      if (/令和\s*[\d０-９]+\s*年度/.test(clean) && clean.length > yearText.length) {
+        yearText = clean;
       }
-      if (val.includes('令和') && val.includes('年度') && !info.name) {
-        info.name = val.replace(/\s+/g, ' ').trim();
+      // 大会タイトル（会長杯/テニス大会/選手権/大会 を含むもの）— 最も長いものを採用
+      if (/(会長杯|テニス大会|選手権|カップ|大会)/.test(clean) && !/令和/.test(clean) && clean.length > titleText.length) {
+        titleText = clean;
       }
+
       if (!info.date && (val.includes('日　時') || val.includes('日 時') || val.includes('日時') || val.includes('開催日'))) {
         const stripped = val.replace(/^(日\s*時|開催日)\s*[：:]?\s*/, '').trim();
         if (stripped && stripped !== val.trim()) {
@@ -197,22 +204,28 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
     }
   }
 
-  // 年度+大会名を統合
-  if (info.name && !info.name.includes('令和')) {
-    const yearName = wb.SheetNames.find(n => n.includes('表紙'));
-    if (yearName) {
-      const ys = wb.Sheets[yearName];
-      for (let r = 0; r < 10; r++) {
-        for (let c = 0; c < 10; c++) {
-          const val = cellStr(ys, colLetter(c) + (r + 1));
-          if (val.includes('令和') && val.includes('年度')) {
-            info.name = val.trim() + ' ' + info.name;
-            break;
+  // 他の表紙シート（例: 表紙（HP））からも補完
+  if (!titleText || !yearText) {
+    const otherCovers = wb.SheetNames.filter(n => n.includes('表紙') && n !== coverSheetName);
+    for (const sn of otherCovers) {
+      const sws = wb.Sheets[sn];
+      const srange = XLSX.utils.decode_range(sws['!ref'] || 'A1:Z50');
+      for (let r = srange.s.r; r <= Math.min(srange.e.r, 50); r++) {
+        for (let c = srange.s.c; c <= srange.e.c; c++) {
+          const v = cellStr(sws, colLetter(c) + (r + 1));
+          if (!v) continue;
+          const clean = v.replace(/\s+/g, ' ').trim();
+          if (!yearText && /令和\s*[\d０-９]+\s*年度/.test(clean)) yearText = clean;
+          if (/(会長杯|テニス大会|選手権|カップ|大会)/.test(clean) && !/令和/.test(clean) && clean.length > titleText.length) {
+            titleText = clean;
           }
         }
       }
     }
   }
+
+  // 年度 + 大会タイトルを連結
+  info.name = [yearText, titleText].filter(Boolean).join(' ').trim();
 
   // ゲームルール解析
   info.gameRules = {};

@@ -305,7 +305,7 @@ function LeagueSection({
 
 /** メインコンポーネント */
 export default function TeamEntryView() {
-  const { leagues, setTeamStatus, setLeagueAllStatus } = useTeamStore();
+  const { leagues, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus } = useTeamStore();
   const [editingTeam, setEditingTeam] = useState<{ team: TeamEntry; colorIndex: number } | null>(null);
 
   if (leagues.length === 0) {
@@ -320,8 +320,31 @@ export default function TeamEntryView() {
     );
   }
 
+  const totalTeams = leagues.reduce((sum, l) => sum + l.teams.length, 0);
+  const totalEntered = leagues.reduce((sum, l) => sum + l.teams.filter(t => t.status === 'entry').length, 0);
+  const allEntered = totalEntered === totalTeams && totalTeams > 0;
+
   return (
     <div className="space-y-3 pb-20">
+      {/* 全体一括エントリー */}
+      <div className="flex items-center gap-2 px-1">
+        <div className="flex-1 text-xs text-slate-500">
+          <span className="font-bold tabular-nums text-slate-700">{totalEntered}</span>
+          <span className="text-slate-400"> / {totalTeams} チーム Entry</span>
+        </div>
+        <button
+          onClick={() => setAllTeamsStatus(allEntered ? 'none' : 'entry')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 ${
+            allEntered
+              ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white hover:shadow-lg'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          {allEntered ? '全て解除' : '全て一括Entry'}
+        </button>
+      </div>
+
       {/* リーグ別セクション */}
       {leagues.map((league, index) => (
         <LeagueSection
