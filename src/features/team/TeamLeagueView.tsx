@@ -1,10 +1,111 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Target, Info, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Target, Info, Settings2, ArrowUp, ArrowDown, HelpCircle } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { createPortal } from 'react-dom';
+
+/** 判定ルール詳細 */
+const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
+  title: string;
+  summary: string;
+  description: string;
+  example: { title: string; lines: string[]; conclusion: string };
+  grad: string;
+  iconBg: string;
+}> = {
+  points: {
+    title: '取得ポイント（種目勝利数）',
+    summary: '勝利した種目（MIX / WD / MD）の合計数で比較します',
+    description: '各対戦では最大3種目を行い、勝利した種目の合計数を「取得ポイント」として集計します。勝利数が同じチーム同士で取得ポイントが多いチームが上位になります。',
+    example: {
+      title: '例：AとBが2勝1敗で並んだ場合',
+      lines: [
+        'チームA: 3試合で 6 種目勝利（2-1 / 3-0 / 1-2）',
+        'チームB: 3試合で 5 種目勝利（2-1 / 2-1 / 1-2）',
+      ],
+      conclusion: '→ 取得ポイントが多いチームAが上位',
+    },
+    grad: 'from-amber-500 to-orange-600',
+    iconBg: 'bg-amber-100 text-amber-700',
+  },
+  gameRatio: {
+    title: 'ゲーム率',
+    summary: '全試合での「取得ゲーム数 ÷ 総ゲーム数」で比較します',
+    description: '各種目で取ったゲーム数を合計し、(取得ゲーム数) ÷ (取得ゲーム数 + 失ゲーム数) の値が高い方が上位になります。接戦で勝ったか、圧勝したかを評価します。',
+    example: {
+      title: '例：AとBのゲーム率を比較',
+      lines: [
+        'チームA: 取得 36 / 失 24 → 36 ÷ 60 = 0.600',
+        'チームB: 取得 32 / 失 28 → 32 ÷ 60 = 0.533',
+      ],
+      conclusion: '→ ゲーム率が高いチームAが上位',
+    },
+    grad: 'from-emerald-500 to-teal-600',
+    iconBg: 'bg-emerald-100 text-emerald-700',
+  },
+  headToHead: {
+    title: '直接対決',
+    summary: '同率 2 チーム同士の場合、直接対戦で勝ったチームが上位です',
+    description: '2チームが完全に同率の場合のみ適用されます。両チームの直接対戦の勝者が上位となります。3チーム以上で同率になった場合はこのルールは適用されません（他のルールで判定）。',
+    example: {
+      title: '例：AとBが完全同率',
+      lines: [
+        '直接対戦: チームA 2-1 チームB',
+      ],
+      conclusion: '→ 直接対戦で勝ったチームAが上位',
+    },
+    grad: 'from-indigo-500 to-blue-600',
+    iconBg: 'bg-indigo-100 text-indigo-700',
+  },
+};
+
+/** 判定ルール詳細ポップアップ */
+function RuleDetailPopup({ rule, onClose }: { rule: TiebreakRuleId; onClose: () => void }) {
+  const d = TIEBREAK_RULE_DETAILS[rule];
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className={`bg-gradient-to-br ${d.grad} px-5 py-4 text-white flex items-center justify-between`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+              <HelpCircle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] opacity-90 font-bold uppercase tracking-wider">判定ルール</div>
+              <div className="text-base font-black truncate">{d.title}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg shrink-0"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className={`text-sm font-bold text-slate-800 ${d.iconBg} px-3 py-2 rounded-lg`}>
+            {d.summary}
+          </div>
+          <div className="text-xs text-slate-600 leading-relaxed">
+            {d.description}
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">{d.example.title}</div>
+            <div className="space-y-1 bg-slate-50 rounded-lg p-3 border border-slate-200">
+              {d.example.lines.map((l, i) => (
+                <div key={i} className="text-xs text-slate-700 font-medium tabular-nums">{l}</div>
+              ))}
+              <div className="text-xs font-black text-slate-900 pt-1.5 mt-1.5 border-t border-slate-200">
+                {d.example.conclusion}
+              </div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400 text-center">
+            ※ 勝数（対戦勝利数）は常にこれらより優先されます
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 /** リーグカラー */
 const LEAGUE_COLORS = [
@@ -36,6 +137,7 @@ function RankText({ rank }: { rank: number }) {
 function TiebreakRuleSettings() {
   const { tiebreakOrder, setTiebreakOrder } = useTeamStore();
   const [open, setOpen] = useState(false);
+  const [detailRule, setDetailRule] = useState<TiebreakRuleId | null>(null);
 
   const move = (idx: number, dir: -1 | 1) => {
     const newOrder = [...tiebreakOrder];
@@ -59,14 +161,24 @@ function TiebreakRuleSettings() {
       </button>
       {open && (
         <div className="px-4 py-3 border-t border-slate-100 space-y-1.5 bg-slate-50/40">
+          <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+            <Info className="w-3 h-3" />
+            ルール名をタップすると詳細と例が表示されます
+          </div>
           {tiebreakOrder.map((rule, i) => (
-            <div key={rule} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-black">{i + 1}</span>
-              <span className="flex-1 text-xs font-bold text-slate-700">{TIEBREAK_RULE_LABELS[rule]}</span>
-              <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30">
+            <div key={rule} className="flex items-center gap-2 px-2 py-1.5 bg-white rounded-lg border border-slate-200">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-black shrink-0">{i + 1}</span>
+              <button
+                onClick={() => setDetailRule(rule)}
+                className="flex-1 flex items-center gap-1.5 text-left px-2 py-1 rounded-md hover:bg-indigo-50 active:bg-indigo-100 transition-colors min-w-0"
+              >
+                <span className="flex-1 text-xs font-bold text-slate-700 truncate">{TIEBREAK_RULE_LABELS[rule]}</span>
+                <HelpCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              </button>
+              <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 shrink-0">
                 <ArrowUp className="w-3.5 h-3.5 text-slate-500" />
               </button>
-              <button onClick={() => move(i, 1)} disabled={i === tiebreakOrder.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30">
+              <button onClick={() => move(i, 1)} disabled={i === tiebreakOrder.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 shrink-0">
                 <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
               </button>
             </div>
@@ -74,6 +186,7 @@ function TiebreakRuleSettings() {
           <div className="text-[10px] text-slate-400 pt-1">※ 勝数は常に最優先です</div>
         </div>
       )}
+      {detailRule && <RuleDetailPopup rule={detailRule} onClose={() => setDetailRule(null)} />}
     </div>
   );
 }
@@ -81,6 +194,7 @@ function TiebreakRuleSettings() {
 /** 判定詳細ポップアップ */
 function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStanding; onClose: () => void }) {
   const { tiebreakOrder } = useTeamStore();
+  const [detailRule, setDetailRule] = useState<TiebreakRuleId | null>(null);
   const totalGames = standing.gamesWon + standing.gamesLost;
   const ratio = totalGames === 0 ? 0 : standing.gamesWon / totalGames;
   return createPortal(
@@ -113,17 +227,25 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-slate-400 font-bold mb-1.5">適用された判定順</div>
+            <div className="text-[10px] text-slate-400 font-bold mb-1.5 flex items-center gap-1">
+              適用された判定順
+              <span className="text-slate-400 font-normal">（タップで詳細）</span>
+            </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs px-2 py-1.5 bg-amber-50 border border-amber-200 rounded">
                 <span className="inline-flex w-5 h-5 rounded-full bg-amber-500 text-white items-center justify-center text-[10px] font-black">0</span>
                 <span className="font-bold text-amber-800">対戦勝数</span>
               </div>
               {tiebreakOrder.map((r, i) => (
-                <div key={r} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded">
+                <button
+                  key={r}
+                  onClick={() => setDetailRule(r)}
+                  className="w-full flex items-center gap-2 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded hover:bg-indigo-50 hover:border-indigo-200 active:scale-[0.98] transition-all"
+                >
                   <span className="inline-flex w-5 h-5 rounded-full bg-slate-600 text-white items-center justify-center text-[10px] font-black">{i + 1}</span>
-                  <span className="font-bold text-slate-700">{TIEBREAK_RULE_LABELS[r]}</span>
-                </div>
+                  <span className="flex-1 text-left font-bold text-slate-700">{TIEBREAK_RULE_LABELS[r]}</span>
+                  <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+                </button>
               ))}
             </div>
           </div>
@@ -135,6 +257,7 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
           )}
         </div>
       </div>
+      {detailRule && <RuleDetailPopup rule={detailRule} onClose={() => setDetailRule(null)} />}
     </div>,
     document.body
   );
