@@ -20,6 +20,12 @@ export interface ScheduleConfig {
   courtBlocks: Record<string, boolean>;
 }
 
+// 会場ごとのブロック使用終了時刻
+// 外側キー: venueId (例: 'yamata', 'sendai')
+// 内側キー: ブロックのインデックス (文字列化)
+// 値: "HH:MM" 形式の終了時刻 (未設定は空文字)
+export type BlockEndTimesMap = Record<string, Record<string, string>>;
+
 // グローバルに保持するアプリの状態
 interface AppState {
   currentTournamentId: string | null;  // 現在作業中の大会ID
@@ -43,6 +49,9 @@ interface AppState {
   scheduleFileName: string;
   setScheduleFileName: (name: string) => void;
 
+  // 会場ごと・ブロックごとの使用終了時刻（コートマップの点滅アラート用）
+  blockEndTimes: BlockEndTimesMap;
+  setBlockEndTime: (venueId: string, blockIdx: number, endTime: string) => void;
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -69,6 +78,22 @@ export const useAppStore = create<AppState>()(
       setImportedSchedule: (items) => set({ importedSchedule: items }),
       scheduleFileName: '',
       setScheduleFileName: (name) => set({ scheduleFileName: name }),
+      blockEndTimes: {},
+      setBlockEndTime: (venueId, blockIdx, endTime) =>
+        set((state) => {
+          const venueMap = { ...(state.blockEndTimes[venueId] || {}) };
+          if (endTime) {
+            venueMap[String(blockIdx)] = endTime;
+          } else {
+            delete venueMap[String(blockIdx)];
+          }
+          return {
+            blockEndTimes: {
+              ...state.blockEndTimes,
+              [venueId]: venueMap,
+            },
+          };
+        }),
     }),
     {
       name: 'tennis-tournament-storage', // localStorage に保存
