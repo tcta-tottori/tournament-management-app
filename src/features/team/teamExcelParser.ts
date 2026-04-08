@@ -157,6 +157,19 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
   let yearText = '';
   let titleText = '';
 
+  // タイトルらしからぬ文字列（ルール説明・順位決定方法など）を除外
+  const isRuleLike = (s: string) =>
+    /(方法|ルール|マッチ|ノーアド|タイブレ|ゲーム先取|ゲームマッチ|行います|ダブルス|男子|女子|先取|リーグ戦|特別|順位|決定)/.test(s);
+
+  const pickTitle = (clean: string) => {
+    if (!/(会長杯|テニス大会|選手権|カップ|杯)/.test(clean)) return;
+    if (/令和/.test(clean)) return;
+    if (isRuleLike(clean)) return;
+    if (clean.length > 40) return;
+    // より短く端的なタイトルを優先（ルール説明より大会名は短い）
+    if (!titleText || clean.length < titleText.length) titleText = clean;
+  };
+
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z50');
   for (let r = range.s.r; r <= Math.min(range.e.r, 50); r++) {
     for (let c = range.s.c; c <= range.e.c; c++) {
@@ -165,13 +178,19 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
       if (!val) continue;
       const clean = val.replace(/\s+/g, ' ').trim();
 
-      // 年度行（令和〜年度）— 最も長いものを採用
-      if (/令和\s*[\d０-９]+\s*年度/.test(clean) && clean.length > yearText.length) {
-        yearText = clean;
+      // 年度行（令和〜年度）— 最も短いものを採用（純粋な "令和7年度" が望ましい）
+      if (/令和\s*[\d０-９]+\s*年度/.test(clean) && !isRuleLike(clean)) {
+        if (!yearText || clean.length < yearText.length) yearText = clean;
       }
-      // 大会タイトル（会長杯/テニス大会/選手権/大会 を含むもの）— 最も長いものを採用
-      if (/(会長杯|テニス大会|選手権|カップ|大会)/.test(clean) && !/令和/.test(clean) && clean.length > titleText.length) {
-        titleText = clean;
+      pickTitle(clean);
+
+      // 日付検出: "3/15" "3月15日" "2026/4/8" "R7.4.8" 等
+      if (!info.date) {
+        const dateMatch = clean.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
+                          clean.match(/^\d{1,2}\/\d{1,2}$/);
+        if (dateMatch && !isRuleLike(clean) && !/令和\s*\d+\s*年度/.test(clean)) {
+          info.date = dateMatch[0];
+        }
       }
 
       if (!info.date && (val.includes('日　時') || val.includes('日 時') || val.includes('日時') || val.includes('開催日'))) {
@@ -205,7 +224,7 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
   }
 
   // 他の表紙シート（例: 表紙（HP））からも補完
-  if (!titleText || !yearText) {
+  {
     const otherCovers = wb.SheetNames.filter(n => n.includes('表紙') && n !== coverSheetName);
     for (const sn of otherCovers) {
       const sws = wb.Sheets[sn];
@@ -215,9 +234,16 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
           const v = cellStr(sws, colLetter(c) + (r + 1));
           if (!v) continue;
           const clean = v.replace(/\s+/g, ' ').trim();
-          if (!yearText && /令和\s*[\d０-９]+\s*年度/.test(clean)) yearText = clean;
-          if (/(会長杯|テニス大会|選手権|カップ|大会)/.test(clean) && !/令和/.test(clean) && clean.length > titleText.length) {
-            titleText = clean;
+          if (/令和\s*[\d０-９]+\s*年度/.test(clean) && !isRuleLike(clean)) {
+            if (!yearText || clean.length < yearText.length) yearText = clean;
+          }
+          pickTitle(clean);
+          if (!info.date) {
+            const dateMatch = clean.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
+                              clean.match(/^\d{1,2}\/\d{1,2}$/);
+            if (dateMatch && !isRuleLike(clean) && !/令和\s*\d+\s*年度/.test(clean)) {
+              info.date = dateMatch[0];
+            }
           }
         }
       }

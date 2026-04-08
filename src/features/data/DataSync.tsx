@@ -1445,8 +1445,19 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           <label className="text-[11px] font-medium text-gray-500 block mb-1">
                             <MapPin className="w-3 h-3 inline mr-0.5 -mt-0.5" />会場
                           </label>
-                          <input type="text" value={wizardEditVenue} onChange={e => setWizardEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                          <select
+                            value={
+                              wizardEditVenue.includes('ヤマタ') ? 'ヤマタスポーツパーク'
+                              : wizardEditVenue.includes('千代') ? '千代テニス場'
+                              : wizardEditVenue || ''
+                            }
+                            onChange={e => setWizardEditVenue(e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                          >
+                            <option value="">会場を選択</option>
+                            <option value="ヤマタスポーツパーク">ヤマタスポーツパーク</option>
+                            <option value="千代テニス場">千代テニス場</option>
+                          </select>
                         </div>
                       </div>
                     ) : (
