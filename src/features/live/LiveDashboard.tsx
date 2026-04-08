@@ -3,7 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../mixed/mixedStore';
+import { useTeamStore } from '../team/teamStore';
 import MixedLiveCourtView from '../mixed/MixedLiveCourtView';
+import TeamLiveCourtView from '../team/TeamLiveCourtView';
 import type { Match, Court } from '../../db/database';
 import {
   BarChart2, Play, CheckCircle, Clock, Trophy, Users, MapPin,
@@ -349,9 +351,14 @@ function TennisCourtBlock({
 
 export default function LiveDashboard() {
   const isMixedImported = useMixedStore(s => s.isImported);
+  const isTeamImported = useTeamStore(s => s.isImported);
 
   if (isMixedImported) {
     return <MixedLiveCourtView />;
+  }
+
+  if (isTeamImported) {
+    return <TeamLiveCourtView />;
   }
 
   return <LiveDashboardInner />;

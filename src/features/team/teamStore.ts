@@ -24,7 +24,7 @@ interface TeamState {
   importFileName: string;
   isImported: boolean;
   rankOverrides: Record<string, Record<string, number>>;
-  bracketCourtAssignments: Record<string, { courtName: string; startedAt: number }>;
+  bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
   lastStandingsHash: string;
   tiebreakOrder: TiebreakRuleId[];
 
@@ -60,7 +60,7 @@ interface TeamState {
   // Navigation
   setCurrentPhase: (phase: TeamPhase) => void;
   setRankOverride: (leagueId: string, teamId: string, rank: number) => void;
-  assignBracketMatchToCourt: (matchId: string, courtName: string) => void;
+  assignBracketMatchToCourt: (matchId: string, courtNames: string[]) => void;
   removeBracketMatchFromCourt: (matchId: string) => void;
   setSelectedLeagueId: (id: string | null) => void;
   setSelectedBracketCategory: (cat: PlacementCategory) => void;
@@ -396,14 +396,14 @@ export const useTeamStore = create<TeamState>()(
       setRankOverride: (leagueId, teamId, rank) => set(state => ({
         rankOverrides: { ...state.rankOverrides, [leagueId]: { ...state.rankOverrides[leagueId], [teamId]: rank } },
       })),
-      assignBracketMatchToCourt: (matchId, courtName) => set(state => {
+      assignBracketMatchToCourt: (matchId, courtNames) => set(state => {
         const brackets = state.brackets.map(b => ({
           ...b,
           matches: b.matches.map(m => m.matchId === matchId ? { ...m, status: 'playing' as const } : m),
         }));
         return {
           brackets,
-          bracketCourtAssignments: { ...state.bracketCourtAssignments, [matchId]: { courtName, startedAt: Date.now() } },
+          bracketCourtAssignments: { ...state.bracketCourtAssignments, [matchId]: { courtNames, startedAt: Date.now() } },
         };
       }),
       removeBracketMatchFromCourt: (matchId) => set(state => {
@@ -630,7 +630,7 @@ export const useTeamStore = create<TeamState>()(
             if (idx >= 0) { newBrackets[idx] = oldB; preservedCategories.add(oldB.category); }
           }
         }
-        const newCourtAssignments: Record<string, { courtName: string; startedAt: number }> = {};
+        const newCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }> = {};
         for (const [matchId, ca] of Object.entries(bracketCourtAssignments)) {
           const cat = matchId.match(/^bracket-(\w+)-/)?.[1];
           if (cat && preservedCategories.has(cat)) newCourtAssignments[matchId] = ca;
@@ -640,7 +640,25 @@ export const useTeamStore = create<TeamState>()(
     }),
     {
       name: 'team-tournament-storage',
-      version: 1,
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2 && persistedState && typeof persistedState === 'object') {
+          const old = persistedState.bracketCourtAssignments || {};
+          const next: Record<string, { courtNames: string[]; startedAt: number }> = {};
+          for (const [k, v] of Object.entries(old)) {
+            const entry = v as any;
+            if (entry && typeof entry === 'object') {
+              if (Array.isArray(entry.courtNames)) {
+                next[k] = { courtNames: entry.courtNames, startedAt: entry.startedAt || Date.now() };
+              } else if (entry.courtName) {
+                next[k] = { courtNames: [entry.courtName], startedAt: entry.startedAt || Date.now() };
+              }
+            }
+          }
+          persistedState.bracketCourtAssignments = next;
+        }
+        return persistedState;
+      },
     }
   )
 );

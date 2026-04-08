@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
-import type { TeamBracketMatch, PlacementCategory } from './types';
+import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
 import { MATCH_TYPE_SHORT } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 
@@ -24,13 +24,42 @@ export default function TeamBracketView() {
   const {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
-    allTeams,
+    allTeams, leagues, rebuildBracketFromSlots,
   } = useTeamStore();
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
-  const [courtInput, setCourtInput] = useState<{ matchId: string; value: string } | null>(null);
+  const [courtAssignMatch, setCourtAssignMatch] = useState<TeamBracketMatch | null>(null);
+  const [courtAssignSelected, setCourtAssignSelected] = useState<string[]>([]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
+  const is1stBracket = selectedBracketCategory === '1st';
+  const showDrawPanel = useMemo(() => {
+    if (!is1stBracket || !currentBracket) return false;
+    const r1 = currentBracket.matches.filter(m => m.round === 1 && !m.isBye);
+    return r1.some(m => !m.team1Id || !m.team2Id);
+  }, [is1stBracket, currentBracket]);
+
+  // 使用中コート（決勝Tに割り当て済みのコート＋予選未完了リーグのコート）
+  const usedCourtNames = useMemo(() => {
+    const used = new Set<string>();
+    for (const ca of Object.values(bracketCourtAssignments)) {
+      for (const c of ca.courtNames) used.add(c);
+    }
+    return used;
+  }, [bracketCourtAssignments]);
+
+  const openCourtAssign = (match: TeamBracketMatch) => {
+    setCourtAssignMatch(match);
+    const existing = bracketCourtAssignments[match.matchId];
+    setCourtAssignSelected(existing ? [...existing.courtNames] : []);
+  };
+
+  const confirmCourtAssign = () => {
+    if (!courtAssignMatch || courtAssignSelected.length === 0) return;
+    assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignSelected);
+    setCourtAssignMatch(null);
+    setCourtAssignSelected([]);
+  };
 
   if (!currentBracket || brackets.length === 0) {
     return (
@@ -120,6 +149,14 @@ export default function TeamBracketView() {
         </div>
       </div>
 
+      {/* 1位トーナメント抽選パネル（1回戦に未配置スロットがある場合のみ） */}
+      {showDrawPanel && currentBracket && (
+        <TeamRouletteDrawPanel
+          bracket={currentBracket}
+          onRebuild={rebuildBracketFromSlots}
+        />
+      )}
+
       {/* ブラケット表示 */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
@@ -170,9 +207,9 @@ export default function TeamBracketView() {
                         <div className="flex items-center justify-between px-2.5 py-1 bg-slate-50/80 border-b border-slate-100 text-[10px]">
                           <div className="flex items-center gap-1 min-w-0">
                             {court ? (
-                              <span className="flex items-center gap-0.5 text-blue-600 font-bold">
-                                <MapPin className="w-2.5 h-2.5" />
-                                {court.courtName}
+                              <span className="flex items-center gap-0.5 text-blue-600 font-bold truncate">
+                                <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                <span className="truncate">{court.courtNames.join('・')}</span>
                               </span>
                             ) : (
                               <span className="text-slate-400 font-medium">#{match.position}</span>
@@ -291,11 +328,20 @@ export default function TeamBracketView() {
                             )}
                             {isReady && !court && (
                               <button
-                                onClick={e => { e.stopPropagation(); setCourtInput({ matchId: match.matchId, value: '' }); }}
+                                onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
                                 className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                               >
                                 <MapPin className="w-3 h-3" />
                                 コート割当
+                              </button>
+                            )}
+                            {isPlaying && court && (
+                              <button
+                                onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
+                                className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                              >
+                                <MapPin className="w-3 h-3" />
+                                コート変更
                               </button>
                             )}
                           </div>
@@ -335,48 +381,88 @@ export default function TeamBracketView() {
         </div>
       </div>
 
-      {/* コート割当ダイアログ */}
-      {courtInput && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setCourtInput(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
+      {/* コート割当ダイアログ（複数選択可） */}
+      {courtAssignMatch && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setCourtAssignMatch(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-5 py-4 text-white">
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
-                <h3 className="font-black">コート割当</h3>
+                <h3 className="font-black">コート割当（複数選択可）</h3>
               </div>
             </div>
             <div className="p-5">
-              <input
-                type="text"
-                value={courtInput.value}
-                onChange={e => setCourtInput({ ...courtInput, value: e.target.value })}
-                placeholder="コート番号（例: 1コート）"
-                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2.5 mb-4 text-sm focus:outline-none focus:border-blue-500"
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && courtInput.value.trim()) {
-                    assignBracketMatchToCourt(courtInput.matchId, courtInput.value.trim());
-                    setCourtInput(null);
-                  }
-                }}
-              />
+              <div className="bg-slate-50 rounded-xl p-3 mb-4 text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-slate-200 text-[8px] font-bold text-slate-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
+                  <span className="font-bold truncate">{courtAssignMatch.team1Name}</span>
+                </div>
+                <div className="text-slate-400 text-[9px] my-0.5">vs</div>
+                <div className="flex items-center gap-2">
+                  {courtAssignMatch.team2League && <span className="w-4 h-4 rounded bg-slate-200 text-[8px] font-bold text-slate-600 flex items-center justify-center">{courtAssignMatch.team2League}</span>}
+                  <span className="font-bold truncate">{courtAssignMatch.team2Name}</span>
+                </div>
+              </div>
+              <label className="text-xs font-bold text-slate-600 block mb-2">
+                コートを選択 <span className="text-slate-400 font-normal">（複数選択可・使用中は選択不可）</span>
+              </label>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {Array.from({ length: 16 }, (_, i) => `${i + 1}コート`).map(c => {
+                  const inLeagueProgress = (() => {
+                    for (const l of leagues) {
+                      const lm = useTeamStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
+                      if (lm.length > 0 && lm.some(m => m.status !== 'finished')) {
+                        const nums = (l.courtName || '').match(/\d+/g);
+                        if (nums && nums.includes(c.replace('コート', ''))) return true;
+                      }
+                    }
+                    return false;
+                  })();
+                  // 既に他のマッチで使用中
+                  const usedByOther = Array.from(usedCourtNames).some(uc => uc === c) &&
+                    !(bracketCourtAssignments[courtAssignMatch.matchId]?.courtNames.includes(c));
+                  const isUsed = inLeagueProgress || usedByOther;
+                  const isSelected = courtAssignSelected.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        if (isUsed) return;
+                        setCourtAssignSelected(prev =>
+                          prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+                        );
+                      }}
+                      disabled={isUsed}
+                      className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
+                        ${isUsed ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' :
+                          isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                          'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                    >
+                      {c.replace('コート', '')}
+                      {isUsed && <span className="block text-[7px] text-slate-300">使用中</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {courtAssignSelected.length > 0 && (
+                <div className="mb-3 text-[10px] text-slate-500 text-center">
+                  選択中: <span className="font-bold text-emerald-600">{courtAssignSelected.sort((a, b) => parseInt(a) - parseInt(b)).join('・')}</span>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCourtInput(null)}
+                  onClick={() => setCourtAssignMatch(null)}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
-                  onClick={() => {
-                    if (courtInput.value.trim()) {
-                      assignBracketMatchToCourt(courtInput.matchId, courtInput.value.trim());
-                      setCourtInput(null);
-                    }
-                  }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all"
+                  onClick={confirmCourtAssign}
+                  disabled={courtAssignSelected.length === 0}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  割当
+                  決定
                 </button>
               </div>
             </div>
@@ -398,6 +484,252 @@ export default function TeamBracketView() {
           isBracket
         />
       )}
+    </div>
+  );
+}
+
+/** 1位トーナメント抽選パネル（ルーレット＋手動配置） */
+function TeamRouletteDrawPanel({ bracket, onRebuild }: {
+  bracket: TeamPlacementBracket;
+  onRebuild: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
+}) {
+  const [spinning, setSpinning] = useState(false);
+  const [currentHighlight, setCurrentHighlight] = useState(-1);
+  const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(new Map());
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [drawComplete, setDrawComplete] = useState(false);
+  const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const teams = bracket.teams;
+  const DRAW_SIZE = 8;
+
+  // チーム数に応じてBYE位置を決定（5チームなら3 BYE等）
+  const BYE_POSITIONS = useMemo(() => {
+    const byeCount = Math.max(0, DRAW_SIZE - teams.length);
+    // 5チーム→[1,5,7]、4チーム→[1,3,5,7]、6チーム→[1,5]、7チーム→[1]、8チーム→[]
+    const presets: Record<number, number[]> = {
+      0: [],
+      1: [1],
+      2: [1, 5],
+      3: [1, 5, 7],
+      4: [1, 3, 5, 7],
+    };
+    return new Set(presets[byeCount] ?? []);
+  }, [teams.length]);
+
+  const teamSlots = useMemo(() =>
+    Array.from({ length: DRAW_SIZE }, (_, i) => i).filter(i => !BYE_POSITIONS.has(i)),
+  [BYE_POSITIONS]);
+
+  const assignedTeamIds = useMemo(() => new Set(assignedSlots.values()), [assignedSlots]);
+  const availableSlots = useMemo(() => teamSlots.filter(i => !assignedSlots.has(i)), [teamSlots, assignedSlots]);
+  const unassignedTeams = useMemo(() => teams.filter(t => !assignedTeamIds.has(t.teamId)), [teams, assignedTeamIds]);
+  const activeTeam = selectedTeamId ? teams.find(t => t.teamId === selectedTeamId) : unassignedTeams[0];
+
+  const syncToBracket = useCallback((slotsMap: Map<number, string>) => {
+    const slots: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    slotsMap.forEach((teamId, slot) => { slots[slot] = teamId; });
+    onRebuild(bracket.category, slots, BYE_POSITIONS);
+  }, [bracket.category, onRebuild, BYE_POSITIONS]);
+
+  const spinRoulette = useCallback(() => {
+    if (!activeTeam || availableSlots.length === 0) return;
+    setSpinning(true);
+    let count = 0;
+    const totalSpins = 12 + Math.floor(Math.random() * 8);
+    const spin = () => {
+      setCurrentHighlight(availableSlots[Math.floor(Math.random() * availableSlots.length)]);
+      count++;
+      if (count < totalSpins) {
+        spinTimerRef.current = setTimeout(spin, 50 + count * 18);
+      } else {
+        const finalSlot = availableSlots[Math.floor(Math.random() * availableSlots.length)];
+        setCurrentHighlight(finalSlot);
+        const newSlots = new Map(assignedSlots);
+        newSlots.set(finalSlot, activeTeam.teamId);
+        setAssignedSlots(newSlots);
+        setSpinning(false);
+        setSelectedTeamId(null);
+        syncToBracket(newSlots);
+      }
+    };
+    spin();
+  }, [activeTeam, availableSlots, assignedSlots, syncToBracket]);
+
+  const manualAssign = (slotIdx: number) => {
+    if (!activeTeam || assignedSlots.has(slotIdx) || BYE_POSITIONS.has(slotIdx)) return;
+    const newSlots = new Map(assignedSlots);
+    newSlots.set(slotIdx, activeTeam.teamId);
+    setAssignedSlots(newSlots);
+    setSelectedTeamId(null);
+    syncToBracket(newSlots);
+  };
+
+  const autoDrawAll = useCallback(() => {
+    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const slots: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    let ti = 0;
+    for (let i = 0; i < DRAW_SIZE; i++) {
+      if (BYE_POSITIONS.has(i)) continue;
+      if (ti < shuffled.length) { slots[i] = shuffled[ti].teamId; ti++; }
+    }
+    onRebuild(bracket.category, slots, BYE_POSITIONS);
+    setDrawComplete(true);
+  }, [teams, bracket.category, onRebuild, BYE_POSITIONS]);
+
+  const confirmDraw = useCallback(() => {
+    syncToBracket(assignedSlots);
+    setDrawComplete(true);
+  }, [assignedSlots, syncToBracket]);
+
+  const resetDraw = () => {
+    setAssignedSlots(new Map());
+    setSelectedTeamId(null);
+    setCurrentHighlight(-1);
+    setDrawComplete(false);
+    if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+    const emptySlots: (string | null)[] = Array(DRAW_SIZE).fill(null);
+    onRebuild(bracket.category, emptySlots, BYE_POSITIONS);
+  };
+
+  useEffect(() => () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); }, []);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-2.5 border-b border-yellow-100 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
+          <Shuffle size={14} className="text-yellow-600" />
+          1位トーナメント 抽選
+        </h3>
+        <button onClick={resetDraw} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+          <RotateCcw size={12} />リセット
+        </button>
+      </div>
+
+      <div className="p-3">
+        {!drawComplete ? (
+          <>
+            {/* チーム選択 */}
+            <div className="mb-3">
+              <div className="text-[10px] text-slate-500 mb-1.5">チームを選択してスロットに配置</div>
+              <div className="flex flex-wrap gap-1">
+                {teams.map(t => {
+                  const isAssigned = assignedTeamIds.has(t.teamId);
+                  const isSelected = activeTeam?.teamId === t.teamId;
+                  return (
+                    <button
+                      key={t.teamId}
+                      onClick={() => !isAssigned && setSelectedTeamId(t.teamId)}
+                      disabled={isAssigned || spinning}
+                      className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                        isAssigned ? 'bg-emerald-50 border-emerald-200 text-emerald-500 line-through opacity-60' :
+                        isSelected ? 'bg-yellow-100 border-yellow-400 text-yellow-800 ring-1 ring-yellow-300' :
+                        'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      {t.leagueId} {t.teamName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ルーレットボタン */}
+            {activeTeam && !spinning && (
+              <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <span className="text-[10px] text-yellow-700 flex-1 truncate">
+                  <span className="font-bold">{activeTeam.leagueId}</span> {activeTeam.teamName}
+                </span>
+                <button
+                  onClick={spinRoulette}
+                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-yellow-500 text-white hover:bg-yellow-600 shrink-0"
+                >
+                  🎲 ルーレット
+                </button>
+              </div>
+            )}
+            {spinning && (
+              <div className="mb-3 py-2 bg-yellow-100 border border-yellow-300 rounded-lg text-center text-xs font-bold text-yellow-700 animate-pulse">
+                抽選中...
+              </div>
+            )}
+
+            {/* スロット表示（対戦ペアで2列表示） */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mb-3">
+              {Array.from({ length: DRAW_SIZE / 2 }, (_, matchIdx) => {
+                const s1 = matchIdx * 2;
+                const s2 = matchIdx * 2 + 1;
+                const isBye1 = BYE_POSITIONS.has(s1);
+                const isBye2 = BYE_POSITIONS.has(s2);
+                const a1 = assignedSlots.get(s1);
+                const a2 = assignedSlots.get(s2);
+                const t1 = a1 ? teams.find(t => t.teamId === a1) : null;
+                const t2 = a2 ? teams.find(t => t.teamId === a2) : null;
+                const hl1 = currentHighlight === s1 && spinning;
+                const hl2 = currentHighlight === s2 && spinning;
+                const canPlace1 = !isBye1 && !assignedSlots.has(s1) && !!activeTeam && !spinning;
+                const canPlace2 = !isBye2 && !assignedSlots.has(s2) && !!activeTeam && !spinning;
+
+                const renderSlot = (si: number, isBye: boolean, team: typeof t1, hl: boolean, canPlace: boolean) => (
+                  <div
+                    onClick={() => canPlace && manualAssign(si)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 text-[10px] transition-all ${
+                      isBye ? 'bg-slate-100 text-slate-400' :
+                      hl ? 'bg-yellow-200' :
+                      team ? 'bg-emerald-50' :
+                      canPlace ? 'bg-yellow-50 cursor-pointer hover:bg-yellow-100' : 'bg-white'
+                    }`}
+                  >
+                    <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
+                    {isBye ? (
+                      <span className="text-slate-300 italic">BYE</span>
+                    ) : team ? (
+                      <span className="font-bold text-slate-800 truncate">
+                        <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                      </span>
+                    ) : canPlace ? (
+                      <span className="text-yellow-500">← タップ</span>
+                    ) : (
+                      <span className="text-slate-300">―</span>
+                    )}
+                  </div>
+                );
+
+                return (
+                  <div key={matchIdx} className="rounded border border-slate-200 overflow-hidden">
+                    {renderSlot(s1, isBye1, t1, hl1, canPlace1)}
+                    <div className="border-t border-slate-100" />
+                    {renderSlot(s2, isBye2, t2, hl2, canPlace2)}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ボタン群 */}
+            <div className="flex gap-2">
+              <button
+                onClick={autoDrawAll}
+                className="flex-1 py-2 bg-yellow-500 text-white rounded-lg text-xs font-bold hover:bg-yellow-600"
+              >
+                🎲 全自動抽選
+              </button>
+              {unassignedTeams.length === 0 && (
+                <button
+                  onClick={confirmDraw}
+                  className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600"
+                >
+                  ✓ 確定
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <div className="text-emerald-600 font-bold text-sm mb-2">抽選完了</div>
+            <p className="text-xs text-slate-500">トーナメント表に反映されました</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
