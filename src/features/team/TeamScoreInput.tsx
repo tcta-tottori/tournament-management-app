@@ -72,21 +72,30 @@ function PlayerPickerPopup({
   onClose: () => void;
 }) {
   const [manual, setManual] = useState(current || '');
+  const [manualMode, setManualMode] = useState(false);
   const reactId = useId();
   const uniqueName = `player-manual-${reactId.replace(/:/g, '')}`;
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
 
   const commit = (name: string) => {
     onSelect(name.trim());
     onClose();
   };
 
+  const openManual = () => {
+    setManualMode(true);
+    // 次フレームでフォーカス（ユーザー操作起点なのでキーボード表示 OK）
+    setTimeout(() => manualInputRef.current?.focus(), 50);
+  };
+
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[130] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[130] flex items-center justify-center p-3" onClick={onClose}>
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <div className={`bg-gradient-to-br ${theme.grad} px-4 py-3 text-white flex items-center justify-between`}>
+        {/* ヘッダー */}
+        <div className={`bg-gradient-to-br ${theme.grad} px-4 py-3 text-white flex items-center justify-between shrink-0`}>
           <div className="min-w-0">
             <div className="text-[10px] opacity-90 font-bold uppercase tracking-wider">{title}</div>
             <div className="text-sm font-black truncate">{teamName}</div>
@@ -96,66 +105,30 @@ function PlayerPickerPopup({
           </button>
         </div>
 
-        {/* 手動入力 */}
-        <div className="p-3 border-b border-slate-100 bg-slate-50/60">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-            <Pencil className="w-3 h-3" />
-            手動入力
-          </div>
-          <form
-            autoComplete="off"
-            onSubmit={e => { e.preventDefault(); if (manual.trim()) commit(manual); }}
-            className="flex gap-1.5"
-          >
-            <input
-              type="text"
-              value={manual}
-              onChange={e => setManual(e.target.value)}
-              placeholder="苗字を入力"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              name={uniqueName}
-              data-lpignore="true"
-              data-form-type="other"
-              data-1p-ignore="true"
-              className={`flex-1 px-3 py-2 text-sm border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 ${theme.ring}`}
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={!manual.trim()}
-              className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${theme.grad} disabled:opacity-30 active:scale-95`}
-            >
-              <Check className="w-4 h-4" />
-            </button>
-          </form>
-        </div>
-
-        {/* 候補リスト */}
-        <div className="flex-1 overflow-y-auto">
+        {/* 候補リスト（メイン領域） */}
+        <div className="flex-1 overflow-y-auto min-h-0">
           {roster.length > 0 ? (
-            <div className="p-2">
-              <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-2 pt-1 pb-1.5 flex items-center gap-1">
+            <div className="p-3">
+              <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-1 pb-2 flex items-center gap-1">
                 <Users className="w-3 h-3" />
                 チーム選手（タップで選択）
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {roster.map(name => {
                   const isSelected = name === current;
                   return (
                     <button
                       key={name}
+                      type="button"
                       onClick={() => commit(name)}
-                      className={`px-3 py-2.5 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 text-left truncate ${
+                      className={`px-3 py-3 rounded-xl border-2 text-base font-bold transition-all active:scale-95 text-left ${
                         isSelected
-                          ? `${theme.bg} ${theme.accentBorder} ${theme.text}`
+                          ? `${theme.bg} ${theme.accentBorder} ${theme.text} shadow-sm`
                           : `${theme.btn}`
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                        {isSelected && <Check className="w-4 h-4 shrink-0" />}
                         <span className="truncate">{name}</span>
                       </div>
                     </button>
@@ -164,23 +137,72 @@ function PlayerPickerPopup({
               </div>
             </div>
           ) : (
-            <div className="p-6 text-center text-xs text-slate-400">
-              チーム選手の登録がありません。手動入力してください。
+            <div className="p-6 text-center text-sm text-slate-400">
+              チーム選手の登録がありません。<br />下から手動入力してください。
             </div>
           )}
         </div>
 
-        {/* クリアボタン */}
-        {current && (
-          <div className="p-3 border-t border-slate-100 bg-slate-50/60">
+        {/* フッター: 手動入力 / クリア */}
+        <div className="shrink-0 border-t border-slate-200 bg-slate-50 p-3 space-y-2">
+          {manualMode ? (
+            <form
+              autoComplete="off"
+              onSubmit={e => { e.preventDefault(); if (manual.trim()) commit(manual); }}
+              className="flex gap-1.5"
+            >
+              <input
+                ref={manualInputRef}
+                type="text"
+                value={manual}
+                onChange={e => setManual(e.target.value)}
+                placeholder="苗字を入力"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                name={uniqueName}
+                data-lpignore="true"
+                data-form-type="other"
+                data-1p-ignore="true"
+                enterKeyHint="done"
+                className={`flex-1 px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 ${theme.ring}`}
+              />
+              <button
+                type="submit"
+                disabled={!manual.trim()}
+                className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${theme.grad} disabled:opacity-30 active:scale-95`}
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setManualMode(false); setManual(current || ''); }}
+                className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </form>
+          ) : (
             <button
+              type="button"
+              onClick={openManual}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-lg hover:bg-slate-100 active:scale-[0.98]"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              手動入力する
+            </button>
+          )}
+          {current && !manualMode && (
+            <button
+              type="button"
               onClick={() => commit('')}
-              className="w-full py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 active:scale-[0.98]"
+              className="w-full py-2 text-xs font-bold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 active:scale-[0.98]"
             >
               選手名をクリア
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>,
     document.body
