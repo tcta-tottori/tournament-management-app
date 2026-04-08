@@ -285,21 +285,38 @@ export default function TeamLeagueView() {
       <TiebreakRuleSettings />
 
       {/* テスト入力ボタン */}
-      <button
-        onClick={() => {
-          if (!confirm(`${selectedLeague.leagueId}リーグの全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
-          for (const m of leagueMatchList) {
-            for (const mt of MATCH_TYPE_ORDER) {
-              updateSubMatchScore(m.matchId, mt, 6, 4, null);
-              updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => {
+            if (!confirm(`${selectedLeague.leagueId}リーグの全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            for (const m of leagueMatchList) {
+              for (const mt of MATCH_TYPE_ORDER) {
+                updateSubMatchScore(m.matchId, mt, 6, 4, null);
+                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+              }
             }
-          }
-        }}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
-      >
-        <Target className="w-3.5 h-3.5" />
-        テスト入力（{selectedLeague.leagueId}リーグ全試合 6-4 / 田中・山本）
-      </button>
+          }}
+          className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
+        >
+          <Target className="w-3.5 h-3.5" />
+          {selectedLeague.leagueId}リーグのみ
+        </button>
+        <button
+          onClick={() => {
+            if (!confirm(`全リーグ（${leagues.length}ブロック）の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            for (const m of leagueMatches) {
+              for (const mt of MATCH_TYPE_ORDER) {
+                updateSubMatchScore(m.matchId, mt, 6, 4, null);
+                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+              }
+            }
+          }}
+          className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 active:scale-95 transition-all"
+        >
+          <Target className="w-3.5 h-3.5" />
+          全リーグ一括（6-4 / 田中・山本）
+        </button>
+      </div>
 
       {/* 成績表 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden">
