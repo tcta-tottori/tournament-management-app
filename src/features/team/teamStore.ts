@@ -221,8 +221,9 @@ export const useTeamStore = create<TeamState>()(
       },
 
       updateBracketSubMatchScore: (matchId, matchType, score1, score2, tiebreakScore) => {
-        set(state => ({
-          brackets: state.brackets.map(b => ({
+        set(state => {
+          let becameFinished = false;
+          const brackets = state.brackets.map(b => ({
             ...b,
             matches: b.matches.map(m => {
               if (m.matchId !== matchId) return m;
@@ -242,17 +243,26 @@ export const useTeamStore = create<TeamState>()(
               if (winsTeam1 >= 2) winnerId = m.team1Id;
               else if (winsTeam2 >= 2) winnerId = m.team2Id;
               else if (allFinished) winnerId = winsTeam1 > winsTeam2 ? m.team1Id : m.team2Id;
+              const nextStatus = (winnerId ? 'finished' : m.status) as TeamBracketMatch['status'];
+              if (nextStatus === 'finished' && m.status !== 'finished') becameFinished = true;
               return {
                 ...m,
                 subMatches: newSubMatches,
                 winsTeam1,
                 winsTeam2,
                 winnerId,
-                status: (winnerId ? 'finished' : m.status) as TeamBracketMatch['status'],
+                status: nextStatus,
               };
             }),
-          })),
-        }));
+          }));
+          // 試合終了時はコート割当を自動解放（複数コート併用に対応）
+          let bracketCourtAssignments = state.bracketCourtAssignments;
+          if (becameFinished && bracketCourtAssignments[matchId]) {
+            const { [matchId]: _, ...rest } = bracketCourtAssignments;
+            bracketCourtAssignments = rest;
+          }
+          return { brackets, bracketCourtAssignments };
+        });
       },
 
       clearBracketSubMatchScore: (matchId, matchType) => {

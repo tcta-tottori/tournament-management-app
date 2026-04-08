@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
@@ -30,8 +30,30 @@ export default function TeamBracketView() {
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
   const [courtAssignMatch, setCourtAssignMatch] = useState<TeamBracketMatch | null>(null);
   const [courtAssignSelected, setCourtAssignSelected] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
+
+  // 全ブラケットから対戦待ち（ready）試合を収集（控えリスト用）
+  const waitingMatches = useMemo(() => {
+    const items: { match: TeamBracketMatch; bracket: TeamPlacementBracket; roundLabel: string }[] = [];
+    for (const b of brackets) {
+      const totalR = Math.log2(b.drawSize);
+      for (const m of b.matches) {
+        if (m.team1Id && m.team2Id && !m.isBye && (m.status === 'waiting' || m.status === 'ready')) {
+          const fromFinal = totalR - m.round;
+          const rl = fromFinal === 0 ? '決勝' : fromFinal === 1 ? '準決勝' : fromFinal === 2 ? '準々決勝' : `${m.round}回戦`;
+          items.push({ match: m, bracket: b, roundLabel: rl });
+        }
+      }
+    }
+    items.sort((a, b) => {
+      if (a.match.round !== b.match.round) return a.match.round - b.match.round;
+      const order = ['1st', '2nd', '3rd', '4th'];
+      return order.indexOf(a.bracket.category) - order.indexOf(b.bracket.category);
+    });
+    return items;
+  }, [brackets]);
   const is1stBracket = selectedBracketCategory === '1st';
   const showDrawPanel = useMemo(() => {
     if (!is1stBracket || !currentBracket) return false;
@@ -95,6 +117,40 @@ export default function TeamBracketView() {
 
   return (
     <div className="space-y-4 pb-20">
+      {/* メインタブ: トーナメント / 控えリスト */}
+      <div className="flex gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setViewMode('bracket')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
+            viewMode === 'bracket' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-[1px]' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Trophy size={14} />
+          トーナメント
+        </button>
+        <button
+          onClick={() => setViewMode('waiting')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
+            viewMode === 'waiting' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-[1px]' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ClipboardList size={14} />
+          控えリスト
+          {waitingMatches.length > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingMatches.length}</span>
+          )}
+        </button>
+      </div>
+
+      {viewMode === 'waiting' && (
+        <TeamWaitingList
+          waitingMatches={waitingMatches}
+          onAssignCourt={openCourtAssign}
+          bracketCourtAssignments={bracketCourtAssignments}
+        />
+      )}
+
+      {viewMode === 'bracket' && (<>
       {/* カテゴリタブ */}
       <div className="sticky top-0 z-20 -mx-2 px-2 pt-1 pb-2 bg-gradient-to-b from-slate-50 via-slate-50 to-transparent">
         <div className="overflow-x-auto scrollbar-hide">
@@ -380,6 +436,7 @@ export default function TeamBracketView() {
           </div>
         </div>
       </div>
+      </>)}
 
       {/* コート割当ダイアログ（複数選択可） */}
       {courtAssignMatch && createPortal(
@@ -484,6 +541,85 @@ export default function TeamBracketView() {
           isBracket
         />
       )}
+    </div>
+  );
+}
+
+/** 控えリスト — 全ブラケットの対戦待ち試合を1回戦優先で表示 */
+function TeamWaitingList({
+  waitingMatches,
+  onAssignCourt,
+  bracketCourtAssignments,
+}: {
+  waitingMatches: { match: TeamBracketMatch; bracket: TeamPlacementBracket; roundLabel: string }[];
+  onAssignCourt: (match: TeamBracketMatch) => void;
+  bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
+}) {
+  if (waitingMatches.length === 0) {
+    return (
+      <div className="text-center py-12 text-slate-400">
+        <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
+        <p className="text-sm">対戦控えはありません</p>
+        <p className="text-[11px] mt-1">両チームが確定した試合がここに表示されます</p>
+      </div>
+    );
+  }
+
+  const catLabel = (cat: PlacementCategory) =>
+    cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4・5位';
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-slate-500 mb-1">
+        {waitingMatches.length}試合が控えています（1回戦優先で自動並べ替え）
+      </div>
+      {waitingMatches.map(({ match, bracket, roundLabel }) => {
+        const cfg = CATEGORY_CONFIG[bracket.category];
+        const ca = bracketCourtAssignments[match.matchId];
+        return (
+          <div key={match.matchId} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-stretch">
+              <div className={`shrink-0 w-14 flex flex-col items-center justify-center border-r border-slate-100 ${cfg.bg}`}>
+                <div className={`text-[10px] font-bold ${cfg.text}`}>{catLabel(bracket.category)}</div>
+                <div className="text-[8px] text-slate-400 mt-0.5">{roundLabel}</div>
+              </div>
+              <div className="flex-1 min-w-0 py-2 px-3">
+                <div className="flex items-center gap-1.5">
+                  {match.team1League && (
+                    <span className="w-5 h-5 rounded bg-slate-100 text-[9px] font-bold text-slate-600 flex items-center justify-center shrink-0">
+                      {match.team1League}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-slate-800 truncate">{match.team1Name}</span>
+                </div>
+                <div className="text-[9px] text-slate-300 font-bold my-0.5 pl-6">VS</div>
+                <div className="flex items-center gap-1.5">
+                  {match.team2League && (
+                    <span className="w-5 h-5 rounded bg-slate-100 text-[9px] font-bold text-slate-600 flex items-center justify-center shrink-0">
+                      {match.team2League}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-slate-800 truncate">{match.team2Name}</span>
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center pr-3 gap-1.5">
+                {ca && ca.courtNames.length > 0 && (
+                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-blue-600">
+                    <MapPin className="w-2.5 h-2.5" />
+                    {ca.courtNames.join('・')}
+                  </span>
+                )}
+                <button
+                  onClick={() => onAssignCourt(match)}
+                  className="px-3 py-2 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all"
+                >
+                  {ca && ca.courtNames.length > 0 ? 'コート変更' : 'コート入れ'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
