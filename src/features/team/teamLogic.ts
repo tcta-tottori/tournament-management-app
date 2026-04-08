@@ -436,14 +436,18 @@ export function toCourtCallName(courtName: string): string {
  * 団体戦・決勝トーナメントのコール文を生成。
  * 選手名や所属は含めず、チーム番号とチーム名のみを使う。
  *
+ * 読み上げ時にチーム番号とチーム名が詰まらないよう、句点 "。" で
+ * 明示的にチャンク境界を入れる（useSpeechSynthesis が "。" で
+ * 分割して 600ms のポーズを挟む仕様のため）。"行って" は TTS が
+ * 「いって」と読んでしまうので、ひらがなで「おこなって」と書く。
+ *
  * 例:
  *   試合のコールをします。
- *   1位トーナメント 1回戦
- *   3番 ファイヤーボルト
- *   4番 チームどんどん舞い上がれ
- *
- *   こちらの試合を、2番コートと4番コートを使って行ってください。
- *   ボールは3番のファイヤーボルトの方、お願いいたします。
+ *   1位トーナメント、1回戦。
+ *   3番。ファイヤーボルト。
+ *   4番。チームどんどん舞い上がれ。
+ *   こちらの試合を、2番コートと4番コートを使っておこなってください。
+ *   ボールは、3番、ファイヤーボルトの方、お願いいたします。
  */
 export function buildTeamBracketCallText(args: {
   category: PlacementCategory;
@@ -461,11 +465,11 @@ export function buildTeamBracketCallText(args: {
     : '指定のコート';
   return [
     '試合のコールをします。',
-    `${categoryLabel} ${roundLabel}`,
-    `${team1Number}番 ${team1Name}`,
-    `${team2Number}番 ${team2Name}`,
-    '',
-    `こちらの試合を、${courtsText}を使って行ってください。ボールは${team1Number}番の${team1Name}の方、お願いいたします。`,
+    `${categoryLabel}、${roundLabel}。`,
+    `${team1Number}番。${team1Name}。`,
+    `${team2Number}番。${team2Name}。`,
+    `こちらの試合を、${courtsText}を使っておこなってください。`,
+    `ボールは、${team1Number}番、${team1Name}の方、お願いいたします。`,
   ].join('\n');
 }
 

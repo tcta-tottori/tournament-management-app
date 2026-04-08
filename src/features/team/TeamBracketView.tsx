@@ -6,6 +6,7 @@ import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from '
 import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useTeamCallStore } from './teamCallStore';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -588,7 +589,11 @@ function TeamCallDialog({
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
-  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const { speak } = useSpeechSynthesis();
+  const isCalling = useTeamCallStore(s => s.isActive);
+  const startCall = useTeamCallStore(s => s.start);
+  const finishCall = useTeamCallStore(s => s.finish);
+  const cancelCall = useTeamCallStore(s => s.cancel);
 
   const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
   const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
@@ -613,16 +618,27 @@ function TeamCallDialog({
   const [text, setText] = useState(initialText);
   useEffect(() => { setText(initialText); }, [initialText]);
 
-  // ダイアログを閉じたら音声も停止
-  useEffect(() => () => { stop(); }, [stop]);
-
   const handleSpeak = () => {
-    if (!text.trim()) return;
-    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 });
+    if (!text.trim() || !team1 || !team2) return;
+    // 既に他のコール中なら一旦止める
+    cancelCall();
+    startCall({
+      matchId: match.matchId,
+      category: match.category,
+      roundLabel,
+      team1Number: team1.teamNumber,
+      team1Name: team1.teamName,
+      team2Number: team2.teamNumber,
+      team2Name: team2.teamName,
+      courtNames,
+    });
+    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
+      finishCall();
+    });
   };
 
   const handleStop = () => {
-    stop();
+    cancelCall();
   };
 
   if (!team1 || !team2) {
@@ -651,6 +667,9 @@ function TeamCallDialog({
             rows={8}
             className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500 resize-y"
           />
+          <div className="text-[10px] text-slate-400 leading-snug">
+            ※コール中はダイアログを閉じても画面右下に進行状況が表示されます。
+          </div>
           <div className="flex gap-2">
             <button
               onClick={onClose}
@@ -658,7 +677,7 @@ function TeamCallDialog({
             >
               閉じる
             </button>
-            {isSpeaking ? (
+            {isCalling ? (
               <button
                 onClick={handleStop}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
