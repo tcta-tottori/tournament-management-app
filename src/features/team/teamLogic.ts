@@ -409,6 +409,66 @@ export function generateAllBrackets(
   return brackets;
 }
 
+/** カテゴリラベル */
+export const PLACEMENT_CATEGORY_LABELS: Record<PlacementCategory, string> = {
+  '1st': '1位トーナメント',
+  '2nd': '2位トーナメント',
+  '3rd': '3位トーナメント',
+  '4th': '4・5位トーナメント',
+};
+
+/** ラウンドラベル（決勝/準決勝/準々決勝/N回戦） */
+export function getBracketRoundLabel(round: number, totalRounds: number): string {
+  const fromFinal = totalRounds - round;
+  if (fromFinal === 0) return '決勝';
+  if (fromFinal === 1) return '準決勝';
+  if (fromFinal === 2) return '準々決勝';
+  return `${round}回戦`;
+}
+
+/** "1コート" → "1番コート" 形式に変換 */
+export function toCourtCallName(courtName: string): string {
+  const m = courtName.match(/^(\d+)\s*コート$/);
+  return m ? `${m[1]}番コート` : courtName;
+}
+
+/**
+ * 団体戦・決勝トーナメントのコール文を生成。
+ * 選手名や所属は含めず、チーム番号とチーム名のみを使う。
+ *
+ * 例:
+ *   試合のコールをします。
+ *   1位トーナメント 1回戦
+ *   3番 ファイヤーボルト
+ *   4番 チームどんどん舞い上がれ
+ *
+ *   こちらの試合を、2番コートと4番コートを使って行ってください。
+ *   ボールは3番のファイヤーボルトの方、お願いいたします。
+ */
+export function buildTeamBracketCallText(args: {
+  category: PlacementCategory;
+  roundLabel: string;
+  team1Number: number;
+  team1Name: string;
+  team2Number: number;
+  team2Name: string;
+  courtNames: string[];
+}): string {
+  const { category, roundLabel, team1Number, team1Name, team2Number, team2Name, courtNames } = args;
+  const categoryLabel = PLACEMENT_CATEGORY_LABELS[category];
+  const courtsText = courtNames.length > 0
+    ? courtNames.map(toCourtCallName).join('と')
+    : '指定のコート';
+  return [
+    '試合のコールをします。',
+    `${categoryLabel} ${roundLabel}`,
+    `${team1Number}番 ${team1Name}`,
+    `${team2Number}番 ${team2Name}`,
+    '',
+    `こちらの試合を、${courtsText}を使って行ってください。ボールは${team1Number}番の${team1Name}の方、お願いいたします。`,
+  ].join('\n');
+}
+
 /** スロットマップを使ったトーナメント試合生成 */
 function generateBracketMatchesWithSlots(
   category: PlacementCategory,

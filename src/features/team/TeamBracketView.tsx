@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT } from './teamLogic';
+import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
+import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -31,6 +32,8 @@ export default function TeamBracketView() {
   const [courtAssignMatch, setCourtAssignMatch] = useState<TeamBracketMatch | null>(null);
   const [courtAssignSelected, setCourtAssignSelected] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
+  const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
+  const [callCourts, setCallCourts] = useState<string[]>([]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -79,8 +82,17 @@ export default function TeamBracketView() {
   const confirmCourtAssign = () => {
     if (!courtAssignMatch || courtAssignSelected.length === 0) return;
     assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignSelected);
+    // 割当後にコールダイアログを自動的に開く
+    setCallMatch(courtAssignMatch);
+    setCallCourts([...courtAssignSelected]);
     setCourtAssignMatch(null);
     setCourtAssignSelected([]);
+  };
+
+  const openCall = (match: TeamBracketMatch) => {
+    const ca = bracketCourtAssignments[match.matchId];
+    setCallMatch(match);
+    setCallCourts(ca ? [...ca.courtNames] : []);
   };
 
   if (!currentBracket || brackets.length === 0) {
@@ -146,6 +158,7 @@ export default function TeamBracketView() {
         <TeamWaitingList
           waitingMatches={waitingMatches}
           onAssignCourt={openCourtAssign}
+          onCall={openCall}
           bracketCourtAssignments={bracketCourtAssignments}
         />
       )}
@@ -371,7 +384,7 @@ export default function TeamBracketView() {
                         </button>
 
                         {/* アクションバー */}
-                        {!isBye && match.team1Id && match.team2Id && (isReady || (isFinished && match.winnerId && match.nextMatchId)) && (
+                        {!isBye && match.team1Id && match.team2Id && (isReady || isPlaying || (isFinished && match.winnerId && match.nextMatchId)) && (
                           <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-50/80 border-t border-slate-100">
                             {isFinished && match.winnerId && match.nextMatchId && (
                               <button
@@ -392,13 +405,22 @@ export default function TeamBracketView() {
                               </button>
                             )}
                             {isPlaying && court && (
-                              <button
-                                onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
-                              >
-                                <MapPin className="w-3 h-3" />
-                                コート変更
-                              </button>
+                              <>
+                                <button
+                                  onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
+                                  className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                                >
+                                  <MapPin className="w-3 h-3" />
+                                  コート変更
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); openCall(match); }}
+                                  className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                >
+                                  <Volume2 className="w-3 h-3" />
+                                  コール
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -528,6 +550,15 @@ export default function TeamBracketView() {
         document.body
       )}
 
+      {/* コールダイアログ */}
+      {callMatch && (
+        <TeamCallDialog
+          match={callMatch}
+          courtNames={callCourts}
+          onClose={() => setCallMatch(null)}
+        />
+      )}
+
       {/* スコア入力ダイアログ */}
       {editingMatch && (
         <TeamScoreInput
@@ -545,14 +576,124 @@ export default function TeamBracketView() {
   );
 }
 
+/** 団体戦・決勝トーナメント用コールダイアログ */
+function TeamCallDialog({
+  match,
+  courtNames,
+  onClose,
+}: {
+  match: TeamBracketMatch;
+  courtNames: string[];
+  onClose: () => void;
+}) {
+  const allTeams = useTeamStore(s => s.allTeams);
+  const brackets = useTeamStore(s => s.brackets);
+  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+
+  const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
+  const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
+  const roundLabel = getBracketRoundLabel(match.round, totalRounds);
+
+  const team1 = allTeams.find(t => t.teamId === match.team1Id);
+  const team2 = allTeams.find(t => t.teamId === match.team2Id);
+
+  const initialText = useMemo(() => {
+    if (!team1 || !team2) return '';
+    return buildTeamBracketCallText({
+      category: match.category,
+      roundLabel,
+      team1Number: team1.teamNumber,
+      team1Name: team1.teamName,
+      team2Number: team2.teamNumber,
+      team2Name: team2.teamName,
+      courtNames,
+    });
+  }, [match.category, roundLabel, team1, team2, courtNames]);
+
+  const [text, setText] = useState(initialText);
+  useEffect(() => { setText(initialText); }, [initialText]);
+
+  // ダイアログを閉じたら音声も停止
+  useEffect(() => () => { stop(); }, [stop]);
+
+  const handleSpeak = () => {
+    if (!text.trim()) return;
+    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 });
+  };
+
+  const handleStop = () => {
+    stop();
+  };
+
+  if (!team1 || !team2) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-5 h-5" />
+            <h3 className="font-black">試合コール</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/20 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="text-[10px] text-slate-500">
+            内容を確認・編集してから「コール」を押してください。
+          </div>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            rows={8}
+            className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500 resize-y"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+            >
+              閉じる
+            </button>
+            {isSpeaking ? (
+              <button
+                onClick={handleStop}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <VolumeX className="w-4 h-4" />
+                停止
+              </button>
+            ) : (
+              <button
+                onClick={handleSpeak}
+                disabled={!text.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+              >
+                <Volume2 className="w-4 h-4" />
+                コール
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /** 控えリスト — 全ブラケットの対戦待ち試合を1回戦優先で表示 */
 function TeamWaitingList({
   waitingMatches,
   onAssignCourt,
+  onCall,
   bracketCourtAssignments,
 }: {
   waitingMatches: { match: TeamBracketMatch; bracket: TeamPlacementBracket; roundLabel: string }[];
   onAssignCourt: (match: TeamBracketMatch) => void;
+  onCall: (match: TeamBracketMatch) => void;
   bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
 }) {
   if (waitingMatches.length === 0) {
@@ -608,6 +749,15 @@ function TeamWaitingList({
                     <MapPin className="w-2.5 h-2.5" />
                     {ca.courtNames.join('・')}
                   </span>
+                )}
+                {ca && ca.courtNames.length > 0 && (
+                  <button
+                    onClick={() => onCall(match)}
+                    className="flex items-center gap-0.5 px-2 py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                  >
+                    <Volume2 className="w-3 h-3" />
+                    コール
+                  </button>
                 )}
                 <button
                   onClick={() => onAssignCourt(match)}
