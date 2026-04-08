@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import type { Match, Court } from '../../db/database';
-import { MapPin, Play, Clock, CheckCircle, AlertCircle, X, Trophy, Timer } from 'lucide-react';
+import { MapPin, Play, Clock, CheckCircle, AlertCircle, X, Trophy, Timer, Settings } from 'lucide-react';
 
 /** テニスコート型のSVGオーバーレイ（縦向き・モバイル用） */
 function CourtLines({ status }: { status: string }) {
@@ -97,6 +97,38 @@ const VENUE_PRESETS: VenuePreset[] = [
   },
 ];
 
+/** ブロック見出し: コート範囲ラベルと使用終了時刻・残り時間バッジを表示 */
+function BlockHeader({
+  label,
+  endTime,
+  warning,
+  compact = false,
+}: {
+  label: string;
+  endTime?: string;
+  warning: 'yellow' | 'red' | null | undefined;
+  compact?: boolean;
+}) {
+  const badgeClass =
+    warning === 'red'
+      ? 'bg-red-600 text-white border-red-700'
+      : warning === 'yellow'
+        ? 'bg-yellow-400 text-yellow-900 border-yellow-600'
+        : 'bg-white/70 text-emerald-700 border-emerald-300';
+  return (
+    <div className={`flex items-center justify-between gap-1 px-1 ${compact ? 'mb-1.5' : 'mb-2'}`}>
+      <div className="text-[10px] text-emerald-700 font-bold leading-none">{label}</div>
+      {endTime ? (
+        <div className={`text-[10px] font-bold border rounded px-1.5 py-0.5 leading-none ${badgeClass}`}>
+          〜{endTime}
+        </div>
+      ) : (
+        <div className="text-[9px] text-gray-400 leading-none">時刻未設定</div>
+      )}
+    </div>
+  );
+}
+
 type CourtStatus = {
   court: Court | null;
   courtName: string;
@@ -106,14 +138,46 @@ type CourtStatus = {
   status: 'empty' | 'playing' | 'ready' | 'unavailable';
 };
 
+/**
+ * ブロックごとの使用終了時刻から警告レベルを算出
+ * - 残り2時間以下かつ1時間超: 'yellow' (黄色点滅)
+ * - 残り1時間以下: 'red'    (赤点滅)
+ * - 終了時刻が過ぎている or 残り2時間超 or 未設定: null
+ * endTime は "HH:MM" 形式。now は Date.now() のミリ秒。
+ */
+function getBlockWarningLevel(endTime: string | undefined, now: number): 'yellow' | 'red' | null {
+  if (!endTime) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(endTime);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  const nowDate = new Date(now);
+  const endDate = new Date(nowDate);
+  endDate.setHours(hours, minutes, 0, 0);
+  const diffMs = endDate.getTime() - now;
+  const ONE_HOUR = 60 * 60 * 1000;
+  const TWO_HOURS = 2 * ONE_HOUR;
+
+  if (diffMs <= 0) return null;          // 既に使用終了済み
+  if (diffMs <= ONE_HOUR) return 'red';  // 1時間以内 → 赤
+  if (diffMs <= TWO_HOURS) return 'yellow'; // 2時間以内 → 黄
+  return null;
+}
+
 export default function CourtMap() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
+  const blockEndTimes = useAppStore(state => state.blockEndTimes);
+  const setBlockEndTime = useAppStore(state => state.setBlockEndTime);
   const [selectedVenue, setSelectedVenue] = useState<string>('yamata');
   const [selectedCourt, setSelectedCourt] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [blockTimeEditorOpen, setBlockTimeEditorOpen] = useState(false);
 
   // Tick: 1秒（コート詳細表示中）/ 10秒（通常）で更新
+  // ブロック使用終了アラートの黄/赤切替判定にも now を使用するため、通常時も10秒間隔で十分
   useEffect(() => {
     const interval = selectedCourt ? 1000 : 10000;
     const timer = setInterval(() => setNow(Date.now()), interval);
@@ -213,6 +277,27 @@ export default function CourtMap() {
     }
     return set;
   }, [courtStatusMap, matchDuration, now]);
+
+  // 現在選択中の会場のブロック使用終了時刻マップ
+  const currentVenueBlockEndTimes = blockEndTimes[selectedVenue] || {};
+
+  // 各ブロックの警告レベル (blockIdx → 'yellow' | 'red' | null)
+  const blockWarnings = useMemo(() => {
+    const map: Record<number, 'yellow' | 'red' | null> = {};
+    venue.blocks.forEach((_, idx) => {
+      const endTime = currentVenueBlockEndTimes[String(idx)];
+      map[idx] = getBlockWarningLevel(endTime, now);
+    });
+    return map;
+  }, [venue, currentVenueBlockEndTimes, now]);
+
+  /** ブロックのコンテナに付与する警告用クラス名を返す */
+  const getBlockWarningClass = (blockIdx: number): string => {
+    const level = blockWarnings[blockIdx];
+    if (level === 'red') return 'block-warning-red';
+    if (level === 'yellow') return 'block-warning-yellow';
+    return '';
+  };
 
   // 統計
   const stats = useMemo(() => {
@@ -406,8 +491,8 @@ export default function CourtMap() {
               会場のコート使用状況をリアルタイムで確認できます
             </p>
           </div>
-          {/* 会場切替 */}
-          <div className="flex gap-2">
+          {/* 会場切替 + ブロック使用時刻設定 */}
+          <div className="flex gap-2 flex-wrap">
             {VENUE_PRESETS.map(v => (
               <button
                 key={v.id}
@@ -421,6 +506,14 @@ export default function CourtMap() {
                 {v.name}
               </button>
             ))}
+            <button
+              onClick={() => setBlockTimeEditorOpen(true)}
+              title="ブロックごとの使用終了時刻を設定"
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-colors flex items-center gap-1.5"
+            >
+              <Settings className="w-4 h-4" />
+              使用時刻設定
+            </button>
           </div>
         </div>
 
@@ -442,6 +535,14 @@ export default function CourtMap() {
             <span className="w-3 h-3 rounded-full bg-gray-300" />
             使用不可 {stats.unavailable}
           </span>
+          <span className="flex items-center gap-1.5 text-yellow-700">
+            <span className="w-3 h-3 rounded-sm border border-yellow-600 bg-yellow-300 animate-pulse" />
+            ブロック終了2時間前
+          </span>
+          <span className="flex items-center gap-1.5 text-red-700">
+            <span className="w-3 h-3 rounded-sm border border-red-700 bg-red-500 animate-pulse" />
+            ブロック終了1時間前
+          </span>
         </div>
       </header>
 
@@ -462,7 +563,12 @@ export default function CourtMap() {
                     const blockIdx = venue.blocks.length - 1 - ri;
                     return (
                       <div key={blockIdx}>
-                        <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                        <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                          <BlockHeader
+                            label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
+                            endTime={currentVenueBlockEndTimes[String(blockIdx)]}
+                            warning={blockWarnings[blockIdx]}
+                          />
                           <div className="grid grid-cols-6 gap-2">
                             {block.courts.map(renderCourtButtonPC)}
                           </div>
@@ -491,10 +597,13 @@ export default function CourtMap() {
                 {venue.blocks.map((block, blockIdx) => (
                   <div key={blockIdx} className="flex items-start">
                     {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
-                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
-                      <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1 text-center">
-                        {block.courts[block.courts.length - 1]}〜{block.courts[0]}
-                      </div>
+                    <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                      <BlockHeader
+                        label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
+                        endTime={currentVenueBlockEndTimes[String(blockIdx)]}
+                        warning={blockWarnings[blockIdx]}
+                        compact
+                      />
                       <div className="flex flex-col gap-2">
                         {[...block.courts].reverse().map(renderCourtButtonPC)}
                       </div>
@@ -534,7 +643,12 @@ export default function CourtMap() {
                     const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
                     return (
                       <div key={blockIdx} className="w-full">
-                        <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                        <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                          <BlockHeader
+                            label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
+                            endTime={currentVenueBlockEndTimes[String(blockIdx)]}
+                            warning={blockWarnings[blockIdx]}
+                          />
                           <div className={`grid ${gridCols} gap-2`}>
                             {block.courts.map(renderCourtButton)}
                           </div>
@@ -563,7 +677,12 @@ export default function CourtMap() {
                 const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
                 return (
                   <div key={blockIdx} className="w-full">
-                    <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm">
+                    <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                      <BlockHeader
+                        label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
+                        endTime={currentVenueBlockEndTimes[String(blockIdx)]}
+                        warning={blockWarnings[blockIdx]}
+                      />
                       <div className={`grid ${gridCols} gap-2`}>
                         {block.courts.map(renderCourtButton)}
                       </div>
@@ -636,6 +755,87 @@ export default function CourtMap() {
           </div>
         </div>
       </div>
+
+      {/* ===== ブロック使用終了時刻 設定モーダル ===== */}
+      {blockTimeEditorOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+          onClick={() => setBlockTimeEditorOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl border border-border-main w-full max-w-md max-h-[85vh] overflow-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-gradient-to-br from-amber-50 to-amber-100 border-b border-amber-200 px-5 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  ブロック使用終了時刻
+                </h3>
+                <p className="text-[11px] text-amber-800/80 mt-0.5">
+                  {venue.name} — 設定した時刻の2時間前で黄色、1時間前で赤く点滅します
+                </p>
+              </div>
+              <button
+                onClick={() => setBlockTimeEditorOpen(false)}
+                className="p-1.5 rounded-lg bg-white/60 hover:bg-white text-amber-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              {venue.blocks.map((block, blockIdx) => {
+                const currentValue = currentVenueBlockEndTimes[String(blockIdx)] || '';
+                const warning = blockWarnings[blockIdx];
+                const rangeLabel = `${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`;
+                return (
+                  <div
+                    key={blockIdx}
+                    className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
+                      warning === 'red'
+                        ? 'bg-red-50 border-red-300'
+                        : warning === 'yellow'
+                          ? 'bg-yellow-50 border-yellow-300'
+                          : 'bg-emerald-50/50 border-emerald-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">ブロック {blockIdx + 1}</div>
+                      <div className="text-xs text-gray-500">コート {rangeLabel}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={currentValue}
+                        onChange={e => setBlockEndTime(selectedVenue, blockIdx, e.target.value)}
+                        className="text-sm font-mono px-2 py-1.5 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      {currentValue && (
+                        <button
+                          onClick={() => setBlockEndTime(selectedVenue, blockIdx, '')}
+                          className="text-[11px] text-gray-500 hover:text-red-600 underline"
+                        >
+                          クリア
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
+              <button
+                onClick={() => setBlockTimeEditorOpen(false)}
+                className="w-full py-2.5 text-sm font-bold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* ===== フルスクリーン コート詳細オーバーレイ ===== */}
       {selectedCourt && selectedCourtDetail && createPortal(
