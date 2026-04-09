@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Target, Info, Settings2, ArrowUp, ArrowDown, HelpCircle } from 'lucide-react';
+import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS } from './teamLogic';
@@ -149,12 +149,12 @@ function TiebreakRuleSettings() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-slate-50 transition-colors"
+        className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-slate-50/80 transition-colors bg-gradient-to-r from-slate-50/60 via-white to-slate-50/40"
       >
-        <Settings2 className="w-4 h-4 text-slate-500" />
+        <Settings2 className="w-4 h-4 text-slate-400" />
         <span className="text-sm font-bold text-slate-700">判定ルール（優先順）</span>
         <span className="ml-auto text-[10px] text-slate-400 truncate">
           {tiebreakOrder.map(r => TIEBREAK_RULE_LABELS[r].split('（')[0]).join(' → ')}
@@ -278,7 +278,7 @@ export default function TeamLeagueView() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-          <Target className="w-8 h-8" />
+          <Trophy className="w-8 h-8 text-slate-400" />
         </div>
         <p className="text-base font-bold text-slate-500">データがありません</p>
       </div>
@@ -433,9 +433,9 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
+          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
         >
-          <Target className="w-3.5 h-3.5" />
+          <Sparkles className="w-3.5 h-3.5" />
           {selectedLeague.leagueId}リーグのみ
         </button>
         <button
@@ -448,17 +448,17 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 active:scale-95 transition-all"
+          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
         >
-          <Target className="w-3.5 h-3.5" />
+          <Sparkles className="w-3.5 h-3.5" />
           全リーグ一括（6-4 / 田中・山本）
         </button>
       </div>
 
       {/* 成績表 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 bg-gradient-to-b from-white to-slate-50/60">
-          <Target className="w-4 h-4 text-slate-500" />
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-indigo-100 flex items-center gap-2 bg-gradient-to-r from-indigo-50/80 via-white to-violet-50/60">
+          <BarChart3 className="w-4 h-4 text-indigo-500" />
           <span className="text-sm font-bold text-slate-700 tracking-wide">成績表</span>
           <span className="ml-auto text-[10px] text-slate-400 tracking-wider">タップで入力</span>
         </div>
@@ -597,9 +597,9 @@ export default function TeamLeagueView() {
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
 
       {/* 対戦順 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
-          <Play className="w-4 h-4 text-slate-500" />
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-sky-100 flex items-center gap-2 bg-gradient-to-r from-sky-50/80 via-white to-indigo-50/60">
+          <ListOrdered className="w-4 h-4 text-sky-500" />
           <span className="text-sm font-bold text-slate-700">対戦順</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
