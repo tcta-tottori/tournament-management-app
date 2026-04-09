@@ -351,17 +351,30 @@ export default function TeamLeagueView() {
                 );
               })}
               {/* 全体表示タブ */}
-              <button
-                onClick={() => setShowAll(true)}
-                className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-1.5 ${
-                  showAll
-                    ? 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-lg ring-2 ring-white/50'
-                    : 'bg-slate-100 text-slate-600 hover:shadow-sm border border-transparent hover:border-slate-200'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>全体</span>
-              </button>
+              {(() => {
+                const allLeaguesComplete = leagues.every(l => {
+                  const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+                  return lm.length > 0 && lm.every(m => m.status === 'finished');
+                });
+                return (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className={`relative px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-1.5 ${
+                      showAll
+                        ? 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-lg ring-2 ring-white/50'
+                        : 'bg-slate-100 text-slate-600 hover:shadow-sm border border-transparent hover:border-slate-200'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>全体</span>
+                    {allLeaguesComplete && (
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           </div>
           <button
@@ -444,7 +457,7 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
-                            <td className={`px-2 py-1 font-bold text-xs align-middle border-r ${c.border} whitespace-nowrap border-l-[3px] ${standing?.rank === 1 ? 'border-l-amber-400' : standing?.rank === 2 ? 'border-l-slate-400' : standing?.rank === 3 ? 'border-l-orange-400' : 'border-l-transparent'} ${c.bg}/20`}>
+                            <td className={`px-2 py-1 font-bold text-xs align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
                             </td>
                             <td className={`px-0.5 py-1 align-middle border-r ${c.border} ${c.bg}/20`}>
@@ -512,14 +525,7 @@ export default function TeamLeagueView() {
                             </td>
                             {complete && (
                               <td className={`px-1.5 py-1 text-center align-middle ${c.bg}/20`}>
-                                {standing && (
-                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black ${
-                                    standing.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white' :
-                                    standing.rank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white' :
-                                    standing.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' :
-                                    `${c.soft} ${c.text}`
-                                  }`}>{standing.rank}</span>
-                                )}
+                                {standing && <RankText rank={standing.rank || 0} />}
                               </td>
                             )}
                           </tr>
@@ -603,7 +609,7 @@ export default function TeamLeagueView() {
           className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          {selectedLeague.leagueId}リーグのみ
+          テスト1
         </button>
         <button
           onClick={() => {
@@ -618,7 +624,7 @@ export default function TeamLeagueView() {
           className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          全リーグ一括（6-4 / 田中・山本）
+          テスト2（一括）
         </button>
       </div>
 
@@ -659,7 +665,7 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`px-2 py-1.5 font-bold text-xs align-middle border-r ${color.border} whitespace-nowrap border-l-[3px] ${standing?.rank === 1 ? 'border-l-amber-400 bg-amber-50/40' : standing?.rank === 2 ? 'border-l-slate-400 bg-slate-50/40' : standing?.rank === 3 ? 'border-l-orange-400 bg-orange-50/30' : `border-l-transparent ${color.bg}/20`}`}>
+                    <td className={`px-2 py-1.5 font-bold text-xs align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                     </td>
                     {/* 種目ラベル列 */}
@@ -745,14 +751,7 @@ export default function TeamLeagueView() {
                     </td>
                     {leagueComplete && (
                       <td className={`px-2 py-1 text-center align-middle ${color.bg}/30`}>
-                        {standing && (
-                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black ${
-                            standing.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-sm' :
-                            standing.rank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-sm' :
-                            standing.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-sm' :
-                            `${color.soft} ${color.text}`
-                          }`}>{standing.rank}</span>
-                        )}
+                        {standing && <RankText rank={standing.rank || 0} />}
                       </td>
                     )}
                     {hasTiebreak && (
@@ -784,9 +783,9 @@ export default function TeamLeagueView() {
 
       {/* 対戦順 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-sky-100 flex items-center gap-2 bg-gradient-to-r from-sky-50/80 via-white to-indigo-50/60">
-          <ListOrdered className="w-4 h-4 text-sky-500" />
-          <span className="text-sm font-bold text-slate-700">対戦順</span>
+        <div className={`px-4 py-2.5 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
+          <ListOrdered className="w-4 h-4 text-white/80" />
+          <span className="text-sm font-bold tracking-wide">対戦順</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
           {selectedLeague.matchOrder.map(mo => {
@@ -827,14 +826,18 @@ export default function TeamLeagueView() {
                   )}
                 </div>
                 <div className="space-y-0.5">
-                  <div className={`truncate ${match.winnerId === team1.teamId ? 'font-black text-blue-700' : 'text-slate-700'}`}>
-                    {team1.teamName.split(' ')[0]}
+                  <div className={`text-sm font-bold leading-snug ${match.winnerId === team1.teamId ? 'font-black text-blue-700' : 'text-slate-800'}`}>
+                    {team1.teamName}
                   </div>
-                  <div className="text-[9px] text-slate-400 text-center font-bold">
-                    {isFinished ? `${match.winsTeam1} - ${match.winsTeam2}` : 'vs'}
+                  <div className={`text-center font-black ${isFinished ? 'text-base tabular-nums' : 'text-[9px] text-slate-400'}`}>
+                    {isFinished ? (
+                      <><span className={match.winnerId === team1.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam1}</span>
+                      <span className="text-slate-300 mx-1">-</span>
+                      <span className={match.winnerId === team2.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam2}</span></>
+                    ) : 'vs'}
                   </div>
-                  <div className={`truncate ${match.winnerId === team2.teamId ? 'font-black text-blue-700' : 'text-slate-700'}`}>
-                    {team2.teamName.split(' ')[0]}
+                  <div className={`text-sm font-bold leading-snug ${match.winnerId === team2.teamId ? 'font-black text-blue-700' : 'text-slate-800'}`}>
+                    {team2.teamName}
                   </div>
                 </div>
 
