@@ -17,8 +17,12 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // モーダルを開くたびに最新コードで再生成する（閉じたらキャッシュを破棄）
   useEffect(() => {
-    if (!isOpen || dataUrl) return;
+    if (!isOpen) {
+      setDataUrl(null);
+      return;
+    }
 
     let isMounted = true;
     setIsLoading(true);
@@ -36,7 +40,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, dataUrl, league, standings, matches, allTeams, tournamentName]);
+  }, [isOpen, league, standings, matches, allTeams, tournamentName]);
 
   const handleDownload = () => {
     if (!dataUrl) return;
