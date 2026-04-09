@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
+import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS } from './teamLogic';
@@ -273,7 +273,6 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
 export default function TeamLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -320,65 +319,54 @@ export default function TeamLeagueView() {
   const getMatchBetween = (team1Id: string, team2Id: string) => scoreMatrix.get(`${team1Id}-${team2Id}`);
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 overflow-auto p-4' : ''} space-y-4 pb-20`}>
+    <div className="space-y-4 pb-20">
       {/* Chrome風リーグ選択タブ */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 overflow-hidden">
-            <div className="chrome-tab-bar">
-              {leagues.map((l, i) => {
-                const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-                const done = lm.filter(m => m.status === 'finished').length;
-                const total = lm.length;
-                const complete = done === total && total > 0;
-                const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
-                return (
-                  <button
-                    key={l.leagueId}
-                    onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
-                    className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
-                  >
-                    <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
-                    <span className="font-bold">{l.leagueId}</span>
-                    <span className="chrome-tab-count">{done}/{total}</span>
-                    {complete && (
-                      <span className="chrome-tab-badge">
-                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {/* 全体表示タブ */}
-              {(() => {
-                const allLeaguesComplete = leagues.every(l => {
-                  const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-                  return lm.length > 0 && lm.every(m => m.status === 'finished');
-                });
-                return (
-                  <button
-                    onClick={() => setShowAll(true)}
-                    className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
-                  >
-                    <Layers className="chrome-tab-icon" />
-                    <span>全体</span>
-                    {allLeaguesComplete && (
-                      <span className="chrome-tab-badge">
-                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
-          <button
-            onClick={() => setIsFullscreen(f => !f)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shrink-0 transition-colors mb-[-1px]"
-            title={isFullscreen ? '通常表示' : '全画面'}
-          >
-            {isFullscreen ? <X size={16} /> : <Maximize2 size={16} />}
-          </button>
+        <div className="chrome-tab-bar">
+          {/* 全体表示タブ */}
+          {(() => {
+            const allLeaguesComplete = leagues.every(l => {
+              const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+              return lm.length > 0 && lm.every(m => m.status === 'finished');
+            });
+            return (
+              <button
+                onClick={() => setShowAll(true)}
+                className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
+              >
+                <Layers className="chrome-tab-icon" />
+                <span>全体</span>
+                {allLeaguesComplete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })()}
+          {leagues.map((l, i) => {
+            const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+            const done = lm.filter(m => m.status === 'finished').length;
+            const total = lm.length;
+            const complete = done === total && total > 0;
+            const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
+            return (
+              <button
+                key={l.leagueId}
+                onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
+                className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
+              >
+                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
+                <span className="font-bold">{l.leagueId}</span>
+                <span className="chrome-tab-count">{done}/{total}</span>
+                {complete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -434,13 +422,16 @@ export default function TeamLeagueView() {
                       <tr className={`bg-gradient-to-r ${c.grad} text-white`}>
                         <th className="px-2 py-2 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">チーム</th>
                         <th className="px-1 py-2 text-center w-[34px] font-bold text-white/90 border-b border-white/20 text-[11px]">種目</th>
-                        {league.teams.map(t => (
-                          <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] border-b border-white/20 whitespace-nowrap">
-                            <span className="inline-block px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black text-white">
-                              {t.teamName.split(/[\s\u3000]+/)[0]}
-                            </span>
-                          </th>
-                        ))}
+                        {league.teams.map(t => {
+                          const displayName = (() => { const n = t.teamName.split(/[\s\u3000]+/)[0]; return n.length > 5 ? n.slice(0, 5) + '...' : n; })();
+                          return (
+                            <th key={t.teamId} className="px-1 py-2 text-center w-[76px] max-w-[76px] border-b border-white/20">
+                              <span className="inline-block px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black text-white truncate max-w-full">
+                                {displayName}
+                              </span>
+                            </th>
+                          );
+                        })}
                         <th className="px-2 py-2 text-center min-w-[50px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">成績</th>
                         {complete && (
                           <th className="px-2 py-2 text-center min-w-[44px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">順位</th>
@@ -469,7 +460,13 @@ export default function TeamLeagueView() {
                             </td>
                             {league.teams.map(colTeam => {
                               if (rowTeam.teamId === colTeam.teamId) {
-                                return <td key={colTeam.teamId} className="bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100" />;
+                                return (
+                                  <td key={colTeam.teamId} className="relative bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100">
+                                    <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                                      <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" />
+                                    </svg>
+                                  </td>
+                                );
                               }
                               const match = sm.get(`${rowTeam.teamId}-${colTeam.teamId}`);
                               if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
@@ -487,12 +484,16 @@ export default function TeamLeagueView() {
                                 >
                                   <div className="flex flex-col gap-0.5 px-1 py-1">
                                     {isFinished && (
-                                      <div className="text-[11px] tabular-nums font-black leading-none">
-                                        <span className={cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}>
-                                          {isTeam1 ? match.winsTeam1 : match.winsTeam2}
-                                          <span className="text-slate-300 mx-0.5">-</span>
-                                          {isTeam1 ? match.winsTeam2 : match.winsTeam1}
-                                        </span>
+                                      <div className={`mx-auto mb-0.5 px-2.5 py-0.5 rounded-full text-[11px] tabular-nums font-black leading-none ${
+                                        cellWonAll
+                                          ? 'bg-blue-600 text-white'
+                                          : cellLostAll
+                                          ? 'bg-rose-100 text-rose-400 border border-rose-200'
+                                          : 'bg-slate-200 text-slate-600'
+                                      }`}>
+                                        {isTeam1 ? match.winsTeam1 : match.winsTeam2}
+                                        <span className={cellWonAll ? 'text-blue-200 mx-0.5' : 'text-slate-300 mx-0.5'}>-</span>
+                                        {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                                       </div>
                                     )}
                                     {MATCH_TYPE_ORDER.map(matchType => {
@@ -538,54 +539,6 @@ export default function TeamLeagueView() {
       {/* ======= 個別リーグ表示モード ======= */}
       {!showAll && <>
 
-      {/* リーグヘッダーカード（コンパクト） */}
-      <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${color.grad} text-white shadow-md`}>
-        <div className="relative px-4 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            {/* 左: リーグ名 + コート */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-2xl font-black tracking-tight leading-none">{selectedLeague.leagueId}</span>
-              <span className="text-xs font-bold opacity-80 leading-none">リーグ</span>
-              {selectedLeague.courtName && (
-                <span className="flex items-center gap-0.5 text-[10px] opacity-75 leading-none">
-                  <MapPin className="w-2.5 h-2.5" />
-                  {selectedLeague.courtName}
-                </span>
-              )}
-            </div>
-            {/* 中央: 結果画像ボタン */}
-            {leagueComplete && (
-              <TeamLeagueResultPreview
-                league={selectedLeague}
-                standings={standings}
-                matches={leagueMatchList}
-                allTeams={allTeams}
-                tournamentName={tournamentInfo?.name || ''}
-              />
-            )}
-            {/* 右: 進捗 */}
-            <div className="flex items-center gap-2 shrink-0">
-              {leagueComplete ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-black leading-none">
-                  <Check className="w-3 h-3" />完了
-                </span>
-              ) : (
-                <span className="text-lg font-black tabular-nums leading-none">
-                  {finishedCount}<span className="text-xs opacity-60">/{totalCount}</span>
-                </span>
-              )}
-            </div>
-          </div>
-          {/* プログレスバー */}
-          <div className="mt-2 h-1 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${totalCount > 0 ? (finishedCount / totalCount) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* 判定ルール設定 */}
       <TiebreakRuleSettings />
 
@@ -628,10 +581,27 @@ export default function TeamLeagueView() {
         const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
         return (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
-        <div className={`px-4 py-2.5 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
-          <BarChart3 className="w-4 h-4 text-white/80" />
-          <span className="text-sm font-bold tracking-wide">成績表</span>
-          <span className="ml-auto text-[10px] text-white/70 tracking-wider">タップで入力</span>
+        <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-r ${color.grad} text-white`}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-black leading-none">{selectedLeague.leagueId}</span>
+            <span className="text-[10px] font-bold opacity-80">リーグ</span>
+            {selectedLeague.courtName && (
+              <span className="text-[10px] opacity-70 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{selectedLeague.courtName}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {leagueComplete && (
+              <TeamLeagueResultPreview
+                league={selectedLeague}
+                standings={standings}
+                matches={leagueMatchList}
+                allTeams={allTeams}
+                tournamentName={tournamentInfo?.name || ''}
+              />
+            )}
+            <span className="text-xs font-black tabular-nums">{finishedCount}/{totalCount}</span>
+            {leagueComplete && <Check className="w-3 h-3" />}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
@@ -639,13 +609,16 @@ export default function TeamLeagueView() {
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
                 <th className={`px-2 py-2.5 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] tracking-wide`}>チーム</th>
                 <th className={`px-1 py-2.5 text-center w-[34px] font-bold ${color.text} border-b ${color.border} text-[11px] tracking-wide`}>種目</th>
-                {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className={`px-1.5 py-2.5 text-center min-w-[68px] border-b ${color.border} whitespace-nowrap`}>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black ${color.soft} ${color.text}`}>
-                      {t.teamName.split(/[\s\u3000]+/)[0]}
-                    </span>
-                  </th>
-                ))}
+                {selectedLeague.teams.map(t => {
+                  const displayName = (() => { const n = t.teamName.split(/[\s\u3000]+/)[0]; return n.length > 5 ? n.slice(0, 5) + '...' : n; })();
+                  return (
+                    <th key={t.teamId} className={`px-1 py-2.5 text-center w-[76px] max-w-[76px] border-b ${color.border}`}>
+                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black ${color.soft} ${color.text} truncate max-w-full`}>
+                        {displayName}
+                      </span>
+                    </th>
+                  );
+                })}
                 <th className={`px-2 py-2.5 text-center min-w-[58px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px]`}>成績</th>
                 {leagueComplete && (
                   <th className={`px-2 py-2.5 text-center min-w-[52px] font-bold ${color.text} border-b ${color.border} text-[11px]`}>順位</th>
@@ -678,7 +651,13 @@ export default function TeamLeagueView() {
                     </td>
                     {selectedLeague.teams.map(colTeam => {
                       if (rowTeam.teamId === colTeam.teamId) {
-                        return <td key={colTeam.teamId} className="bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100" />;
+                        return (
+                          <td key={colTeam.teamId} className="relative bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100">
+                            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                              <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" />
+                            </svg>
+                          </td>
+                        );
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
                       if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
