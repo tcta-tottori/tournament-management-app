@@ -423,29 +423,31 @@ export default function TeamLeagueView() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-50/80">
-                        <th className="px-2 py-1.5 text-left min-w-[120px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">チーム</th>
-                        <th className="px-1 py-1.5 text-center w-[34px] font-bold text-slate-600 border-b border-slate-200">種目</th>
+                      <tr className={`bg-gradient-to-r ${c.grad} text-white`}>
+                        <th className="px-2 py-2 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">チーム</th>
+                        <th className="px-1 py-2 text-center w-[34px] font-bold text-white/90 border-b border-white/20 text-[11px]">種目</th>
                         {league.teams.map(t => (
-                          <th key={t.teamId} className="px-1.5 py-1.5 text-center min-w-[68px] text-[10px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">
-                            {t.teamName.split(/[\s\u3000]+/)[0]}
+                          <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] border-b border-white/20 whitespace-nowrap">
+                            <span className="inline-block px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black text-white">
+                              {t.teamName.split(/[\s\u3000]+/)[0]}
+                            </span>
                           </th>
                         ))}
-                        <th className="px-2 py-1.5 text-center min-w-[50px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">成績</th>
+                        <th className="px-2 py-2 text-center min-w-[50px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">成績</th>
                         {complete && (
-                          <th className="px-2 py-1.5 text-center min-w-[44px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">順位</th>
+                          <th className="px-2 py-2 text-center min-w-[44px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">順位</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
-                      {league.teams.map(rowTeam => {
+                      {league.teams.map((rowTeam, rowIdx) => {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
-                          <tr key={rowTeam.teamId} className="border-t border-slate-100">
-                            <td className="px-2 py-1 font-bold text-xs bg-slate-50/40 align-middle border-r border-slate-100 whitespace-nowrap">
+                          <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
+                            <td className={`px-2 py-1 font-bold text-xs align-middle border-r ${c.border} whitespace-nowrap border-l-[3px] ${standing?.rank === 1 ? 'border-l-amber-400' : standing?.rank === 2 ? 'border-l-slate-400' : standing?.rank === 3 ? 'border-l-orange-400' : 'border-l-transparent'} ${c.bg}/20`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
                             </td>
-                            <td className="px-0.5 py-1 align-middle border-r border-slate-100 bg-slate-50/30">
+                            <td className={`px-0.5 py-1 align-middle border-r ${c.border} ${c.bg}/20`}>
                               <div className="flex flex-col gap-0.5 items-center">
                                 {MATCH_TYPE_ORDER.map(mt => {
                                   const tag = MATCH_TYPE_COLORS[mt];
@@ -505,12 +507,19 @@ export default function TeamLeagueView() {
                                 </td>
                               );
                             })}
-                            <td className="px-1.5 py-1 text-center font-black text-sm align-middle bg-slate-50/40 tabular-nums">
-                              {standing ? <>{standing.wins}<span className="text-slate-300">-</span>{standing.losses}</> : '-'}
+                            <td className={`px-1.5 py-1 text-center font-black text-sm align-middle ${c.bg}/20 tabular-nums border-l ${c.border}`}>
+                              {standing ? <><span className={c.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span></> : '-'}
                             </td>
                             {complete && (
-                              <td className="px-1.5 py-1 text-center align-middle bg-slate-50/40">
-                                {standing && <RankText rank={standing.rank || 0} />}
+                              <td className={`px-1.5 py-1 text-center align-middle ${c.bg}/20`}>
+                                {standing && (
+                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black ${
+                                    standing.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white' :
+                                    standing.rank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white' :
+                                    standing.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' :
+                                    `${c.soft} ${c.text}`
+                                  }`}>{standing.rank}</span>
+                                )}
                               </td>
                             )}
                           </tr>
@@ -618,41 +627,43 @@ export default function TeamLeagueView() {
         const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
         return (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-indigo-100 flex items-center gap-2 bg-gradient-to-r from-indigo-50/80 via-white to-violet-50/60">
-          <BarChart3 className="w-4 h-4 text-indigo-500" />
-          <span className="text-sm font-bold text-slate-700 tracking-wide">成績表</span>
-          <span className="ml-auto text-[10px] text-slate-400 tracking-wider">タップで入力</span>
+        <div className={`px-4 py-2.5 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
+          <BarChart3 className="w-4 h-4 text-white/80" />
+          <span className="text-sm font-bold tracking-wide">成績表</span>
+          <span className="ml-auto text-[10px] text-white/70 tracking-wider">タップで入力</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-gradient-to-b from-slate-50 to-slate-100/80">
-                <th className="px-2 py-2 text-left min-w-[120px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap text-[11px] tracking-wide">チーム</th>
-                <th className="px-1 py-2 text-center w-[34px] font-bold text-slate-500 border-b border-slate-200 text-[11px] tracking-wide">種目</th>
+              <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
+                <th className={`px-2 py-2.5 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] tracking-wide`}>チーム</th>
+                <th className={`px-1 py-2.5 text-center w-[34px] font-bold ${color.text} border-b ${color.border} text-[11px] tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] text-[10px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap">
-                    {t.teamName.split(/[\s\u3000]+/)[0]}
+                  <th key={t.teamId} className={`px-1.5 py-2.5 text-center min-w-[68px] border-b ${color.border} whitespace-nowrap`}>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black ${color.soft} ${color.text}`}>
+                      {t.teamName.split(/[\s\u3000]+/)[0]}
+                    </span>
                   </th>
                 ))}
-                <th className="px-2 py-2 text-center min-w-[58px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap text-[11px]">成績</th>
+                <th className={`px-2 py-2.5 text-center min-w-[58px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px]`}>成績</th>
                 {leagueComplete && (
-                  <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">順位</th>
+                  <th className={`px-2 py-2.5 text-center min-w-[52px] font-bold ${color.text} border-b ${color.border} text-[11px]`}>順位</th>
                 )}
                 {hasTiebreak && (
-                  <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">判定</th>
+                  <th className={`px-2 py-2.5 text-center min-w-[80px] font-bold ${color.text} border-b ${color.border} text-[11px]`}>判定</th>
                 )}
               </tr>
             </thead>
             <tbody>
-              {selectedLeague.teams.map(rowTeam => {
+              {selectedLeague.teams.map((rowTeam, rowIdx) => {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
-                  <tr key={rowTeam.teamId} className="border-t border-slate-100">
-                    <td className="px-2 py-1.5 font-bold text-xs bg-slate-50/40 align-middle border-r border-slate-100 whitespace-nowrap">
-                      <div className="truncate max-w-[180px]" title={rowTeam.teamName}>{rowTeam.teamName}</div>
+                  <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
+                    <td className={`px-2 py-1.5 font-bold text-xs align-middle border-r ${color.border} whitespace-nowrap border-l-[3px] ${standing?.rank === 1 ? 'border-l-amber-400 bg-amber-50/40' : standing?.rank === 2 ? 'border-l-slate-400 bg-slate-50/40' : standing?.rank === 3 ? 'border-l-orange-400 bg-orange-50/30' : `border-l-transparent ${color.bg}/20`}`}>
+                      <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                     </td>
                     {/* 種目ラベル列 */}
-                    <td className="px-0.5 py-1.5 align-middle border-r border-slate-100 bg-slate-50/30">
+                    <td className={`px-0.5 py-1.5 align-middle border-r ${color.border} ${color.bg}/20`}>
                       <div className="flex flex-col gap-0.5 items-center">
                         {MATCH_TYPE_ORDER.map(mt => {
                           const tag = MATCH_TYPE_COLORS[mt];
@@ -725,21 +736,28 @@ export default function TeamLeagueView() {
                         </td>
                       );
                     })}
-                    <td className="px-2 py-1 text-center font-black text-sm align-middle bg-slate-50/40">
+                    <td className={`px-2 py-1 text-center font-black text-sm align-middle ${color.bg}/30 border-l ${color.border}`}>
                       {standing ? (
                         <div className="tabular-nums">
-                          {standing.wins}<span className="text-slate-300">-</span>{standing.losses}
+                          <span className={color.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span>
                         </div>
                       ) : '-'}
                     </td>
                     {leagueComplete && (
-                      <td className="px-2 py-1 text-center align-middle bg-slate-50/40">
-                        {standing && <RankText rank={standing.rank || 0} />}
+                      <td className={`px-2 py-1 text-center align-middle ${color.bg}/30`}>
+                        {standing && (
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black ${
+                            standing.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-sm' :
+                            standing.rank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-sm' :
+                            standing.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white shadow-sm' :
+                            `${color.soft} ${color.text}`
+                          }`}>{standing.rank}</span>
+                        )}
                       </td>
                     )}
                     {hasTiebreak && (
                       <td
-                        className="px-2 py-1 text-center align-middle bg-slate-50/40 cursor-pointer hover:bg-slate-100 transition-colors"
+                        className={`px-2 py-1 text-center align-middle ${color.bg}/30 cursor-pointer hover:${color.bg} transition-colors`}
                         onClick={() => standing && setJudgementTarget(standing)}
                       >
                         {standing?.tiebreakReason ? (

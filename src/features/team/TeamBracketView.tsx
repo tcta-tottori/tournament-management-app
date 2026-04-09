@@ -228,247 +228,299 @@ export default function TeamBracketView() {
       )}
 
       {/* ブラケット表示 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-500" />
-          <span className="text-sm font-bold text-slate-700">トーナメント表</span>
-          <span className="ml-auto text-[10px] text-slate-400">横スクロールで全体表示</span>
-        </div>
-        <div className="overflow-x-auto">
-          <div className="flex gap-3 min-w-fit p-3">
-            {roundMatches.map((matches, ri) => (
-              <div key={ri} className="flex flex-col gap-3 min-w-[240px]">
-                {/* ラウンドヘッダー */}
-                <div className={`text-center font-black text-xs px-3 py-2 rounded-xl ${
-                  ri + 1 === totalRounds
-                    ? 'bg-gradient-to-r from-yellow-100 to-amber-100 text-amber-800 border border-amber-200'
-                    : ri + 1 === totalRounds - 1
-                    ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-indigo-700 border border-indigo-200'
-                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                }`}>
-                  {getRoundName(ri + 1)}
-                </div>
+      {(() => {
+        const MATCH_HEIGHT = 140;
+        const MATCH_WIDTH = 260;
+        const ROUND_GAP = 48;
+        const MATCH_GAP = 20;
+        const GRID_UNIT = MATCH_HEIGHT + MATCH_GAP;
+        const getMatchY = (roundIdx: number, matchIdx: number) => {
+          const spacing = Math.pow(2, roundIdx);
+          const offset = (spacing - 1) * GRID_UNIT / 2;
+          return 36 + matchIdx * spacing * GRID_UNIT + offset + MATCH_HEIGHT / 2;
+        };
+        const r1count = roundMatches[0]?.length || 0;
+        const svgHeight = r1count * GRID_UNIT + 36;
+        const catGradColors: Record<string, string> = {
+          '1st': '#f59e0b',
+          '2nd': '#94a3b8',
+          '3rd': '#f97316',
+          '4th': '#3b82f6',
+        };
+        const lineColor = catGradColors[selectedBracketCategory] || '#c9cdd3';
 
-                {/* 試合カード */}
-                <div className="flex flex-col justify-around flex-1 gap-3">
-                  {matches.map(match => {
+        return (<>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className={`px-4 py-2.5 border-b flex items-center gap-2 bg-gradient-to-r ${currentConfig.grad} text-white`}>
+          <Trophy className="w-4 h-4 text-white/80" />
+          <span className="text-sm font-bold">トーナメント表</span>
+          <span className="ml-auto text-[10px] text-white/70">横スクロールで全体表示</span>
+        </div>
+        <div className="overflow-x-auto bg-gradient-to-br from-slate-50/80 via-white to-slate-50/50">
+          <div className="relative p-4" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds + (winnerTeam ? 180 : 0), height: svgHeight }}>
+            {/* 接続線SVG */}
+            <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
+              {roundMatches.slice(0, -1).map((rMatches, roundIdx) => {
+                const x1 = roundIdx * (MATCH_WIDTH + ROUND_GAP) + MATCH_WIDTH;
+                const x2 = (roundIdx + 1) * (MATCH_WIDTH + ROUND_GAP);
+                const xMid = (x1 + x2) / 2;
+                const pairs: React.ReactNode[] = [];
+                for (let i = 0; i < rMatches.length; i += 2) {
+                  if (i + 1 >= rMatches.length) break;
+                  const y1 = getMatchY(roundIdx, i);
+                  const y2 = getMatchY(roundIdx, i + 1);
+                  const yNext = getMatchY(roundIdx + 1, Math.floor(i / 2));
+                  pairs.push(
+                    <g key={`line-${roundIdx}-${i}`}>
+                      <line x1={x1} y1={y1} x2={xMid} y2={y1} stroke={lineColor} strokeWidth="2" strokeOpacity="0.5" />
+                      <line x1={x1} y1={y2} x2={xMid} y2={y2} stroke={lineColor} strokeWidth="2" strokeOpacity="0.5" />
+                      <line x1={xMid} y1={y1} x2={xMid} y2={y2} stroke={lineColor} strokeWidth="2" strokeOpacity="0.5" />
+                      <line x1={xMid} y1={yNext} x2={x2} y2={yNext} stroke={lineColor} strokeWidth="2" strokeOpacity="0.5" />
+                    </g>
+                  );
+                }
+                return pairs;
+              })}
+            </svg>
+
+            {/* 各ラウンドのマッチカード */}
+            {roundMatches.map((matches, ri) => {
+              const round = ri + 1;
+              const colX = ri * (MATCH_WIDTH + ROUND_GAP);
+              return (
+                <div key={round}>
+                  {/* ラウンドラベル */}
+                  <div className="absolute" style={{ left: colX, top: 4, width: MATCH_WIDTH }}>
+                    <div className="text-center">
+                      <span className={`inline-block px-4 py-1 rounded-full text-xs font-black shadow-sm ${
+                        round === totalRounds
+                          ? `bg-gradient-to-r ${currentConfig.grad} text-white`
+                          : round === totalRounds - 1
+                          ? `${currentConfig.bg} ${currentConfig.text} border border-current/20`
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}>
+                        {getRoundName(round)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 各試合 */}
+                  {matches.map((match, matchIdx) => {
+                    const centerY = getMatchY(ri, matchIdx);
                     const court = bracketCourtAssignments[match.matchId];
                     const isFinished = match.status === 'finished';
                     const isBye = match.status === 'bye';
                     const isPlaying = match.status === 'playing';
                     const isReady = match.status === 'ready';
 
-                    const cardStyle = isFinished
-                      ? 'border-emerald-200 bg-emerald-50/30'
-                      : isBye
-                      ? 'border-slate-200 bg-slate-50/50 opacity-70'
-                      : isPlaying
-                      ? 'border-blue-400 bg-blue-50/40 ring-2 ring-blue-500/30 shadow-lg league-match-blink'
-                      : isReady
-                      ? 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                      : 'border-slate-200 opacity-80';
-
-                    return (
-                      <div
-                        key={match.matchId}
-                        className={`border rounded-xl overflow-hidden transition-all bg-white ${cardStyle}`}
-                      >
-                        {/* ステータスバー */}
-                        <div className="flex items-center justify-between px-2.5 py-1 bg-slate-50/80 border-b border-slate-100 text-[10px]">
-                          <div className="flex items-center gap-1 min-w-0">
-                            {court ? (
-                              <span className="flex items-center gap-0.5 text-blue-600 font-bold truncate">
-                                <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                <span className="truncate">{court.courtNames.join('・')}</span>
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 font-medium">#{match.position}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {isFinished && (
-                              <span className="flex items-center gap-0.5 text-emerald-600 font-bold">
-                                <Check className="w-2.5 h-2.5" />
-                                完了
+                    // BYE表示
+                    if (isBye) {
+                      const byeName = match.team1Name || match.team2Name || 'BYE';
+                      const byeLeague = match.team1League || match.team2League;
+                      return (
+                        <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - 28, width: MATCH_WIDTH, zIndex: 1 }}>
+                          <div className="flex items-center gap-2 px-3 h-14 rounded-lg border border-slate-200 bg-white/80">
+                            {byeLeague && (
+                              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${currentConfig.bg} ${currentConfig.text} text-[9px] font-black shrink-0`}>
+                                {byeLeague}
                               </span>
                             )}
-                            {isPlaying && (
-                              <span className="flex items-center gap-1 text-blue-600 font-bold animate-pulse">
-                                <Play className="w-2.5 h-2.5" />
-                                対戦中
-                                {court?.startedAt && (() => {
-                                  const el = Math.floor((Date.now() - court.startedAt) / 60000);
-                                  const h = Math.floor(el / 60);
-                                  const m = el % 60;
-                                  return (
-                                    <span className="font-mono text-[9px] text-blue-500 ml-0.5">
-                                      {h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}
-                                    </span>
-                                  );
-                                })()}
-                              </span>
-                            )}
-                            {isBye && <span className="text-slate-400 font-bold">BYE</span>}
+                            <span className="text-sm font-bold text-slate-700 truncate flex-1">{byeName}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">BYE</span>
                           </div>
                         </div>
+                      );
+                    }
 
-                        {/* チーム1 */}
-                        <button
-                          onClick={() => !isBye && match.team1Id && match.team2Id && setEditingMatch(match)}
-                          disabled={isBye || !match.team1Id || !match.team2Id}
-                          className={`w-full flex items-center gap-2 px-3 py-2 transition-colors text-left ${
-                            match.winnerId === match.team1Id ? 'bg-blue-50' : ''
-                          } ${!isBye && isReady ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
-                        >
-                          {match.team1League && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black shrink-0">
-                              {match.team1League}
-                            </span>
-                          )}
-                          <span className={`flex-1 text-sm truncate ${
-                            match.team1Name === 'BYE'
-                              ? 'text-slate-300 italic'
-                              : match.winnerId === match.team1Id
-                              ? 'font-black text-blue-700'
-                              : 'text-slate-700'
+                    // 通常マッチカード
+                    const borderStyle = isFinished
+                      ? 'border-emerald-300 shadow-sm'
+                      : isPlaying
+                      ? 'border-green-400 shadow-md bracket-playing-blink'
+                      : isReady && match.team1Id && match.team2Id
+                      ? 'border-blue-300 hover:shadow-md'
+                      : 'border-slate-200';
+
+                    return (
+                      <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
+                        <div className={`rounded-xl border-2 overflow-hidden transition-all bg-white ${borderStyle}`} style={{ height: MATCH_HEIGHT }}>
+                          {/* ステータスバー */}
+                          <div className={`flex items-center justify-between px-2.5 py-1 border-b text-[10px] ${
+                            isPlaying ? 'bg-green-50 border-green-100' :
+                            isFinished ? 'bg-emerald-50/50 border-emerald-100' :
+                            `${currentConfig.bg} border-slate-100`
                           }`}>
-                            {match.team1Name || '---'}
-                          </span>
-                          {isFinished && !isBye && (
-                            <span className={`text-sm font-black tabular-nums ${
-                              match.winnerId === match.team1Id ? 'text-blue-600' : 'text-slate-300'
-                            }`}>
-                              {match.winsTeam1}
-                            </span>
-                          )}
-                        </button>
-
-                        {/* スコア詳細 */}
-                        {isFinished && !isBye && match.subMatches.length > 0 && (
-                          <div className="px-2 py-1 bg-slate-50/50 border-y border-slate-100">
-                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] justify-center">
-                              {match.subMatches.map(sm => (
-                                <span key={sm.type} className="font-mono">
-                                  <span className="text-slate-400 font-bold">{MATCH_TYPE_SHORT[sm.type]}</span>
-                                  <span className={`ml-0.5 font-black ${
-                                    sm.winnerId === match.team1Id ? 'text-blue-600' :
-                                    sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
-                                  }`}>
-                                    {sm.score1}-{sm.score2}
-                                  </span>
-                                  {sm.tiebreakScore !== null && <span className="text-slate-400">({sm.tiebreakScore})</span>}
+                            <div className="flex items-center gap-1 min-w-0">
+                              {court ? (
+                                <span className="flex items-center gap-0.5 text-blue-600 font-bold truncate">
+                                  <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                  <span className="truncate">{court.courtNames.join('・')}</span>
                                 </span>
-                              ))}
+                              ) : (
+                                <span className="text-slate-400 font-medium">#{match.position}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {isFinished && (
+                                <span className="flex items-center gap-0.5 text-emerald-600 font-bold">
+                                  <Check className="w-2.5 h-2.5" />完了
+                                </span>
+                              )}
+                              {isPlaying && (
+                                <span className="flex items-center gap-1 text-green-600 font-bold animate-pulse">
+                                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                                  対戦中
+                                  {court?.startedAt && (() => {
+                                    const el = Math.floor((Date.now() - court.startedAt) / 60000);
+                                    const h = Math.floor(el / 60);
+                                    const m = el % 60;
+                                    return <span className="font-mono text-[9px] text-green-500 ml-0.5">{h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}</span>;
+                                  })()}
+                                </span>
+                              )}
+                              {!isFinished && !isPlaying && match.team1Id && match.team2Id && (
+                                <span className="text-amber-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />控え</span>
+                              )}
                             </div>
                           </div>
-                        )}
 
-                        {/* チーム2 */}
-                        <button
-                          onClick={() => !isBye && match.team1Id && match.team2Id && setEditingMatch(match)}
-                          disabled={isBye || !match.team1Id || !match.team2Id}
-                          className={`w-full flex items-center gap-2 px-3 py-2 border-t border-slate-100 transition-colors text-left ${
-                            match.winnerId === match.team2Id ? 'bg-blue-50' : ''
-                          } ${!isBye && isReady ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
-                        >
-                          {match.team2League && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black shrink-0">
-                              {match.team2League}
-                            </span>
-                          )}
-                          <span className={`flex-1 text-sm truncate ${
-                            match.team2Name === 'BYE'
-                              ? 'text-slate-300 italic'
-                              : match.winnerId === match.team2Id
-                              ? 'font-black text-blue-700'
-                              : 'text-slate-700'
+                          {/* チーム1 */}
+                          <button
+                            onClick={() => match.team1Id && match.team2Id && setEditingMatch(match)}
+                            disabled={!match.team1Id || !match.team2Id}
+                            className={`w-full flex items-center gap-2 px-3 py-2 transition-colors text-left border-b border-slate-100 ${
+                              match.winnerId === match.team1Id ? 'bg-blue-50/80' : ''
+                            } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
+                          >
+                            {match.team1League && (
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg ${currentConfig.bg} ${currentConfig.text} text-[9px] font-black shrink-0`}>
+                                {match.team1League}
+                              </span>
+                            )}
+                            <span className={`flex-1 text-sm truncate ${
+                              match.team1Name === 'BYE' ? 'text-slate-300 italic' :
+                              match.winnerId === match.team1Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
+                            }`}>{match.team1Name || '---'}</span>
+                            {isFinished && (
+                              <span className={`text-base font-black tabular-nums ${
+                                match.winnerId === match.team1Id ? 'text-blue-600' : 'text-slate-300'
+                              }`}>{match.winsTeam1}</span>
+                            )}
+                          </button>
+
+                          {/* チーム2 */}
+                          <button
+                            onClick={() => match.team1Id && match.team2Id && setEditingMatch(match)}
+                            disabled={!match.team1Id || !match.team2Id}
+                            className={`w-full flex items-center gap-2 px-3 py-2 transition-colors text-left ${
+                              match.winnerId === match.team2Id ? 'bg-blue-50/80' : ''
+                            } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
+                          >
+                            {match.team2League && (
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg ${currentConfig.bg} ${currentConfig.text} text-[9px] font-black shrink-0`}>
+                                {match.team2League}
+                              </span>
+                            )}
+                            <span className={`flex-1 text-sm truncate ${
+                              match.team2Name === 'BYE' ? 'text-slate-300 italic' :
+                              match.winnerId === match.team2Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
+                            }`}>{match.team2Name || '---'}</span>
+                            {isFinished && (
+                              <span className={`text-base font-black tabular-nums ${
+                                match.winnerId === match.team2Id ? 'text-blue-600' : 'text-slate-300'
+                              }`}>{match.winsTeam2}</span>
+                            )}
+                          </button>
+
+                          {/* スコア詳細 + アクション */}
+                          <div className={`flex items-center justify-between px-2 py-1 border-t text-[9px] ${
+                            isPlaying ? 'bg-green-50/50 border-green-100' :
+                            isFinished ? 'bg-slate-50/50 border-slate-100' :
+                            'bg-slate-50/30 border-slate-100'
                           }`}>
-                            {match.team2Name || '---'}
-                          </span>
-                          {isFinished && !isBye && (
-                            <span className={`text-sm font-black tabular-nums ${
-                              match.winnerId === match.team2Id ? 'text-blue-600' : 'text-slate-300'
-                            }`}>
-                              {match.winsTeam2}
-                            </span>
-                          )}
-                        </button>
-
-                        {/* アクションバー */}
-                        {!isBye && match.team1Id && match.team2Id && (isReady || isPlaying || (isFinished && match.winnerId && match.nextMatchId)) && (
-                          <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-50/80 border-t border-slate-100">
-                            {isFinished && match.winnerId && match.nextMatchId && (
-                              <button
-                                onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }}
-                                className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100 active:bg-blue-200 transition-colors"
-                              >
-                                勝者進出
-                                <ChevronRight className="w-3 h-3" />
-                              </button>
-                            )}
-                            {isReady && !court && (
-                              <button
-                                onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                              >
-                                <MapPin className="w-3 h-3" />
-                                コート割当
-                              </button>
-                            )}
-                            {isPlaying && court && (
-                              <>
-                                <button
-                                  onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                  className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
-                                >
-                                  <MapPin className="w-3 h-3" />
-                                  コート変更
+                            {isFinished && match.subMatches.length > 0 ? (
+                              <div className="flex gap-1.5 flex-1">
+                                {match.subMatches.map(sm => (
+                                  <span key={sm.type} className="font-mono">
+                                    <span className="text-slate-400 font-bold">{MATCH_TYPE_SHORT[sm.type]}</span>
+                                    <span className={`ml-0.5 font-black ${
+                                      sm.winnerId === match.team1Id ? 'text-blue-600' :
+                                      sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
+                                    }`}>{sm.score1}-{sm.score2}</span>
+                                    {sm.tiebreakScore !== null && <span className="text-slate-400">({sm.tiebreakScore})</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : <div className="flex-1" />}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isFinished && match.winnerId && match.nextMatchId && (
+                                <button onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors">
+                                  勝者進出<ChevronRight className="w-2.5 h-2.5" />
                                 </button>
-                                <button
-                                  onClick={e => { e.stopPropagation(); openCall(match); }}
-                                  className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors"
-                                >
-                                  <Volume2 className="w-3 h-3" />
-                                  コール
+                              )}
+                              {isReady && !court && match.team1Id && match.team2Id && (
+                                <button onClick={e => { e.stopPropagation(); openCourtAssign(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                  <MapPin className="w-2.5 h-2.5" />コート
                                 </button>
-                              </>
-                            )}
+                              )}
+                              {isPlaying && court && (
+                                <>
+                                  <button onClick={e => { e.stopPropagation(); openCourtAssign(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors">
+                                    <MapPin className="w-2.5 h-2.5" />変更
+                                  </button>
+                                  <button onClick={e => { e.stopPropagation(); openCall(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors">
+                                    <Volume2 className="w-2.5 h-2.5" />コール
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* 優勝チーム表示 */}
-            {winnerTeam && (
-              <div className="flex flex-col justify-center min-w-[220px]">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 p-5 text-white shadow-xl">
-                  <div className="absolute inset-0 opacity-20">
-                    <div className="absolute -top-5 -right-5 w-24 h-24 rounded-full bg-white blur-2xl" />
-                    <div className="absolute -bottom-5 -left-5 w-24 h-24 rounded-full bg-white blur-2xl" />
-                  </div>
-                  <div className="relative text-center">
-                    <Trophy className="w-10 h-10 mx-auto mb-2 drop-shadow-lg" />
-                    <div className="text-[10px] font-black uppercase tracking-widest opacity-90">優勝</div>
-                    <div className="text-lg font-black tracking-tight mt-1">
-                      {winnerTeam.teamName}
+            {winnerTeam && (() => {
+              const finalY = getMatchY(totalRounds - 1, 0);
+              const winnerX = totalRounds * (MATCH_WIDTH + ROUND_GAP) - ROUND_GAP + 16;
+              return (
+                <div className="absolute" style={{ left: winnerX, top: finalY - 60, width: 160, zIndex: 2 }}>
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 p-4 text-white shadow-xl">
+                    <div className="absolute inset-0 opacity-20">
+                      <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white blur-2xl" />
                     </div>
-                    {winnerTeam.leagueId && (
-                      <div className="inline-flex items-center gap-0.5 mt-2 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] font-bold">
-                        <Users className="w-2.5 h-2.5" />
-                        {winnerTeam.leagueId}リーグ
-                      </div>
-                    )}
+                    <div className="relative text-center">
+                      <Trophy className="w-8 h-8 mx-auto mb-1.5 drop-shadow-lg" />
+                      <div className="text-[9px] font-black uppercase tracking-widest opacity-90">優勝</div>
+                      <div className="text-sm font-black tracking-tight mt-0.5 truncate">{winnerTeam.teamName}</div>
+                      {winnerTeam.leagueId && (
+                        <div className="inline-flex items-center gap-0.5 mt-1.5 px-2 py-0.5 bg-white/20 rounded-full text-[9px] font-bold">
+                          <Users className="w-2.5 h-2.5" />{winnerTeam.leagueId}リーグ
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>
+
+      {/* 点滅アニメーション */}
+      <style>{`
+        @keyframes bracket-playing {
+          0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+          50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.3); }
+        }
+        .bracket-playing-blink { animation: bracket-playing 2s ease-in-out infinite; }
+      `}</style>
+        </>);
+      })()}
       </>)}
 
       {/* コート割当ダイアログ（複数選択可） */}
