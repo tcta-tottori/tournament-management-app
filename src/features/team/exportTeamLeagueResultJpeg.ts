@@ -402,6 +402,10 @@ export async function generateTeamLeagueResultDataUrl(
       ctx.fillText(TYPE_LABEL[mt], tagX + tagW / 2, tagY + tagH / 2 + 0.5);
     }
 
+    // 種目列の上部（総合勝敗エリア）に「勝敗」ラベルを表示
+    const overallY = rowTop + overallAreaH / 2;
+    drawText('勝敗', typeColX + typeColW / 2, overallY, 11, 'center', COL.slate500, 'bold');
+
     // サブ行の境界線
     const subRowRightEdge = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
     drawLine(typeColX, subAreaTop, subRowRightEdge, subAreaTop, COL.slate200, 0.8);
