@@ -72,21 +72,22 @@ export async function generateTeamLeagueResultDataUrl(
 
   // ---- レイアウト定数 ----
   const scale = 2;
-  const paddingX = 56;
-  const paddingY = 48;
-  const headerH = 124; // 大きな角丸バッジ + 大会名 + 会場ロゴ
+  const paddingX = 30;
+  const paddingY = 26;
+  const headerH = 110; // 角丸バッジ + 大会名 + 会場ロゴ
   const colHeaderH = 44;
   const rowH = 146;
-  const nameColW = 190;
+  const numColW = 60;       // チーム番号専用列
+  const nameColW = 168;     // チーム名（番号と分離したのでやや細く）
   const typeColW = 54;
   const recordColW = 96;
-  const rankColW = 82;
-  const tableW = nameColW + typeColW + scoreColW * teamCount + recordColW + rankColW;
+  const rankColW = 88;
+  const tableW = numColW + nameColW + typeColW + scoreColW * teamCount + recordColW + rankColW;
   const tableH = colHeaderH + rowH * teamCount;
 
   // ---- フッター（TCTA横長ロゴ） ----
-  const tctaMaxH = 100;
-  const tctaMaxW = Math.min(400, tableW * 0.4);
+  const tctaMaxH = 88;
+  const tctaMaxW = Math.min(360, tableW * 0.36);
   let tctaW = 0;
   let tctaH = 0;
   if (tctaLogo) {
@@ -98,12 +99,12 @@ export async function generateTeamLeagueResultDataUrl(
       tctaH = tctaW / ratio;
     }
   }
-  const footerH = Math.max(tctaH + 42, 70);
+  const footerH = Math.max(tctaH + 28, 56);
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + tableH + footerH;
 
-  // ---- カラーパレット（refined sky palette） ----
+  // ---- カラーパレット（refined sky + premium medal palette） ----
   const COL = {
     white: '#ffffff',
     sky50: '#f0f9ff',
@@ -126,6 +127,10 @@ export async function generateTeamLeagueResultDataUrl(
     slate700: '#334155',
     slate800: '#1e293b',
     slate900: '#0f172a',
+    // 上位3チームのメダル風グラデ
+    gold:   { c1: '#fde68a', c2: '#f59e0b', c3: '#b45309', text: '#7c2d12' },
+    silver: { c1: '#f1f5f9', c2: '#cbd5e1', c3: '#64748b', text: '#334155' },
+    bronze: { c1: '#fed7aa', c2: '#c2410c', c3: '#7c2d12', text: '#7c2d12' },
   };
 
   const canvas = document.createElement('canvas');
@@ -137,6 +142,17 @@ export async function generateTeamLeagueResultDataUrl(
   // 背景: リーグの枠外は完全な白で塗りつぶす（ロゴの矩形が背景に浮かないように）
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
+
+  // ---- リッチ装飾: キャンバス上端の細いアクセントバー（sky → gold → sky） ----
+  const topBarH = 5;
+  const topBarGrad = ctx.createLinearGradient(0, 0, totalW, 0);
+  topBarGrad.addColorStop(0,    COL.sky500);
+  topBarGrad.addColorStop(0.45, COL.sky400);
+  topBarGrad.addColorStop(0.5,  COL.gold.c2);
+  topBarGrad.addColorStop(0.55, COL.sky400);
+  topBarGrad.addColorStop(1,    COL.sky500);
+  ctx.fillStyle = topBarGrad;
+  ctx.fillRect(0, 0, totalW, topBarH);
 
   // ---- ヘルパー ----
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color = COL.slate200, w = 1) => {
@@ -278,48 +294,64 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.lineTo(paddingX + tableW, accentY);
   ctx.stroke();
 
-  // ---- 表全体枠（影付け） ----
+  // ---- 表全体枠（影付け - より上質な深さ） ----
   const tableX = paddingX;
   const tableY = paddingY + headerH;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 6;
-  drawRoundRect(tableX, tableY, tableW, tableH, 16, COL.white);
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 8;
+  drawRoundRect(tableX, tableY, tableW, tableH, 18, COL.white);
   ctx.restore();
 
-  // 列ヘッダー背景（角丸マスク）
+  // 列ヘッダー背景（角丸マスク + より深い水色グラデ）
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(tableX + 16, tableY);
-  ctx.arcTo(tableX + tableW, tableY, tableX + tableW, tableY + colHeaderH, 16);
+  ctx.moveTo(tableX + 18, tableY);
+  ctx.arcTo(tableX + tableW, tableY, tableX + tableW, tableY + colHeaderH, 18);
   ctx.arcTo(tableX + tableW, tableY + colHeaderH, tableX, tableY + colHeaderH, 0);
   ctx.arcTo(tableX, tableY + colHeaderH, tableX, tableY, 0);
-  ctx.arcTo(tableX, tableY, tableX + tableW, tableY, 16);
+  ctx.arcTo(tableX, tableY, tableX + tableW, tableY, 18);
   ctx.clip();
   const headGrad = ctx.createLinearGradient(tableX, tableY, tableX, tableY + colHeaderH);
-  headGrad.addColorStop(0, '#f8fafc');
-  headGrad.addColorStop(1, '#e0f2fe');
+  headGrad.addColorStop(0,   '#ecfeff');
+  headGrad.addColorStop(0.5, '#e0f2fe');
+  headGrad.addColorStop(1,   '#bae6fd');
   ctx.fillStyle = headGrad;
   ctx.fillRect(tableX, tableY, tableW, colHeaderH);
+  // 列ヘッダー上端の細い光彩ライン
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillRect(tableX, tableY, tableW, 1.5);
   ctx.restore();
 
-  // 列ヘッダー下の強めのライン
-  drawLine(tableX, tableY + colHeaderH, tableX + tableW, tableY + colHeaderH, COL.sky500, 1.5);
+  // 列ヘッダー下の強めのライン (sky → gold → sky で1本入れる)
+  const headerLineGrad = ctx.createLinearGradient(tableX, 0, tableX + tableW, 0);
+  headerLineGrad.addColorStop(0,    COL.sky500);
+  headerLineGrad.addColorStop(0.45, COL.sky500);
+  headerLineGrad.addColorStop(0.5,  COL.gold.c2);
+  headerLineGrad.addColorStop(0.55, COL.sky500);
+  headerLineGrad.addColorStop(1,    COL.sky500);
+  ctx.strokeStyle = headerLineGrad;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(tableX, tableY + colHeaderH);
+  ctx.lineTo(tableX + tableW, tableY + colHeaderH);
+  ctx.stroke();
 
   // ---- 列ヘッダー テキスト ----
   const thColor = COL.sky800;
-  drawText('チーム', tableX + nameColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
-  drawText('種目', tableX + nameColW + typeColW / 2, tableY + colHeaderH / 2, 11, 'center', thColor, 'black');
+  drawText('No.', tableX + numColW / 2, tableY + colHeaderH / 2, 11, 'center', thColor, 'black');
+  drawText('チーム', tableX + numColW + nameColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
+  drawText('種目', tableX + numColW + nameColW + typeColW / 2, tableY + colHeaderH / 2, 11, 'center', thColor, 'black');
 
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
-    const x = tableX + nameColW + typeColW + scoreColW * i + scoreColW / 2;
+    const x = tableX + numColW + nameColW + typeColW + scoreColW * i + scoreColW / 2;
     const shortName = team.teamName.split(/[\s\u3000]+/)[0] || team.teamName;
     drawText(shortName, x, tableY + colHeaderH / 2, 12, 'center', thColor, 'black', scoreColW - 14);
   }
-  let colCursor = tableX + nameColW + typeColW + scoreColW * teamCount;
+  let colCursor = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
   drawText('勝敗', colCursor + recordColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
   colCursor += recordColW;
   drawText('順位', colCursor + rankColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
@@ -342,14 +374,20 @@ export async function generateTeamLeagueResultDataUrl(
     const subAreaTop = rowTop + overallAreaH;
     const subCenters = [0, 1, 2].map(i => subAreaTop + subH * i + subH / 2);
 
+    // --- 番号列 (バッジなし、専用列に大きな数字) ---
+    const numColCenterX = tableX + numColW / 2;
+    // 番号列に薄い背景帯を入れて視覚的に独立させる
+    ctx.fillStyle = COL.slate50;
+    ctx.fillRect(tableX + 0.5, rowTop + 0.5, numColW - 0.5, rowH - 1);
+    drawText(String(team.numberInLeague), numColCenterX, rowTop + rowH / 2, 28, 'center', COL.slate700, 'black');
+    // 番号列とチーム名列の境界
+    drawLine(tableX + numColW, tableY + colHeaderH, tableX + numColW, tableY + tableH, COL.slate200, 1);
+
     // --- チーム名列 ---
-    // チーム番号バッジ（小）
-    drawRoundRect(tableX + 12, rowTop + rowH / 2 - 16, 32, 32, 8, COL.sky50, COL.sky400, 1.5);
-    drawText(String(team.numberInLeague), tableX + 28, rowTop + rowH / 2, 16, 'center', COL.sky700, 'black');
-    drawText(team.teamName, tableX + 52, rowTop + rowH / 2, 16, 'left', COL.slate900, 'bold', nameColW - 60);
+    drawText(team.teamName, tableX + numColW + 14, rowTop + rowH / 2, 16, 'left', COL.slate900, 'bold', nameColW - 22);
 
     // --- 種目列 ---
-    const typeColX = tableX + nameColW;
+    const typeColX = tableX + numColW + nameColW;
     drawLine(typeColX, tableY + colHeaderH, typeColX, tableY + tableH, COL.slate200, 1);
 
     for (let i = 0; i < TYPE_ORDER.length; i++) {
@@ -369,7 +407,7 @@ export async function generateTeamLeagueResultDataUrl(
     }
 
     // サブ行の境界線
-    const subRowRightEdge = tableX + nameColW + typeColW + scoreColW * teamCount;
+    const subRowRightEdge = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
     drawLine(typeColX, subAreaTop, subRowRightEdge, subAreaTop, COL.slate200, 0.8);
     for (let i = 1; i < 3; i++) {
       const y = subAreaTop + subH * i;
@@ -378,7 +416,7 @@ export async function generateTeamLeagueResultDataUrl(
 
     // --- 対戦スコア列 ---
     for (let colIdx = 0; colIdx < teamCount; colIdx++) {
-      const x = tableX + nameColW + typeColW + scoreColW * colIdx;
+      const x = tableX + numColW + nameColW + typeColW + scoreColW * colIdx;
 
       drawLine(x, tableY + colHeaderH, x, tableY + tableH, COL.slate200, 1);
 
@@ -491,23 +529,56 @@ export async function generateTeamLeagueResultDataUrl(
     // --- 勝敗列 ---
     const wins = standing?.wins ?? 0;
     const losses = standing?.losses ?? 0;
-    const recL = tableX + nameColW + typeColW + scoreColW * teamCount;
+    const recL = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
     drawLine(recL, tableY + colHeaderH, recL, tableY + tableH, COL.slate200, 1);
     drawText(`${wins}勝${losses}敗`, recL + recordColW / 2, rowTop + rowH / 2, 15, 'center', COL.slate800, 'bold');
 
-    // --- 順位列 ---
+    // --- 順位列 (上位3チームはメダル風グラデバッジ) ---
     const rkL = recL + recordColW;
     drawLine(rkL, tableY + colHeaderH, rkL, tableY + tableH, COL.slate200, 1);
     const rank = standing?.rank ?? 0;
-    if (rank > 0) {
-      drawText(`${rank}位`, rkL + rankColW / 2, rowTop + rowH / 2, 20, 'center', COL.slate800, 'black');
+    const rankCx = rkL + rankColW / 2;
+    const rankCy = rowTop + rowH / 2;
+    if (rank > 0 && rank <= 3) {
+      const medal = rank === 1 ? COL.gold : rank === 2 ? COL.silver : COL.bronze;
+      // メダルバッジ: 楕円形のグラデーション + 軽い影
+      const badgeW = 64;
+      const badgeH = 46;
+      const bx = rankCx - badgeW / 2;
+      const by = rankCy - badgeH / 2;
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.18)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 3;
+      const medalGrad = ctx.createLinearGradient(bx, by, bx, by + badgeH);
+      medalGrad.addColorStop(0,    medal.c1);
+      medalGrad.addColorStop(0.55, medal.c2);
+      medalGrad.addColorStop(1,    medal.c3);
+      drawRoundRect(bx, by, badgeW, badgeH, 14, medalGrad);
+      ctx.restore();
+      // 内側の細いハイライト
+      const hl = ctx.createLinearGradient(bx, by, bx, by + badgeH * 0.55);
+      hl.addColorStop(0, 'rgba(255,255,255,0.55)');
+      hl.addColorStop(1, 'rgba(255,255,255,0)');
+      drawRoundRect(bx + 2, by + 2, badgeW - 4, badgeH * 0.55, 12, hl);
+      // 内側ボーダー
+      drawRoundRect(bx + 1.2, by + 1.2, badgeW - 2.4, badgeH - 2.4, 13, undefined, 'rgba(255,255,255,0.55)', 1);
+      // 数字 (★ 付き)
+      ctx.fillStyle = medal.text;
+      ctx.font = '900 22px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${rank}位`, rankCx, rankCy + 1);
+    } else if (rank > 0) {
+      drawText(`${rank}位`, rankCx, rankCy, 20, 'center', COL.slate800, 'black');
     } else {
-      drawText('-', rkL + rankColW / 2, rowTop + rowH / 2, 16, 'center', COL.slate300, 'normal');
+      drawText('-', rankCx, rankCy, 16, 'center', COL.slate300, 'normal');
     }
   }
 
-  // 表の外枠
-  drawRoundRect(tableX, tableY, tableW, tableH, 16, undefined, COL.sky200, 1.5);
+  // 表の外枠（やや太め + 内側に薄い反射ライン）
+  drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, COL.sky300, 1.5);
+  drawRoundRect(tableX + 1.2, tableY + 1.2, tableW - 2.4, tableH - 2.4, 17, undefined, 'rgba(255,255,255,0.6)', 1);
 
   // ---- フッター: TCTA公式ロゴを右下に配置（添付 logo-tcta.png） ----
   if (tctaLogo) {
