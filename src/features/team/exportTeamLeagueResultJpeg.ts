@@ -85,9 +85,9 @@ export async function generateTeamLeagueResultDataUrl(
   const tableW = numColW + nameColW + typeColW + scoreColW * teamCount + recordColW + rankColW;
   const tableH = colHeaderH + rowH * teamCount;
 
-  // ---- フッター（TCTA横長ロゴ） ----
-  const tctaMaxH = 88;
-  const tctaMaxW = Math.min(360, tableW * 0.36);
+  // ---- フッター（TCTA横長ロゴ — 必要最小限のスペース） ----
+  const tctaMaxH = 56;
+  const tctaMaxW = Math.min(280, tableW * 0.3);
   let tctaW = 0;
   let tctaH = 0;
   if (tctaLogo) {
@@ -99,7 +99,7 @@ export async function generateTeamLeagueResultDataUrl(
       tctaH = tctaW / ratio;
     }
   }
-  const footerH = Math.max(tctaH + 28, 56);
+  const footerH = tctaLogo ? tctaH + 14 : 24;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + tableH + footerH;
@@ -143,14 +143,12 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- リッチ装飾: キャンバス上端の細いアクセントバー（sky → gold → sky） ----
+  // ---- リッチ装飾: キャンバス上端の細いアクセントバー（水色 → 紫） ----
   const topBarH = 5;
   const topBarGrad = ctx.createLinearGradient(0, 0, totalW, 0);
-  topBarGrad.addColorStop(0,    COL.sky500);
-  topBarGrad.addColorStop(0.45, COL.sky400);
-  topBarGrad.addColorStop(0.5,  COL.gold.c2);
-  topBarGrad.addColorStop(0.55, COL.sky400);
-  topBarGrad.addColorStop(1,    COL.sky500);
+  topBarGrad.addColorStop(0,   '#0ea5e9'); // sky-500
+  topBarGrad.addColorStop(0.5, '#8b5cf6'); // violet-500
+  topBarGrad.addColorStop(1,   '#a855f7'); // purple-500
   ctx.fillStyle = topBarGrad;
   ctx.fillRect(0, 0, totalW, topBarH);
 
@@ -325,13 +323,11 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.fillRect(tableX, tableY, tableW, 1.5);
   ctx.restore();
 
-  // 列ヘッダー下の強めのライン (sky → gold → sky で1本入れる)
+  // 列ヘッダー下の強めのライン (水色 → 紫 で統一)
   const headerLineGrad = ctx.createLinearGradient(tableX, 0, tableX + tableW, 0);
-  headerLineGrad.addColorStop(0,    COL.sky500);
-  headerLineGrad.addColorStop(0.45, COL.sky500);
-  headerLineGrad.addColorStop(0.5,  COL.gold.c2);
-  headerLineGrad.addColorStop(0.55, COL.sky500);
-  headerLineGrad.addColorStop(1,    COL.sky500);
+  headerLineGrad.addColorStop(0,   '#0ea5e9');
+  headerLineGrad.addColorStop(0.5, '#8b5cf6');
+  headerLineGrad.addColorStop(1,   '#a855f7');
   ctx.strokeStyle = headerLineGrad;
   ctx.lineWidth = 1.8;
   ctx.beginPath();
@@ -550,10 +546,10 @@ export async function generateTeamLeagueResultDataUrl(
   drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, COL.sky300, 1.5);
   drawRoundRect(tableX + 1.2, tableY + 1.2, tableW - 2.4, tableH - 2.4, 17, undefined, 'rgba(255,255,255,0.6)', 1);
 
-  // ---- フッター: TCTA公式ロゴを右下に配置（添付 logo-tcta.png） ----
+  // ---- フッター: TCTA公式ロゴを右下に最小余白で配置 ----
   if (tctaLogo) {
     const logoX = paddingX + tableW - tctaW;
-    const logoY = tableY + tableH + 24;
+    const logoY = tableY + tableH + 8;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
 
