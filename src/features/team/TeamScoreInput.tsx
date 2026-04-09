@@ -635,7 +635,7 @@ export default function TeamScoreInput({
               {overallWinner === 1 && (
                 <div className="flex items-center justify-center gap-1 mt-1">
                   <Trophy size={12} className="text-amber-500" />
-                  <span className="text-[10px] font-bold text-amber-600">勝利確定</span>
+                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
                 </div>
               )}
             </div>
@@ -649,7 +649,7 @@ export default function TeamScoreInput({
               {overallWinner === 2 && (
                 <div className="flex items-center justify-center gap-1 mt-1">
                   <Trophy size={12} className="text-amber-500" />
-                  <span className="text-[10px] font-bold text-amber-600">勝利確定</span>
+                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
                 </div>
               )}
             </div>
@@ -666,7 +666,7 @@ export default function TeamScoreInput({
               <span className="mx-2">-</span>
               <span className={winTally.t2 > winTally.t1 ? 'text-indigo-700' : ''}>{winTally.t2}</span>
               {overallWinner > 0 && (
-                <span className="ml-2 text-xs text-amber-600">勝利確定</span>
+                <span className="ml-2 text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
               )}
             </div>
           </div>

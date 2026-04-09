@@ -263,7 +263,7 @@ export default function TeamBracketView() {
                       : isBye
                       ? 'border-slate-200 bg-slate-50/50 opacity-70'
                       : isPlaying
-                      ? 'border-blue-300 bg-blue-50/30 ring-2 ring-blue-500/20 shadow-md'
+                      ? 'border-blue-400 bg-blue-50/40 ring-2 ring-blue-500/30 shadow-lg league-match-blink'
                       : isReady
                       ? 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
                       : 'border-slate-200 opacity-80';
@@ -293,9 +293,19 @@ export default function TeamBracketView() {
                               </span>
                             )}
                             {isPlaying && (
-                              <span className="flex items-center gap-0.5 text-blue-600 font-bold animate-pulse">
+                              <span className="flex items-center gap-1 text-blue-600 font-bold animate-pulse">
                                 <Play className="w-2.5 h-2.5" />
                                 対戦中
+                                {court?.startedAt && (() => {
+                                  const el = Math.floor((Date.now() - court.startedAt) / 60000);
+                                  const h = Math.floor(el / 60);
+                                  const m = el % 60;
+                                  return (
+                                    <span className="font-mono text-[9px] text-blue-500 ml-0.5">
+                                      {h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}
+                                    </span>
+                                  );
+                                })()}
                               </span>
                             )}
                             {isBye && <span className="text-slate-400 font-bold">BYE</span>}
@@ -730,49 +740,56 @@ function TeamWaitingList({
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-slate-500 mb-1">
-        {waitingMatches.length}試合が控えています（1回戦優先で自動並べ替え）
+      <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
+          <ClipboardList className="w-3 h-3" />
+          {waitingMatches.length}試合
+        </span>
+        <span>控えています（1回戦優先で自動並べ替え）</span>
       </div>
-      {waitingMatches.map(({ match, bracket, roundLabel }) => {
+      {waitingMatches.map(({ match, bracket, roundLabel }, idx) => {
         const cfg = CATEGORY_CONFIG[bracket.category];
         const ca = bracketCourtAssignments[match.matchId];
+        const hasCourtAssigned = ca && ca.courtNames.length > 0;
         return (
-          <div key={match.matchId} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="flex items-stretch">
-              <div className={`shrink-0 w-14 flex flex-col items-center justify-center border-r border-slate-100 ${cfg.bg}`}>
-                <div className={`text-[10px] font-bold ${cfg.text}`}>{catLabel(bracket.category)}</div>
-                <div className="text-[8px] text-slate-400 mt-0.5">{roundLabel}</div>
-              </div>
-              <div className="flex-1 min-w-0 py-2 px-3">
-                <div className="flex items-center gap-1.5">
-                  {match.team1League && (
-                    <span className="w-5 h-5 rounded bg-slate-100 text-[9px] font-bold text-slate-600 flex items-center justify-center shrink-0">
-                      {match.team1League}
-                    </span>
-                  )}
-                  <span className="text-xs font-bold text-slate-800 truncate">{match.team1Name}</span>
-                </div>
-                <div className="text-[9px] text-slate-300 font-bold my-0.5 pl-6">VS</div>
-                <div className="flex items-center gap-1.5">
-                  {match.team2League && (
-                    <span className="w-5 h-5 rounded bg-slate-100 text-[9px] font-bold text-slate-600 flex items-center justify-center shrink-0">
-                      {match.team2League}
-                    </span>
-                  )}
-                  <span className="text-xs font-bold text-slate-800 truncate">{match.team2Name}</span>
-                </div>
-              </div>
-              <div className="shrink-0 flex items-center pr-3 gap-1.5">
-                {ca && ca.courtNames.length > 0 && (
-                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-blue-600">
-                    <MapPin className="w-2.5 h-2.5" />
-                    {ca.courtNames.join('・')}
-                  </span>
+          <div key={match.matchId} className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all ${
+            hasCourtAssigned
+              ? 'border-blue-200 ring-1 ring-blue-100'
+              : 'border-slate-200'
+          }`}>
+            {/* 上段: カテゴリ + チーム + 番号 */}
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="text-[10px] font-bold text-slate-400 tabular-nums shrink-0">#{idx + 1}</span>
+              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black ${cfg.bg} ${cfg.text} shrink-0`}>
+                {catLabel(bracket.category)} {roundLabel}
+              </span>
+              <div className="flex-1 min-w-0 flex items-center gap-1 text-xs font-bold text-slate-800">
+                {match.team1League && (
+                  <span className="w-4 h-4 rounded bg-slate-100 text-[8px] font-bold text-slate-500 flex items-center justify-center shrink-0">{match.team1League}</span>
                 )}
-                {ca && ca.courtNames.length > 0 && (
+                <span className="truncate">{match.team1Name}</span>
+                <span className="text-[9px] text-slate-300 font-bold mx-0.5 shrink-0">vs</span>
+                {match.team2League && (
+                  <span className="w-4 h-4 rounded bg-slate-100 text-[8px] font-bold text-slate-500 flex items-center justify-center shrink-0">{match.team2League}</span>
+                )}
+                <span className="truncate">{match.team2Name}</span>
+              </div>
+            </div>
+            {/* 下段: コート状況 + ボタン */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/60 border-t border-slate-100">
+              {hasCourtAssigned ? (
+                <span className="flex items-center gap-0.5 text-[10px] font-bold text-blue-600">
+                  <MapPin className="w-2.5 h-2.5" />
+                  {ca.courtNames.join('・')}番コート
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400">コート未割当</span>
+              )}
+              <div className="ml-auto flex items-center gap-1.5">
+                {hasCourtAssigned && (
                   <button
                     onClick={() => onCall(match)}
-                    className="flex items-center gap-0.5 px-2 py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                    className="flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
                   >
                     <Volume2 className="w-3 h-3" />
                     コール
@@ -780,9 +797,13 @@ function TeamWaitingList({
                 )}
                 <button
                   onClick={() => onAssignCourt(match)}
-                  className="px-3 py-2 text-[10px] font-bold text-white bg-emerald-500 rounded-lg hover:bg-emerald-600 active:scale-95 transition-all"
+                  className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg active:scale-95 transition-all ${
+                    hasCourtAssigned
+                      ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
+                      : 'text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm'
+                  }`}
                 >
-                  {ca && ca.courtNames.length > 0 ? 'コート変更' : 'コート入れ'}
+                  {hasCourtAssigned ? 'コート変更' : 'コート入れ'}
                 </button>
               </div>
             </div>

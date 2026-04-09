@@ -377,6 +377,8 @@ export default function TeamLeagueView() {
       {/* ======= 全体表示モード ======= */}
       {showAll && (
         <div className="space-y-4">
+          {/* 判定ルール設定（全体表示でも表示） */}
+          <TiebreakRuleSettings />
           {leagues.map((league, li) => {
             const c = getColor(li);
             const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
