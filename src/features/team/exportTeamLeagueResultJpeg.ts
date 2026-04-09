@@ -450,13 +450,33 @@ export async function generateTeamLeagueResultDataUrl(
         ctx.fillRect(x + 1, rowTop + 1, scoreColW - 2, rowH - 2);
       }
 
-      // 総合勝敗（各対戦セル上部）— 目立つ大きな数字
+      // 総合勝敗（各対戦セル上部）— ピルバッジ型で描画
       const overallY = rowTop + overallAreaH / 2;
-      ctx.font = '900 22px "Inter", "Helvetica Neue", sans-serif';
-      ctx.fillStyle = won ? COL.sky700 : COL.slate400;
+      const overallText = `${myWins} - ${oppWins}`;
+      ctx.font = '900 16px "Inter", "Helvetica Neue", sans-serif';
+      const badgeTextW = ctx.measureText(overallText).width;
+      const badgePadX = 12;
+      const badgePadY = 5;
+      const bw = badgeTextW + badgePadX * 2;
+      const bh = 22;
+      const bx2 = x + scoreColW / 2 - bw / 2;
+      const by2 = overallY - bh / 2;
+      if (won) {
+        // 勝利側: 水色グラデバッジ + 白文字
+        const pillGrad = ctx.createLinearGradient(bx2, by2, bx2 + bw, by2 + bh);
+        pillGrad.addColorStop(0, COL.sky500);
+        pillGrad.addColorStop(1, COL.sky700);
+        drawRoundRect(bx2, by2, bw, bh, bh / 2, pillGrad);
+        ctx.fillStyle = COL.white;
+      } else {
+        // 敗北側: 淡い枠線バッジ + 薄テキスト
+        drawRoundRect(bx2, by2, bw, bh, bh / 2, '#f8fafc', COL.slate300, 1);
+        ctx.fillStyle = COL.slate400;
+      }
+      ctx.font = '900 16px "Inter", "Helvetica Neue", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${myWins}-${oppWins}`, x + scoreColW / 2, overallY);
+      ctx.fillText(overallText, x + scoreColW / 2, overallY);
 
       // 種目ごとの対戦結果行（選手名＋大きなスコア）
       for (let i = 0; i < TYPE_ORDER.length; i++) {

@@ -687,7 +687,7 @@ export default function TeamLeagueView() {
                           }`}
                           onClick={() => setEditingMatch(match)}
                         >
-                          <div className="flex flex-col px-1 py-1 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[90px]">
+                          <div className="flex flex-col px-1 py-1 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[68px]">
                             {/* 対戦全体の勝敗バッジ — 太く目立たせる */}
                             {isFinished && (
                               <div className={`mx-auto mb-0.5 px-2.5 py-0.5 rounded-full text-[11px] tabular-nums font-black leading-none ${
@@ -702,26 +702,19 @@ export default function TeamLeagueView() {
                                 {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                               </div>
                             )}
-                            {/* 種目別スコア + 選手名 */}
+                            {/* 種目別スコア */}
                             {MATCH_TYPE_ORDER.map(matchType => {
                               const sub = match.subMatches.find(sm => sm.type === matchType);
                               const myScore = isTeam1 ? sub?.score1 : sub?.score2;
                               const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
                               const won = sub?.winnerId === rowTeam.teamId;
                               const hasScore = myScore != null && oppScore != null;
-                              const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
-                              const pNames = myPlayers.join('/');
                               return (
-                                <div key={matchType} className="flex items-center justify-center gap-0.5 text-[10px] tabular-nums h-4 leading-none">
+                                <div key={matchType} className="flex items-center justify-center text-[10px] tabular-nums h-4 leading-none">
                                   {hasScore ? (
-                                    <>
-                                      {pNames && (
-                                        <span className="text-[8px] text-slate-400 truncate max-w-[38px]">{pNames}</span>
-                                      )}
-                                      <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
-                                        {myScore}-{oppScore}
-                                      </span>
-                                    </>
+                                    <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
+                                      {myScore}-{oppScore}
+                                    </span>
                                   ) : (
                                     <span className="text-slate-300 font-bold">-</span>
                                   )}

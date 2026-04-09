@@ -624,50 +624,34 @@ export default function TeamScoreInput({
           onSubmit={e => { e.preventDefault(); handleSave(); }}
           className="p-4"
         >
-          {/* Team names（対戦チーム別カラー: 左=オレンジ, 右=グリーン） */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${
+          {/* Team names + 対戦スコア（ビッグ表示） */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className={`flex-1 text-center py-2 px-2 rounded-xl border-2 transition-all ${
               overallWinner === 1
-                ? 'bg-amber-50 border-amber-400'
+                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
                 : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
-              <div className={`font-bold text-sm truncate ${TEAM_THEME[1].textStrong}`}>{team1Name}</div>
-              {overallWinner === 1 && (
-                <div className="flex items-center justify-center gap-1 mt-1">
-                  <Trophy size={12} className="text-amber-500" />
-                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
-                </div>
-              )}
+              <div className={`font-bold text-sm truncate ${overallWinner === 1 ? 'text-amber-800' : TEAM_THEME[1].textStrong}`}>{team1Name}</div>
             </div>
-            <div className="text-lg font-bold text-gray-300 flex-shrink-0">VS</div>
-            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${
+            {/* 中央: 大きなグラデーションスコア */}
+            <div className="flex flex-col items-center shrink-0">
+              <div className={`text-3xl font-black tabular-nums leading-none ${
+                overallWinner > 0
+                  ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
+                  : 'text-slate-300'
+              }`}>
+                {winTally.t1}<span className="text-lg mx-0.5 opacity-40">:</span>{winTally.t2}
+              </div>
+              <div className="text-[9px] text-slate-400 font-bold mt-0.5">
+                {overallWinner > 0 ? '試合終了' : 'VS'}
+              </div>
+            </div>
+            <div className={`flex-1 text-center py-2 px-2 rounded-xl border-2 transition-all ${
               overallWinner === 2
-                ? 'bg-amber-50 border-amber-400'
+                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
                 : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
             }`}>
-              <div className={`font-bold text-sm truncate ${TEAM_THEME[2].textStrong}`}>{team2Name}</div>
-              {overallWinner === 2 && (
-                <div className="flex items-center justify-center gap-1 mt-1">
-                  <Trophy size={12} className="text-amber-500" />
-                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Win tally */}
-          <div className="flex items-center justify-center mb-4">
-            <div className={`px-4 py-1.5 rounded-full text-sm font-bold ${
-              overallWinner > 0
-                ? 'bg-amber-100 text-amber-700 border border-amber-300'
-                : 'bg-gray-100 text-gray-600 border border-gray-200'
-            }`}>
-              <span className={winTally.t1 > winTally.t2 ? 'text-indigo-700' : ''}>{winTally.t1}</span>
-              <span className="mx-2">-</span>
-              <span className={winTally.t2 > winTally.t1 ? 'text-indigo-700' : ''}>{winTally.t2}</span>
-              {overallWinner > 0 && (
-                <span className="ml-2 text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
-              )}
+              <div className={`font-bold text-sm truncate ${overallWinner === 2 ? 'text-amber-800' : TEAM_THEME[2].textStrong}`}>{team2Name}</div>
             </div>
           </div>
 
