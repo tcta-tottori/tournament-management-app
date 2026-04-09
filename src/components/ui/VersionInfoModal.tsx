@@ -21,7 +21,7 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'Ver 2.0',
+    version: 'Ver 2.1',
     date: '2026-04-04',
     highlights: '決勝トーナメント旧データ残留修正・結果タブ完全削除・ストア永続化改善',
     timeGroups: [
