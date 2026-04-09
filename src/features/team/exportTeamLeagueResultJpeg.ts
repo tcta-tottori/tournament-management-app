@@ -62,7 +62,7 @@ export async function generateTeamLeagueResultDataUrl(
       const p2W = mctx.measureText(p2).width;
 
       mctx.font = SCORE_FONT;
-      const scoreW = mctx.measureText(`${sub.score1}-${sub.score2}`).width;
+      const scoreW = mctx.measureText(`${sub.score1} - ${sub.score2}`).width;
 
       const total = p1W + 10 + scoreW + 10 + p2W;
       if (total > maxTextW) maxTextW = total;
@@ -134,23 +134,9 @@ export async function generateTeamLeagueResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(scale, scale);
 
-  // 背景: 上部・下部に同じ濃さの sky グラデを乗せて上下のトーンを統一
+  // 背景: リーグの枠外は完全な白で塗りつぶす（ロゴの矩形が背景に浮かないように）
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  // 上部バンド（sky → white）
-  const bgGradTop = ctx.createLinearGradient(0, 0, 0, paddingY + headerH);
-  bgGradTop.addColorStop(0, '#f0f9ff');
-  bgGradTop.addColorStop(1, '#ffffff');
-  ctx.fillStyle = bgGradTop;
-  ctx.fillRect(0, 0, totalW, paddingY + headerH);
-  // 下部バンド（white → sky）— 上部と対称になるよう同じ高さで配置
-  const bottomBandH = headerH + paddingY;
-  const bottomBandY = totalH - bottomBandH;
-  const bgGradBottom = ctx.createLinearGradient(0, bottomBandY, 0, totalH);
-  bgGradBottom.addColorStop(0, '#ffffff');
-  bgGradBottom.addColorStop(1, '#f0f9ff');
-  ctx.fillStyle = bgGradBottom;
-  ctx.fillRect(0, bottomBandY, totalW, bottomBandH);
 
   // ---- ヘルパー ----
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color = COL.slate200, w = 1) => {
@@ -453,19 +439,20 @@ export async function generateTeamLeagueResultDataUrl(
         const oppPlayers = (isTeam1 ? sub.players2 : sub.players1) || [];
         const myP = myPlayers.join('/') || '　';
         const oppP = oppPlayers.join('/') || '　';
-        const scoreText = `${myScore}-${oppScore}`;
+        // 数字とハイフンの隙間が無くて読みづらいので、半角スペースを挟んで描画する。
+        // 計測も同じテキストで行う。
+        const displayScoreText = `${myScore} - ${oppScore}`;
 
         // 左 = 行チーム（自分）、右 = 対戦相手。
-        // 「左側が勝者のセル（subWon）」では左の選手名を強調・スコアも種目色で目立たせる。
-        // 「敗者側」（subWon=false）はすべて普通表示（控えめなグレー）にする。
+        // 「左側が勝者のセル（subWon）」では左の選手名のみ太字にして強調する。
+        // 文字色は両側とも統一し、太さの違いだけで勝敗を表現する（薄さを抑える）。
         const leftIsWinner = subWon;
         const myNameFont = leftIsWinner
           ? 'bold 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
           : NAME_FONT;
         const oppNameFont = NAME_FONT;
-        const myNameColor = leftIsWinner ? COL.slate900 : COL.slate400;
-        const oppNameColor = leftIsWinner ? COL.slate500 : COL.slate400;
-        const scoreColor = leftIsWinner ? tc.fg : COL.slate400;
+        const nameColor = COL.slate700;
+        const scoreColor = leftIsWinner ? tc.fg : COL.slate500;
 
         // 計測
         ctx.font = myNameFont;
@@ -474,28 +461,29 @@ export async function generateTeamLeagueResultDataUrl(
         const oppNameW = ctx.measureText(oppP).width;
 
         ctx.font = SCORE_FONT;
-        const scoreW = ctx.measureText(scoreText).width;
+        const scoreW = ctx.measureText(displayScoreText).width;
 
         const gap = 9;
         const totalW = myNameW + gap + scoreW + gap + oppNameW;
         const cellCx = x + scoreColW / 2;
         const startX = cellCx - totalW / 2;
 
-        // 左選手名（自分側 / 勝者なら強調）
+        // 左選手名（自分側 / 勝者なら太字）
         ctx.font = myNameFont;
-        ctx.fillStyle = myNameColor;
+        ctx.fillStyle = nameColor;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(myP, startX, subY);
 
         // スコア（大・目立つ・種目色 / 敗者は控えめ）
+        // 数字とハイフンの間に隙間を入れて視認性を確保（"6 - 4" で描画）
         ctx.font = SCORE_FONT;
         ctx.fillStyle = scoreColor;
-        ctx.fillText(scoreText, startX + myNameW + gap, subY);
+        ctx.fillText(displayScoreText, startX + myNameW + gap, subY);
 
         // 右選手名（対戦相手 / 常に普通表示）
         ctx.font = oppNameFont;
-        ctx.fillStyle = oppNameColor;
+        ctx.fillStyle = nameColor;
         ctx.fillText(oppP, startX + myNameW + gap + scoreW + gap, subY);
       }
     }
