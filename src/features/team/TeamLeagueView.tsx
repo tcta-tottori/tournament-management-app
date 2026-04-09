@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS } from './teamLogic';
+import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -885,9 +885,10 @@ export default function TeamLeagueView() {
         const allLeagueTeams = leagues.flatMap(l => l.teams);
         const team1 = allLeagueTeams.find(t => t.teamId === editingMatch.team1Id);
         const team2 = allLeagueTeams.find(t => t.teamId === editingMatch.team2Id);
-        const familyOf = (n: string) => n.trim().split(/[\s\u3000]+/)[0] || n;
-        const t1Roster = Array.from(new Set((team1?.members || []).map(m => familyOf(m.player.name)).filter(Boolean)));
-        const t2Roster = Array.from(new Set((team2?.members || []).map(m => familyOf(m.player.name)).filter(Boolean)));
+        const t1Members = team1?.members || [];
+        const t2Members = team2?.members || [];
+        const t1Roster = Array.from(new Set(t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean)));
+        const t2Roster = Array.from(new Set(t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean)));
         return (
           <TeamScoreInput
             matchId={editingMatch.matchId}
@@ -897,6 +898,8 @@ export default function TeamLeagueView() {
             team2Name={team2?.teamName || ''}
             subMatches={editingMatch.subMatches}
             team1Roster={t1Roster}
+            team1Members={t1Members}
+            team2Members={t2Members}
             team2Roster={t2Roster}
             onClose={() => setEditingMatch(null)}
           />

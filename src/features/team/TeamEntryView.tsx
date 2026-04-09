@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2 } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
+import { getDisplayName } from './teamLogic';
 
 /** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
@@ -17,7 +18,7 @@ const LEAGUE_COLORS = [
 ];
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
 
-/** 苗字のみ抽出 */
+/** 苗字のみ抽出（フォールバック用） */
 function familyName(name: string): string {
   return name.trim().split(/[\s　]+/)[0] || name;
 }
@@ -43,6 +44,10 @@ function TeamEditModal({
 
   const updateMember = (idx: number, value: string) => {
     setMembers(prev => prev.map((m, i) => i === idx ? { ...m, player: { ...m.player, name: value } } : m));
+  };
+
+  const updateDisplayName = (idx: number, value: string) => {
+    setMembers(prev => prev.map((m, i) => i === idx ? { ...m, player: { ...m.player, displayName: value || undefined } } : m));
   };
 
   const removeMember = (idx: number) => {
@@ -95,23 +100,36 @@ function TeamEditModal({
             </button>
           </div>
           <div className="space-y-1.5">
-            {members.map((m, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={m.player.name}
-                  onChange={e => updateMember(i, e.target.value)}
-                  placeholder="選手名"
-                  className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                />
-                <button
-                  onClick={() => removeMember(i)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+            {members.map((m, i) => {
+              const autoDisplay = getDisplayName(m.player, members);
+              return (
+                <div key={i} className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={m.player.name}
+                    onChange={e => updateMember(i, e.target.value)}
+                    placeholder="選手名"
+                    className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  />
+                  <input
+                    type="text"
+                    value={m.player.displayName ?? ''}
+                    onChange={e => updateDisplayName(i, e.target.value)}
+                    placeholder={autoDisplay}
+                    title="表示名（空欄で自動）"
+                    className={`w-14 text-center text-xs font-bold border rounded-lg px-1 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-100 shrink-0 ${
+                      m.player.displayName ? `${color.border} ${color.text} ${color.bg}` : 'border-slate-200 text-slate-400'
+                    }`}
+                  />
+                  <button
+                    onClick={() => removeMember(i)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
             {members.length === 0 && (
               <div className="text-center py-3 text-xs text-slate-300 italic">メンバーなし</div>
             )}
@@ -153,7 +171,7 @@ function CompactTeamCard({
 }) {
   const color = getColor(colorIndex);
   const memberCount = team.members.length;
-  const families = team.members.map(m => familyName(m.player.name)).filter(Boolean);
+  const families = team.members.map(m => getDisplayName(m.player, team.members)).filter(Boolean);
 
   const statusStyles =
     team.status === 'entry'

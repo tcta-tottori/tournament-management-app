@@ -2,8 +2,68 @@ import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
   MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType,
-  TiebreakRuleId
+  TiebreakRuleId, TeamPlayer, TeamMember
 } from './types';
+
+/** 苗字のみ抽出 */
+export function familyName(name: string): string {
+  return name.trim().split(/[\s\u3000]+/)[0] || name;
+}
+
+/** 名前（下の名前）の先頭1文字を取得 */
+function givenNameInitial(name: string): string {
+  const parts = name.trim().split(/[\s\u3000]+/);
+  return parts.length > 1 ? parts[1][0] || '' : '';
+}
+
+/** 表示名の構造（メイン部分＋補助文字） */
+export interface DisplayNameParts {
+  main: string;    // メイン表示（デフォルト2文字）
+  sub: string;     // 同姓時の補助文字（名前の1文字目）
+  full: string;    // main + sub の結合文字列
+}
+
+/**
+ * メンバーの表示名を生成する
+ * - displayName が設定されていればそれを使用
+ * - 未設定の場合は苗字の先頭2文字
+ * - 同じチームに同姓がいる場合、名前の1文字目を補助文字として付加
+ */
+export function getDisplayNameParts(
+  player: TeamPlayer,
+  allMembers: TeamMember[],
+): DisplayNameParts {
+  // displayName が設定済みならそのまま返す
+  if (player.displayName) {
+    return { main: player.displayName, sub: '', full: player.displayName };
+  }
+
+  const surname = familyName(player.name);
+  const main = surname.slice(0, 2);
+
+  // 同チーム内で同じ2文字苗字の人がいるかチェック
+  const sameNameMembers = allMembers.filter(m => {
+    const otherSurname = familyName(m.player.name);
+    return otherSurname.slice(0, 2) === main && m.player.name !== player.name;
+  });
+
+  if (sameNameMembers.length > 0) {
+    const sub = givenNameInitial(player.name);
+    return { main, sub, full: main + sub };
+  }
+
+  return { main, sub: '', full: main };
+}
+
+/**
+ * 表示名の文字列を取得（単純な文字列として）
+ */
+export function getDisplayName(
+  player: TeamPlayer,
+  allMembers: TeamMember[],
+): string {
+  return getDisplayNameParts(player, allMembers).full;
+}
 
 /** タイブレークルール定義 */
 export const TIEBREAK_RULE_LABELS: Record<TiebreakRuleId, string> = {

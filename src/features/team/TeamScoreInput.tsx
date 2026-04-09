@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { SubMatchScore, MatchType, BracketSubMatchScore } from './types';
-import { MATCH_TYPE_ORDER, MATCH_TYPE_LABELS, MATCH_TYPE_SHORT } from './teamLogic';
+import { MATCH_TYPE_ORDER, MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
+import type { TeamMember } from './types';
 
 /** Full-width to half-width number conversion */
 function toHalfWidth(s: string): string {
@@ -103,6 +104,7 @@ const TEAM_THEME: Record<1 | 2, TeamTheme> = {
 /** 選手名選択ポップアップ */
 function PlayerPickerPopup({
   title, teamName, roster, current, theme, teamTheme, usedPlayers, onSelect, onClose,
+  members, teamId, onUpdateDisplayName,
 }: {
   title: string;
   teamName: string;
@@ -114,9 +116,16 @@ function PlayerPickerPopup({
   usedPlayers: string[];
   onSelect: (name: string) => void;
   onClose: () => void;
+  /** メンバー一覧（表示名編集用） */
+  members?: TeamMember[];
+  /** チームID（表示名編集用） */
+  teamId?: string;
+  /** 表示名更新コールバック */
+  onUpdateDisplayName?: (teamId: string, playerName: string, displayName: string | undefined) => void;
 }) {
   const [manual, setManual] = useState(current || '');
   const [manualMode, setManualMode] = useState(false);
+  const [showDisplayNameEdit, setShowDisplayNameEdit] = useState(false);
   const reactId = useId();
   const uniqueName = `player-manual-${reactId.replace(/:/g, '')}`;
   const manualInputRef = useRef<HTMLInputElement | null>(null);
@@ -183,7 +192,9 @@ function PlayerPickerPopup({
                     >
                       <div className="flex items-center gap-1.5">
                         {isSelected && <Check className="w-4 h-4 shrink-0" />}
-                        <span className={`truncate ${isUsed ? 'line-through' : ''}`}>{name}</span>
+                        <span className={`truncate ${isUsed ? 'line-through' : ''}`}>
+                          <DisplayNameSpan name={name} />
+                        </span>
                         {isUsed && (
                           <span className="ml-auto text-[9px] font-bold text-slate-400 shrink-0">出場済み</span>
                         )}
@@ -196,6 +207,47 @@ function PlayerPickerPopup({
                 <p className="mt-3 text-[10px] text-slate-400 px-1 leading-snug">
                   ※ 同じ対戦内で既に出場した選手は選択できません。
                 </p>
+              )}
+
+              {/* 表示名編集セクション */}
+              {members && members.length > 0 && teamId && onUpdateDisplayName && (
+                <div className="mt-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowDisplayNameEdit(!showDisplayNameEdit)}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1"
+                  >
+                    <Pencil className="w-2.5 h-2.5" />
+                    表示名を編集
+                    <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showDisplayNameEdit ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showDisplayNameEdit && (
+                    <div className="mt-2 space-y-1">
+                      {members.map(m => {
+                        const autoName = getDisplayNameParts(m.player, members);
+                        return (
+                          <div key={m.player.name} className="flex items-center gap-1.5 text-[10px]">
+                            <span className="text-slate-500 truncate w-16 shrink-0">{m.player.name.trim().split(/[\s\u3000]+/)[0]}</span>
+                            <input
+                              type="text"
+                              value={m.player.displayName ?? ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                onUpdateDisplayName(teamId, m.player.name, val || undefined);
+                              }}
+                              placeholder={autoName.full}
+                              className={`flex-1 min-w-0 text-center text-xs font-bold border rounded px-1 py-0.5 focus:outline-none focus:ring-1 ${
+                                m.player.displayName
+                                  ? `${teamTheme.btnBorder} ${teamTheme.btnText} bg-white`
+                                  : 'border-slate-200 text-slate-400'
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : (
@@ -280,6 +332,26 @@ function PlayerPickerPopup({
   );
 }
 
+/**
+ * 表示名レンダリング: メイン文字 + 同姓補助文字（小さめ・下揃え）
+ * nameStr が3文字以上の場合、先頭2文字をメイン、残りを小さいサブ文字として表示
+ */
+function DisplayNameSpan({ name, className }: { name: string; className?: string }) {
+  if (!name) return null;
+  // 2文字以下はそのまま
+  if (name.length <= 2) {
+    return <span className={className}>{name}</span>;
+  }
+  const main = name.slice(0, 2);
+  const sub = name.slice(2);
+  return (
+    <span className={`inline-flex items-baseline ${className || ''}`}>
+      <span>{main}</span>
+      <span className="text-[0.75em] ml-[1px] opacity-80">{sub}</span>
+    </span>
+  );
+}
+
 /** 選手名ボタン（タップでピッカー表示） */
 function PlayerPickerButton({
   value, placeholder, teamTheme, onClick,
@@ -299,7 +371,7 @@ function PlayerPickerButton({
           : `bg-white ${teamTheme.border} text-slate-400`
       }`}
     >
-      <span className="truncate">{value || placeholder}</span>
+      {value ? <DisplayNameSpan name={value} className="truncate" /> : <span className="truncate">{placeholder}</span>}
       <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
     </button>
   );
@@ -314,10 +386,14 @@ interface Props {
   subMatches: (SubMatchScore | BracketSubMatchScore)[];
   onClose: () => void;
   isBracket?: boolean;
-  /** team1の選手苗字候補リスト */
+  /** team1の選手表示名候補リスト */
   team1Roster?: string[];
-  /** team2の選手苗字候補リスト */
+  /** team2の選手表示名候補リスト */
   team2Roster?: string[];
+  /** team1のメンバー（表示名生成用） */
+  team1Members?: TeamMember[];
+  /** team2のメンバー（表示名生成用） */
+  team2Members?: TeamMember[];
 }
 
 interface SubMatchState {
@@ -334,12 +410,14 @@ interface SubMatchState {
 const WIN_GAMES = 6;
 
 export default function TeamScoreInput({
-  matchId, team1Name, team2Name, subMatches, onClose, isBracket = false,
+  matchId, team1Id, team2Id, team1Name, team2Name, subMatches, onClose, isBracket = false,
   team1Roster = [], team2Roster = [],
+  team1Members = [], team2Members = [],
 }: Props) {
   const {
     updateSubMatchScore, clearSubMatchScore, updateSubMatchPlayers,
     updateBracketSubMatchScore, clearBracketSubMatchScore,
+    updatePlayerDisplayName,
   } = useTeamStore();
 
   // Local state for each sub-match (MIX, WD, MD)
@@ -624,17 +702,41 @@ export default function TeamScoreInput({
           onSubmit={e => { e.preventDefault(); handleSave(); }}
           className="p-4"
         >
-          {/* Team names + 対戦スコア（ビッグ表示） */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className={`flex-1 text-center py-2 px-2 rounded-xl border-2 transition-all ${
+          {/* Team names（チーム名のみ表示） */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`flex-1 text-center py-2 px-3 rounded-xl border-2 transition-all ${
               overallWinner === 1
                 ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
+                : overallWinner === 2
+                ? 'bg-slate-50 border-slate-200'
                 : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
-              <div className={`font-bold text-sm truncate ${overallWinner === 1 ? 'text-amber-800' : TEAM_THEME[1].textStrong}`}>{team1Name}</div>
+              <div className={`font-bold text-sm truncate ${
+                overallWinner === 1 ? 'text-amber-800' : overallWinner === 2 ? 'text-slate-400' : TEAM_THEME[1].textStrong
+              }`}>{team1Name}</div>
+              {overallWinner === 1 && (
+                <div className="text-[10px] font-black text-amber-600 mt-0.5 tracking-wider">WIN</div>
+              )}
             </div>
-            {/* 中央: 大きなグラデーションスコア */}
-            <div className="flex flex-col items-center shrink-0">
+            <div className={`flex-1 text-center py-2 px-3 rounded-xl border-2 transition-all ${
+              overallWinner === 2
+                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
+                : overallWinner === 1
+                ? 'bg-slate-50 border-slate-200'
+                : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
+            }`}>
+              <div className={`font-bold text-sm truncate ${
+                overallWinner === 2 ? 'text-amber-800' : overallWinner === 1 ? 'text-slate-400' : TEAM_THEME[2].textStrong
+              }`}>{team2Name}</div>
+              {overallWinner === 2 && (
+                <div className="text-[10px] font-black text-amber-600 mt-0.5 tracking-wider">WIN</div>
+              )}
+            </div>
+          </div>
+
+          {/* 対戦スコア（下に配置） */}
+          <div className="flex justify-center mb-4">
+            <div className="flex flex-col items-center">
               <div className={`text-3xl font-black tabular-nums leading-none ${
                 overallWinner > 0
                   ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
@@ -645,13 +747,6 @@ export default function TeamScoreInput({
               <div className="text-[9px] text-slate-400 font-bold mt-0.5">
                 {overallWinner > 0 ? '試合終了' : 'VS'}
               </div>
-            </div>
-            <div className={`flex-1 text-center py-2 px-2 rounded-xl border-2 transition-all ${
-              overallWinner === 2
-                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
-                : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
-            }`}>
-              <div className={`font-bold text-sm truncate ${overallWinner === 2 ? 'text-amber-800' : TEAM_THEME[2].textStrong}`}>{team2Name}</div>
             </div>
           </div>
 
@@ -895,6 +990,8 @@ export default function TeamScoreInput({
         const isTeam1 = pickerState.side === 1;
         const roster = isTeam1 ? team1Roster : team2Roster;
         const tName = isTeam1 ? team1Name : team2Name;
+        const tId = isTeam1 ? team1Id : team2Id;
+        const tMembers = isTeam1 ? team1Members : team2Members;
         const theme = MATCH_TYPE_THEME[pickerState.mt];
         const teamTheme = TEAM_THEME[pickerState.side];
         const current = scores[pickerState.mt][pickerState.key];
@@ -922,6 +1019,9 @@ export default function TeamScoreInput({
             usedPlayers={usedPlayers}
             onSelect={(name) => handlePlayerChange(pickerState.mt, pickerState.key, name)}
             onClose={() => setPicker(null)}
+            members={tMembers}
+            teamId={tId}
+            onUpdateDisplayName={!isBracket ? updatePlayerDisplayName : undefined}
           />
         );
       })()}
