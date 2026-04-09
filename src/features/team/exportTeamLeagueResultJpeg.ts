@@ -134,14 +134,23 @@ export async function generateTeamLeagueResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(scale, scale);
 
-  // 背景: 上部にごく薄い sky グラデを乗せて上質な印象に
+  // 背景: 上部・下部に同じ濃さの sky グラデを乗せて上下のトーンを統一
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, paddingY + headerH);
-  bgGrad.addColorStop(0, '#f0f9ff');
-  bgGrad.addColorStop(1, '#ffffff');
-  ctx.fillStyle = bgGrad;
+  // 上部バンド（sky → white）
+  const bgGradTop = ctx.createLinearGradient(0, 0, 0, paddingY + headerH);
+  bgGradTop.addColorStop(0, '#f0f9ff');
+  bgGradTop.addColorStop(1, '#ffffff');
+  ctx.fillStyle = bgGradTop;
   ctx.fillRect(0, 0, totalW, paddingY + headerH);
+  // 下部バンド（white → sky）— 上部と対称になるよう同じ高さで配置
+  const bottomBandH = headerH + paddingY;
+  const bottomBandY = totalH - bottomBandH;
+  const bgGradBottom = ctx.createLinearGradient(0, bottomBandY, 0, totalH);
+  bgGradBottom.addColorStop(0, '#ffffff');
+  bgGradBottom.addColorStop(1, '#f0f9ff');
+  ctx.fillStyle = bgGradBottom;
+  ctx.fillRect(0, bottomBandY, totalW, bottomBandH);
 
   // ---- ヘルパー ----
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color = COL.slate200, w = 1) => {
@@ -237,14 +246,15 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.textBaseline = 'middle';
   ctx.fillText(leagueId, badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 3);
 
-  // バッジ横の小さなラベル
-  drawText('リーグ', badgeX + badgeSize + 16, badgeY + 38, 15, 'left', COL.slate600, 'bold');
+  // バッジ横の「リーグ」ラベル（大きく・バッジ下端揃え）
+  // バッジは [badgeY, badgeY + badgeSize] の範囲にあるので、
+  // 下端揃えのため textBaseline を 'alphabetic' に切り替えてバッジ下端付近に配置する。
   ctx.save();
-  ctx.font = 'bold 10px "Inter", sans-serif';
-  ctx.fillStyle = COL.sky500;
+  ctx.fillStyle = COL.slate800;
+  ctx.font = '900 38px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('PRELIMINARY', badgeX + badgeSize + 16, badgeY + 58);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('リーグ', badgeX + badgeSize + 18, badgeY + badgeSize - 6);
   ctx.restore();
 
   // 右: 大会名 + 会場ロゴ
@@ -445,9 +455,22 @@ export async function generateTeamLeagueResultDataUrl(
         const oppP = oppPlayers.join('/') || '　';
         const scoreText = `${myScore}-${oppScore}`;
 
+        // 左 = 行チーム（自分）、右 = 対戦相手。
+        // 「左側が勝者のセル（subWon）」では左の選手名を強調・スコアも種目色で目立たせる。
+        // 「敗者側」（subWon=false）はすべて普通表示（控えめなグレー）にする。
+        const leftIsWinner = subWon;
+        const myNameFont = leftIsWinner
+          ? 'bold 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
+          : NAME_FONT;
+        const oppNameFont = NAME_FONT;
+        const myNameColor = leftIsWinner ? COL.slate900 : COL.slate400;
+        const oppNameColor = leftIsWinner ? COL.slate500 : COL.slate400;
+        const scoreColor = leftIsWinner ? tc.fg : COL.slate400;
+
         // 計測
-        ctx.font = NAME_FONT;
+        ctx.font = myNameFont;
         const myNameW = ctx.measureText(myP).width;
+        ctx.font = oppNameFont;
         const oppNameW = ctx.measureText(oppP).width;
 
         ctx.font = SCORE_FONT;
@@ -458,24 +481,21 @@ export async function generateTeamLeagueResultDataUrl(
         const cellCx = x + scoreColW / 2;
         const startX = cellCx - totalW / 2;
 
-        const nameColor = subWon ? COL.slate700 : COL.slate500;
-        const scoreColor = subWon ? tc.fg : COL.slate400;
-
-        // 左選手名（小）
-        ctx.font = NAME_FONT;
-        ctx.fillStyle = nameColor;
+        // 左選手名（自分側 / 勝者なら強調）
+        ctx.font = myNameFont;
+        ctx.fillStyle = myNameColor;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(myP, startX, subY);
 
-        // スコア（大・目立つ・種目色）
+        // スコア（大・目立つ・種目色 / 敗者は控えめ）
         ctx.font = SCORE_FONT;
         ctx.fillStyle = scoreColor;
         ctx.fillText(scoreText, startX + myNameW + gap, subY);
 
-        // 右選手名（小）
-        ctx.font = NAME_FONT;
-        ctx.fillStyle = nameColor;
+        // 右選手名（対戦相手 / 常に普通表示）
+        ctx.font = oppNameFont;
+        ctx.fillStyle = oppNameColor;
         ctx.fillText(oppP, startX + myNameW + gap + scoreW + gap, subY);
       }
     }
@@ -501,9 +521,9 @@ export async function generateTeamLeagueResultDataUrl(
   // 表の外枠
   drawRoundRect(tableX, tableY, tableW, tableH, 16, undefined, COL.sky200, 1.5);
 
-  // ---- フッター: TCTA公式ロゴを左下に配置（添付 logo-tcta.png） ----
+  // ---- フッター: TCTA公式ロゴを右下に配置（添付 logo-tcta.png） ----
   if (tctaLogo) {
-    const logoX = paddingX;
+    const logoX = paddingX + tableW - tctaW;
     const logoY = tableY + tableH + 24;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
