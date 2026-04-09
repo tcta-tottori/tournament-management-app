@@ -527,6 +527,16 @@ export default function TeamLeagueView() {
                           onClick={() => setEditingMatch(match)}
                         >
                           <div className="flex flex-col gap-0.5 px-1.5 py-1.5 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md">
+                            {/* 対戦全体の勝敗 (種目勝利数) */}
+                            {isFinished && (
+                              <div className="flex items-center justify-center text-[12px] tabular-nums font-black leading-none">
+                                <span className={cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}>
+                                  {isTeam1 ? match.winsTeam1 : match.winsTeam2}
+                                  <span className="text-slate-300 mx-0.5">-</span>
+                                  {isTeam1 ? match.winsTeam2 : match.winsTeam1}
+                                </span>
+                              </div>
+                            )}
                             {MATCH_TYPE_ORDER.map(matchType => {
                               const sub = match.subMatches.find(sm => sm.type === matchType);
                               const myScore = isTeam1 ? sub?.score1 : sub?.score2;
