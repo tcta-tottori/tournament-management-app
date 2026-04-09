@@ -4,6 +4,8 @@
 export interface TeamPlayer {
   name: string;
   affiliation: string;
+  /** 表示名（省略時は苗字の先頭2文字） */
+  displayName?: string;
 }
 
 /** チームメンバー（団体戦） */

@@ -56,6 +56,7 @@ interface TeamState {
   setAllTeamsStatus: (status: 'none' | 'entry' | 'def') => void;
   setTeamMembers: (teamId: string, members: TeamMember[]) => void;
   updateTeamName: (teamId: string, name: string) => void;
+  updatePlayerDisplayName: (teamId: string, playerName: string, displayName: string | undefined) => void;
 
   // Navigation
   setCurrentPhase: (phase: TeamPhase) => void;
@@ -398,6 +399,26 @@ export const useTeamStore = create<TeamState>()(
           return {
             leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(update) })),
             allTeams: state.allTeams.map(update),
+          };
+        });
+      },
+
+      updatePlayerDisplayName: (teamId, playerName, displayName) => {
+        set(state => {
+          const updateMember = (t: TeamEntry): TeamEntry => {
+            if (t.teamId !== teamId) return t;
+            return {
+              ...t,
+              members: t.members.map(m =>
+                m.player.name === playerName
+                  ? { ...m, player: { ...m.player, displayName: displayName || undefined } }
+                  : m
+              ),
+            };
+          };
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateMember) })),
+            allTeams: state.allTeams.map(updateMember),
           };
         });
       },
