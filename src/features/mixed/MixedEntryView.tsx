@@ -136,10 +136,10 @@ function rowBg(status: 'none' | 'entry' | 'def'): string {
   return '';
 }
 
-/** リーグバッジカラー */
+/** リーグバッジカラー（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
-  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200' },
   { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200' },
+  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200' },
   { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200' },
   { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200' },
   { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200' },

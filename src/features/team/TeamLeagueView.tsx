@@ -614,6 +614,9 @@ export default function TeamLeagueView() {
       </div>
 
       {/* 成績表 */}
+      {(() => {
+        const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
+        return (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
         <div className="px-4 py-2.5 border-b border-indigo-100 flex items-center gap-2 bg-gradient-to-r from-indigo-50/80 via-white to-violet-50/60">
           <BarChart3 className="w-4 h-4 text-indigo-500" />
@@ -633,10 +636,10 @@ export default function TeamLeagueView() {
                 ))}
                 <th className="px-2 py-2 text-center min-w-[58px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap text-[11px]">成績</th>
                 {leagueComplete && (
-                  <>
-                    <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">順位</th>
-                    <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">判定</th>
-                  </>
+                  <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">順位</th>
+                )}
+                {hasTiebreak && (
+                  <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">判定</th>
                 )}
               </tr>
             </thead>
@@ -676,37 +679,49 @@ export default function TeamLeagueView() {
                       return (
                         <td
                           key={colTeam.teamId}
-                          className={`p-0 text-center cursor-pointer transition-all border-r border-slate-100 align-middle group ${
-                            cellWonAll ? 'bg-gradient-to-br from-blue-50 to-indigo-50/60' :
-                            cellLostAll ? 'bg-gradient-to-br from-rose-50/60 to-rose-50/30' :
+                          className={`p-0 text-center cursor-pointer transition-all border-r border-slate-100 align-top group ${
+                            cellWonAll ? 'bg-gradient-to-b from-blue-50/80 to-indigo-50/40' :
+                            cellLostAll ? 'bg-gradient-to-b from-rose-50/50 to-white' :
                             isCurrent ? 'league-match-blink' :
                             'hover:bg-slate-50 active:bg-slate-100'
                           }`}
                           onClick={() => setEditingMatch(match)}
                         >
-                          <div className="flex flex-col gap-0.5 px-1.5 py-1.5 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md">
-                            {/* 対戦全体の勝敗 (種目勝利数) */}
+                          <div className="flex flex-col px-1 py-1 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[90px]">
+                            {/* 対戦全体の勝敗バッジ — 太く目立たせる */}
                             {isFinished && (
-                              <div className="flex items-center justify-center text-[12px] tabular-nums font-black leading-none">
-                                <span className={cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}>
-                                  {isTeam1 ? match.winsTeam1 : match.winsTeam2}
-                                  <span className="text-slate-300 mx-0.5">-</span>
-                                  {isTeam1 ? match.winsTeam2 : match.winsTeam1}
-                                </span>
+                              <div className={`mx-auto mb-0.5 px-2.5 py-0.5 rounded-full text-[11px] tabular-nums font-black leading-none ${
+                                cellWonAll
+                                  ? 'bg-blue-600 text-white'
+                                  : cellLostAll
+                                  ? 'bg-rose-100 text-rose-400 border border-rose-200'
+                                  : 'bg-slate-200 text-slate-600'
+                              }`}>
+                                {isTeam1 ? match.winsTeam1 : match.winsTeam2}
+                                <span className={cellWonAll ? 'text-blue-200 mx-0.5' : 'text-slate-300 mx-0.5'}>-</span>
+                                {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                               </div>
                             )}
+                            {/* 種目別スコア + 選手名 */}
                             {MATCH_TYPE_ORDER.map(matchType => {
                               const sub = match.subMatches.find(sm => sm.type === matchType);
                               const myScore = isTeam1 ? sub?.score1 : sub?.score2;
                               const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
                               const won = sub?.winnerId === rowTeam.teamId;
-                              const hasScore = myScore !== null && myScore !== undefined && oppScore !== null && oppScore !== undefined;
+                              const hasScore = myScore != null && oppScore != null;
+                              const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
+                              const pNames = myPlayers.join('/');
                               return (
-                                <div key={matchType} className="flex items-center justify-center text-[11px] tabular-nums h-3.5">
+                                <div key={matchType} className="flex items-center justify-center gap-0.5 text-[10px] tabular-nums h-4 leading-none">
                                   {hasScore ? (
-                                    <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-500'}`}>
-                                      {myScore}-{oppScore}
-                                    </span>
+                                    <>
+                                      {pNames && (
+                                        <span className="text-[8px] text-slate-400 truncate max-w-[38px]">{pNames}</span>
+                                      )}
+                                      <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
+                                        {myScore}-{oppScore}
+                                      </span>
+                                    </>
                                   ) : (
                                     <span className="text-slate-300 font-bold">-</span>
                                   )}
@@ -725,24 +740,24 @@ export default function TeamLeagueView() {
                       ) : '-'}
                     </td>
                     {leagueComplete && (
-                      <>
-                        <td className="px-2 py-1 text-center align-middle bg-slate-50/40">
-                          {standing && <RankText rank={standing.rank || 0} />}
-                        </td>
-                        <td
-                          className="px-2 py-1 text-center align-middle bg-slate-50/40 cursor-pointer hover:bg-slate-100 transition-colors"
-                          onClick={() => standing && setJudgementTarget(standing)}
-                        >
-                          {standing?.tiebreakReason ? (
-                            <div className="inline-flex items-center gap-0.5 text-[9px] text-slate-600 font-medium">
-                              <Info className="w-2.5 h-2.5" />
-                              <span className="truncate max-w-[80px]">{standing.tiebreakReason}</span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-300">—</span>
-                          )}
-                        </td>
-                      </>
+                      <td className="px-2 py-1 text-center align-middle bg-slate-50/40">
+                        {standing && <RankText rank={standing.rank || 0} />}
+                      </td>
+                    )}
+                    {hasTiebreak && (
+                      <td
+                        className="px-2 py-1 text-center align-middle bg-slate-50/40 cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => standing && setJudgementTarget(standing)}
+                      >
+                        {standing?.tiebreakReason ? (
+                          <div className="inline-flex items-center gap-0.5 text-[9px] text-slate-600 font-medium">
+                            <Info className="w-2.5 h-2.5" />
+                            <span className="truncate max-w-[80px]">{standing.tiebreakReason}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-300">—</span>
+                        )}
+                      </td>
                     )}
                   </tr>
                 );
@@ -751,6 +766,8 @@ export default function TeamLeagueView() {
           </table>
         </div>
       </div>
+        );
+      })()}
 
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
 

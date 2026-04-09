@@ -3,12 +3,16 @@ import { Trophy, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import { calculateTeamStandings } from './teamLogic';
 
+/** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
   { header: 'from-blue-500 to-indigo-600', badge: 'bg-blue-100 text-blue-700' },
   { header: 'from-emerald-500 to-teal-600', badge: 'bg-emerald-100 text-emerald-700' },
   { header: 'from-purple-500 to-violet-600', badge: 'bg-purple-100 text-purple-700' },
   { header: 'from-rose-500 to-pink-600', badge: 'bg-rose-100 text-rose-700' },
   { header: 'from-amber-500 to-orange-600', badge: 'bg-amber-100 text-amber-700' },
+  { header: 'from-cyan-500 to-sky-600', badge: 'bg-cyan-100 text-cyan-700' },
+  { header: 'from-lime-500 to-green-600', badge: 'bg-lime-100 text-lime-700' },
+  { header: 'from-fuchsia-500 to-purple-600', badge: 'bg-fuchsia-100 text-fuchsia-700' },
 ];
 
 export default function TeamStandingsView() {

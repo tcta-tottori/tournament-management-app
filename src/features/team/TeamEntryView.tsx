@@ -4,10 +4,10 @@ import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2 } from 'luc
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
 
-/** リーグカラーパレット */
+/** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
-  { grad: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', solid: 'bg-emerald-500' },
   { grad: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', solid: 'bg-blue-500' },
+  { grad: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', solid: 'bg-emerald-500' },
   { grad: 'from-purple-500 to-violet-600', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', solid: 'bg-purple-500' },
   { grad: 'from-rose-500 to-pink-600', bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', solid: 'bg-rose-500' },
   { grad: 'from-amber-500 to-orange-600', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', solid: 'bg-amber-500' },
