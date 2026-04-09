@@ -533,43 +533,13 @@ export async function generateTeamLeagueResultDataUrl(
     drawLine(recL, tableY + colHeaderH, recL, tableY + tableH, COL.slate200, 1);
     drawText(`${wins}勝${losses}敗`, recL + recordColW / 2, rowTop + rowH / 2, 15, 'center', COL.slate800, 'bold');
 
-    // --- 順位列 (上位3チームはメダル風グラデバッジ) ---
+    // --- 順位列 ---
     const rkL = recL + recordColW;
     drawLine(rkL, tableY + colHeaderH, rkL, tableY + tableH, COL.slate200, 1);
     const rank = standing?.rank ?? 0;
     const rankCx = rkL + rankColW / 2;
     const rankCy = rowTop + rowH / 2;
-    if (rank > 0 && rank <= 3) {
-      const medal = rank === 1 ? COL.gold : rank === 2 ? COL.silver : COL.bronze;
-      // メダルバッジ: 楕円形のグラデーション + 軽い影
-      const badgeW = 64;
-      const badgeH = 46;
-      const bx = rankCx - badgeW / 2;
-      const by = rankCy - badgeH / 2;
-      ctx.save();
-      ctx.shadowColor = 'rgba(15, 23, 42, 0.18)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetY = 3;
-      const medalGrad = ctx.createLinearGradient(bx, by, bx, by + badgeH);
-      medalGrad.addColorStop(0,    medal.c1);
-      medalGrad.addColorStop(0.55, medal.c2);
-      medalGrad.addColorStop(1,    medal.c3);
-      drawRoundRect(bx, by, badgeW, badgeH, 14, medalGrad);
-      ctx.restore();
-      // 内側の細いハイライト
-      const hl = ctx.createLinearGradient(bx, by, bx, by + badgeH * 0.55);
-      hl.addColorStop(0, 'rgba(255,255,255,0.55)');
-      hl.addColorStop(1, 'rgba(255,255,255,0)');
-      drawRoundRect(bx + 2, by + 2, badgeW - 4, badgeH * 0.55, 12, hl);
-      // 内側ボーダー
-      drawRoundRect(bx + 1.2, by + 1.2, badgeW - 2.4, badgeH - 2.4, 13, undefined, 'rgba(255,255,255,0.55)', 1);
-      // 数字 (★ 付き)
-      ctx.fillStyle = medal.text;
-      ctx.font = '900 22px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${rank}位`, rankCx, rankCy + 1);
-    } else if (rank > 0) {
+    if (rank > 0) {
       drawText(`${rank}位`, rankCx, rankCy, 20, 'center', COL.slate800, 'black');
     } else {
       drawText('-', rankCx, rankCy, 16, 'center', COL.slate300, 'normal');
