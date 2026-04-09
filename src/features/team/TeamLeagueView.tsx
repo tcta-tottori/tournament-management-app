@@ -316,10 +316,11 @@ export default function TeamLeagueView() {
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 overflow-auto p-4' : ''} space-y-4 pb-20`}>
       {/* リーグ選択タブ（横スクロール可） */}
-      <div className="sticky top-0 z-20 -mx-2 px-2 pt-1 pb-2 bg-gradient-to-b from-slate-50 via-slate-50 to-transparent">
+      <div className="sticky top-0 z-20 -mx-2 px-2 pt-1 pb-2 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent">
         <div className="flex items-center gap-2">
           <div className="flex-1 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-1.5 min-w-max">
+            {/* pt/pb で絶対配置チェックバッジのクリップを防ぐ, px-0.5 で左右も確保 */}
+            <div className="flex gap-2 min-w-max pt-2 pb-1 px-0.5">
               {leagues.map((l, i) => {
                 const c = getColor(i);
                 const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
@@ -331,10 +332,10 @@ export default function TeamLeagueView() {
                   <button
                     key={l.leagueId}
                     onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
-                    className={`relative px-3.5 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
+                    className={`relative px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${
                       isSelected
-                        ? `bg-gradient-to-br ${c.grad} text-white shadow-md`
-                        : `${c.bg} ${c.text} hover:shadow-sm`
+                        ? `bg-gradient-to-br ${c.grad} text-white shadow-lg ring-2 ring-white/50`
+                        : `${c.bg} ${c.text} hover:shadow-sm border border-transparent hover:border-slate-200`
                     }`}
                   >
                     <span className="text-base font-black">{l.leagueId}</span>
@@ -342,8 +343,8 @@ export default function TeamLeagueView() {
                       {done}/{total}
                     </span>
                     {complete && (
-                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white flex items-center justify-center">
-                        <Check className="w-2 h-2 text-white" strokeWidth={4} />
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                       </span>
                     )}
                   </button>
@@ -352,10 +353,10 @@ export default function TeamLeagueView() {
               {/* 全体表示タブ */}
               <button
                 onClick={() => setShowAll(true)}
-                className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-1.5 ${
                   showAll
-                    ? 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:shadow-sm'
+                    ? 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-lg ring-2 ring-white/50'
+                    : 'bg-slate-100 text-slate-600 hover:shadow-sm border border-transparent hover:border-slate-200'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -620,19 +621,19 @@ export default function TeamLeagueView() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80">
-                <th className="px-2 py-2 text-left min-w-[120px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">チーム</th>
-                <th className="px-1 py-2 text-center w-[34px] font-bold text-slate-600 border-b border-slate-200">種目</th>
+              <tr className="bg-gradient-to-b from-slate-50 to-slate-100/80">
+                <th className="px-2 py-2 text-left min-w-[120px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap text-[11px] tracking-wide">チーム</th>
+                <th className="px-1 py-2 text-center w-[34px] font-bold text-slate-500 border-b border-slate-200 text-[11px] tracking-wide">種目</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] text-[10px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">
+                  <th key={t.teamId} className="px-1.5 py-2 text-center min-w-[68px] text-[10px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap">
                     {t.teamName.split(/[\s\u3000]+/)[0]}
                   </th>
                 ))}
-                <th className="px-2 py-2 text-center min-w-[58px] font-bold text-slate-600 border-b border-slate-200 whitespace-nowrap">成績</th>
+                <th className="px-2 py-2 text-center min-w-[58px] font-bold text-slate-500 border-b border-slate-200 whitespace-nowrap text-[11px]">成績</th>
                 {leagueComplete && (
                   <>
-                    <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-600 border-b border-slate-200">順位</th>
-                    <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-600 border-b border-slate-200">判定</th>
+                    <th className="px-2 py-2 text-center min-w-[52px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">順位</th>
+                    <th className="px-2 py-2 text-center min-w-[80px] font-bold text-slate-500 border-b border-slate-200 text-[11px]">判定</th>
                   </>
                 )}
               </tr>
