@@ -274,11 +274,6 @@ export async function generateTeamLeagueResultDataUrl(
     const standing = standings.find(s => s.teamId === team.teamId);
     const rowTop = tableY + colHeaderH + rowH * rowIdx;
 
-    if (rowIdx % 2 === 1) {
-      ctx.fillStyle = COL.sky50;
-      ctx.fillRect(tableX + 0.5, rowTop + 0.5, tableW - 1, rowH - 1);
-    }
-
     if (rowIdx > 0) {
       drawLine(tableX, rowTop, tableX + tableW, rowTop, COL.slate200, 1);
     }
@@ -402,16 +397,7 @@ export async function generateTeamLeagueResultDataUrl(
     drawLine(rkL, tableY, rkL, tableY + tableH, COL.slate200, 1);
     const rank = standing?.rank ?? 0;
     if (rank > 0) {
-      if (rank === 1) {
-        ctx.save();
-        ctx.shadowColor = 'rgba(14, 165, 233, 0.35)';
-        ctx.shadowBlur = 8;
-        drawRoundRect(rkL + rankColW / 2 - 22, rowTop + rowH / 2 - 20, 44, 40, 10, COL.sky500);
-        ctx.restore();
-        drawText(`${rank}位`, rkL + rankColW / 2, rowTop + rowH / 2, 17, 'center', COL.white, true);
-      } else {
-        drawText(`${rank}位`, rkL + rankColW / 2, rowTop + rowH / 2, 18, 'center', COL.slate700, true);
-      }
+      drawText(`${rank}位`, rkL + rankColW / 2, rowTop + rowH / 2, 18, 'center', COL.slate700, true);
     } else {
       drawText('-', rkL + rankColW / 2, rowTop + rowH / 2, 16, 'center', COL.slate300, false);
     }
