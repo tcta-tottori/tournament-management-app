@@ -122,6 +122,12 @@ const LEAGUE_COLORS = [
 
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
 
+/** タブドット用ソリッドカラー */
+const LEAGUE_SOLID_COLORS = [
+  '#3b82f6', '#10b981', '#8b5cf6', '#f43f5e',
+  '#f59e0b', '#06b6d4', '#84cc16', '#d946ef',
+];
+
 /** 種目カラー */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   MIX: { bg: 'bg-violet-100', text: 'text-violet-700' },
@@ -315,14 +321,12 @@ export default function TeamLeagueView() {
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 overflow-auto p-4' : ''} space-y-4 pb-20`}>
-      {/* リーグ選択タブ（横スクロール可） */}
-      <div className="sticky top-0 z-20 -mx-2 px-2 pt-1 pb-2 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent">
+      {/* Chrome風リーグ選択タブ */}
+      <div className="sticky top-0 z-20 -mx-2 px-2">
         <div className="flex items-center gap-2">
-          <div className="flex-1 overflow-x-auto scrollbar-hide">
-            {/* pt/pb で絶対配置チェックバッジのクリップを防ぐ, px-0.5 で左右も確保 */}
-            <div className="flex gap-2 min-w-max pt-2 pb-1 px-0.5">
+          <div className="flex-1 overflow-hidden">
+            <div className="chrome-tab-bar">
               {leagues.map((l, i) => {
-                const c = getColor(i);
                 const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
                 const done = lm.filter(m => m.status === 'finished').length;
                 const total = lm.length;
@@ -332,19 +336,14 @@ export default function TeamLeagueView() {
                   <button
                     key={l.leagueId}
                     onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
-                    className={`relative px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${
-                      isSelected
-                        ? `bg-gradient-to-br ${c.grad} text-white shadow-lg ring-2 ring-white/50`
-                        : `${c.bg} ${c.text} hover:shadow-sm border border-transparent hover:border-slate-200`
-                    }`}
+                    className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
                   >
-                    <span className="text-base font-black">{l.leagueId}</span>
-                    <span className={`ml-1 text-[10px] tabular-nums ${isSelected ? 'opacity-80' : 'opacity-60'}`}>
-                      {done}/{total}
-                    </span>
+                    <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
+                    <span className="font-bold">{l.leagueId}</span>
+                    <span className="chrome-tab-count">{done}/{total}</span>
                     {complete && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      <span className="chrome-tab-badge">
+                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
                       </span>
                     )}
                   </button>
@@ -359,17 +358,13 @@ export default function TeamLeagueView() {
                 return (
                   <button
                     onClick={() => setShowAll(true)}
-                    className={`relative px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-1.5 ${
-                      showAll
-                        ? 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-lg ring-2 ring-white/50'
-                        : 'bg-slate-100 text-slate-600 hover:shadow-sm border border-transparent hover:border-slate-200'
-                    }`}
+                    className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
                   >
-                    <Layers className="w-3.5 h-3.5" />
+                    <Layers className="chrome-tab-icon" />
                     <span>全体</span>
                     {allLeaguesComplete && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      <span className="chrome-tab-badge">
+                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
                       </span>
                     )}
                   </button>
@@ -379,7 +374,7 @@ export default function TeamLeagueView() {
           </div>
           <button
             onClick={() => setIsFullscreen(f => !f)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shrink-0 transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shrink-0 transition-colors mb-[-1px]"
             title={isFullscreen ? '通常表示' : '全画面'}
           >
             {isFullscreen ? <X size={16} /> : <Maximize2 size={16} />}

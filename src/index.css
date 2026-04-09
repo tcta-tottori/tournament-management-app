@@ -696,3 +696,121 @@
 .court-detail-item {
   animation: courtDetailItemIn 0.35s ease-out both;
 }
+
+/* ===========================================================
+   Chrome風タブ
+   =========================================================== */
+.chrome-tab-bar {
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(to bottom, #e8ecf0, #dde2e8);
+  padding: 8px 8px 0;
+  border-radius: 12px 12px 0 0;
+  gap: 1px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.chrome-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.chrome-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px 8px;
+  border-radius: 10px 10px 0 0;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chrome-tab:hover:not(.chrome-tab-active) {
+  background: rgba(255, 255, 255, 0.45);
+  color: #475569;
+  border-radius: 10px 10px 0 0;
+}
+
+.chrome-tab-active {
+  background: white;
+  color: #1e293b;
+  z-index: 2;
+  font-weight: 700;
+}
+
+.chrome-tab-active::before,
+.chrome-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.chrome-tab-active::before {
+  left: -8px;
+  border-bottom-right-radius: 8px;
+  box-shadow: 3px 0 0 0 white;
+}
+
+.chrome-tab-active::after {
+  right: -8px;
+  border-bottom-left-radius: 8px;
+  box-shadow: -3px 0 0 0 white;
+}
+
+.chrome-tab-content {
+  background: white;
+  border-radius: 0 0 12px 12px;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  padding: 12px;
+}
+
+/* カラードット（タブ内のリーグ色表示） */
+.chrome-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 完了バッジ */
+.chrome-tab-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* アイコン付きタブ（決勝T等） */
+.chrome-tab-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* タブカウンター */
+.chrome-tab-count {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}

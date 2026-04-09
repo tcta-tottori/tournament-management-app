@@ -15,6 +15,20 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '4th': '4・5位トーナメント',
 };
 
+const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
+  '1st': '1位',
+  '2nd': '2位',
+  '3rd': '3位',
+  '4th': '4・5位',
+};
+
+const CATEGORY_SOLID_COLORS: Record<PlacementCategory, string> = {
+  '1st': '#f59e0b',
+  '2nd': '#94a3b8',
+  '3rd': '#f97316',
+  '4th': '#3b82f6',
+};
+
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
   '1st': { grad: 'from-yellow-400 to-amber-500', bg: 'bg-yellow-50', text: 'text-yellow-700', icon: Trophy },
   '2nd': { grad: 'from-slate-400 to-slate-500', bg: 'bg-slate-50', text: 'text-slate-700', icon: Medal },
@@ -130,29 +144,27 @@ export default function TeamBracketView() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* メインタブ: トーナメント / 控えリスト */}
-      <div className="flex gap-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setViewMode('bracket')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
-            viewMode === 'bracket' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-[1px]' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Trophy size={14} />
-          トーナメント
-        </button>
-        <button
-          onClick={() => setViewMode('waiting')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-bold transition-all ${
-            viewMode === 'waiting' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-[1px]' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <ClipboardList size={14} />
-          控えリスト
-          {waitingMatches.length > 0 && (
-            <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingMatches.length}</span>
-          )}
-        </button>
+      {/* Chrome風メインタブ: トーナメント / 控えリスト */}
+      <div className="sticky top-0 z-20 -mx-2 px-2">
+        <div className="chrome-tab-bar">
+          <button
+            onClick={() => setViewMode('bracket')}
+            className={`chrome-tab ${viewMode === 'bracket' ? 'chrome-tab-active' : ''}`}
+          >
+            <Trophy className="chrome-tab-icon" />
+            <span>トーナメント</span>
+          </button>
+          <button
+            onClick={() => setViewMode('waiting')}
+            className={`chrome-tab ${viewMode === 'waiting' ? 'chrome-tab-active' : ''}`}
+          >
+            <ClipboardList className="chrome-tab-icon" />
+            <span>控えリスト</span>
+            {waitingMatches.length > 0 && (
+              <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
+            )}
+          </button>
+        </div>
       </div>
 
       {viewMode === 'waiting' && (
@@ -165,35 +177,28 @@ export default function TeamBracketView() {
       )}
 
       {viewMode === 'bracket' && (<>
-      {/* カテゴリタブ */}
-      <div className="sticky top-0 z-20 -mx-2 px-2 pt-1 pb-2 bg-gradient-to-b from-slate-50 via-slate-50 to-transparent">
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex gap-1.5 min-w-max">
-            {brackets.map(b => {
-              const isSelected = b.category === selectedBracketCategory;
-              const cfg = CATEGORY_CONFIG[b.category];
-              const Icon = cfg.icon;
-              const finishedCount = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
-              const total = b.matches.length;
-              return (
-                <button
-                  key={b.category}
-                  onClick={() => setSelectedBracketCategory(b.category)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                    isSelected
-                      ? `bg-gradient-to-br ${cfg.grad} text-white shadow-md`
-                      : `${cfg.bg} ${cfg.text} hover:shadow-sm`
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{CATEGORY_LABELS[b.category]}</span>
-                  <span className={`text-[10px] tabular-nums ${isSelected ? 'opacity-80' : 'opacity-60'}`}>
-                    {finishedCount}/{total}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Chrome風カテゴリタブ（コンパクト） */}
+      <div className="-mx-2 px-2">
+        <div className="chrome-tab-bar">
+          {brackets.map(b => {
+            const isSelected = b.category === selectedBracketCategory;
+            const cfg = CATEGORY_CONFIG[b.category];
+            const Icon = cfg.icon;
+            const finishedCount = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
+            const total = b.matches.length;
+            return (
+              <button
+                key={b.category}
+                onClick={() => setSelectedBracketCategory(b.category)}
+                className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
+              >
+                <span className="chrome-tab-dot" style={{ background: CATEGORY_SOLID_COLORS[b.category] }} />
+                <Icon className="chrome-tab-icon" />
+                <span className="font-bold">{CATEGORY_SHORT_LABELS[b.category]}</span>
+                <span className="chrome-tab-count">{finishedCount}/{total}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

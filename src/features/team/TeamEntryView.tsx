@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2 } from 'lucide-react';
+import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
 
@@ -303,10 +303,17 @@ function LeagueSection({
   );
 }
 
+/** LEAGUE_COLORSのソリッドカラー（タブドット用） */
+const LEAGUE_SOLID_COLORS = [
+  '#3b82f6', '#10b981', '#8b5cf6', '#f43f5e',
+  '#f59e0b', '#06b6d4', '#84cc16', '#d946ef',
+];
+
 /** メインコンポーネント */
 export default function TeamEntryView() {
   const { leagues, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus } = useTeamStore();
   const [editingTeam, setEditingTeam] = useState<{ team: TeamEntry; colorIndex: number } | null>(null);
+  const [selectedTab, setSelectedTab] = useState<string>('all');
 
   if (leagues.length === 0) {
     return (
@@ -324,8 +331,49 @@ export default function TeamEntryView() {
   const totalEntered = leagues.reduce((sum, l) => sum + l.teams.filter(t => t.status === 'entry').length, 0);
   const allEntered = totalEntered === totalTeams && totalTeams > 0;
 
+  const visibleLeagues = selectedTab === 'all'
+    ? leagues
+    : leagues.filter(l => l.leagueId === selectedTab);
+
   return (
     <div className="space-y-3 pb-20">
+      {/* Chrome風タブ */}
+      <div className="sticky top-0 z-20 -mx-2 px-2">
+        <div className="chrome-tab-bar">
+          {/* 全体タブ */}
+          <button
+            onClick={() => setSelectedTab('all')}
+            className={`chrome-tab ${selectedTab === 'all' ? 'chrome-tab-active' : ''}`}
+          >
+            <Layers className="chrome-tab-icon" />
+            <span>全体</span>
+            <span className="chrome-tab-count">{totalEntered}/{totalTeams}</span>
+          </button>
+          {/* 各リーグタブ */}
+          {leagues.map((l, i) => {
+            const entryCount = l.teams.filter(t => t.status === 'entry').length;
+            const total = l.teams.length;
+            const complete = entryCount === total && total > 0;
+            return (
+              <button
+                key={l.leagueId}
+                onClick={() => setSelectedTab(l.leagueId)}
+                className={`chrome-tab ${selectedTab === l.leagueId ? 'chrome-tab-active' : ''}`}
+              >
+                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
+                <span className="font-bold">{l.leagueId}</span>
+                <span className="chrome-tab-count">{entryCount}/{total}</span>
+                {complete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 全体一括エントリー */}
       <div className="flex items-center gap-2 px-1">
         <div className="flex-1 text-xs text-slate-500">
@@ -346,16 +394,19 @@ export default function TeamEntryView() {
       </div>
 
       {/* リーグ別セクション */}
-      {leagues.map((league, index) => (
-        <LeagueSection
-          key={league.leagueId}
-          league={league}
-          leagueIndex={index}
-          onSetTeamStatus={setTeamStatus}
-          onSetLeagueAll={setLeagueAllStatus}
-          onEditTeam={team => setEditingTeam({ team, colorIndex: index })}
-        />
-      ))}
+      {visibleLeagues.map((league) => {
+        const index = leagues.findIndex(l => l.leagueId === league.leagueId);
+        return (
+          <LeagueSection
+            key={league.leagueId}
+            league={league}
+            leagueIndex={index}
+            onSetTeamStatus={setTeamStatus}
+            onSetLeagueAll={setLeagueAllStatus}
+            onEditTeam={team => setEditingTeam({ team, colorIndex: index })}
+          />
+        );
+      })}
 
       {/* 編集モーダル */}
       {editingTeam && (
