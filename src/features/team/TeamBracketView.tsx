@@ -183,7 +183,7 @@ export default function TeamBracketView() {
               <button
                 key={b.category}
                 onClick={() => { setShowAllBrackets(false); setSelectedBracketCategory(b.category); }}
-                className={`chrome-tab !px-3 !py-1.5 !rounded-lg !gap-0 ${isSelected ? 'chrome-tab-active' : ''}`}
+                className={`chrome-tab !px-3 !py-2 ${isSelected ? 'chrome-tab-active' : ''}`}
               >
                 <span className={`px-3 py-1 rounded-md text-xs font-black ${
                   isSelected ? `${style.activeBg} ${style.activeText}` : `${style.inactiveBg} ${style.inactiveText}`
