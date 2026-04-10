@@ -424,20 +424,20 @@ export default function TeamLeagueView() {
                 </div>
                 {/* 成績表 */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
+                  <table className="w-full text-xs border-collapse lg:text-sm">
                     <thead>
                       <tr className={`bg-gradient-to-r ${c.grad} text-white`}>
-                        <th className="px-2 py-2 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">チーム</th>
-                        <th className="px-1 py-2 text-center w-[34px] font-bold text-white/90 border-b border-white/20 text-[11px]">種目</th>
+                        <th className="px-2 py-2 lg:px-4 lg:py-3 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px] lg:text-xs">チーム</th>
+                        <th className="px-1 py-2 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold text-white/90 border-b border-white/20 text-[11px] lg:text-xs">種目</th>
                         {league.teams.map(t => (
-                          <th key={t.teamId} className="px-1 py-2 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[100px] border-b border-white/20">
-                            <span className="inline-block w-full px-1 py-0.5 rounded-full bg-white/20 text-[10px] lg:text-[11px] font-black text-white truncate" title={t.teamName}>
+                          <th key={t.teamId} className="px-1 py-2 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b border-white/20">
+                            <span className="inline-block w-full px-1 py-0.5 lg:px-2 lg:py-1 rounded-full bg-white/20 text-[10px] lg:text-[11px] font-black text-white truncate" title={t.teamName}>
                               <span className="lg:hidden">{truncTeamName(t.teamName)}</span>
-                              <span className="hidden lg:inline">{truncTeamName(t.teamName, 10)}</span>
+                              <span className="hidden lg:inline">{truncTeamName(t.teamName, 12)}</span>
                             </span>
                           </th>
                         ))}
-                        <th className="px-2 py-2 text-center min-w-[50px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">成績</th>
+                        <th className="px-2 py-2 lg:px-3 lg:py-3 text-center min-w-[50px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px] lg:text-xs">成績</th>
                         {complete && (
                           <th className="px-2 py-2 text-center min-w-[44px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">順位</th>
                         )}
@@ -448,15 +448,15 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
-                            <td className={`px-2 py-1 font-bold text-xs align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
+                            <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
                             </td>
-                            <td className={`px-0.5 py-1 align-middle border-r ${c.border} ${c.bg}/20`}>
-                              <div className="flex flex-col gap-0.5 items-center">
+                            <td className={`px-0.5 py-1 lg:px-1 lg:py-2.5 align-middle border-r ${c.border} ${c.bg}/20`}>
+                              <div className="flex flex-col gap-0.5 lg:gap-1 items-center">
                                 {MATCH_TYPE_ORDER.map(mt => {
                                   const tag = MATCH_TYPE_COLORS[mt];
                                   return (
-                                    <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 rounded text-[8px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
+                                    <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 lg:w-8 lg:h-4 rounded text-[8px] lg:text-[9px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
                                       {MATCH_TYPE_SHORT[mt]}
                                     </span>
                                   );
@@ -483,14 +483,12 @@ export default function TeamLeagueView() {
                                   }`}
                                   onClick={() => setEditingMatch(match)}
                                 >
-                                  <div className="flex flex-col gap-0.5 px-1 py-1">
+                                  <div className="flex flex-col gap-0.5 px-1 py-1 lg:px-2 lg:py-1.5">
                                     {isFinished && (
-                                      <div className="text-[11px] tabular-nums font-black leading-none">
-                                        <span className={cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}>
-                                          {isTeam1 ? match.winsTeam1 : match.winsTeam2}
-                                          <span className="text-slate-300 mx-0.5">-</span>
-                                          {isTeam1 ? match.winsTeam2 : match.winsTeam1}
-                                        </span>
+                                      <div className={`text-[11px] lg:text-xs tabular-nums font-black leading-none text-center ${cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}`}>
+                                        {isTeam1 ? match.winsTeam1 : match.winsTeam2}
+                                        <span className="text-slate-300 mx-0.5">-</span>
+                                        {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                                       </div>
                                     )}
                                     {MATCH_TYPE_ORDER.map(matchType => {
@@ -502,11 +500,11 @@ export default function TeamLeagueView() {
                                       const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                                       const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                                       return (
-                                        <div key={matchType} className="flex items-center justify-center text-[10px] tabular-nums h-3.5 leading-[14px] gap-1">
+                                        <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px] gap-1">
                                           {hasScore ? (<>
-                                            <span className="hidden lg:inline text-[9px] text-slate-400 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
+                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
                                             <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
-                                            <span className="hidden lg:inline text-[9px] text-slate-400 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
                                           </>) : (
                                             <span className="text-slate-300 font-bold">-</span>
                                           )}
@@ -517,11 +515,11 @@ export default function TeamLeagueView() {
                                 </td>
                               );
                             })}
-                            <td className={`px-1.5 py-1 text-center font-black text-sm align-middle ${c.bg}/20 tabular-nums border-l ${c.border}`}>
+                            <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center font-black text-sm lg:text-base align-middle ${c.bg}/20 tabular-nums border-l ${c.border}`}>
                               {standing ? <><span className={c.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span></> : '-'}
                             </td>
                             {complete && (
-                              <td className={`px-1.5 py-1 text-center align-middle ${c.bg}/20`}>
+                              <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${c.bg}/20`}>
                                 {standing && <RankText rank={standing.rank || 0} />}
                               </td>
                             )}
@@ -584,7 +582,7 @@ export default function TeamLeagueView() {
         return (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:w-fit lg:min-w-[600px] lg:mx-auto">
         {/* コンパクトヘッダー */}
-        <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-r ${color.grad} text-white`}>
+        <div className={`flex items-center justify-between gap-2 px-3 py-1.5 lg:px-4 lg:py-2 bg-gradient-to-r ${color.grad} text-white`}>
           <div className="flex items-center gap-2">
             <span className="text-lg font-black leading-none">{selectedLeague.leagueId}</span>
             <span className="text-[10px] font-bold opacity-80">リーグ</span>
@@ -607,25 +605,25 @@ export default function TeamLeagueView() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse lg:text-sm">
             <thead>
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
-                <th className={`px-2 py-2.5 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] tracking-wide`}>チーム</th>
-                <th className={`px-1 py-2.5 text-center w-[34px] font-bold ${color.text} border-b ${color.border} text-[11px] tracking-wide`}>種目</th>
+                <th className={`px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
+                <th className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className={`px-1 py-2.5 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[100px] border-b ${color.border}`}>
-                    <span className={`inline-block w-full px-1 py-0.5 rounded-full text-[10px] lg:text-[11px] font-black ${color.soft} ${color.text} truncate`} title={t.teamName}>
+                  <th key={t.teamId} className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b ${color.border}`}>
+                    <span className={`inline-block w-full px-1 py-0.5 lg:px-2 lg:py-1 rounded-full text-[10px] lg:text-[11px] font-black ${color.soft} ${color.text} truncate`} title={t.teamName}>
                       <span className="lg:hidden">{truncTeamName(t.teamName)}</span>
-                      <span className="hidden lg:inline">{truncTeamName(t.teamName, 10)}</span>
+                      <span className="hidden lg:inline">{truncTeamName(t.teamName, 12)}</span>
                     </span>
                   </th>
                 ))}
-                <th className={`px-2 py-2.5 text-center min-w-[58px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px]`}>成績</th>
+                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
                 {leagueComplete && (
-                  <th className={`px-2 py-2.5 text-center min-w-[52px] font-bold ${color.text} border-b ${color.border} text-[11px]`}>順位</th>
+                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs`}>順位</th>
                 )}
                 {hasTiebreak && (
-                  <th className={`px-2 py-2.5 text-center min-w-[80px] font-bold ${color.text} border-b ${color.border} text-[11px]`}>判定</th>
+                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[80px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs`}>判定</th>
                 )}
               </tr>
             </thead>
@@ -634,16 +632,16 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`px-2 py-1.5 font-bold text-xs align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
+                    <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                     </td>
                     {/* 種目ラベル列 */}
-                    <td className={`px-0.5 py-1.5 align-middle border-r ${color.border} ${color.bg}/20`}>
-                      <div className="flex flex-col gap-0.5 items-center">
+                    <td className={`px-0.5 py-1.5 lg:px-1 lg:py-2.5 align-middle border-r ${color.border} ${color.bg}/20`}>
+                      <div className="flex flex-col gap-0.5 lg:gap-1 items-center">
                         {MATCH_TYPE_ORDER.map(mt => {
                           const tag = MATCH_TYPE_COLORS[mt];
                           return (
-                            <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 rounded text-[8px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
+                            <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 lg:w-8 lg:h-4 rounded text-[8px] lg:text-[9px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
                               {MATCH_TYPE_SHORT[mt]}
                             </span>
                           );
@@ -675,10 +673,10 @@ export default function TeamLeagueView() {
                           }`}
                           onClick={() => setEditingMatch(match)}
                         >
-                          <div className="flex flex-col px-1 py-1 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[68px]">
-                            {/* 対戦全体の勝敗バッジ — 太く目立たせる */}
+                          <div className="flex flex-col px-1 py-1 lg:px-2 lg:py-1.5 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[68px]">
+                            {/* 対戦全体の勝敗バッジ */}
                             {isFinished && (
-                              <div className={`mx-auto mb-0.5 px-2.5 py-0.5 rounded-full text-[11px] tabular-nums font-black leading-none ${
+                              <div className={`mx-auto mb-0.5 lg:mb-1 px-2.5 py-0.5 lg:px-3 lg:py-1 rounded-full text-[11px] lg:text-xs tabular-nums font-black leading-none ${
                                 cellWonAll
                                   ? 'bg-blue-600 text-white'
                                   : cellLostAll
@@ -700,13 +698,13 @@ export default function TeamLeagueView() {
                               const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                               const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                               return (
-                                <div key={matchType} className="flex items-center justify-center text-[10px] tabular-nums h-4 leading-none gap-1">
+                                <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none gap-1">
                                   {hasScore ? (<>
-                                    <span className="hidden lg:inline text-[9px] text-slate-400 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
+                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
                                     <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
                                       {myScore}-{oppScore}
                                     </span>
-                                    <span className="hidden lg:inline text-[9px] text-slate-400 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
                                   </>) : (
                                     <span className="text-slate-300 font-bold">-</span>
                                   )}
@@ -717,7 +715,7 @@ export default function TeamLeagueView() {
                         </td>
                       );
                     })}
-                    <td className={`px-2 py-1 text-center font-black text-sm align-middle ${color.bg}/30 border-l ${color.border}`}>
+                    <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center font-black text-sm lg:text-base align-middle ${color.bg}/30 border-l ${color.border}`}>
                       {standing ? (
                         <div className="tabular-nums">
                           <span className={color.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span>
@@ -725,13 +723,13 @@ export default function TeamLeagueView() {
                       ) : '-'}
                     </td>
                     {leagueComplete && (
-                      <td className={`px-2 py-1 text-center align-middle ${color.bg}/30`}>
+                      <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30`}>
                         {standing && <RankText rank={standing.rank || 0} />}
                       </td>
                     )}
                     {hasTiebreak && (
                       <td
-                        className={`px-2 py-1 text-center align-middle ${color.bg}/30 cursor-pointer hover:${color.bg} transition-colors`}
+                        className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 cursor-pointer hover:${color.bg} transition-colors`}
                         onClick={() => standing && setJudgementTarget(standing)}
                       >
                         {standing?.tiebreakReason ? (
@@ -757,12 +755,12 @@ export default function TeamLeagueView() {
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
 
       {/* 対戦順 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
-        <div className={`px-4 py-2.5 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:w-fit lg:min-w-[600px] lg:mx-auto">
+        <div className={`px-4 py-2.5 lg:py-3 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
           <ListOrdered className="w-4 h-4 text-white/80" />
           <span className="text-sm font-bold tracking-wide">対戦順</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:gap-3 p-3 lg:p-4">
           {selectedLeague.matchOrder.map(mo => {
             const match = leagueMatchList.find(m => m.matchNumber === mo.matchNumber);
             const team1 = selectedLeague.teams[mo.team1Index - 1];
