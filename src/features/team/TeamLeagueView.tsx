@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, Maximize2, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
+import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
 import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName } from './teamLogic';
@@ -273,7 +273,6 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
 export default function TeamLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -320,65 +319,54 @@ export default function TeamLeagueView() {
   const getMatchBetween = (team1Id: string, team2Id: string) => scoreMatrix.get(`${team1Id}-${team2Id}`);
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 overflow-auto p-4' : ''} space-y-4 pb-20`}>
+    <div className="space-y-4 pb-20">
       {/* Chrome風リーグ選択タブ */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 overflow-hidden">
-            <div className="chrome-tab-bar">
-              {leagues.map((l, i) => {
-                const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-                const done = lm.filter(m => m.status === 'finished').length;
-                const total = lm.length;
-                const complete = done === total && total > 0;
-                const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
-                return (
-                  <button
-                    key={l.leagueId}
-                    onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
-                    className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
-                  >
-                    <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
-                    <span className="font-bold">{l.leagueId}</span>
-                    <span className="chrome-tab-count">{done}/{total}</span>
-                    {complete && (
-                      <span className="chrome-tab-badge">
-                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {/* 全体表示タブ */}
-              {(() => {
-                const allLeaguesComplete = leagues.every(l => {
-                  const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-                  return lm.length > 0 && lm.every(m => m.status === 'finished');
-                });
-                return (
-                  <button
-                    onClick={() => setShowAll(true)}
-                    className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
-                  >
-                    <Layers className="chrome-tab-icon" />
-                    <span>全体</span>
-                    {allLeaguesComplete && (
-                      <span className="chrome-tab-badge">
-                        <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
-          <button
-            onClick={() => setIsFullscreen(f => !f)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 shrink-0 transition-colors mb-[-1px]"
-            title={isFullscreen ? '通常表示' : '全画面'}
-          >
-            {isFullscreen ? <X size={16} /> : <Maximize2 size={16} />}
-          </button>
+        <div className="chrome-tab-bar">
+          {leagues.map((l, i) => {
+            const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+            const done = lm.filter(m => m.status === 'finished').length;
+            const total = lm.length;
+            const complete = done === total && total > 0;
+            const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
+            return (
+              <button
+                key={l.leagueId}
+                onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
+                className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
+              >
+                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
+                <span className="font-bold">{l.leagueId}</span>
+                <span className="chrome-tab-count">{done}/{total}</span>
+                {complete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {/* 全体表示タブ */}
+          {(() => {
+            const allLeaguesComplete = leagues.every(l => {
+              const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+              return lm.length > 0 && lm.every(m => m.status === 'finished');
+            });
+            return (
+              <button
+                onClick={() => setShowAll(true)}
+                className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
+              >
+                <Layers className="chrome-tab-icon" />
+                <span>全体</span>
+                {allLeaguesComplete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })()}
         </div>
       </div>
 
