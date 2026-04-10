@@ -206,7 +206,7 @@ export default function TeamBracketView() {
           })}
           <button
             onClick={() => setShowAllBrackets(true)}
-            className={`chrome-tab ${showAllBrackets ? 'chrome-tab-active' : ''}`}
+            className={`chrome-tab ml-auto ${showAllBrackets ? 'chrome-tab-active' : ''}`}
           >
             <Layers className="chrome-tab-icon" />
             <span>全体</span>
