@@ -424,15 +424,16 @@ export default function TeamLeagueView() {
                 </div>
                 {/* 成績表 */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
+                  <table className="w-full text-xs border-collapse lg:w-auto lg:mx-auto">
                     <thead>
                       <tr className={`bg-gradient-to-r ${c.grad} text-white`}>
                         <th className="px-2 py-2 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">チーム</th>
                         <th className="px-1 py-2 text-center w-[34px] font-bold text-white/90 border-b border-white/20 text-[11px]">種目</th>
                         {league.teams.map(t => (
-                          <th key={t.teamId} className="px-1 py-2 text-center w-[76px] min-w-[76px] max-w-[76px] border-b border-white/20">
-                            <span className="inline-block w-full px-1 py-0.5 rounded-full bg-white/20 text-[10px] font-black text-white truncate" title={t.teamName}>
-                              {truncTeamName(t.teamName)}
+                          <th key={t.teamId} className="px-1 py-2 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-[130px] lg:min-w-[130px] lg:max-w-[130px] border-b border-white/20">
+                            <span className="inline-block w-full px-1 py-0.5 rounded-full bg-white/20 text-[10px] lg:text-[11px] font-black text-white truncate" title={t.teamName}>
+                              <span className="lg:hidden">{truncTeamName(t.teamName)}</span>
+                              <span className="hidden lg:inline">{truncTeamName(t.teamName, 10)}</span>
                             </span>
                           </th>
                         ))}
@@ -483,6 +484,10 @@ export default function TeamLeagueView() {
                                   onClick={() => setEditingMatch(match)}
                                 >
                                   <div className="flex flex-col gap-0.5 px-1 py-1">
+                                    {/* PC: 対戦相手チーム名 */}
+                                    <div className="hidden lg:block text-[9px] text-slate-400 font-medium truncate leading-tight" title={colTeam.teamName}>
+                                      vs {truncTeamName(colTeam.teamName, 8)}
+                                    </div>
                                     {isFinished && (
                                       <div className="text-[11px] tabular-nums font-black leading-none">
                                         <span className={cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}>
@@ -602,15 +607,16 @@ export default function TeamLeagueView() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse lg:w-auto lg:mx-auto">
             <thead>
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
                 <th className={`px-2 py-2.5 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] tracking-wide`}>チーム</th>
                 <th className={`px-1 py-2.5 text-center w-[34px] font-bold ${color.text} border-b ${color.border} text-[11px] tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className={`px-1 py-2.5 text-center w-[76px] min-w-[76px] max-w-[76px] border-b ${color.border}`}>
-                    <span className={`inline-block w-full px-1 py-0.5 rounded-full text-[10px] font-black ${color.soft} ${color.text} truncate`} title={t.teamName}>
-                      {truncTeamName(t.teamName)}
+                  <th key={t.teamId} className={`px-1 py-2.5 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-[130px] lg:min-w-[130px] lg:max-w-[130px] border-b ${color.border}`}>
+                    <span className={`inline-block w-full px-1 py-0.5 rounded-full text-[10px] lg:text-[11px] font-black ${color.soft} ${color.text} truncate`} title={t.teamName}>
+                      <span className="lg:hidden">{truncTeamName(t.teamName)}</span>
+                      <span className="hidden lg:inline">{truncTeamName(t.teamName, 10)}</span>
                     </span>
                   </th>
                 ))}
@@ -670,6 +676,10 @@ export default function TeamLeagueView() {
                           onClick={() => setEditingMatch(match)}
                         >
                           <div className="flex flex-col px-1 py-1 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[68px]">
+                            {/* PC: 対戦相手チーム名 */}
+                            <div className="hidden lg:block text-[9px] text-slate-400 font-medium truncate mb-0.5 leading-tight" title={colTeam.teamName}>
+                              vs {truncTeamName(colTeam.teamName, 8)}
+                            </div>
                             {/* 対戦全体の勝敗バッジ — 太く目立たせる */}
                             {isFinished && (
                               <div className={`mx-auto mb-0.5 px-2.5 py-0.5 rounded-full text-[11px] tabular-nums font-black leading-none ${
