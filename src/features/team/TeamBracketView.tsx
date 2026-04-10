@@ -189,6 +189,13 @@ export default function TeamBracketView() {
       {/* カテゴリタブ（色分けバッジ） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
+          <button
+            onClick={() => setShowAllBrackets(true)}
+            className={`chrome-tab ${showAllBrackets ? 'chrome-tab-active' : ''}`}
+          >
+            <Layers className="chrome-tab-icon" />
+            <span>全体</span>
+          </button>
           {brackets.map(b => {
             const isSelected = !showAllBrackets && b.category === selectedBracketCategory;
             const style = CATEGORY_TAB_STYLES[b.category];
@@ -204,13 +211,6 @@ export default function TeamBracketView() {
               </button>
             );
           })}
-          <button
-            onClick={() => setShowAllBrackets(true)}
-            className={`chrome-tab ml-auto ${showAllBrackets ? 'chrome-tab-active' : ''}`}
-          >
-            <Layers className="chrome-tab-icon" />
-            <span>全体</span>
-          </button>
         </div>
       </div>
 

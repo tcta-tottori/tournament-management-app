@@ -330,6 +330,27 @@ export default function TeamLeagueView() {
       {/* Chrome風リーグ選択タブ */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
         <div className="chrome-tab-bar">
+          {/* 全体表示タブ（左端） */}
+          {(() => {
+            const allLeaguesComplete = leagues.every(l => {
+              const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
+              return lm.length > 0 && lm.every(m => m.status === 'finished');
+            });
+            return (
+              <button
+                onClick={() => setShowAll(true)}
+                className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
+              >
+                <Layers className="chrome-tab-icon" />
+                <span>全体</span>
+                {allLeaguesComplete && (
+                  <span className="chrome-tab-badge">
+                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            );
+          })()}
           {leagues.map((l, i) => {
             const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
             const done = lm.filter(m => m.status === 'finished').length;
@@ -353,27 +374,6 @@ export default function TeamLeagueView() {
               </button>
             );
           })}
-          {/* 全体表示タブ（右端） */}
-          {(() => {
-            const allLeaguesComplete = leagues.every(l => {
-              const lm = leagueMatches.filter(m => m.leagueId === l.leagueId);
-              return lm.length > 0 && lm.every(m => m.status === 'finished');
-            });
-            return (
-              <button
-                onClick={() => setShowAll(true)}
-                className={`chrome-tab ml-auto ${showAll ? 'chrome-tab-active' : ''}`}
-              >
-                <Layers className="chrome-tab-icon" />
-                <span>全体</span>
-                {allLeaguesComplete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
-                )}
-              </button>
-            );
-          })()}
         </div>
       </div>
 
@@ -464,7 +464,9 @@ export default function TeamLeagueView() {
                             </td>
                             {league.teams.map(colTeam => {
                               if (rowTeam.teamId === colTeam.teamId) {
-                                return <td key={colTeam.teamId} className="bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100" />;
+                                return (
+                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom right, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                              );
                               }
                               const match = sm.get(`${rowTeam.teamId}-${colTeam.teamId}`);
                               if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
@@ -644,7 +646,9 @@ export default function TeamLeagueView() {
                     </td>
                     {selectedLeague.teams.map(colTeam => {
                       if (rowTeam.teamId === colTeam.teamId) {
-                        return <td key={colTeam.teamId} className="bg-gradient-to-br from-slate-100 to-slate-50 border-r border-slate-100" />;
+                        return (
+                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom right, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                              );
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
                       if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
