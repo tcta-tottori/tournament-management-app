@@ -126,8 +126,8 @@ export default function TeamBracketView() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* メインタブ: トーナメント / 控えリスト（セグメント切替） */}
-      <div className="flex justify-center">
+      {/* モバイル: メインタブ: トーナメント / 控えリスト（セグメント切替） */}
+      <div className="flex justify-center lg:hidden">
         <div className="inline-flex bg-slate-100 rounded-xl p-1 gap-1">
           <button
             onClick={() => setViewMode('bracket')}
@@ -157,6 +157,8 @@ export default function TeamBracketView() {
         </div>
       </div>
 
+      {/* モバイル: 控えリスト */}
+      <div className="lg:hidden">
       {viewMode === 'waiting' && (
         <TeamWaitingList
           waitingMatches={waitingMatches}
@@ -165,8 +167,31 @@ export default function TeamBracketView() {
           bracketCourtAssignments={bracketCourtAssignments}
         />
       )}
+      </div>
 
-      {viewMode === 'bracket' && (<>
+      {/* PC: 左=控えリスト / 右=トーナメント の2カラム分割 */}
+      <div className="lg:flex lg:gap-4">
+        {/* PC左カラム: 控えリスト（PCのみ表示） */}
+        <div className="hidden lg:block lg:w-1/2 lg:shrink-0">
+          <div className="sticky top-0">
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <ClipboardList className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-black text-slate-700">控えリスト</span>
+              {waitingMatches.length > 0 && (
+                <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
+              )}
+            </div>
+            <TeamWaitingList
+              waitingMatches={waitingMatches}
+              onAssignCourt={openCourtAssign}
+              onCall={openCall}
+              bracketCourtAssignments={bracketCourtAssignments}
+            />
+          </div>
+        </div>
+
+        {/* 右カラム（PC）/ フルワイド（モバイル）: トーナメント表示 */}
+        <div className={`lg:w-1/2 lg:shrink-0 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
       {/* カテゴリタブ（色分けバッジ） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
@@ -588,7 +613,8 @@ export default function TeamBracketView() {
         `}</style>
         </>);
       })()}
-      </>)}
+        </div>{/* 右カラム end */}
+      </div>{/* PC flex / モバイル wrapper end */}
 
       {/* コート割当ダイアログ（複数選択可） */}
       {courtAssignMatch && createPortal(

@@ -6,18 +6,18 @@ import TeamBracketView from './TeamBracketView';
 export default function TeamScoreView() {
   const {
     brackets, leagues, leagueMatches, rankOverrides, allTeams,
-    lastStandingsHash, autoPopulateBrackets,
+    lastStandingsHash, autoPopulateBrackets, tiebreakOrder,
   } = useTeamStore();
 
   const currentHash = useMemo(() => {
     if (leagues.length === 0) return '';
-    const standings = calculateTeamStandings(leagues, leagueMatches, rankOverrides);
+    const standings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, tiebreakOrder);
     const parts: string[] = [];
     for (const [leagueId, ls] of standings) {
       parts.push(`${leagueId}:${ls.map(s => `${s.teamId}@${s.rank}`).join(',')}`);
     }
     return parts.sort().join('|');
-  }, [leagues, leagueMatches, rankOverrides]);
+  }, [leagues, leagueMatches, rankOverrides, tiebreakOrder]);
 
   const bracketsStale = useMemo(() => {
     if (brackets.length === 0 || allTeams.length === 0) return false;
