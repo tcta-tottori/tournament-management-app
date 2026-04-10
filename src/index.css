@@ -703,10 +703,18 @@
 .chrome-tab-bar {
   display: flex;
   align-items: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   background: linear-gradient(to bottom, #dce1e8, #d3d8e0);
   padding: 6px 6px 0;
   gap: 2px;
+}
+
+.chrome-tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .chrome-tab {
