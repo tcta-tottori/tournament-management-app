@@ -397,7 +397,7 @@ export default function TeamLeagueView() {
             }
 
             return (
-              <div key={league.leagueId} className="bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden lg:w-fit lg:min-w-[600px] lg:mx-auto">
+              <div key={league.leagueId} className="bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden lg:max-w-5xl lg:mx-auto">
                 {/* コンパクトヘッダー */}
                 <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-r ${c.grad} text-white`}>
                   <div className="flex items-center gap-2">
@@ -437,9 +437,9 @@ export default function TeamLeagueView() {
                             </span>
                           </th>
                         ))}
-                        <th className="px-2 py-2 lg:px-3 lg:py-3 text-center min-w-[50px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px] lg:text-xs">成績</th>
+                        <th className="px-2 py-2 lg:px-3 lg:py-3 text-center min-w-[50px] font-bold text-white/90 border-b border-l border-white/20 whitespace-nowrap text-[11px] lg:text-xs">成績</th>
                         {complete && (
-                          <th className="px-2 py-2 text-center min-w-[44px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px]">順位</th>
+                          <th className="px-2 py-2 lg:px-3 lg:py-3 text-center min-w-[44px] font-bold text-white/90 border-b border-l border-white/20 whitespace-nowrap text-[11px] lg:text-xs">順位</th>
                         )}
                       </tr>
                     </thead>
@@ -522,7 +522,7 @@ export default function TeamLeagueView() {
                               {standing ? <><span className={c.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span></> : '-'}
                             </td>
                             {complete && (
-                              <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${c.bg}/20`}>
+                              <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${c.bg}/20 border-l ${c.border}`}>
                                 {standing && <RankText rank={standing.rank || 0} />}
                               </td>
                             )}
@@ -583,7 +583,7 @@ export default function TeamLeagueView() {
       {(() => {
         const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
         return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:w-fit lg:min-w-[600px] lg:mx-auto">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">
         {/* コンパクトヘッダー */}
         <div className={`flex items-center justify-between gap-2 px-3 py-1.5 lg:px-4 lg:py-2 bg-gradient-to-r ${color.grad} text-white`}>
           <div className="flex items-center gap-2">
@@ -622,12 +622,12 @@ export default function TeamLeagueView() {
                     </span>
                   </th>
                 ))}
-                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
+                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
                 {leagueComplete && (
-                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs`}>順位</th>
+                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>順位</th>
                 )}
                 {hasTiebreak && (
-                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[80px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs`}>判定</th>
+                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[80px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>判定</th>
                 )}
               </tr>
             </thead>
@@ -730,13 +730,13 @@ export default function TeamLeagueView() {
                       ) : '-'}
                     </td>
                     {leagueComplete && (
-                      <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30`}>
+                      <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border}`}>
                         {standing && <RankText rank={standing.rank || 0} />}
                       </td>
                     )}
                     {hasTiebreak && (
                       <td
-                        className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 cursor-pointer hover:${color.bg} transition-colors`}
+                        className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border} cursor-pointer hover:${color.bg} transition-colors`}
                         onClick={() => standing && setJudgementTarget(standing)}
                       >
                         {standing?.tiebreakReason ? (
@@ -762,7 +762,7 @@ export default function TeamLeagueView() {
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
 
       {/* 対戦順 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:w-fit lg:min-w-[600px] lg:mx-auto">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">
         <div className={`px-4 py-2.5 lg:py-3 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
           <ListOrdered className="w-4 h-4 text-white/80" />
           <span className="text-sm font-bold tracking-wide">対戦順</span>
