@@ -492,9 +492,75 @@ export function toCourtCallName(courtName: string): string {
   return m ? `${m[1]}番コート` : courtName;
 }
 
+/** 数字をカタカナ読みに変換（TTS用） */
+const KATAKANA_DIGITS = ['ゼロ', 'イチ', 'ニ', 'サン', 'ヨン', 'ゴ', 'ロク', 'ナナ', 'ハチ', 'キュウ'];
+export function numberToKatakana(n: number): string {
+  if (n <= 0) return String(n);
+  if (n < 10) return KATAKANA_DIGITS[n];
+  if (n < 20) return 'ジュウ' + (n === 10 ? '' : KATAKANA_DIGITS[n - 10]);
+  if (n < 100) {
+    const tens = Math.floor(n / 10);
+    const ones = n % 10;
+    return KATAKANA_DIGITS[tens] + 'ジュウ' + (ones === 0 ? '' : KATAKANA_DIGITS[ones]);
+  }
+  return String(n);
+}
+
+/**
+ * コート名配列を表示用にフォーマット（アラビア数字）。
+ * 2コート以上で連番の場合は「5番コートから8番コート」形式を使う。
+ */
+export function formatCourtRange(courtNames: string[]): string {
+  if (courtNames.length === 0) return '指定のコート';
+  if (courtNames.length === 1) return toCourtCallName(courtNames[0]);
+
+  const numbers = courtNames.map(name => {
+    const m = name.match(/^(\d+)\s*コート$/);
+    return m ? parseInt(m[1], 10) : null;
+  });
+
+  if (numbers.every((n): n is number => n !== null)) {
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const isConsecutive = sorted.every((n, i) => i === 0 || n === sorted[i - 1]! + 1);
+    if (isConsecutive && sorted.length >= 2) {
+      return `${sorted[0]}番コートから${sorted[sorted.length - 1]}番コート`;
+    }
+  }
+  return courtNames.map(toCourtCallName).join('と');
+}
+
+/**
+ * コート名配列をカタカナ読みでフォーマット（TTS用）。
+ * 2コート以上で連番の場合は「ゴ番コートからハチ番コート」形式を使う。
+ */
+function formatCourtRangeKatakana(courtNames: string[]): string {
+  const toKatakanaCourtName = (name: string) => {
+    const m = name.match(/^(\d+)\s*コート$/);
+    return m ? `${numberToKatakana(parseInt(m[1], 10))}番コート` : name;
+  };
+
+  if (courtNames.length === 0) return '指定のコート';
+  if (courtNames.length === 1) return toKatakanaCourtName(courtNames[0]);
+
+  const numbers = courtNames.map(name => {
+    const m = name.match(/^(\d+)\s*コート$/);
+    return m ? parseInt(m[1], 10) : null;
+  });
+
+  if (numbers.every((n): n is number => n !== null)) {
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const isConsecutive = sorted.every((n, i) => i === 0 || n === sorted[i - 1]! + 1);
+    if (isConsecutive && sorted.length >= 2) {
+      return `${numberToKatakana(sorted[0])}番コートから${numberToKatakana(sorted[sorted.length - 1])}番コート`;
+    }
+  }
+  return courtNames.map(toKatakanaCourtName).join('と');
+}
+
 /**
  * 団体戦・決勝トーナメントのコール文を生成。
  * 選手名や所属は含めず、チーム番号とチーム名のみを使う。
+ * 数字はカタカナで表記し、TTS が正しく発音できるようにする。
  *
  * 読み上げ時にチーム番号とチーム名が詰まらないよう、句点 "。" で
  * 明示的にチャンク境界を入れる（useSpeechSynthesis が "。" で
@@ -503,11 +569,11 @@ export function toCourtCallName(courtName: string): string {
  *
  * 例:
  *   試合のコールをします。
- *   1位トーナメント、1回戦。
- *   3番。ファイヤーボルト。
- *   4番。チームどんどん舞い上がれ。
- *   こちらの試合を、2番コートと4番コートを使っておこなってください。
- *   ボールは、3番、ファイヤーボルトの方、お願いいたします。
+ *   ニ位トーナメント、準々決勝。
+ *   ロク番。ノーレット7。
+ *   ジュウヨン番。ファイヤー ボルト。
+ *   こちらの試合を、ゴ番コートからハチ番コートを使っておこなってください。
+ *   ボールは、ロク番、ノーレット7の方、お願いいたします。
  */
 export function buildTeamBracketCallText(args: {
   category: PlacementCategory;
@@ -520,16 +586,14 @@ export function buildTeamBracketCallText(args: {
 }): string {
   const { category, roundLabel, team1Number, team1Name, team2Number, team2Name, courtNames } = args;
   const categoryLabel = PLACEMENT_CATEGORY_LABELS[category];
-  const courtsText = courtNames.length > 0
-    ? courtNames.map(toCourtCallName).join('と')
-    : '指定のコート';
+  const courtsText = formatCourtRangeKatakana(courtNames);
   return [
     '試合のコールをします。',
     `${categoryLabel}、${roundLabel}。`,
-    `${team1Number}番。${team1Name}。`,
-    `${team2Number}番。${team2Name}。`,
+    `${numberToKatakana(team1Number)}番。${team1Name}。`,
+    `${numberToKatakana(team2Number)}番。${team2Name}。`,
     `こちらの試合を、${courtsText}を使っておこなってください。`,
-    `ボールは、${team1Number}番、${team1Name}の方、お願いいたします。`,
+    `ボールは、${numberToKatakana(team1Number)}番、${team1Name}の方、お願いいたします。`,
   ].join('\n');
 }
 

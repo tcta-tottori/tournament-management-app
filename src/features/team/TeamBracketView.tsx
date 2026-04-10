@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, X, Layers } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
@@ -48,8 +48,11 @@ export default function TeamBracketView() {
   const [courtAssignSelected, setCourtAssignSelected] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
   const [showAllBrackets, setShowAllBrackets] = useState(false);
-  const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
-  const [callCourts, setCallCourts] = useState<string[]>([]);
+
+  const { speak } = useSpeechSynthesis();
+  const startCall = useTeamCallStore(s => s.start);
+  const finishCall = useTeamCallStore(s => s.finish);
+  const cancelCall = useTeamCallStore(s => s.cancel);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -95,20 +98,54 @@ export default function TeamBracketView() {
     setCourtAssignSelected(existing ? [...existing.courtNames] : []);
   };
 
+  /** コールを直接開始（右下バブルのみ表示） */
+  const doCall = (match: TeamBracketMatch, courtNamesForCall: string[]) => {
+    const team1 = allTeams.find(t => t.teamId === match.team1Id);
+    const team2 = allTeams.find(t => t.teamId === match.team2Id);
+    if (!team1 || !team2) return;
+
+    const bracket = brackets.find(b => b.category === match.category);
+    const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
+    const roundLabel = getBracketRoundLabel(match.round, totalRounds);
+
+    const text = buildTeamBracketCallText({
+      category: match.category,
+      roundLabel,
+      team1Number: team1.teamNumber,
+      team1Name: team1.teamName,
+      team2Number: team2.teamNumber,
+      team2Name: team2.teamName,
+      courtNames: courtNamesForCall,
+    });
+
+    cancelCall();
+    startCall({
+      matchId: match.matchId,
+      category: match.category,
+      roundLabel,
+      team1Number: team1.teamNumber,
+      team1Name: team1.teamName,
+      team2Number: team2.teamNumber,
+      team2Name: team2.teamName,
+      courtNames: courtNamesForCall,
+    });
+    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
+      finishCall();
+    });
+  };
+
   const confirmCourtAssign = () => {
     if (!courtAssignMatch || courtAssignSelected.length === 0) return;
     assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignSelected);
-    // 割当後にコールダイアログを自動的に開く
-    setCallMatch(courtAssignMatch);
-    setCallCourts([...courtAssignSelected]);
+    // 割当後にコールを直接開始
+    doCall(courtAssignMatch, [...courtAssignSelected]);
     setCourtAssignMatch(null);
     setCourtAssignSelected([]);
   };
 
   const openCall = (match: TeamBracketMatch) => {
     const ca = bracketCourtAssignments[match.matchId];
-    setCallMatch(match);
-    setCallCourts(ca ? [...ca.courtNames] : []);
+    doCall(match, ca ? [...ca.courtNames] : []);
   };
 
   if (!currentBracket || brackets.length === 0) {
@@ -670,15 +707,6 @@ export default function TeamBracketView() {
         document.body
       )}
 
-      {/* コールダイアログ */}
-      {callMatch && (
-        <TeamCallDialog
-          match={callMatch}
-          courtNames={callCourts}
-          onClose={() => setCallMatch(null)}
-        />
-      )}
-
       {/* スコア入力ダイアログ */}
       {editingMatch && (
         <TeamScoreInput
@@ -693,132 +721,6 @@ export default function TeamBracketView() {
         />
       )}
     </div>
-  );
-}
-
-/** 団体戦・決勝トーナメント用コールダイアログ */
-function TeamCallDialog({
-  match,
-  courtNames,
-  onClose,
-}: {
-  match: TeamBracketMatch;
-  courtNames: string[];
-  onClose: () => void;
-}) {
-  const allTeams = useTeamStore(s => s.allTeams);
-  const brackets = useTeamStore(s => s.brackets);
-  const { speak } = useSpeechSynthesis();
-  const isCalling = useTeamCallStore(s => s.isActive);
-  const startCall = useTeamCallStore(s => s.start);
-  const finishCall = useTeamCallStore(s => s.finish);
-  const cancelCall = useTeamCallStore(s => s.cancel);
-
-  const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
-  const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
-  const roundLabel = getBracketRoundLabel(match.round, totalRounds);
-
-  const team1 = allTeams.find(t => t.teamId === match.team1Id);
-  const team2 = allTeams.find(t => t.teamId === match.team2Id);
-
-  const initialText = useMemo(() => {
-    if (!team1 || !team2) return '';
-    return buildTeamBracketCallText({
-      category: match.category,
-      roundLabel,
-      team1Number: team1.teamNumber,
-      team1Name: team1.teamName,
-      team2Number: team2.teamNumber,
-      team2Name: team2.teamName,
-      courtNames,
-    });
-  }, [match.category, roundLabel, team1, team2, courtNames]);
-
-  const [text, setText] = useState(initialText);
-  useEffect(() => { setText(initialText); }, [initialText]);
-
-  const handleSpeak = () => {
-    if (!text.trim() || !team1 || !team2) return;
-    // 既に他のコール中なら一旦止める
-    cancelCall();
-    startCall({
-      matchId: match.matchId,
-      category: match.category,
-      roundLabel,
-      team1Number: team1.teamNumber,
-      team1Name: team1.teamName,
-      team2Number: team2.teamNumber,
-      team2Name: team2.teamName,
-      courtNames,
-    });
-    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
-      finishCall();
-    });
-  };
-
-  const handleStop = () => {
-    cancelCall();
-  };
-
-  if (!team1 || !team2) {
-    return null;
-  }
-
-  return createPortal(
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-5 h-5" />
-            <h3 className="font-black">試合コール</h3>
-          </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/20 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="text-[10px] text-slate-500">
-            内容を確認・編集してから「コール」を押してください。
-          </div>
-          <textarea
-            value={text}
-            onChange={e => setText(e.target.value)}
-            rows={8}
-            className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500 resize-y"
-          />
-          <div className="text-[10px] text-slate-400 leading-snug">
-            ※コール中はダイアログを閉じても画面右下に進行状況が表示されます。
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-            >
-              閉じる
-            </button>
-            {isCalling ? (
-              <button
-                onClick={handleStop}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <VolumeX className="w-4 h-4" />
-                停止
-              </button>
-            ) : (
-              <button
-                onClick={handleSpeak}
-                disabled={!text.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-              >
-                <Volume2 className="w-4 h-4" />
-                コール
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
   );
 }
 

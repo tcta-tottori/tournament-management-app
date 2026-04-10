@@ -1,6 +1,6 @@
 import { Volume2, X, MapPin } from 'lucide-react';
 import { useTeamCallStore } from './teamCallStore';
-import { PLACEMENT_CATEGORY_LABELS, toCourtCallName } from './teamLogic';
+import { PLACEMENT_CATEGORY_LABELS, formatCourtRange } from './teamLogic';
 
 /**
  * コール中に右下に常時表示するステータスバブル。
@@ -53,7 +53,7 @@ export default function TeamCallStatusBubble() {
             <div className="flex items-center gap-1 pt-1.5 border-t border-slate-100 mt-1.5">
               <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
               <span className="text-[11px] font-bold text-blue-600 truncate">
-                {content.courtNames.map(toCourtCallName).join('と')}
+                {formatCourtRange(content.courtNames)}
               </span>
             </div>
           )}
