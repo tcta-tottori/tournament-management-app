@@ -216,7 +216,7 @@ export async function generateTeamLeagueResultDataUrl(
   // 左: 大きな角丸バッジ（アルファベット1文字のみ）
   const badgeSize = 90;
   const badgeX = paddingX;
-  const badgeY = paddingY + 14;
+  const badgeY = paddingY + 4;
 
   // 外側影
   ctx.save();
@@ -375,7 +375,7 @@ export async function generateTeamLeagueResultDataUrl(
     // 番号列に薄い背景帯を入れて視覚的に独立させる
     ctx.fillStyle = COL.slate50;
     ctx.fillRect(tableX + 0.5, rowTop + 0.5, numColW - 0.5, rowH - 1);
-    drawText(String(team.numberInLeague), numColCenterX, rowTop + rowH / 2, 28, 'center', COL.slate700, 'black');
+    drawText(String(team.teamNumber), numColCenterX, rowTop + rowH / 2, 28, 'center', COL.slate700, 'black');
     // 番号列とチーム名列の境界
     drawLine(tableX + numColW, tableY + colHeaderH, tableX + numColW, tableY + tableH, COL.slate200, 1);
 

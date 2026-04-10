@@ -427,7 +427,8 @@ export default function TeamLeagueView() {
                   <table className="w-full text-xs border-collapse lg:text-sm">
                     <thead>
                       <tr className={`bg-gradient-to-r ${c.grad} text-white`}>
-                        <th className="px-2 py-2 lg:px-4 lg:py-3 text-left min-w-[120px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px] lg:text-xs">チーム</th>
+                        <th className="px-1 py-2 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold text-white/80 border-b border-white/20 text-[10px] lg:text-[11px]">No.</th>
+                        <th className="px-2 py-2 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold text-white/90 border-b border-white/20 whitespace-nowrap text-[11px] lg:text-xs">チーム</th>
                         <th className="px-1 py-2 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold text-white/90 border-b border-white/20 text-[11px] lg:text-xs">種目</th>
                         {league.teams.map(t => (
                           <th key={t.teamId} className="px-1 py-2 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b border-white/20">
@@ -448,6 +449,9 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
+                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                              {rowTeam.teamNumber}
+                            </td>
                             <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
                             </td>
@@ -608,7 +612,8 @@ export default function TeamLeagueView() {
           <table className="w-full text-xs border-collapse lg:text-sm">
             <thead>
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
-                <th className={`px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[120px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
+                <th className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold ${color.text} border-b ${color.border} text-[10px] lg:text-[11px]`}>No.</th>
+                <th className={`px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
                 <th className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
                   <th key={t.teamId} className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b ${color.border}`}>
@@ -632,6 +637,9 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
+                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                      {rowTeam.teamNumber}
+                    </td>
                     <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                     </td>
