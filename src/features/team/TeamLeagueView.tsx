@@ -130,9 +130,8 @@ const LEAGUE_SOLID_COLORS = [
 
 /** チーム名を最大6文字に制限（6文字超は5文字+...） */
 function truncTeamName(name: string, max = 6): string {
-  const first = name.split(/[\s\u3000]+/)[0];
-  if (first.length <= max) return first;
-  return first.slice(0, max - 1) + '…';
+  if (name.length <= max) return name;
+  return name.slice(0, max - 1) + '…';
 }
 
 /** 種目カラー */
@@ -768,7 +767,7 @@ export default function TeamLeagueView() {
           <ListOrdered className="w-4 h-4 text-white/80" />
           <span className="text-sm font-bold tracking-wide">対戦順</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:gap-3 p-3 lg:p-4">
+        <div className="divide-y divide-slate-100">
           {selectedLeague.matchOrder.map(mo => {
             const match = leagueMatchList.find(m => m.matchNumber === mo.matchNumber);
             const team1 = selectedLeague.teams[mo.team1Index - 1];
@@ -782,76 +781,54 @@ export default function TeamLeagueView() {
               <button
                 key={mo.matchNumber}
                 onClick={() => setEditingMatch(match)}
-                className={`relative p-2.5 rounded-xl border text-xs transition-all active:scale-95 text-left ${
+                className={`w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-2.5 text-left transition-colors ${
                   isFinished
-                    ? 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300'
+                    ? 'bg-emerald-50/40 hover:bg-emerald-50/80'
                     : isCurrent
-                    ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-500/20 shadow-sm'
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    ? 'bg-blue-50/60 hover:bg-blue-50'
+                    : 'hover:bg-slate-50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-black text-slate-400">#{mo.matchNumber}</span>
+                {/* # */}
+                <span className="text-[10px] lg:text-[11px] font-black text-slate-400 w-5 lg:w-6 text-center shrink-0">#{mo.matchNumber}</span>
+
+                {/* チーム1 */}
+                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate ${match.winnerId === team1.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
+                  {team1.teamName}
+                </div>
+
+                {/* スコア / vs */}
+                <div className="shrink-0 text-center w-12 lg:w-14">
                   {isFinished ? (
-                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black">
-                      <Check className="w-2.5 h-2.5" />
-                      完了
-                    </div>
+                    <span className="text-sm lg:text-base font-black tabular-nums">
+                      <span className={match.winnerId === team1.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam1}</span>
+                      <span className="text-slate-300 mx-0.5">-</span>
+                      <span className={match.winnerId === team2.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam2}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-bold">vs</span>
+                  )}
+                </div>
+
+                {/* チーム2 */}
+                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate text-right ${match.winnerId === team2.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
+                  {team2.teamName}
+                </div>
+
+                {/* ステータス */}
+                <div className="shrink-0 w-10 lg:w-12 flex justify-end">
+                  {isFinished ? (
+                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] lg:text-[9px] font-black">
+                      <Check className="w-2.5 h-2.5" />完了
+                    </span>
                   ) : isCurrent ? (
-                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-black animate-pulse">
+                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[8px] lg:text-[9px] font-black animate-pulse">
                       <Play className="w-2.5 h-2.5" />
-                      対戦中
-                    </div>
+                    </span>
                   ) : (
                     <Circle className="w-3 h-3 text-slate-300" />
                   )}
                 </div>
-                <div className="space-y-0.5">
-                  <div className={`text-sm font-bold leading-snug ${match.winnerId === team1.teamId ? 'font-black text-blue-700' : 'text-slate-800'}`}>
-                    {team1.teamName}
-                  </div>
-                  <div className={`text-center font-black ${isFinished ? 'text-base tabular-nums' : 'text-[9px] text-slate-400'}`}>
-                    {isFinished ? (
-                      <><span className={match.winnerId === team1.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam1}</span>
-                      <span className="text-slate-300 mx-1">-</span>
-                      <span className={match.winnerId === team2.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam2}</span></>
-                    ) : 'vs'}
-                  </div>
-                  <div className={`text-sm font-bold leading-snug ${match.winnerId === team2.teamId ? 'font-black text-blue-700' : 'text-slate-800'}`}>
-                    {team2.teamName}
-                  </div>
-                </div>
-
-                {/* 種目別スコア（選手名つき） */}
-                {(isFinished || isCurrent) && (
-                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
-                    {MATCH_TYPE_ORDER.map(mt => {
-                      const sub = match.subMatches.find(sm => sm.type === mt);
-                      const has = sub && sub.score1 !== null && sub.score2 !== null;
-                      const tag = MATCH_TYPE_COLORS[mt];
-                      const p1 = sub?.players1?.join('/') || '';
-                      const p2 = sub?.players2?.join('/') || '';
-                      return (
-                        <div key={mt} className="flex items-center gap-1 text-[9px]">
-                          <span className={`inline-flex items-center justify-center w-7 h-3 rounded text-[7px] font-black ${tag.bg} ${tag.text}`}>
-                            {MATCH_TYPE_SHORT[mt]}
-                          </span>
-                          {has ? (
-                            <span className="flex-1 truncate text-slate-600 tabular-nums">
-                              {p1 && <span className="font-bold">{p1} </span>}
-                              <span className="font-black">{sub!.score1}-{sub!.score2}</span>
-                              {p2 && <span className="font-bold"> {p2}</span>}
-                            </span>
-                          ) : (
-                            <span className="flex-1 text-slate-300">
-                              {p1 || p2 ? `${p1} vs ${p2}` : '—'}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </button>
             );
           })}
