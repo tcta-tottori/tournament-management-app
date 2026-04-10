@@ -16,10 +16,10 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
 };
 
 const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
-  '1st': '1位',
-  '2nd': '2位',
-  '3rd': '3位',
-  '4th': '4・5位',
+  '1st': '1位T',
+  '2nd': '2位T',
+  '3rd': '3位T',
+  '4th': '4・5位T',
 };
 
 const CATEGORY_SOLID_COLORS: Record<PlacementCategory, string> = {
@@ -144,22 +144,30 @@ export default function TeamBracketView() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* Chrome風メインタブ: トーナメント / 控えリスト */}
-      <div className="sticky top-0 z-20 -mx-2 px-2">
-        <div className="chrome-tab-bar">
+      {/* メインタブ: トーナメント / 控えリスト（セグメント切替） */}
+      <div className="flex justify-center">
+        <div className="inline-flex bg-slate-100 rounded-xl p-1 gap-1">
           <button
             onClick={() => setViewMode('bracket')}
-            className={`chrome-tab ${viewMode === 'bracket' ? 'chrome-tab-active' : ''}`}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'bracket'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            <Trophy className="chrome-tab-icon" />
-            <span>トーナメント</span>
+            <Trophy className="w-3.5 h-3.5" />
+            トーナメント
           </button>
           <button
             onClick={() => setViewMode('waiting')}
-            className={`chrome-tab ${viewMode === 'waiting' ? 'chrome-tab-active' : ''}`}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'waiting'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            <ClipboardList className="chrome-tab-icon" />
-            <span>控えリスト</span>
+            <ClipboardList className="w-3.5 h-3.5" />
+            控えリスト
             {waitingMatches.length > 0 && (
               <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
             )}
@@ -182,8 +190,6 @@ export default function TeamBracketView() {
         <div className="chrome-tab-bar">
           {brackets.map(b => {
             const isSelected = b.category === selectedBracketCategory;
-            const cfg = CATEGORY_CONFIG[b.category];
-            const Icon = cfg.icon;
             const finishedCount = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
             const total = b.matches.length;
             return (
@@ -193,7 +199,6 @@ export default function TeamBracketView() {
                 className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
               >
                 <span className="chrome-tab-dot" style={{ background: CATEGORY_SOLID_COLORS[b.category] }} />
-                <Icon className="chrome-tab-icon" />
                 <span className="font-bold">{CATEGORY_SHORT_LABELS[b.category]}</span>
                 <span className="chrome-tab-count">{finishedCount}/{total}</span>
               </button>
