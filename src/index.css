@@ -747,27 +747,6 @@
   font-weight: 700;
 }
 
-.chrome-tab-active::before,
-.chrome-tab-active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  width: 8px;
-  height: 8px;
-  background: transparent;
-}
-
-.chrome-tab-active::before {
-  left: -8px;
-  border-bottom-right-radius: 8px;
-  box-shadow: 3px 0 0 0 #f7f5f2;
-}
-
-.chrome-tab-active::after {
-  right: -8px;
-  border-bottom-left-radius: 8px;
-  box-shadow: -3px 0 0 0 #f7f5f2;
-}
 
 /* カラードット（タブ内のリーグ色表示） */
 .chrome-tab-dot {

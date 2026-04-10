@@ -465,7 +465,7 @@ export default function TeamLeagueView() {
                             {league.teams.map(colTeam => {
                               if (rowTeam.teamId === colTeam.teamId) {
                                 return (
-                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom right, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom left, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
                               );
                               }
                               const match = sm.get(`${rowTeam.teamId}-${colTeam.teamId}`);
@@ -647,7 +647,7 @@ export default function TeamLeagueView() {
                     {selectedLeague.teams.map(colTeam => {
                       if (rowTeam.teamId === colTeam.teamId) {
                         return (
-                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom right, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom left, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
                               );
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
