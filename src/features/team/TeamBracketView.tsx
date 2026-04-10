@@ -3,7 +3,7 @@ import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkle
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
+import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { useTeamCallStore } from './teamCallStore';
@@ -41,6 +41,7 @@ export default function TeamBracketView() {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
     allTeams, leagues, rebuildBracketFromSlots,
+    updateBracketSubMatchScore, updateBracketSubMatchPlayers,
   } = useTeamStore();
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
@@ -192,6 +193,66 @@ export default function TeamBracketView() {
             );
           })}
         </div>
+      </div>
+
+      {/* テスト入力ボタン */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => {
+            const target = showAllBrackets ? brackets : (currentBracket ? [currentBracket] : []);
+            const label = showAllBrackets ? '全トーナメント' : CATEGORY_LABELS[selectedBracketCategory];
+            if (!confirm(`${label}の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            for (const bracket of target) {
+              const totalRounds = Math.log2(bracket.drawSize);
+              for (let round = 1; round <= totalRounds; round++) {
+                const freshBrackets = useTeamStore.getState().brackets;
+                const freshBracket = freshBrackets.find(b => b.category === bracket.category);
+                if (!freshBracket) continue;
+                const roundMatches = freshBracket.matches.filter(
+                  m => m.round === round && m.team1Id && m.team2Id && !m.isBye
+                );
+                for (const m of roundMatches) {
+                  for (const mt of MATCH_TYPE_ORDER) {
+                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
+                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                  }
+                  useTeamStore.getState().advanceWinner(m.matchId);
+                }
+              }
+            }
+          }}
+          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          テスト（{showAllBrackets ? '全体' : CATEGORY_SHORT_LABELS[selectedBracketCategory]}）
+        </button>
+        <button
+          onClick={() => {
+            if (!confirm(`全トーナメント（${brackets.length}カテゴリ）の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            for (const bracket of brackets) {
+              const totalRounds = Math.log2(bracket.drawSize);
+              for (let round = 1; round <= totalRounds; round++) {
+                const freshBrackets = useTeamStore.getState().brackets;
+                const freshBracket = freshBrackets.find(b => b.category === bracket.category);
+                if (!freshBracket) continue;
+                const roundMatches = freshBracket.matches.filter(
+                  m => m.round === round && m.team1Id && m.team2Id && !m.isBye
+                );
+                for (const m of roundMatches) {
+                  for (const mt of MATCH_TYPE_ORDER) {
+                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
+                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                  }
+                  useTeamStore.getState().advanceWinner(m.matchId);
+                }
+              }
+            }
+          }}
+          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          テスト（一括）
+        </button>
       </div>
 
       {/* === ブラケット表示（全体・個別共通） === */}
