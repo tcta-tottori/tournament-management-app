@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
@@ -22,11 +22,11 @@ const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
   '4th': '4・5位T',
 };
 
-const CATEGORY_SOLID_COLORS: Record<PlacementCategory, string> = {
-  '1st': '#f59e0b',
-  '2nd': '#94a3b8',
-  '3rd': '#f97316',
-  '4th': '#3b82f6',
+const CATEGORY_TAB_STYLES: Record<PlacementCategory, { activeBg: string; activeText: string; inactiveBg: string; inactiveText: string }> = {
+  '1st': { activeBg: 'bg-amber-500', activeText: 'text-white', inactiveBg: 'bg-amber-100', inactiveText: 'text-amber-700' },
+  '2nd': { activeBg: 'bg-slate-500', activeText: 'text-white', inactiveBg: 'bg-slate-200', inactiveText: 'text-slate-600' },
+  '3rd': { activeBg: 'bg-orange-500', activeText: 'text-white', inactiveBg: 'bg-orange-100', inactiveText: 'text-orange-700' },
+  '4th': { activeBg: 'bg-blue-500', activeText: 'text-white', inactiveBg: 'bg-blue-100', inactiveText: 'text-blue-700' },
 };
 
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
@@ -47,6 +47,7 @@ export default function TeamBracketView() {
   const [courtAssignMatch, setCourtAssignMatch] = useState<TeamBracketMatch | null>(null);
   const [courtAssignSelected, setCourtAssignSelected] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
+  const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
 
@@ -185,28 +186,73 @@ export default function TeamBracketView() {
       )}
 
       {viewMode === 'bracket' && (<>
-      {/* Chrome風カテゴリタブ（コンパクト） */}
+      {/* カテゴリタブ（色分けバッジ） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
           {brackets.map(b => {
-            const isSelected = b.category === selectedBracketCategory;
-            const finishedCount = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
-            const total = b.matches.length;
+            const isSelected = !showAllBrackets && b.category === selectedBracketCategory;
+            const style = CATEGORY_TAB_STYLES[b.category];
             return (
               <button
                 key={b.category}
-                onClick={() => setSelectedBracketCategory(b.category)}
-                className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
+                onClick={() => { setShowAllBrackets(false); setSelectedBracketCategory(b.category); }}
+                className={`chrome-tab !px-3 !py-1.5 !rounded-lg !gap-0 ${isSelected ? 'chrome-tab-active' : ''}`}
               >
-                <span className="chrome-tab-dot" style={{ background: CATEGORY_SOLID_COLORS[b.category] }} />
-                <span className="font-bold">{CATEGORY_SHORT_LABELS[b.category]}</span>
-                <span className="chrome-tab-count">{finishedCount}/{total}</span>
+                <span className={`px-3 py-1 rounded-md text-xs font-black ${
+                  isSelected ? `${style.activeBg} ${style.activeText}` : `${style.inactiveBg} ${style.inactiveText}`
+                }`}>{CATEGORY_SHORT_LABELS[b.category]}</span>
               </button>
             );
           })}
+          <button
+            onClick={() => setShowAllBrackets(true)}
+            className={`chrome-tab ${showAllBrackets ? 'chrome-tab-active' : ''}`}
+          >
+            <Layers className="chrome-tab-icon" />
+            <span>全体</span>
+          </button>
         </div>
       </div>
 
+      {/* === 全体表示モード === */}
+      {showAllBrackets && (
+        <div className="space-y-6">
+          {brackets.map(b => {
+            const cfg = CATEGORY_CONFIG[b.category];
+            const style = CATEGORY_TAB_STYLES[b.category];
+            const totalR = Math.log2(b.drawSize);
+            const finalMatch = b.matches.find(m => m.round === totalR);
+            const winner = finalMatch?.winnerId ? allTeams.find(t => t.teamId === finalMatch.winnerId) : null;
+            const finished = b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length;
+            const total = b.matches.length;
+            return (
+              <div key={b.category} className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 bg-gradient-to-r ${cfg.grad} text-white`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-md text-xs font-black ${style.activeBg} text-white`}>{CATEGORY_SHORT_LABELS[b.category]}</span>
+                    <span className="text-sm font-bold">{CATEGORY_LABELS[b.category]}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold tabular-nums">{finished}/{total}</span>
+                    {winner && <span className="text-xs font-black">🏆 {winner.teamName}</span>}
+                  </div>
+                </div>
+                <div className="p-3">
+                  <button
+                    onClick={() => { setShowAllBrackets(false); setSelectedBracketCategory(b.category); }}
+                    className={`w-full py-2 text-xs font-bold rounded-lg border transition-all active:scale-[0.98] ${style.inactiveBg} ${style.inactiveText} border-transparent hover:border-slate-200`}
+                  >
+                    詳細を表示 →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* === 個別カテゴリ表示 === */}
+      {!showAllBrackets && (<>
       {/* カテゴリヘッダー */}
       <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${currentConfig.grad} text-white shadow-lg`}>
         <div className="absolute inset-0 opacity-10">
@@ -531,6 +577,7 @@ export default function TeamBracketView() {
       `}</style>
         </>);
       })()}
+      </>)}
       </>)}
 
       {/* コート割当ダイアログ（複数選択可） */}
