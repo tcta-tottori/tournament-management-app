@@ -703,9 +703,9 @@
 .chrome-tab-bar {
   display: flex;
   align-items: flex-end;
-  background: white;
-  padding: 6px 8px 0;
-  gap: 1px;
+  background: linear-gradient(to bottom, #dce1e8, #d3d8e0);
+  padding: 8px 8px 0;
+  gap: 2px;
   overflow-x: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -726,23 +726,22 @@
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
   border: none;
-  background: #f1f5f9;
+  background: transparent;
   color: #64748b;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .chrome-tab:hover:not(.chrome-tab-active) {
-  background: #e8ecf1;
-  color: #475569;
+  background: rgba(255, 255, 255, 0.4);
+  color: #334155;
 }
 
 .chrome-tab-active {
-  background: white;
+  background: #f7f5f2;
   color: #1e293b;
   z-index: 2;
   font-weight: 700;
-  border-bottom: 2px solid transparent;
 }
 
 .chrome-tab-active::before,
@@ -758,13 +757,13 @@
 .chrome-tab-active::before {
   left: -8px;
   border-bottom-right-radius: 8px;
-  box-shadow: 3px 0 0 0 white;
+  box-shadow: 3px 0 0 0 #f7f5f2;
 }
 
 .chrome-tab-active::after {
   right: -8px;
   border-bottom-left-radius: 8px;
-  box-shadow: -3px 0 0 0 white;
+  box-shadow: -3px 0 0 0 #f7f5f2;
 }
 
 /* カラードット（タブ内のリーグ色表示） */

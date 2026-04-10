@@ -468,6 +468,19 @@ export default function TeamScoreInput({
     return () => clearTimeout(timer);
   }, []);
 
+  // Current time (HH:MM)
+  const [nowTime, setNowTime] = useState(() => {
+    const d = new Date();
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      setNowTime(`${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`);
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+
   // Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -702,51 +715,62 @@ export default function TeamScoreInput({
           onSubmit={e => { e.preventDefault(); handleSave(); }}
           className="p-4"
         >
-          {/* Team names（チーム名のみ表示） */}
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`flex-1 text-center py-2 px-3 rounded-xl border-2 transition-all ${
+          {/* Team names（チーム名のみ表示 — 高さ統一） */}
+          <div className="flex items-stretch gap-2 mb-2">
+            <div className={`flex-1 flex flex-col items-center justify-center text-center py-2.5 px-3 rounded-xl border-2 transition-all min-h-[56px] ${
               overallWinner === 1
                 ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
                 : overallWinner === 2
                 ? 'bg-slate-50 border-slate-200'
                 : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
-              <div className={`font-bold text-sm truncate ${
+              <div className={`font-bold text-sm truncate w-full ${
                 overallWinner === 1 ? 'text-amber-800' : overallWinner === 2 ? 'text-slate-400' : TEAM_THEME[1].textStrong
               }`}>{team1Name}</div>
-              {overallWinner === 1 && (
-                <div className="text-[10px] font-black text-amber-600 mt-0.5 tracking-wider">WIN</div>
-              )}
+              <div className="h-4 flex items-center">
+                {overallWinner === 1 && (
+                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
+                )}
+              </div>
             </div>
-            <div className={`flex-1 text-center py-2 px-3 rounded-xl border-2 transition-all ${
+            <div className={`flex-1 flex flex-col items-center justify-center text-center py-2.5 px-3 rounded-xl border-2 transition-all min-h-[56px] ${
               overallWinner === 2
                 ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
                 : overallWinner === 1
                 ? 'bg-slate-50 border-slate-200'
                 : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
             }`}>
-              <div className={`font-bold text-sm truncate ${
+              <div className={`font-bold text-sm truncate w-full ${
                 overallWinner === 2 ? 'text-amber-800' : overallWinner === 1 ? 'text-slate-400' : TEAM_THEME[2].textStrong
               }`}>{team2Name}</div>
-              {overallWinner === 2 && (
-                <div className="text-[10px] font-black text-amber-600 mt-0.5 tracking-wider">WIN</div>
-              )}
+              <div className="h-4 flex items-center">
+                {overallWinner === 2 && (
+                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* 対戦スコア（下に配置） */}
+          {/* 対戦スコア（大きく表示） */}
           <div className="flex justify-center mb-4">
-            <div className="flex flex-col items-center">
-              <div className={`text-3xl font-black tabular-nums leading-none ${
+            <div className="flex items-baseline gap-1">
+              <span className={`text-5xl font-black tabular-nums leading-none ${
                 overallWinner > 0
                   ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
                   : 'text-slate-300'
               }`}>
-                {winTally.t1}<span className="text-lg mx-0.5 opacity-40">:</span>{winTally.t2}
-              </div>
-              <div className="text-[9px] text-slate-400 font-bold mt-0.5">
-                {overallWinner > 0 ? '試合終了' : 'VS'}
-              </div>
+                {winTally.t1}
+              </span>
+              <span className={`text-3xl font-black leading-none ${
+                overallWinner > 0 ? 'text-slate-400' : 'text-slate-300'
+              }`}>-</span>
+              <span className={`text-5xl font-black tabular-nums leading-none ${
+                overallWinner > 0
+                  ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
+                  : 'text-slate-300'
+              }`}>
+                {winTally.t2}
+              </span>
             </div>
           </div>
 
@@ -962,8 +986,8 @@ export default function TeamScoreInput({
             決定 {filledCount > 0 && `(${filledCount}/3)`}
           </button>
 
-          {/* Clear / Cancel */}
-          <div className="flex gap-3">
+          {/* Clear / Cancel + 時刻 */}
+          <div className="flex items-center gap-3">
             {hasExistingScores && (
               <button
                 type="button"
@@ -980,6 +1004,7 @@ export default function TeamScoreInput({
             >
               キャンセル
             </button>
+            <span className="text-xs font-bold text-slate-400 tabular-nums shrink-0">{nowTime}</span>
           </div>
         </form>
       </div>
