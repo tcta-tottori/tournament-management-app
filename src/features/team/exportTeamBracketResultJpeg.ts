@@ -59,7 +59,6 @@ export async function generateTeamBracketResultDataUrl(
   const paddingX = 30;
   const paddingY = 26;
   const headerH = 110;
-  const footerGap = 8;
   const matchW = 260;
   const matchH = 158; // チーム名2段 + サブマッチ3行 + ステータス
   const roundGap = 44;
@@ -70,13 +69,15 @@ export async function generateTeamBracketResultDataUrl(
 
   // 接続線がはみ出さないよう、上部に余裕を持たせる
   const bracketTopPad = 48; // ラウンドラベル用
-  const bracketH = r1Count * gridUnit + bracketTopPad + 16;
+  // TCTAロゴをブラケット枠内右下に配置するため、下部パディングを確保する
+  const bracketBottomPad = 72;
+  const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
   const bracketW = maxRound * matchW + (maxRound - 1) * roundGap;
   const tableW = Math.max(bracketW, 720);
 
-  // ---- フッター（TCTA横長ロゴ） ----
-  const tctaMaxH = 56;
-  const tctaMaxW = Math.min(280, tableW * 0.3);
+  // ---- TCTA横長ロゴのサイズ計算（ブラケット枠内に収める） ----
+  const tctaMaxH = 48;
+  const tctaMaxW = Math.min(240, tableW * 0.28);
   let tctaW = 0;
   let tctaH = 0;
   if (tctaLogo) {
@@ -88,10 +89,9 @@ export async function generateTeamBracketResultDataUrl(
       tctaH = tctaW / ratio;
     }
   }
-  const footerH = tctaLogo ? tctaH + 14 : 24;
 
   const totalW = tableW + paddingX * 2;
-  const totalH = paddingY * 2 + headerH + bracketH + footerGap + footerH;
+  const totalH = paddingY * 2 + headerH + bracketH;
 
   // ---- カラーパレット ----
   const COL = {
@@ -194,59 +194,55 @@ export async function generateTeamBracketResultDataUrl(
   };
 
   // ---- ヘッダー ----
-  // 左: カテゴリ角丸バッジ（"1位"など）
+  // 左: "◯位トーナメント" を一体化した横長バッジ
   const catColor = CATEGORY_COLORS[bracket.category];
-  const badgeSize = 90;
+  const catText =
+    bracket.category === '1st' ? '1位トーナメント' :
+    bracket.category === '2nd' ? '2位トーナメント' :
+    bracket.category === '3rd' ? '3位トーナメント' :
+    '4・5位トーナメント';
+
+  // バッジサイズをテキスト幅に合わせて決定
+  const badgeFontSize = 30;
+  const badgeH = 62;
+  ctx.font = `900 ${badgeFontSize}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
+  const badgeTextW = ctx.measureText(catText).width;
+  const badgePadX = 28;
+  const badgeW = badgeTextW + badgePadX * 2;
   const badgeX = paddingX;
-  const badgeY = paddingY + 4;
+  const badgeY = paddingY + (headerH - badgeH) / 2 - 8;
 
   ctx.save();
   ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 10;
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeSize);
+  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
   badgeGrad.addColorStop(0, catColor.c1);
   badgeGrad.addColorStop(0.55, catColor.c2);
   badgeGrad.addColorStop(1, catColor.c3);
-  drawRoundRect(badgeX, badgeY, badgeSize, badgeSize, 20, badgeGrad);
+  drawRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, badgeGrad);
   ctx.restore();
 
   // 内側ハイライト
-  const innerHL = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeSize * 0.55);
-  innerHL.addColorStop(0, 'rgba(255,255,255,0.28)');
+  const innerHL = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH * 0.55);
+  innerHL.addColorStop(0, 'rgba(255,255,255,0.32)');
   innerHL.addColorStop(1, 'rgba(255,255,255,0)');
-  drawRoundRect(badgeX + 2, badgeY + 2, badgeSize - 4, badgeSize * 0.55, 18, innerHL);
+  drawRoundRect(badgeX + 2, badgeY + 2, badgeW - 4, badgeH * 0.55, badgeH / 2 - 2, innerHL);
 
   // 内側ボーダー
-  drawRoundRect(badgeX + 1.5, badgeY + 1.5, badgeSize - 3, badgeSize - 3, 18.5, undefined, 'rgba(255,255,255,0.4)', 1);
+  drawRoundRect(badgeX + 1.5, badgeY + 1.5, badgeW - 3, badgeH - 3, badgeH / 2 - 1.5, undefined, 'rgba(255,255,255,0.45)', 1);
 
-  // バッジ内の文字（"1位"/"2位"/"3位"/"4・5位"）
-  const catNumText =
-    bracket.category === '1st' ? '1位' :
-    bracket.category === '2nd' ? '2位' :
-    bracket.category === '3rd' ? '3位' :
-    '4・5位';
+  // バッジ内テキスト
   ctx.fillStyle = COL.white;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // 文字数に合わせてサイズ調整
-  const catFontSize = catNumText.length >= 4 ? 24 : 42;
-  ctx.font = `900 ${catFontSize}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-  ctx.fillText(catNumText, badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 3);
-
-  // バッジ横の「トーナメント」ラベル
-  ctx.save();
-  ctx.fillStyle = COL.slate800;
-  ctx.font = '900 30px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('トーナメント', badgeX + badgeSize + 18, badgeY + badgeSize - 6);
-  ctx.restore();
+  ctx.font = `900 ${badgeFontSize}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
+  ctx.fillText(catText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
 
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;
   if (tournamentName) {
-    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeSize - 260);
+    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeW - 40);
   }
   if (venueLogo) {
     const venueMaxH = 48;
@@ -364,14 +360,43 @@ export async function generateTeamBracketResultDataUrl(
     const cy = cyCenter - matchH / 2;
     const isFinished = match.status === 'finished';
 
-    // BYEマッチ
+    // BYEマッチ: 「BYE」の文字は表示せず、通常のチーム行と同じスタイル（リーグ色バッジ + チーム名）で描画する
     if (match.isBye) {
-      const byeName = match.team1Name || match.team2Name || 'BYE';
-      const byeH = 48;
+      const byeName = match.team1Name || match.team2Name || '';
+      const byeLeague = match.team1League || match.team2League || '';
+      const byeH = 44;
       const byeY = cyCenter - byeH / 2;
-      drawRoundRect(cx, byeY, matchW, byeH, 10, COL.slate50, COL.slate200, 1);
-      drawText(byeName, cx + matchW / 2 - 18, byeY + byeH / 2, 13, 'center', COL.slate600, 'bold', matchW - 60);
-      drawText('BYE', cx + matchW - 20, byeY + byeH / 2, 10, 'right', COL.slate400, 'bold');
+
+      // カード背景（影付き、通常マッチと同じ見た目）
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 3;
+      drawRoundRect(cx, byeY, matchW, byeH, 12, COL.white);
+      ctx.restore();
+      drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.slate200, 1.5);
+
+      // リーグ色バッジ（通常のチーム行と統一）
+      const bgBadgeX = cx + 10;
+      const bgBadgeW = 22;
+      const bgBadgeH = 20;
+      const bgBadgeY = byeY + (byeH - bgBadgeH) / 2;
+      drawRoundRect(bgBadgeX, bgBadgeY, bgBadgeW, bgBadgeH, 5, COL.sky100, COL.sky200, 1);
+      drawText(byeLeague || '-', bgBadgeX + bgBadgeW / 2, bgBadgeY + bgBadgeH / 2 + 0.5, 11, 'center', COL.sky700, 'black');
+
+      // チーム名（中央寄せ風、badgeの右から右端まで）
+      const nameX = bgBadgeX + bgBadgeW + 8;
+      const nameMaxW = matchW - (nameX - cx) - 14;
+      drawText(
+        byeName || '---',
+        nameX,
+        byeY + byeH / 2,
+        13,
+        'left',
+        COL.slate700,
+        'bold',
+        nameMaxW,
+      );
       return;
     }
 
@@ -524,10 +549,12 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- フッター: TCTAロゴ ----
+  // ---- TCTAロゴ: トーナメント表枠内の右下に配置 ----
   if (tctaLogo) {
-    const logoX = paddingX + tableW - tctaW;
-    const logoY = bracketAreaY + bracketH + footerGap;
+    const logoMarginX = 16;
+    const logoMarginY = 14;
+    const logoX = paddingX + tableW - tctaW - logoMarginX;
+    const logoY = bracketAreaY + bracketH - tctaH - logoMarginY;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
 
