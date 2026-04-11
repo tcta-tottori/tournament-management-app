@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket, TeamEntry } from './types';
@@ -7,6 +7,7 @@ import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracke
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { useTeamCallStore } from './teamCallStore';
+import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -67,6 +68,13 @@ const LEAGUE_BADGE_STYLES = [
 
 const FALLBACK_LEAGUE_STYLE = { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
 
+/** 種目カラー（予選リーグと統一） */
+const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  MIX: { bg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-200' },
+  WD:  { bg: 'bg-pink-100',   text: 'text-pink-700',   border: 'border-pink-200' },
+  MD:  { bg: 'bg-sky-100',    text: 'text-sky-700',    border: 'border-sky-200' },
+};
+
 /** "9コート" や "5番コート" から数字のみを抽出 */
 function extractCourtNumberShort(courtName: string): string {
   const m = courtName.match(/(\d+)/);
@@ -103,7 +111,7 @@ export default function TeamBracketView() {
   const {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
-    allTeams, leagues, rebuildBracketFromSlots,
+    allTeams, leagues, rebuildBracketFromSlots, tournamentInfo,
     updateBracketSubMatchScore, updateBracketSubMatchPlayers,
   } = useTeamStore();
 
@@ -374,8 +382,6 @@ export default function TeamBracketView() {
             const bRoundMatches = Array.from({ length: bTotalRounds }, (_, i) =>
               bracket.matches.filter(m => m.round === i + 1)
             );
-            const bFinal = bracket.matches.find(m => m.round === bTotalRounds);
-            const bWinner = bFinal?.winnerId ? allTeams.find(t => t.teamId === bFinal.winnerId) : null;
             const bGetRoundName = (round: number) => {
               if (round === bTotalRounds) return '決勝';
               if (round === bTotalRounds - 1) return '準決勝';
@@ -406,6 +412,8 @@ export default function TeamBracketView() {
             const headerFinished = bracket.matches.filter(m => !m.isBye && m.status === 'finished').length;
             const headerPct = headerTotal > 0 ? Math.round((headerFinished / headerTotal) * 100) : 0;
 
+            const bracketDone = headerTotal > 0 && headerFinished === headerTotal;
+
             return (
               <div key={cat} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 {/* 一体型ヘッダー（アイコン削除、右側に進捗ゲージ） */}
@@ -414,27 +422,29 @@ export default function TeamBracketView() {
                     <div className="text-base font-black tracking-tight">{CATEGORY_LABELS[cat]}</div>
                     <div className="text-[10px] opacity-80">{bracket.drawSize}チームドロー</div>
                   </div>
-                  {/* 右側: 進捗ゲージ + 優勝者 */}
-                  <div className="shrink-0 flex flex-col items-end gap-1 min-w-[130px]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black tabular-nums tracking-tight">
-                        {headerFinished}<span className="opacity-60">/{headerTotal}</span>
-                      </span>
-                      <div className="w-20 h-1.5 rounded-full bg-white/25 overflow-hidden shadow-inner">
-                        <div
-                          className="h-full bg-white rounded-full transition-all duration-500 shadow-[0_0_6px_rgba(255,255,255,0.6)]"
-                          style={{ width: `${headerPct}%` }}
-                        />
-                      </div>
-                    </div>
-                    {bWinner ? (
-                      <div className="text-right leading-tight">
-                        <span className="text-[9px] font-bold uppercase tracking-wider opacity-80 mr-1">優勝</span>
-                        <span className="text-xs font-black truncate inline-block max-w-[110px] align-bottom">{bWinner.teamName}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[9px] font-bold opacity-75 tabular-nums">{headerPct}% 完了</span>
+                  {/* 右側: 結果画像ボタン + 進捗ゲージ */}
+                  <div className="shrink-0 flex items-center gap-2">
+                    {bracketDone && (
+                      <TeamBracketResultPreview
+                        bracket={bracket}
+                        allTeams={allTeams}
+                        tournamentName={tournamentInfo?.name || ''}
+                      />
                     )}
+                    <div className="flex flex-col items-end gap-1 min-w-[130px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black tabular-nums tracking-tight">
+                          {headerFinished}<span className="opacity-60">/{headerTotal}</span>
+                        </span>
+                        <div className="w-20 h-1.5 rounded-full bg-white/25 overflow-hidden shadow-inner">
+                          <div
+                            className="h-full bg-white rounded-full transition-all duration-500 shadow-[0_0_6px_rgba(255,255,255,0.6)]"
+                            style={{ width: `${headerPct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-bold opacity-75 tabular-nums">{headerPct}% 完了</span>
+                    </div>
                   </div>
                 </div>
 
@@ -447,7 +457,7 @@ export default function TeamBracketView() {
 
                 {/* ブラケット本体 */}
                 <div className="overflow-x-auto bg-gradient-to-br from-slate-50/80 via-white to-slate-50/50">
-                  <div className="relative p-4" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * bTotalRounds + (bWinner ? 170 : 0), height: svgHeight }}>
+                  <div className="relative p-4" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * bTotalRounds, height: svgHeight }}>
                     {/* 接続線SVG */}
                     <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * bTotalRounds, height: svgHeight }}>
                       {bRoundMatches.slice(0, -1).map((rMatches, roundIdx) => {
@@ -667,17 +677,22 @@ export default function TeamBracketView() {
                                     {/* 中央: スコア詳細 */}
                                     <div className="flex-1 min-w-0 flex items-center justify-center overflow-hidden">
                                       {isFinished && match.subMatches.length > 0 && (
-                                        <div className="flex gap-1.5 overflow-hidden">
-                                          {match.subMatches.map(sm => (
-                                            <span key={sm.type} className="font-mono whitespace-nowrap">
-                                              <span className="text-slate-400 font-bold">{MATCH_TYPE_SHORT[sm.type]}</span>
-                                              <span className={`ml-0.5 font-black ${
-                                                sm.winnerId === match.team1Id ? 'text-blue-600' :
-                                                sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
-                                              }`}>{sm.score1}-{sm.score2}</span>
-                                              {sm.tiebreakScore !== null && <span className="text-slate-400">({sm.tiebreakScore})</span>}
-                                            </span>
-                                          ))}
+                                        <div className="flex gap-1 overflow-hidden items-center">
+                                          {match.subMatches.map(sm => {
+                                            const tag = MATCH_TYPE_COLORS[sm.type];
+                                            return (
+                                              <span key={sm.type} className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                                                <span className={`inline-flex items-center justify-center px-1 h-3.5 rounded text-[8px] font-black tracking-wider ${tag.bg} ${tag.text} border ${tag.border}`}>
+                                                  {MATCH_TYPE_SHORT[sm.type]}
+                                                </span>
+                                                <span className={`font-mono font-black tabular-nums ${
+                                                  sm.winnerId === match.team1Id ? 'text-blue-600' :
+                                                  sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
+                                                }`}>{sm.score1}-{sm.score2}</span>
+                                                {sm.tiebreakScore !== null && <span className="text-slate-400 font-mono">({sm.tiebreakScore})</span>}
+                                              </span>
+                                            );
+                                          })}
                                         </div>
                                       )}
                                     </div>
@@ -712,30 +727,6 @@ export default function TeamBracketView() {
                       );
                     })}
 
-                    {/* 優勝チーム表示 */}
-                    {bWinner && (() => {
-                      const finalY = getMatchY(bTotalRounds - 1, 0);
-                      const winnerX = bTotalRounds * (MATCH_WIDTH + ROUND_GAP) - ROUND_GAP + 16;
-                      return (
-                        <div className="absolute" style={{ left: winnerX, top: finalY - 55, width: 150, zIndex: 2 }}>
-                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 p-3 text-white shadow-xl">
-                            <div className="absolute inset-0 opacity-20">
-                              <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white blur-2xl" />
-                            </div>
-                            <div className="relative text-center">
-                              <Trophy className="w-7 h-7 mx-auto mb-1 drop-shadow-lg" />
-                              <div className="text-[9px] font-black uppercase tracking-widest opacity-90">優勝</div>
-                              <div className="text-xs font-black tracking-tight mt-0.5 truncate">{bWinner.teamName}</div>
-                              {bWinner.leagueId && (
-                                <div className="inline-flex items-center gap-0.5 mt-1 px-2 py-0.5 bg-white/20 rounded-full text-[9px] font-bold">
-                                  <Users className="w-2.5 h-2.5" />{bWinner.leagueId}リーグ
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
               </div>
