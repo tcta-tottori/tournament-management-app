@@ -51,6 +51,29 @@ const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; tex
 };
 
 /**
+ * リーグ別の色パレット（TeamLeagueView の LEAGUE_SOLID_COLORS と対応）。
+ * インデックス順にリーグへ割り当てる。
+ */
+const LEAGUE_BADGE_STYLES = [
+  { bg: 'bg-blue-100',    text: 'text-blue-700',    border: 'border-blue-200' },
+  { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
+  { bg: 'bg-purple-100',  text: 'text-purple-700',  border: 'border-purple-200' },
+  { bg: 'bg-rose-100',    text: 'text-rose-700',    border: 'border-rose-200' },
+  { bg: 'bg-amber-100',   text: 'text-amber-700',   border: 'border-amber-200' },
+  { bg: 'bg-cyan-100',    text: 'text-cyan-700',    border: 'border-cyan-200' },
+  { bg: 'bg-lime-100',    text: 'text-lime-700',    border: 'border-lime-200' },
+  { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+];
+
+const FALLBACK_LEAGUE_STYLE = { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+
+/** "9コート" や "5番コート" から数字のみを抽出 */
+function extractCourtNumberShort(courtName: string): string {
+  const m = courtName.match(/(\d+)/);
+  return m ? m[1] : courtName;
+}
+
+/**
  * テスト入力用：チームのメンバーを上から順に取り出し、
  * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
  * メンバーが足りない場合は先頭に戻って巡回する。
@@ -93,6 +116,17 @@ export default function TeamBracketView() {
   const [callCourts, setCallCourts] = useState<string[]>([]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
+
+  /** リーグID → 色スタイル のマッピング（store の leagues の順序で割り当て） */
+  const leagueStyleMap = useMemo(() => {
+    const map: Record<string, typeof LEAGUE_BADGE_STYLES[number]> = {};
+    leagues.forEach((l, i) => {
+      map[l.leagueId] = LEAGUE_BADGE_STYLES[i % LEAGUE_BADGE_STYLES.length];
+    });
+    return map;
+  }, [leagues]);
+  const getLeagueStyle = (leagueId: string | null | undefined) =>
+    (leagueId && leagueStyleMap[leagueId]) || FALLBACK_LEAGUE_STYLE;
 
   // 全ブラケットから対戦待ち（ready）試合を収集（控えリスト用）
   const waitingMatches = useMemo(() => {
@@ -474,11 +508,12 @@ export default function TeamBracketView() {
                             if (isBye) {
                               const byeName = match.team1Name || match.team2Name || 'BYE';
                               const byeLeague = match.team1League || match.team2League;
+                              const byeStyle = getLeagueStyle(byeLeague);
                               return (
                                 <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - 24, width: MATCH_WIDTH, zIndex: 1 }}>
                                   <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-slate-200 bg-white/80">
                                     {byeLeague && (
-                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${cfg.bg} ${cfg.text} text-[9px] font-black shrink-0`}>
+                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${byeStyle.bg} ${byeStyle.text} text-[9px] font-black shrink-0`}>
                                         {byeLeague}
                                       </span>
                                     )}
@@ -509,8 +544,8 @@ export default function TeamBracketView() {
                                     <div className="flex items-center gap-1 min-w-0">
                                       {court ? (
                                         <span className="flex items-center gap-0.5 text-blue-600 font-bold truncate">
-                                          <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                          <span className="truncate">{court.courtNames.join('・')}</span>
+                                          <MapPin className="w-3 h-3 shrink-0" />
+                                          <span className="truncate tabular-nums">{court.courtNames.map(extractCourtNumberShort).join('・')}</span>
                                         </span>
                                       ) : (
                                         <span className="text-slate-400 font-medium">#{match.position}</span>
@@ -542,11 +577,14 @@ export default function TeamBracketView() {
                                       match.winnerId === match.team1Id ? 'bg-blue-50/80' : ''
                                     } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
                                   >
-                                    {match.team1League && (
-                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${cfg.bg} ${cfg.text} text-[9px] font-black shrink-0`}>
-                                        {match.team1League}
-                                      </span>
-                                    )}
+                                    {match.team1League && (() => {
+                                      const s = getLeagueStyle(match.team1League);
+                                      return (
+                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${s.bg} ${s.text} text-[9px] font-black shrink-0`}>
+                                          {match.team1League}
+                                        </span>
+                                      );
+                                    })()}
                                     <span className={`flex-1 text-xs truncate ${
                                       match.team1Name === 'BYE' ? 'text-slate-300 italic' :
                                       match.winnerId === match.team1Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
@@ -566,11 +604,14 @@ export default function TeamBracketView() {
                                       match.winnerId === match.team2Id ? 'bg-blue-50/80' : ''
                                     } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
                                   >
-                                    {match.team2League && (
-                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${cfg.bg} ${cfg.text} text-[9px] font-black shrink-0`}>
-                                        {match.team2League}
-                                      </span>
-                                    )}
+                                    {match.team2League && (() => {
+                                      const s = getLeagueStyle(match.team2League);
+                                      return (
+                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${s.bg} ${s.text} text-[9px] font-black shrink-0`}>
+                                          {match.team2League}
+                                        </span>
+                                      );
+                                    })()}
                                     <span className={`flex-1 text-xs truncate ${
                                       match.team2Name === 'BYE' ? 'text-slate-300 italic' :
                                       match.winnerId === match.team2Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
@@ -593,19 +634,21 @@ export default function TeamBracketView() {
                                       {isReady && !court && match.team1Id && match.team2Id && (
                                         <button
                                           onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                           aria-label="コート割当"
+                                          title="コート割当"
                                         >
-                                          <MapPin className="w-3 h-3" />コート
+                                          <MapPin className="w-3.5 h-3.5" />IN
                                         </button>
                                       )}
                                       {isPlaying && court && (
                                         <button
                                           onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black text-blue-600 hover:bg-blue-100 transition-colors"
                                           aria-label="コート変更"
+                                          title="コート変更"
                                         >
-                                          <MapPin className="w-3 h-3" />変更
+                                          <MapPin className="w-3.5 h-3.5" />変更
                                         </button>
                                       )}
                                     </div>
@@ -634,9 +677,11 @@ export default function TeamBracketView() {
                                         <>
                                           <button
                                             onClick={e => { e.stopPropagation(); openCall(match); }}
-                                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                            className="flex items-center justify-center p-1 rounded text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                            aria-label="試合コール"
+                                            title="試合コール"
                                           >
-                                            <Volume2 className="w-2.5 h-2.5" />コール
+                                            <Volume2 className="w-3.5 h-3.5" />
                                           </button>
                                           {court.startedAt && (() => {
                                             const el = Math.floor((Date.now() - court.startedAt) / 60000);
@@ -967,6 +1012,17 @@ function TeamWaitingList({
   onCall: (match: TeamBracketMatch) => void;
   bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
 }) {
+  const leagues = useTeamStore(s => s.leagues);
+  const leagueStyleMap = useMemo(() => {
+    const map: Record<string, typeof LEAGUE_BADGE_STYLES[number]> = {};
+    leagues.forEach((l, i) => {
+      map[l.leagueId] = LEAGUE_BADGE_STYLES[i % LEAGUE_BADGE_STYLES.length];
+    });
+    return map;
+  }, [leagues]);
+  const getLeagueStyle = (leagueId: string | null | undefined) =>
+    (leagueId && leagueStyleMap[leagueId]) || FALLBACK_LEAGUE_STYLE;
+
   if (waitingMatches.length === 0) {
     return (
       <div className="text-center py-12 text-slate-400">
@@ -993,6 +1049,8 @@ function TeamWaitingList({
         const cfg = CATEGORY_CONFIG[bracket.category];
         const ca = bracketCourtAssignments[match.matchId];
         const hasCourtAssigned = ca && ca.courtNames.length > 0;
+        const s1 = getLeagueStyle(match.team1League);
+        const s2 = getLeagueStyle(match.team2League);
         return (
           <div key={match.matchId} className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all ${
             hasCourtAssigned
@@ -1007,12 +1065,12 @@ function TeamWaitingList({
               </span>
               <div className="flex-1 min-w-0 flex items-center gap-1 text-xs font-bold text-slate-800">
                 {match.team1League && (
-                  <span className="w-4 h-4 rounded bg-slate-100 text-[8px] font-bold text-slate-500 flex items-center justify-center shrink-0">{match.team1League}</span>
+                  <span className={`w-4 h-4 rounded ${s1.bg} ${s1.text} text-[8px] font-black flex items-center justify-center shrink-0`}>{match.team1League}</span>
                 )}
                 <span className="truncate">{match.team1Name}</span>
                 <span className="text-[9px] text-slate-300 font-bold mx-0.5 shrink-0">vs</span>
                 {match.team2League && (
-                  <span className="w-4 h-4 rounded bg-slate-100 text-[8px] font-bold text-slate-500 flex items-center justify-center shrink-0">{match.team2League}</span>
+                  <span className={`w-4 h-4 rounded ${s2.bg} ${s2.text} text-[8px] font-black flex items-center justify-center shrink-0`}>{match.team2League}</span>
                 )}
                 <span className="truncate">{match.team2Name}</span>
               </div>
@@ -1020,9 +1078,9 @@ function TeamWaitingList({
             {/* 下段: コート状況 + ボタン */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/60 border-t border-slate-100">
               {hasCourtAssigned ? (
-                <span className="flex items-center gap-0.5 text-[10px] font-bold text-blue-600">
-                  <MapPin className="w-2.5 h-2.5" />
-                  {ca.courtNames.join('・')}番コート
+                <span className="flex items-center gap-0.5 text-[11px] font-bold text-blue-600 tabular-nums">
+                  <MapPin className="w-3 h-3" />
+                  {ca.courtNames.map(extractCourtNumberShort).join('・')}
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-400">コート未割当</span>
@@ -1031,21 +1089,23 @@ function TeamWaitingList({
                 {hasCourtAssigned && (
                   <button
                     onClick={() => onCall(match)}
-                    className="flex items-center gap-0.5 px-2 py-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                    className="flex items-center justify-center p-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                    aria-label="試合コール"
+                    title="試合コール"
                   >
-                    <Volume2 className="w-3 h-3" />
-                    コール
+                    <Volume2 className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   onClick={() => onAssignCourt(match)}
-                  className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg active:scale-95 transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-black rounded-lg active:scale-95 transition-all ${
                     hasCourtAssigned
                       ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
                       : 'text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm'
                   }`}
                 >
-                  {hasCourtAssigned ? 'コート変更' : 'コート入れ'}
+                  <MapPin className="w-3.5 h-3.5" />
+                  {hasCourtAssigned ? '変更' : 'IN'}
                 </button>
               </div>
             </div>
