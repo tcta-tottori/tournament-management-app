@@ -135,6 +135,46 @@ function truncTeamName(name: string, max = 6): string {
 }
 
 /**
+ * プレイヤー名の表示コンポーネント
+ * - 空白区切りで苗字のみ抽出
+ * - 2文字以下 → そのまま表示
+ * - 3文字 → 先頭2文字 + 1文字（小さめ、同姓補助）
+ * - 4文字以上 → 先頭2文字のみ表示（フルネーム対策）
+ */
+function PlayerDisplay({ name }: { name: string }) {
+  if (!name) return null;
+  const famName = name.trim().split(/[\s\u3000]+/)[0] || name;
+  if (famName.length <= 2) {
+    return <span>{famName}</span>;
+  }
+  if (famName.length === 3) {
+    return (
+      <span className="inline-flex items-baseline">
+        <span>{famName.slice(0, 2)}</span>
+        <span className="text-[0.6em] opacity-75 ml-px">{famName.slice(2)}</span>
+      </span>
+    );
+  }
+  // 4文字以上は苗字＋名前の可能性が高いので先頭2文字のみ
+  return <span>{famName.slice(0, 2)}</span>;
+}
+
+/** 複数のプレイヤー名をスラッシュ区切りで表示 */
+function PlayerListDisplay({ players }: { players: string[] }) {
+  if (players.length === 0) return null;
+  return (
+    <span className="inline-flex items-baseline gap-0.5">
+      {players.map((p, i) => (
+        <span key={i} className="inline-flex items-baseline">
+          {i > 0 && <span className="text-slate-300 mx-[1px]">/</span>}
+          <PlayerDisplay name={p} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
  * テスト入力用：チームのメンバーを上から順に取り出し、
  * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
  * メンバーが足りない場合は先頭に戻って巡回する。
@@ -483,7 +523,7 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
-                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                               {rowTeam.teamNumber}
                             </td>
                             <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
@@ -538,13 +578,20 @@ export default function TeamLeagueView() {
                                       const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                                       const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                                       return (
-                                        <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px] gap-1">
+                                        <div
+                                          key={matchType}
+                                          className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px]"
+                                        >
                                           {hasScore ? (<>
-                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
-                                            <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
-                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                            <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                              <PlayerListDisplay players={myPlayers} />
+                                            </span>
+                                            <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
+                                            <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                              <PlayerListDisplay players={oppPlayers} />
+                                            </span>
                                           </>) : (
-                                            <span className="text-slate-300 font-bold">-</span>
+                                            <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
                                           )}
                                         </div>
                                       );
@@ -679,7 +726,7 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
                     <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
@@ -748,15 +795,22 @@ export default function TeamLeagueView() {
                               const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                               const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                               return (
-                                <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none gap-1">
+                                <div
+                                  key={matchType}
+                                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none"
+                                >
                                   {hasScore ? (<>
-                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
-                                    <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
+                                    <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                      <PlayerListDisplay players={myPlayers} />
+                                    </span>
+                                    <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-400'}`}>
                                       {myScore}-{oppScore}
                                     </span>
-                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                    <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                      <PlayerListDisplay players={oppPlayers} />
+                                    </span>
                                   </>) : (
-                                    <span className="text-slate-300 font-bold">-</span>
+                                    <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
                                   )}
                                 </div>
                               );
