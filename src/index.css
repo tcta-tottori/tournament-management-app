@@ -823,64 +823,82 @@
 
 /* ===========================================================
    決勝T 対戦カード アクションボタン（IN / 変更 / コール）
+   ミニマル&リファインド: フラット / 単層ぼかし影 / 細ボーダー
    =========================================================== */
 .bracket-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 3px 8px;
-  min-width: 52px;
+  gap: 4px;
+  padding: 0 10px;
+  min-width: 56px;
   height: 22px;
   border-radius: 6px;
   font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.35) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
-    0 1px 2px rgba(15, 23, 42, 0.25),
-    0 2px 4px rgba(15, 23, 42, 0.12);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  border: 1px solid;
+  background-clip: padding-box;
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.1s ease;
 }
 .bracket-action-btn:hover {
-  filter: brightness(1.1);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.4) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
-    0 2px 4px rgba(15, 23, 42, 0.3),
-    0 3px 6px rgba(15, 23, 42, 0.15);
+  transform: translateY(-0.5px);
 }
 .bracket-action-btn:active {
-  transform: scale(0.94);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.2) inset,
-    0 1px 1px rgba(15, 23, 42, 0.3);
+  transform: translateY(0) scale(0.97);
+  transition-duration: 0.05s;
 }
 .bracket-action-btn svg {
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
+  stroke-width: 2.25;
 }
 
-/* IN（コート割当・緑） */
+/* IN（コート割当・エメラルド） */
 .bracket-btn-in {
-  background: linear-gradient(to bottom, #34d399 0%, #10b981 55%, #059669 100%);
-  border-color: #047857;
+  color: #065f46;
+  background-color: #d1fae5;
+  border-color: #6ee7b7;
+  box-shadow: 0 1px 0 rgba(16, 185, 129, 0.08);
+}
+.bracket-btn-in:hover {
+  background-color: #a7f3d0;
+  border-color: #34d399;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.18);
 }
 
-/* 変更（コート変更・青） */
+/* 変更（コート変更・インディゴ） */
 .bracket-btn-change {
-  background: linear-gradient(to bottom, #60a5fa 0%, #3b82f6 55%, #2563eb 100%);
-  border-color: #1d4ed8;
+  color: #1e3a8a;
+  background-color: #dbeafe;
+  border-color: #93c5fd;
+  box-shadow: 0 1px 0 rgba(59, 130, 246, 0.08);
+}
+.bracket-btn-change:hover {
+  background-color: #bfdbfe;
+  border-color: #60a5fa;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.18);
 }
 
-/* コール（赤） */
+/* コール（ローズ） */
 .bracket-btn-call {
-  background: linear-gradient(to bottom, #f87171 0%, #ef4444 55%, #dc2626 100%);
-  border-color: #b91c1c;
+  color: #9f1239;
+  background-color: #ffe4e6;
+  border-color: #fda4af;
+  box-shadow: 0 1px 0 rgba(244, 63, 94, 0.08);
+}
+.bracket-btn-call:hover {
+  background-color: #fecdd3;
+  border-color: #fb7185;
+  box-shadow: 0 2px 6px rgba(244, 63, 94, 0.2);
 }
 
 /* ALL タブ用グレーグラデーションラベル（視認性優先） */
