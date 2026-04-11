@@ -2,8 +2,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
-import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
+import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket, TeamEntry } from './types';
+import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, familyName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { useTeamCallStore } from './teamCallStore';
@@ -22,11 +22,12 @@ const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
   '4th': '4・5位T',
 };
 
-const CATEGORY_TAB_STYLES: Record<PlacementCategory, { activeBg: string; activeText: string; inactiveBg: string; inactiveText: string }> = {
-  '1st': { activeBg: 'bg-amber-500', activeText: 'text-white', inactiveBg: 'bg-amber-100', inactiveText: 'text-amber-700' },
-  '2nd': { activeBg: 'bg-slate-500', activeText: 'text-white', inactiveBg: 'bg-slate-200', inactiveText: 'text-slate-600' },
-  '3rd': { activeBg: 'bg-orange-500', activeText: 'text-white', inactiveBg: 'bg-orange-100', inactiveText: 'text-orange-700' },
-  '4th': { activeBg: 'bg-blue-500', activeText: 'text-white', inactiveBg: 'bg-blue-100', inactiveText: 'text-blue-700' },
+/** カテゴリタブのリッチカラー文字 */
+const CATEGORY_TAB_COLORS: Record<PlacementCategory, { active: string; inactive: string }> = {
+  '1st': { active: '#d97706', inactive: '#f59e0b' }, // amber
+  '2nd': { active: '#475569', inactive: '#94a3b8' }, // slate
+  '3rd': { active: '#ea580c', inactive: '#fb923c' }, // orange
+  '4th': { active: '#2563eb', inactive: '#60a5fa' }, // blue
 };
 
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
@@ -36,11 +37,38 @@ const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; tex
   '4th': { grad: 'from-blue-400 to-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', icon: Sparkles },
 };
 
+/**
+ * テスト入力用：チームのメンバーを上から順に取り出し、
+ * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
+ * メンバーが足りない場合は先頭に戻って巡回する。
+ */
+function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
+  const fallback = ['田中', '山本'];
+  if (!team || team.members.length === 0) {
+    return { MIX: fallback, WD: fallback, MD: fallback };
+  }
+  const names = team.members.map(m => {
+    const n = familyName(m.player.name || '').trim();
+    return n || '名無し';
+  });
+  const pick = (startIdx: number): string[] => {
+    const a = names[startIdx % names.length];
+    const b = names[(startIdx + 1) % names.length];
+    return [a, b];
+  };
+  return {
+    MIX: pick(0),
+    WD: pick(2),
+    MD: pick(4),
+  };
+}
+
 export default function TeamBracketView() {
   const {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
     allTeams, leagues, rebuildBracketFromSlots,
+    updateBracketSubMatchScore, updateBracketSubMatchPlayers,
   } = useTeamStore();
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
@@ -166,7 +194,91 @@ export default function TeamBracketView() {
       )}
 
       {viewMode === 'bracket' && (<>
-      {/* カテゴリタブ（色分けバッジ） */}
+      {/* テスト入力ボタン（選択中トーナメント / 全トーナメント） */}
+      {(() => {
+        /**
+         * 対象カテゴリ内の全試合を 6-4 で埋めて進出を連鎖させる。
+         * @param categoryFilter null なら全カテゴリ、Set なら指定カテゴリのみ対象。
+         */
+        const fillBracketTest = (categoryFilter: Set<PlacementCategory> | null) => {
+          const inTarget = (cat: PlacementCategory) => !categoryFilter || categoryFilter.has(cat);
+          // 1回戦→決勝まで最大でもラウンド数回繰り返せば全て埋まる（8ドロー=3ラウンド）
+          for (let iter = 0; iter < 8; iter++) {
+            // 現在のスナップショット取得
+            const snapshot = useTeamStore.getState().brackets;
+            let filledAny = false;
+            for (const b of snapshot) {
+              if (!inTarget(b.category)) continue;
+              for (const m of b.matches) {
+                if (!m.team1Id || !m.team2Id || m.isBye || m.status === 'finished') continue;
+                const t1 = allTeams.find(t => t.teamId === m.team1Id);
+                const t2 = allTeams.find(t => t.teamId === m.team2Id);
+                const p1 = getTestPlayersForTeam(t1);
+                const p2 = getTestPlayersForTeam(t2);
+                for (const mt of MATCH_TYPE_ORDER) {
+                  updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
+                  updateBracketSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
+                }
+                filledAny = true;
+              }
+            }
+            // 確定した勝者を次試合へ進出
+            const afterFill = useTeamStore.getState().brackets;
+            let advancedAny = false;
+            for (const b of afterFill) {
+              if (!inTarget(b.category)) continue;
+              for (const m of b.matches) {
+                if (m.status !== 'finished' || !m.winnerId || !m.nextMatchId) continue;
+                const nextM = b.matches.find(nm => nm.matchId === m.nextMatchId);
+                if (!nextM) continue;
+                // まだ進出していない場合のみ advanceWinner 呼び出し
+                const already =
+                  (m.nextSlot === 'team1' && nextM.team1Id === m.winnerId) ||
+                  (m.nextSlot === 'team2' && nextM.team2Id === m.winnerId);
+                if (!already) {
+                  advanceWinner(m.matchId);
+                  advancedAny = true;
+                }
+              }
+            }
+            if (!filledAny && !advancedAny) break;
+          }
+        };
+
+        return (
+          <div className="-mx-2 px-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  if (!currentBracket || showAllBrackets) return;
+                  const label = CATEGORY_LABELS[selectedBracketCategory];
+                  if (!confirm(`${label}の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
+                  fillBracketTest(new Set([selectedBracketCategory]));
+                }}
+                disabled={showAllBrackets || !currentBracket}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                テスト（このトーナメント）
+              </button>
+              <button
+                onClick={() => {
+                  if (brackets.length === 0) return;
+                  if (!confirm(`全トーナメント（${brackets.length}カテゴリ）の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
+                  fillBracketTest(null);
+                }}
+                disabled={brackets.length === 0}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                テスト（全トーナメント）
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* カテゴリタブ（リッチカラー文字） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
           <button
@@ -174,20 +286,30 @@ export default function TeamBracketView() {
             className={`chrome-tab ${showAllBrackets ? 'chrome-tab-active' : ''}`}
           >
             <Layers className="chrome-tab-icon" />
-            <span>全体</span>
+            <span className="chrome-tab-label" style={{ color: showAllBrackets ? '#1e293b' : '#64748b' }}>全体</span>
           </button>
           {brackets.map(b => {
             const isSelected = !showAllBrackets && b.category === selectedBracketCategory;
-            const style = CATEGORY_TAB_STYLES[b.category];
+            const colors = CATEGORY_TAB_COLORS[b.category];
+            // トーナメントの全試合終了判定
+            const nonByeMatches = b.matches.filter(m => !m.isBye && m.team1Id && m.team2Id);
+            const finishedCount = nonByeMatches.filter(m => m.status === 'finished').length;
+            const bracketDone = nonByeMatches.length > 0 && finishedCount === nonByeMatches.length;
             return (
               <button
                 key={b.category}
                 onClick={() => { setShowAllBrackets(false); setSelectedBracketCategory(b.category); }}
-                className={`chrome-tab !px-3 !py-2 ${isSelected ? 'chrome-tab-active' : ''}`}
+                className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
               >
-                <span className={`px-3 py-1 rounded-md text-xs font-black ${
-                  isSelected ? `${style.activeBg} ${style.activeText}` : `${style.inactiveBg} ${style.inactiveText}`
-                }`}>{CATEGORY_SHORT_LABELS[b.category]}</span>
+                <span
+                  className={`chrome-tab-label ${bracketDone ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: isSelected ? colors.active : colors.inactive }}
+                >
+                  {CATEGORY_SHORT_LABELS[b.category]}
+                </span>
+                {bracketDone && (
+                  <Check className="w-3 h-3" strokeWidth={3} style={{ color: isSelected ? colors.active : colors.inactive }} />
+                )}
               </button>
             );
           })}

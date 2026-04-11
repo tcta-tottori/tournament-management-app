@@ -355,36 +355,60 @@ export default function TeamEntryView() {
 
   return (
     <div className="space-y-3 pb-20">
-      {/* Chrome風タブ */}
+      {/* Chrome風タブ（リッチカラー文字） */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
         <div className="chrome-tab-bar">
           {/* 全体タブ */}
-          <button
-            onClick={() => setSelectedTab('all')}
-            className={`chrome-tab ${selectedTab === 'all' ? 'chrome-tab-active' : ''}`}
-          >
-            <Layers className="chrome-tab-icon" />
-            <span>全体</span>
-            <span className="chrome-tab-count">{totalEntered}/{totalTeams}</span>
-          </button>
+          {(() => {
+            const allComplete = allEntered;
+            return (
+              <button
+                onClick={() => setSelectedTab('all')}
+                className={`chrome-tab ${selectedTab === 'all' ? 'chrome-tab-active' : ''}`}
+              >
+                <Layers className="chrome-tab-icon" />
+                <span
+                  className={`chrome-tab-label ${allComplete ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: allComplete ? '#059669' : (selectedTab === 'all' ? '#1e293b' : '#64748b') }}
+                >全体</span>
+                <span
+                  className={`chrome-tab-progress ${allComplete ? 'chrome-tab-progress-done' : ''}`}
+                  style={{ color: allComplete ? '#059669' : '#64748b' }}
+                >
+                  {totalEntered}/{totalTeams}
+                </span>
+                {allComplete && (
+                  <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
+                )}
+              </button>
+            );
+          })()}
           {/* 各リーグタブ */}
           {leagues.map((l, i) => {
             const entryCount = l.teams.filter(t => t.status === 'entry').length;
             const total = l.teams.length;
             const complete = entryCount === total && total > 0;
+            const solidColor = LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length];
             return (
               <button
                 key={l.leagueId}
                 onClick={() => setSelectedTab(l.leagueId)}
                 className={`chrome-tab ${selectedTab === l.leagueId ? 'chrome-tab-active' : ''}`}
               >
-                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
-                <span className="font-bold">{l.leagueId}</span>
-                <span className="chrome-tab-count">{entryCount}/{total}</span>
+                <span
+                  className={`chrome-tab-label ${complete ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {l.leagueId}
+                </span>
+                <span
+                  className={`chrome-tab-progress ${complete ? 'chrome-tab-progress-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {entryCount}/{total}
+                </span>
                 {complete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
+                  <Check className="w-3 h-3" strokeWidth={3} style={{ color: solidColor }} />
                 )}
               </button>
             );

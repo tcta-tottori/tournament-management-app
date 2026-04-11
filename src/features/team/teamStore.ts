@@ -46,6 +46,7 @@ interface TeamState {
 
   // Actions: Tournament
   updateBracketSubMatchScore: (matchId: string, matchType: MatchType, score1: number, score2: number, tiebreakScore?: number | null) => void;
+  updateBracketSubMatchPlayers: (matchId: string, matchType: MatchType, players1: string[], players2: string[]) => void;
   clearBracketSubMatchScore: (matchId: string, matchType: MatchType) => void;
   setBracketMatchStatus: (matchId: string, status: TeamBracketMatch['status']) => void;
   advanceWinner: (matchId: string) => void;
@@ -264,6 +265,23 @@ export const useTeamStore = create<TeamState>()(
           }
           return { brackets, bracketCourtAssignments };
         });
+      },
+
+      updateBracketSubMatchPlayers: (matchId, matchType, players1, players2) => {
+        set(state => ({
+          brackets: state.brackets.map(b => ({
+            ...b,
+            matches: b.matches.map(m => {
+              if (m.matchId !== matchId) return m;
+              return {
+                ...m,
+                subMatches: m.subMatches.map(sm =>
+                  sm.type === matchType ? { ...sm, players1, players2 } : sm
+                ),
+              };
+            }),
+          })),
+        }));
       },
 
       clearBracketSubMatchScore: (matchId, matchType) => {

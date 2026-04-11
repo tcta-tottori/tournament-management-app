@@ -779,7 +779,7 @@
   flex-shrink: 0;
 }
 
-/* 完了バッジ */
+/* 完了バッジ（旧バージョン・未使用） */
 .chrome-tab-badge {
   position: absolute;
   top: 2px;
@@ -808,4 +808,43 @@
   font-weight: 700;
   opacity: 0.55;
   font-variant-numeric: tabular-nums;
+}
+
+/* リッチカラー文字ラベル（バッジに代わる完了表示） */
+.chrome-tab-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: color 0.15s ease, filter 0.15s ease;
+}
+.chrome-tab:not(.chrome-tab-active) .chrome-tab-label {
+  filter: saturate(0.65) brightness(0.95);
+}
+.chrome-tab-active .chrome-tab-label {
+  filter: saturate(1.15) brightness(1.02);
+}
+
+/* 完了時は文字をより濃く・太く強調 */
+.chrome-tab-label-done {
+  font-weight: 900;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 6px currentColor;
+}
+
+/* タブ内の進捗テキスト（リッチカラー） */
+.chrome-tab-progress {
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s ease, opacity 0.15s ease;
+  opacity: 0.75;
+}
+.chrome-tab-active .chrome-tab-progress {
+  opacity: 1;
+}
+.chrome-tab-progress-done {
+  opacity: 1 !important;
+  font-weight: 900;
 }

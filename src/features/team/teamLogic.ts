@@ -353,10 +353,14 @@ export function nextPowerOf2(n: number): number {
  * 2位: C2, B2, D2, A2, E2
  * 3位: D3, C3, E3, B3, A3
  * 4・5位: B4, D4, E5, A4, D5, E4, C4
+ *
+ * ※ 5チーム+3BYEの場合、null の配置は必ず「各R1マッチに1つずつ」
+ * 分散させる必要がある。隣り合わせ（同じマッチの両側）に置くと
+ * 空試合（ゴーストマッチ）となり、決勝T が正しく進まない。
  */
 export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
-  '2nd': ['C', null, 'B', 'D', 'A', 'E', null, null],
-  '3rd': ['D', null, 'C', 'E', 'B', 'A', null, null],
+  '2nd': ['C', null, 'B', null, 'D', 'A', 'E', null],
+  '3rd': ['D', null, 'C', null, 'E', 'B', 'A', null],
   '4th': ['B', 'D', 'E5', 'A', 'D5', 'E', 'C', null],
 };
 

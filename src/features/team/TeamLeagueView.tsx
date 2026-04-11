@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
-import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName } from './teamLogic';
+import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
+import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -132,6 +132,32 @@ const LEAGUE_SOLID_COLORS = [
 function truncTeamName(name: string, max = 6): string {
   if (name.length <= max) return name;
   return name.slice(0, max - 1) + '…';
+}
+
+/**
+ * テスト入力用：チームのメンバーを上から順に取り出し、
+ * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
+ * メンバーが足りない場合は先頭に戻って巡回する。
+ */
+function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
+  const fallback = ['田中', '山本'];
+  if (!team || team.members.length === 0) {
+    return { MIX: fallback, WD: fallback, MD: fallback };
+  }
+  const names = team.members.map(m => {
+    const n = familyName(m.player.name || '').trim();
+    return n || '名無し';
+  });
+  const pick = (startIdx: number): string[] => {
+    const a = names[startIdx % names.length];
+    const b = names[(startIdx + 1) % names.length];
+    return [a, b];
+  };
+  return {
+    MIX: pick(0),
+    WD: pick(2),
+    MD: pick(4),
+  };
 }
 
 /** 種目カラー */
@@ -326,7 +352,7 @@ export default function TeamLeagueView() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* Chrome風リーグ選択タブ */}
+      {/* Chrome風リーグ選択タブ（リッチカラー文字） */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
         <div className="chrome-tab-bar">
           {/* 全体表示タブ（左端） */}
@@ -341,11 +367,12 @@ export default function TeamLeagueView() {
                 className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
               >
                 <Layers className="chrome-tab-icon" />
-                <span>全体</span>
+                <span
+                  className={`chrome-tab-label ${allLeaguesComplete ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: allLeaguesComplete ? '#059669' : (showAll ? '#1e293b' : '#64748b') }}
+                >全体</span>
                 {allLeaguesComplete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
+                  <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
                 )}
               </button>
             );
@@ -356,19 +383,27 @@ export default function TeamLeagueView() {
             const total = lm.length;
             const complete = done === total && total > 0;
             const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
+            const solidColor = LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length];
             return (
               <button
                 key={l.leagueId}
                 onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
                 className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
               >
-                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
-                <span className="font-bold">{l.leagueId}</span>
-                <span className="chrome-tab-count">{done}/{total}</span>
+                <span
+                  className={`chrome-tab-label ${complete ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {l.leagueId}
+                </span>
+                <span
+                  className={`chrome-tab-progress ${complete ? 'chrome-tab-progress-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {done}/{total}
+                </span>
                 {complete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
+                  <Check className="w-3 h-3" strokeWidth={3} style={{ color: solidColor }} />
                 )}
               </button>
             );
@@ -549,11 +584,15 @@ export default function TeamLeagueView() {
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => {
-            if (!confirm(`${selectedLeague.leagueId}リーグの全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            if (!confirm(`${selectedLeague.leagueId}リーグの全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
             for (const m of leagueMatchList) {
+              const t1 = allTeams.find(t => t.teamId === m.team1Id);
+              const t2 = allTeams.find(t => t.teamId === m.team2Id);
+              const p1 = getTestPlayersForTeam(t1);
+              const p2 = getTestPlayersForTeam(t2);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
-                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
             }
           }}
@@ -564,11 +603,15 @@ export default function TeamLeagueView() {
         </button>
         <button
           onClick={() => {
-            if (!confirm(`全リーグ（${leagues.length}ブロック）の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            if (!confirm(`全リーグ（${leagues.length}ブロック）の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
             for (const m of leagueMatches) {
+              const t1 = allTeams.find(t => t.teamId === m.team1Id);
+              const t2 = allTeams.find(t => t.teamId === m.team2Id);
+              const p1 = getTestPlayersForTeam(t1);
+              const p2 = getTestPlayersForTeam(t2);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
-                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
             }
           }}
