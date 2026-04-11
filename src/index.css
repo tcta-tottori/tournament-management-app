@@ -821,6 +821,25 @@
   transition: color 0.15s ease;
 }
 
+/* 虹色グラデーションラベル（ALL タブ用） */
+.chrome-tab-label-rainbow {
+  background: linear-gradient(
+    135deg,
+    #ff3d7f 0%,
+    #ff8c00 18%,
+    #ffd700 35%,
+    #22c55e 52%,
+    #06b6d4 70%,
+    #6366f1 85%,
+    #d946ef 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent !important;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+}
+
 /* 完了時は文字をより濃く・太く強調 */
 .chrome-tab-label-done {
   font-weight: 900;

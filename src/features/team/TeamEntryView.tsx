@@ -366,11 +366,8 @@ export default function TeamEntryView() {
                 onClick={() => setSelectedTab('all')}
                 className={`chrome-tab ${selectedTab === 'all' ? 'chrome-tab-active' : ''}`}
               >
-                <Layers className="chrome-tab-icon" />
-                <span
-                  className={`chrome-tab-label ${allComplete ? 'chrome-tab-label-done' : ''}`}
-                  style={{ color: allComplete ? '#059669' : (selectedTab === 'all' ? '#1e293b' : '#64748b') }}
-                >ALL</span>
+                <Layers className="chrome-tab-icon" stroke="url(#rainbow-grad)" />
+                <span className="chrome-tab-label chrome-tab-label-rainbow">ALL</span>
                 <span
                   className={`chrome-tab-progress ${allComplete ? 'chrome-tab-progress-done' : ''}`}
                   style={{ color: allComplete ? '#059669' : '#64748b' }}

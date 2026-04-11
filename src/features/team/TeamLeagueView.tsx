@@ -406,11 +406,8 @@ export default function TeamLeagueView() {
                 onClick={() => setShowAll(true)}
                 className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
               >
-                <Layers className="chrome-tab-icon" />
-                <span
-                  className={`chrome-tab-label ${allLeaguesComplete ? 'chrome-tab-label-done' : ''}`}
-                  style={{ color: allLeaguesComplete ? '#059669' : (showAll ? '#1e293b' : '#64748b') }}
-                >ALL</span>
+                <Layers className="chrome-tab-icon" stroke="url(#rainbow-grad)" />
+                <span className="chrome-tab-label chrome-tab-label-rainbow">ALL</span>
                 {allLeaguesComplete && (
                   <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
                 )}
