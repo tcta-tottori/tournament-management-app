@@ -634,7 +634,7 @@ export default function TeamBracketView() {
                                       {isReady && !court && match.team1Id && match.team2Id && (
                                         <button
                                           onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                          className="flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-black text-white bg-emerald-500 border border-emerald-600 shadow-sm hover:bg-emerald-600 active:scale-95 transition-all"
                                           aria-label="コート割当"
                                           title="コート割当"
                                         >
@@ -644,7 +644,7 @@ export default function TeamBracketView() {
                                       {isPlaying && court && (
                                         <button
                                           onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black text-blue-600 hover:bg-blue-100 transition-colors"
+                                          className="flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-black text-blue-700 bg-white border border-blue-300 shadow-sm hover:bg-blue-50 active:scale-95 transition-all"
                                           aria-label="コート変更"
                                           title="コート変更"
                                         >
