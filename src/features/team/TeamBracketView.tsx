@@ -623,33 +623,46 @@ export default function TeamBracketView() {
                                     )}
                                   </button>
 
-                                  {/* スコア詳細 + アクション（左下: コート操作 / 右下: 経過時間 or 操作ボタン） */}
+                                  {/* スコア詳細 + アクション（左下: コート/コール / 右下: 経過時間 or 勝者進出） */}
                                   <div className={`flex items-center justify-between gap-1 px-2 py-0.5 border-t text-[9px] ${
                                     isPlaying ? 'bg-green-50/50 border-green-100' :
                                     isFinished ? 'bg-slate-50/50 border-slate-100' :
                                     'bg-slate-50/30 border-slate-100'
                                   }`}>
-                                    {/* 左下: コート入力/変更ボタン */}
+                                    {/* 左下: コート入力/変更 + コールボタン（すべて同じサイズのリッチボタン） */}
                                     <div className="flex items-center gap-1 shrink-0">
                                       {isReady && !court && match.team1Id && match.team2Id && (
                                         <button
                                           onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-black text-white bg-emerald-500 border border-emerald-600 shadow-sm hover:bg-emerald-600 active:scale-95 transition-all"
+                                          className="bracket-action-btn bracket-btn-in"
                                           aria-label="コート割当"
                                           title="コート割当"
                                         >
-                                          <MapPin className="w-3.5 h-3.5" />IN
+                                          <MapPin className="w-3.5 h-3.5" />
+                                          <span>IN</span>
                                         </button>
                                       )}
                                       {isPlaying && court && (
-                                        <button
-                                          onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
-                                          className="flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-black text-blue-700 bg-white border border-blue-300 shadow-sm hover:bg-blue-50 active:scale-95 transition-all"
-                                          aria-label="コート変更"
-                                          title="コート変更"
-                                        >
-                                          <MapPin className="w-3.5 h-3.5" />変更
-                                        </button>
+                                        <>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
+                                            className="bracket-action-btn bracket-btn-change"
+                                            aria-label="コート変更"
+                                            title="コート変更"
+                                          >
+                                            <MapPin className="w-3.5 h-3.5" />
+                                            <span>変更</span>
+                                          </button>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); openCall(match); }}
+                                            className="bracket-action-btn bracket-btn-call"
+                                            aria-label="試合コール"
+                                            title="試合コール"
+                                          >
+                                            <Volume2 className="w-3.5 h-3.5" />
+                                            <span>コール</span>
+                                          </button>
+                                        </>
                                       )}
                                     </div>
 
@@ -671,30 +684,18 @@ export default function TeamBracketView() {
                                       )}
                                     </div>
 
-                                    {/* 右下: 経過時間 or 操作ボタン */}
+                                    {/* 右下: 経過時間 or 勝者進出 */}
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {isPlaying && court && (
-                                        <>
-                                          <button
-                                            onClick={e => { e.stopPropagation(); openCall(match); }}
-                                            className="flex items-center justify-center p-1 rounded-md text-white bg-red-500 border border-red-600 shadow-sm hover:bg-red-600 active:scale-95 transition-all"
-                                            aria-label="試合コール"
-                                            title="試合コール"
-                                          >
-                                            <Volume2 className="w-3.5 h-3.5" />
-                                          </button>
-                                          {court.startedAt && (() => {
-                                            const el = Math.floor((Date.now() - court.startedAt) / 60000);
-                                            const h = Math.floor(el / 60);
-                                            const m = el % 60;
-                                            return (
-                                              <span className="font-mono text-[9px] font-bold text-green-600 tabular-nums">
-                                                {h}:{String(m).padStart(2, '0')}
-                                              </span>
-                                            );
-                                          })()}
-                                        </>
-                                      )}
+                                      {isPlaying && court?.startedAt && (() => {
+                                        const el = Math.floor((Date.now() - court.startedAt) / 60000);
+                                        const h = Math.floor(el / 60);
+                                        const m = el % 60;
+                                        return (
+                                          <span className="font-mono text-[10px] font-black text-green-600 tabular-nums">
+                                            {h}:{String(m).padStart(2, '0')}
+                                          </span>
+                                        );
+                                      })()}
                                       {isFinished && match.winnerId && match.nextMatchId && (
                                         <button
                                           onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }}

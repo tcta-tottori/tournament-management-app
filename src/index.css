@@ -821,6 +821,68 @@
   transition: color 0.15s ease;
 }
 
+/* ===========================================================
+   決勝T 対戦カード アクションボタン（IN / 変更 / コール）
+   =========================================================== */
+.bracket-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px 8px;
+  min-width: 52px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
+    0 1px 2px rgba(15, 23, 42, 0.25),
+    0 2px 4px rgba(15, 23, 42, 0.12);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+.bracket-action-btn:hover {
+  filter: brightness(1.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.12) inset,
+    0 2px 4px rgba(15, 23, 42, 0.3),
+    0 3px 6px rgba(15, 23, 42, 0.15);
+}
+.bracket-action-btn:active {
+  transform: scale(0.94);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 1px 1px rgba(15, 23, 42, 0.3);
+}
+.bracket-action-btn svg {
+  flex-shrink: 0;
+}
+
+/* IN（コート割当・緑） */
+.bracket-btn-in {
+  background: linear-gradient(to bottom, #34d399 0%, #10b981 55%, #059669 100%);
+  border-color: #047857;
+}
+
+/* 変更（コート変更・青） */
+.bracket-btn-change {
+  background: linear-gradient(to bottom, #60a5fa 0%, #3b82f6 55%, #2563eb 100%);
+  border-color: #1d4ed8;
+}
+
+/* コール（赤） */
+.bracket-btn-call {
+  background: linear-gradient(to bottom, #f87171 0%, #ef4444 55%, #dc2626 100%);
+  border-color: #b91c1c;
+}
+
 /* ALL タブ用グレーグラデーションラベル（視認性優先） */
 .chrome-tab-label-rainbow {
   background: linear-gradient(
