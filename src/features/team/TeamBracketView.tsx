@@ -644,7 +644,7 @@ export default function TeamBracketView() {
                                             const m = el % 60;
                                             return (
                                               <span className="font-mono text-[9px] font-bold text-green-600 tabular-nums">
-                                                {h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}
+                                                {h}:{String(m).padStart(2, '0')}
                                               </span>
                                             );
                                           })()}

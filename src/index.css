@@ -323,7 +323,7 @@
 .nav-tab {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   padding: 10px 10px;
   min-height: 44px;
