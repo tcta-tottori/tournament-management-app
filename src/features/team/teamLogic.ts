@@ -496,9 +496,47 @@ export function toCourtCallName(courtName: string): string {
   return m ? `${m[1]}番コート` : courtName;
 }
 
+/** コート番号を抽出（'5コート' → 5） */
+function extractCourtNumber(courtName: string): number | null {
+  const m = courtName.match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * コール用のコート名テキストを生成。
+ * - 0件: '指定のコート'
+ * - 1～2件: 「1番コートと2番コート」形式
+ * - 3件以上で連番: 「5番コートから8番コートまで」に省略
+ * - 3件以上で非連番: 「と」でフルに列挙
+ */
+export function formatCourtsForCall(courtNames: string[]): string {
+  if (courtNames.length === 0) return '指定のコート';
+  if (courtNames.length <= 2) {
+    return courtNames.map(toCourtCallName).join('と');
+  }
+  const numbers = courtNames.map(extractCourtNumber);
+  if (numbers.every((n): n is number => n !== null)) {
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const isContiguous = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+    if (isContiguous) {
+      return `${sorted[0]}番コートから${sorted[sorted.length - 1]}番コートまで`;
+    }
+  }
+  return courtNames.map(toCourtCallName).join('と');
+}
+
+/**
+ * 読み上げ用に装飾記号（♪ ★ ♡ 等）を取り除く。
+ * Unicode Symbol, other (\p{So}) と Symbol, modifier (\p{Sk}) を対象とする。
+ */
+export function sanitizeForSpeech(text: string): string {
+  return text.replace(/[\p{So}\p{Sk}]/gu, '').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * 団体戦・決勝トーナメントのコール文を生成。
  * 選手名や所属は含めず、チーム番号とチーム名のみを使う。
+ * チーム名から装飾記号（♪ ★ 等）は取り除いて読み上げる。
  *
  * 読み上げ時にチーム番号とチーム名が詰まらないよう、句点 "。" で
  * 明示的にチャンク境界を入れる（useSpeechSynthesis が "。" で
@@ -510,7 +548,7 @@ export function toCourtCallName(courtName: string): string {
  *   1位トーナメント、1回戦。
  *   3番。ファイヤーボルト。
  *   4番。チームどんどん舞い上がれ。
- *   こちらの試合を、2番コートと4番コートを使っておこなってください。
+ *   こちらの試合を、5番コートから8番コートまで使っておこなってください。
  *   ボールは、3番、ファイヤーボルトの方、お願いいたします。
  */
 export function buildTeamBracketCallText(args: {
@@ -524,16 +562,16 @@ export function buildTeamBracketCallText(args: {
 }): string {
   const { category, roundLabel, team1Number, team1Name, team2Number, team2Name, courtNames } = args;
   const categoryLabel = PLACEMENT_CATEGORY_LABELS[category];
-  const courtsText = courtNames.length > 0
-    ? courtNames.map(toCourtCallName).join('と')
-    : '指定のコート';
+  const courtsText = formatCourtsForCall(courtNames);
+  const cleanTeam1Name = sanitizeForSpeech(team1Name);
+  const cleanTeam2Name = sanitizeForSpeech(team2Name);
   return [
     '試合のコールをします。',
     `${categoryLabel}、${roundLabel}。`,
-    `${team1Number}番。${team1Name}。`,
-    `${team2Number}番。${team2Name}。`,
+    `${team1Number}番。${cleanTeam1Name}。`,
+    `${team2Number}番。${cleanTeam2Name}。`,
     `こちらの試合を、${courtsText}を使っておこなってください。`,
-    `ボールは、${team1Number}番、${team1Name}の方、お願いいたします。`,
+    `ボールは、${team1Number}番、${cleanTeam1Name}の方、お願いいたします。`,
   ].join('\n');
 }
 

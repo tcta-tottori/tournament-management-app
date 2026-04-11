@@ -19,7 +19,7 @@ const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位T',
   '2nd': '2位T',
   '3rd': '3位T',
-  '4th': '4・5位T',
+  '4th': '4·5位T',
 };
 
 /** カテゴリタブのリッチカラー文字 */
@@ -304,10 +304,10 @@ export default function TeamBracketView() {
           {brackets.map(b => {
             const isSelected = !showAllBrackets && b.category === selectedBracketCategory;
             const colors = CATEGORY_TAB_COLORS[b.category];
-            // トーナメントの全試合終了判定
-            const nonByeMatches = b.matches.filter(m => !m.isBye && m.team1Id && m.team2Id);
-            const finishedCount = nonByeMatches.filter(m => m.status === 'finished').length;
-            const bracketDone = nonByeMatches.length > 0 && finishedCount === nonByeMatches.length;
+            // トーナメントの全試合終了判定（全試合 = teams.length - 1）
+            const tabTotal = Math.max(0, b.teams.length - 1);
+            const finishedCount = b.matches.filter(m => !m.isBye && m.status === 'finished').length;
+            const bracketDone = tabTotal > 0 && finishedCount === tabTotal;
             return (
               <button
                 key={b.category}
@@ -368,9 +368,10 @@ export default function TeamBracketView() {
             };
             const lineColor = catGradColors[cat] || '#c9cdd3';
 
-            // ヘッダー用の進捗計算（BYE は除外、両チーム決定済みの試合のみ対象）
-            const headerTotal = bracket.matches.filter(m => !m.isBye && m.team1Id && m.team2Id).length;
-            const headerFinished = bracket.matches.filter(m => !m.isBye && m.team1Id && m.team2Id && m.status === 'finished').length;
+            // ヘッダー用の進捗計算
+            // 総試合数 = そのトーナメントに参加するチーム数 - 1（シングルエリミの定理）
+            const headerTotal = Math.max(0, bracket.teams.length - 1);
+            const headerFinished = bracket.matches.filter(m => !m.isBye && m.status === 'finished').length;
             const headerPct = headerTotal > 0 ? Math.round((headerFinished / headerTotal) * 100) : 0;
 
             return (
@@ -499,7 +500,7 @@ export default function TeamBracketView() {
                             return (
                               <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
                                 <div className={`rounded-xl border-2 overflow-hidden transition-all bg-white ${borderStyle}`} style={{ height: MATCH_HEIGHT }}>
-                                  {/* ステータスバー */}
+                                  {/* ステータスバー（経過時間は下段に移動） */}
                                   <div className={`flex items-center justify-between px-2 py-0.5 border-b text-[10px] ${
                                     isPlaying ? 'bg-green-50 border-green-100' :
                                     isFinished ? 'bg-emerald-50/50 border-emerald-100' :
@@ -525,12 +526,6 @@ export default function TeamBracketView() {
                                         <span className="flex items-center gap-1 text-green-600 font-bold animate-pulse">
                                           <span className="w-2 h-2 rounded-full bg-green-500" />
                                           対戦中
-                                          {court?.startedAt && (() => {
-                                            const el = Math.floor((Date.now() - court.startedAt) / 60000);
-                                            const h = Math.floor(el / 60);
-                                            const m = el % 60;
-                                            return <span className="font-mono text-[9px] text-green-500 ml-0.5">{h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}</span>;
-                                          })()}
                                         </span>
                                       )}
                                       {!isFinished && !isPlaying && match.team1Id && match.team2Id && (
@@ -587,46 +582,81 @@ export default function TeamBracketView() {
                                     )}
                                   </button>
 
-                                  {/* スコア詳細 + アクション */}
-                                  <div className={`flex items-center justify-between px-2 py-0.5 border-t text-[9px] ${
+                                  {/* スコア詳細 + アクション（左下: コート操作 / 右下: 経過時間 or 操作ボタン） */}
+                                  <div className={`flex items-center justify-between gap-1 px-2 py-0.5 border-t text-[9px] ${
                                     isPlaying ? 'bg-green-50/50 border-green-100' :
                                     isFinished ? 'bg-slate-50/50 border-slate-100' :
                                     'bg-slate-50/30 border-slate-100'
                                   }`}>
-                                    {isFinished && match.subMatches.length > 0 ? (
-                                      <div className="flex gap-1.5 flex-1">
-                                        {match.subMatches.map(sm => (
-                                          <span key={sm.type} className="font-mono">
-                                            <span className="text-slate-400 font-bold">{MATCH_TYPE_SHORT[sm.type]}</span>
-                                            <span className={`ml-0.5 font-black ${
-                                              sm.winnerId === match.team1Id ? 'text-blue-600' :
-                                              sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
-                                            }`}>{sm.score1}-{sm.score2}</span>
-                                            {sm.tiebreakScore !== null && <span className="text-slate-400">({sm.tiebreakScore})</span>}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : <div className="flex-1" />}
+                                    {/* 左下: コート入力/変更ボタン */}
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {isFinished && match.winnerId && match.nextMatchId && (
-                                        <button onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors">
-                                          勝者進出<ChevronRight className="w-2.5 h-2.5" />
-                                        </button>
-                                      )}
                                       {isReady && !court && match.team1Id && match.team2Id && (
-                                        <button onClick={e => { e.stopPropagation(); openCourtAssign(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                                          <MapPin className="w-2.5 h-2.5" />コート
+                                        <button
+                                          onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                          aria-label="コート割当"
+                                        >
+                                          <MapPin className="w-3 h-3" />コート
                                         </button>
                                       )}
                                       {isPlaying && court && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); openCourtAssign(match); }}
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                                          aria-label="コート変更"
+                                        >
+                                          <MapPin className="w-3 h-3" />変更
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* 中央: スコア詳細 */}
+                                    <div className="flex-1 min-w-0 flex items-center justify-center overflow-hidden">
+                                      {isFinished && match.subMatches.length > 0 && (
+                                        <div className="flex gap-1.5 overflow-hidden">
+                                          {match.subMatches.map(sm => (
+                                            <span key={sm.type} className="font-mono whitespace-nowrap">
+                                              <span className="text-slate-400 font-bold">{MATCH_TYPE_SHORT[sm.type]}</span>
+                                              <span className={`ml-0.5 font-black ${
+                                                sm.winnerId === match.team1Id ? 'text-blue-600' :
+                                                sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
+                                              }`}>{sm.score1}-{sm.score2}</span>
+                                              {sm.tiebreakScore !== null && <span className="text-slate-400">({sm.tiebreakScore})</span>}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* 右下: 経過時間 or 操作ボタン */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {isPlaying && court && (
                                         <>
-                                          <button onClick={e => { e.stopPropagation(); openCourtAssign(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors">
-                                            <MapPin className="w-2.5 h-2.5" />変更
-                                          </button>
-                                          <button onClick={e => { e.stopPropagation(); openCall(match); }} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors">
+                                          <button
+                                            onClick={e => { e.stopPropagation(); openCall(match); }}
+                                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                          >
                                             <Volume2 className="w-2.5 h-2.5" />コール
                                           </button>
+                                          {court.startedAt && (() => {
+                                            const el = Math.floor((Date.now() - court.startedAt) / 60000);
+                                            const h = Math.floor(el / 60);
+                                            const m = el % 60;
+                                            return (
+                                              <span className="font-mono text-[9px] font-bold text-green-600 tabular-nums">
+                                                {h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}分`}
+                                              </span>
+                                            );
+                                          })()}
                                         </>
+                                      )}
+                                      {isFinished && match.winnerId && match.nextMatchId && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }}
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                                        >
+                                          勝者進出<ChevronRight className="w-2.5 h-2.5" />
+                                        </button>
                                       )}
                                     </div>
                                   </div>
@@ -855,6 +885,8 @@ function TeamCallDialog({
     speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
       finishCall();
     });
+    // 中央ポップアップを閉じ、右下のコール中バブルだけ表示する
+    onClose();
   };
 
   const handleStop = () => {

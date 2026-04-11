@@ -720,7 +720,7 @@
 .chrome-tab {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
   padding: 8px 16px 10px;
   border-radius: 10px 10px 0 0;
