@@ -677,7 +677,7 @@ export default function TeamBracketView() {
                                         <>
                                           <button
                                             onClick={e => { e.stopPropagation(); openCall(match); }}
-                                            className="flex items-center justify-center p-1 rounded text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                            className="flex items-center justify-center p-1 rounded-md text-white bg-red-500 border border-red-600 shadow-sm hover:bg-red-600 active:scale-95 transition-all"
                                             aria-label="試合コール"
                                             title="試合コール"
                                           >
@@ -1089,7 +1089,7 @@ function TeamWaitingList({
                 {hasCourtAssigned && (
                   <button
                     onClick={() => onCall(match)}
-                    className="flex items-center justify-center p-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 active:scale-95 transition-all"
+                    className="flex items-center justify-center p-1.5 text-white bg-red-500 border border-red-600 rounded-lg shadow-sm hover:bg-red-600 active:scale-95 transition-all"
                     aria-label="試合コール"
                     title="試合コール"
                   >
