@@ -30,6 +30,19 @@ const CATEGORY_TAB_COLORS: Record<PlacementCategory, { active: string; inactive:
   '4th': { active: '#2563eb', inactive: '#60a5fa' }, // blue
 };
 
+/**
+ * "1位T", "4・5位T" などのカテゴリ短縮ラベルから「位」の部分だけ
+ * 小さい文字で描画する。それ以外の文字はそのまま。
+ */
+function renderCategoryShortLabel(label: string): React.ReactNode {
+  const parts = label.split(/(位)/);
+  return parts.map((part, i) =>
+    part === '位'
+      ? <span key={i} className="text-[0.55em] opacity-80 align-middle">{part}</span>
+      : <span key={i}>{part}</span>
+  );
+}
+
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
   '1st': { grad: 'from-yellow-400 to-amber-500', bg: 'bg-yellow-50', text: 'text-yellow-700', icon: Trophy },
   '2nd': { grad: 'from-slate-400 to-slate-500', bg: 'bg-slate-50', text: 'text-slate-700', icon: Medal },
@@ -305,7 +318,7 @@ export default function TeamBracketView() {
                   className={`chrome-tab-label ${bracketDone ? 'chrome-tab-label-done' : ''}`}
                   style={{ color: isSelected ? colors.active : colors.inactive }}
                 >
-                  {CATEGORY_SHORT_LABELS[b.category]}
+                  {renderCategoryShortLabel(CATEGORY_SHORT_LABELS[b.category])}
                 </span>
                 {bracketDone && (
                   <Check className="w-3 h-3" strokeWidth={3} style={{ color: isSelected ? colors.active : colors.inactive }} />
@@ -355,24 +368,41 @@ export default function TeamBracketView() {
             };
             const lineColor = catGradColors[cat] || '#c9cdd3';
 
+            // ヘッダー用の進捗計算（BYE は除外、両チーム決定済みの試合のみ対象）
+            const headerTotal = bracket.matches.filter(m => !m.isBye && m.team1Id && m.team2Id).length;
+            const headerFinished = bracket.matches.filter(m => !m.isBye && m.team1Id && m.team2Id && m.status === 'finished').length;
+            const headerPct = headerTotal > 0 ? Math.round((headerFinished / headerTotal) * 100) : 0;
+
             return (
               <div key={cat} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {/* 一体型ヘッダー */}
+                {/* 一体型ヘッダー（アイコン削除、右側に進捗ゲージ） */}
                 <div className={`px-4 py-3 flex items-center gap-3 bg-gradient-to-r ${cfg.grad} text-white`}>
-                  <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-                    <cfg.icon className="w-5 h-5" />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-base font-black tracking-tight">{CATEGORY_LABELS[cat]}</div>
                     <div className="text-[10px] opacity-80">{bracket.drawSize}チームドロー</div>
                   </div>
-                  {bWinner && (
-                    <div className="text-right shrink-0">
-                      <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">優勝</div>
-                      <div className="text-sm font-black truncate max-w-[120px]">{bWinner.teamName}</div>
+                  {/* 右側: 進捗ゲージ + 優勝者 */}
+                  <div className="shrink-0 flex flex-col items-end gap-1 min-w-[130px]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black tabular-nums tracking-tight">
+                        {headerFinished}<span className="opacity-60">/{headerTotal}</span>
+                      </span>
+                      <div className="w-20 h-1.5 rounded-full bg-white/25 overflow-hidden shadow-inner">
+                        <div
+                          className="h-full bg-white rounded-full transition-all duration-500 shadow-[0_0_6px_rgba(255,255,255,0.6)]"
+                          style={{ width: `${headerPct}%` }}
+                        />
+                      </div>
                     </div>
-                  )}
-                  <span className="text-[10px] text-white/60 shrink-0 hidden sm:block">横スクロール</span>
+                    {bWinner ? (
+                      <div className="text-right leading-tight">
+                        <span className="text-[9px] font-bold uppercase tracking-wider opacity-80 mr-1">優勝</span>
+                        <span className="text-xs font-black truncate inline-block max-w-[110px] align-bottom">{bWinner.teamName}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[9px] font-bold opacity-75 tabular-nums">{headerPct}% 完了</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 1位トーナメント抽選パネル */}
