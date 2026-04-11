@@ -286,7 +286,7 @@ export default function TeamBracketView() {
             className={`chrome-tab ${showAllBrackets ? 'chrome-tab-active' : ''}`}
           >
             <Layers className="chrome-tab-icon" />
-            <span className="chrome-tab-label" style={{ color: showAllBrackets ? '#1e293b' : '#64748b' }}>全体</span>
+            <span className="chrome-tab-label" style={{ color: showAllBrackets ? '#1e293b' : '#64748b' }}>ALL</span>
           </button>
           {brackets.map(b => {
             const isSelected = !showAllBrackets && b.category === selectedBracketCategory;

@@ -410,7 +410,7 @@ export default function TeamLeagueView() {
                 <span
                   className={`chrome-tab-label ${allLeaguesComplete ? 'chrome-tab-label-done' : ''}`}
                   style={{ color: allLeaguesComplete ? '#059669' : (showAll ? '#1e293b' : '#64748b') }}
-                >全体</span>
+                >ALL</span>
                 {allLeaguesComplete && (
                   <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
                 )}

@@ -370,7 +370,7 @@ export default function TeamEntryView() {
                 <span
                   className={`chrome-tab-label ${allComplete ? 'chrome-tab-label-done' : ''}`}
                   style={{ color: allComplete ? '#059669' : (selectedTab === 'all' ? '#1e293b' : '#64748b') }}
-                >全体</span>
+                >ALL</span>
                 <span
                   className={`chrome-tab-progress ${allComplete ? 'chrome-tab-progress-done' : ''}`}
                   style={{ color: allComplete ? '#059669' : '#64748b' }}
