@@ -2,8 +2,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
-import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket, TeamEntry } from './types';
-import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, familyName } from './teamLogic';
+import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
+import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { useTeamCallStore } from './teamCallStore';
@@ -81,38 +81,11 @@ function extractCourtNumberShort(courtName: string): string {
   return m ? m[1] : courtName;
 }
 
-/**
- * テスト入力用：チームのメンバーを上から順に取り出し、
- * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
- * メンバーが足りない場合は先頭に戻って巡回する。
- */
-function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
-  const fallback = ['田中', '山本'];
-  if (!team || team.members.length === 0) {
-    return { MIX: fallback, WD: fallback, MD: fallback };
-  }
-  const names = team.members.map(m => {
-    const n = familyName(m.player.name || '').trim();
-    return n || '名無し';
-  });
-  const pick = (startIdx: number): string[] => {
-    const a = names[startIdx % names.length];
-    const b = names[(startIdx + 1) % names.length];
-    return [a, b];
-  };
-  return {
-    MIX: pick(0),
-    WD: pick(2),
-    MD: pick(4),
-  };
-}
-
 export default function TeamBracketView() {
   const {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
     allTeams, leagues, rebuildBracketFromSlots, tournamentInfo,
-    updateBracketSubMatchScore, updateBracketSubMatchPlayers,
   } = useTeamStore();
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
@@ -274,88 +247,6 @@ export default function TeamBracketView() {
 
         {/* 右カラム（PC）/ フルワイド（モバイル）: トーナメント表示 */}
         <div className={`lg:w-1/2 lg:shrink-0 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
-      {/* テスト入力ボタン（選択中トーナメント / 全トーナメント） */}
-      {(() => {
-        /**
-         * 対象カテゴリ内の全試合を 6-4 で埋めて進出を連鎖させる。
-         * @param categoryFilter null なら全カテゴリ、Set なら指定カテゴリのみ対象。
-         */
-        const fillBracketTest = (categoryFilter: Set<PlacementCategory> | null) => {
-          const inTarget = (cat: PlacementCategory) => !categoryFilter || categoryFilter.has(cat);
-          // 1回戦→決勝まで最大でもラウンド数回繰り返せば全て埋まる（8ドロー=3ラウンド）
-          for (let iter = 0; iter < 8; iter++) {
-            // 現在のスナップショット取得
-            const snapshot = useTeamStore.getState().brackets;
-            let filledAny = false;
-            for (const b of snapshot) {
-              if (!inTarget(b.category)) continue;
-              for (const m of b.matches) {
-                if (!m.team1Id || !m.team2Id || m.isBye || m.status === 'finished') continue;
-                const t1 = allTeams.find(t => t.teamId === m.team1Id);
-                const t2 = allTeams.find(t => t.teamId === m.team2Id);
-                const p1 = getTestPlayersForTeam(t1);
-                const p2 = getTestPlayersForTeam(t2);
-                for (const mt of MATCH_TYPE_ORDER) {
-                  updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
-                  updateBracketSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
-                }
-                filledAny = true;
-              }
-            }
-            // 確定した勝者を次試合へ進出
-            const afterFill = useTeamStore.getState().brackets;
-            let advancedAny = false;
-            for (const b of afterFill) {
-              if (!inTarget(b.category)) continue;
-              for (const m of b.matches) {
-                if (m.status !== 'finished' || !m.winnerId || !m.nextMatchId) continue;
-                const nextM = b.matches.find(nm => nm.matchId === m.nextMatchId);
-                if (!nextM) continue;
-                // まだ進出していない場合のみ advanceWinner 呼び出し
-                const already =
-                  (m.nextSlot === 'team1' && nextM.team1Id === m.winnerId) ||
-                  (m.nextSlot === 'team2' && nextM.team2Id === m.winnerId);
-                if (!already) {
-                  advanceWinner(m.matchId);
-                  advancedAny = true;
-                }
-              }
-            }
-            if (!filledAny && !advancedAny) break;
-          }
-        };
-
-        return (
-          <div className="-mx-2 px-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  if (!currentBracket || showAllBrackets) return;
-                  const label = CATEGORY_LABELS[selectedBracketCategory];
-                  if (!confirm(`${label}の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
-                  fillBracketTest(new Set([selectedBracketCategory]));
-                }}
-                disabled={showAllBrackets || !currentBracket}
-                className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                TEST
-              </button>
-              <button
-                onClick={() => {
-                  if (brackets.length === 0) return;
-                  if (!confirm(`全トーナメント（${brackets.length}カテゴリ）の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
-                  fillBracketTest(null);
-                }}
-                disabled={brackets.length === 0}
-                className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                TEST（ALL）
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* カテゴリタブ（リッチカラー文字） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
@@ -599,7 +490,7 @@ export default function TeamBracketView() {
                             const isReady = match.status === 'ready';
 
                             if (isBye) {
-                              const byeName = match.team1Name || match.team2Name || 'BYE';
+                              const byeName = match.team1Name || match.team2Name || '';
                               const byeLeague = match.team1League || match.team2League;
                               const byeStyle = getLeagueStyle(byeLeague);
                               return (
@@ -611,7 +502,6 @@ export default function TeamBracketView() {
                                       </span>
                                     )}
                                     <span className="text-sm font-bold text-slate-700 truncate flex-1">{byeName}</span>
-                                    <span className="text-[10px] text-slate-400 font-bold">BYE</span>
                                   </div>
                                 </div>
                               );
