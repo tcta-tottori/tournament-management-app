@@ -640,10 +640,9 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト1
+          TEST
         </button>
         <button
           onClick={() => {
@@ -659,10 +658,9 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト2（一括）
+          TEST（ALL）
         </button>
       </div>
 
