@@ -42,7 +42,7 @@ export async function generateTeamLeagueResultDataUrl(
   const teamCount = teams.length;
 
   // ---- フォント定義 ----
-  const NAME_FONT = '500 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const NAME_FONT = '500 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   const SCORE_FONT = 'bold 18px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
 
   // ---- 対戦テキストの最大幅を事前計測して scoreColW を最適化 ----
@@ -64,7 +64,7 @@ export async function generateTeamLeagueResultDataUrl(
       mctx.font = SCORE_FONT;
       const scoreW = mctx.measureText(`${sub.score1} - ${sub.score2}`).width;
 
-      const total = p1W + 10 + scoreW + 10 + p2W;
+      const total = p1W + 6 + scoreW + 6 + p2W;
       if (total > maxTextW) maxTextW = total;
     }
   }
@@ -506,7 +506,7 @@ export async function generateTeamLeagueResultDataUrl(
         // 文字色は両側とも統一し、太さの違いだけで勝敗を表現する（薄さを抑える）。
         const leftIsWinner = subWon;
         const myNameFont = leftIsWinner
-          ? 'bold 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
+          ? 'bold 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
           : NAME_FONT;
         const oppNameFont = NAME_FONT;
         const nameColor = COL.slate700;
@@ -521,7 +521,7 @@ export async function generateTeamLeagueResultDataUrl(
         ctx.font = SCORE_FONT;
         const scoreW = ctx.measureText(displayScoreText).width;
 
-        const gap = 9;
+        const gap = 5;
         const totalW = myNameW + gap + scoreW + gap + oppNameW;
         const cellCx = x + scoreColW / 2;
         const startX = cellCx - totalW / 2;

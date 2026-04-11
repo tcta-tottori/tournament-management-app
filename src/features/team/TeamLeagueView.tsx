@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
-import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName } from './teamLogic';
+import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
+import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -132,6 +132,72 @@ const LEAGUE_SOLID_COLORS = [
 function truncTeamName(name: string, max = 6): string {
   if (name.length <= max) return name;
   return name.slice(0, max - 1) + '…';
+}
+
+/**
+ * プレイヤー名の表示コンポーネント
+ * - 空白区切りで苗字のみ抽出
+ * - 2文字以下 → そのまま表示
+ * - 3文字 → 先頭2文字 + 1文字（小さめ、同姓補助）
+ * - 4文字以上 → 先頭2文字のみ表示（フルネーム対策）
+ */
+function PlayerDisplay({ name }: { name: string }) {
+  if (!name) return null;
+  const famName = name.trim().split(/[\s\u3000]+/)[0] || name;
+  if (famName.length <= 2) {
+    return <span>{famName}</span>;
+  }
+  if (famName.length === 3) {
+    return (
+      <span className="inline-flex items-baseline">
+        <span>{famName.slice(0, 2)}</span>
+        <span className="text-[0.6em] opacity-75 ml-px">{famName.slice(2)}</span>
+      </span>
+    );
+  }
+  // 4文字以上は苗字＋名前の可能性が高いので先頭2文字のみ
+  return <span>{famName.slice(0, 2)}</span>;
+}
+
+/** 複数のプレイヤー名をスラッシュ区切りで表示 */
+function PlayerListDisplay({ players }: { players: string[] }) {
+  if (players.length === 0) return null;
+  return (
+    <span className="inline-flex items-baseline gap-0.5">
+      {players.map((p, i) => (
+        <span key={i} className="inline-flex items-baseline">
+          {i > 0 && <span className="text-slate-300 mx-[1px]">/</span>}
+          <PlayerDisplay name={p} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * テスト入力用：チームのメンバーを上から順に取り出し、
+ * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
+ * メンバーが足りない場合は先頭に戻って巡回する。
+ */
+function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
+  const fallback = ['田中', '山本'];
+  if (!team || team.members.length === 0) {
+    return { MIX: fallback, WD: fallback, MD: fallback };
+  }
+  const names = team.members.map(m => {
+    const n = familyName(m.player.name || '').trim();
+    return n || '名無し';
+  });
+  const pick = (startIdx: number): string[] => {
+    const a = names[startIdx % names.length];
+    const b = names[(startIdx + 1) % names.length];
+    return [a, b];
+  };
+  return {
+    MIX: pick(0),
+    WD: pick(2),
+    MD: pick(4),
+  };
 }
 
 /** 種目カラー */
@@ -326,7 +392,7 @@ export default function TeamLeagueView() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* Chrome風リーグ選択タブ */}
+      {/* Chrome風リーグ選択タブ（リッチカラー文字） */}
       <div className="sticky top-0 z-20 -mx-2 px-2">
         <div className="chrome-tab-bar">
           {/* 全体表示タブ（左端） */}
@@ -340,12 +406,10 @@ export default function TeamLeagueView() {
                 onClick={() => setShowAll(true)}
                 className={`chrome-tab ${showAll ? 'chrome-tab-active' : ''}`}
               >
-                <Layers className="chrome-tab-icon" />
-                <span>全体</span>
+                <Layers className="chrome-tab-icon" stroke="url(#rainbow-grad)" />
+                <span className="chrome-tab-label chrome-tab-label-rainbow">ALL</span>
                 {allLeaguesComplete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
+                  <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
                 )}
               </button>
             );
@@ -356,19 +420,27 @@ export default function TeamLeagueView() {
             const total = lm.length;
             const complete = done === total && total > 0;
             const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
+            const solidColor = LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length];
             return (
               <button
                 key={l.leagueId}
                 onClick={() => { setShowAll(false); setSelectedLeagueId(l.leagueId); }}
                 className={`chrome-tab ${isSelected ? 'chrome-tab-active' : ''}`}
               >
-                <span className="chrome-tab-dot" style={{ background: LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length] }} />
-                <span className="font-bold">{l.leagueId}</span>
-                <span className="chrome-tab-count">{done}/{total}</span>
+                <span
+                  className={`chrome-tab-label ${complete ? 'chrome-tab-label-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {l.leagueId}
+                </span>
+                <span
+                  className={`chrome-tab-progress ${complete ? 'chrome-tab-progress-done' : ''}`}
+                  style={{ color: solidColor }}
+                >
+                  {done}/{total}
+                </span>
                 {complete && (
-                  <span className="chrome-tab-badge">
-                    <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                  </span>
+                  <Check className="w-3 h-3" strokeWidth={3} style={{ color: solidColor }} />
                 )}
               </button>
             );
@@ -448,7 +520,7 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
-                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                               {rowTeam.teamNumber}
                             </td>
                             <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
@@ -503,13 +575,20 @@ export default function TeamLeagueView() {
                                       const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                                       const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                                       return (
-                                        <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px] gap-1">
+                                        <div
+                                          key={matchType}
+                                          className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px]"
+                                        >
                                           {hasScore ? (<>
-                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
-                                            <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
-                                            <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                            <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                              <PlayerListDisplay players={myPlayers} />
+                                            </span>
+                                            <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
+                                            <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                              <PlayerListDisplay players={oppPlayers} />
+                                            </span>
                                           </>) : (
-                                            <span className="text-slate-300 font-bold">-</span>
+                                            <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
                                           )}
                                         </div>
                                       );
@@ -549,33 +628,39 @@ export default function TeamLeagueView() {
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => {
-            if (!confirm(`${selectedLeague.leagueId}リーグの全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            if (!confirm(`${selectedLeague.leagueId}リーグの全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
             for (const m of leagueMatchList) {
+              const t1 = allTeams.find(t => t.teamId === m.team1Id);
+              const t2 = allTeams.find(t => t.teamId === m.team2Id);
+              const p1 = getTestPlayersForTeam(t1);
+              const p2 = getTestPlayersForTeam(t2);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
-                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト1
+          TEST
         </button>
         <button
           onClick={() => {
-            if (!confirm(`全リーグ（${leagues.length}ブロック）の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
+            if (!confirm(`全リーグ（${leagues.length}ブロック）の全試合を、各チームのメンバーを使って 6-4 で埋めます。よろしいですか？`)) return;
             for (const m of leagueMatches) {
+              const t1 = allTeams.find(t => t.teamId === m.team1Id);
+              const t2 = allTeams.find(t => t.teamId === m.team2Id);
+              const p1 = getTestPlayersForTeam(t1);
+              const p2 = getTestPlayersForTeam(t2);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
-                updateSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト2（一括）
+          TEST（ALL）
         </button>
       </div>
 
@@ -636,7 +721,7 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[11px] lg:text-xs font-black text-slate-500 tabular-nums`}>
+                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
                     <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
@@ -705,15 +790,22 @@ export default function TeamLeagueView() {
                               const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                               const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
                               return (
-                                <div key={matchType} className="flex items-center justify-center text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none gap-1">
+                                <div
+                                  key={matchType}
+                                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none"
+                                >
                                   {hasScore ? (<>
-                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{myPlayers.join('/') || ''}</span>
-                                    <span className={`font-black ${won ? 'text-blue-700' : 'text-rose-400'}`}>
+                                    <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                      <PlayerListDisplay players={myPlayers} />
+                                    </span>
+                                    <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-400'}`}>
                                       {myScore}-{oppScore}
                                     </span>
-                                    <span className="hidden lg:inline text-[10px] text-slate-500 font-medium truncate max-w-[60px]">{oppPlayers.join('/') || ''}</span>
+                                    <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                      <PlayerListDisplay players={oppPlayers} />
+                                    </span>
                                   </>) : (
-                                    <span className="text-slate-300 font-bold">-</span>
+                                    <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
                                   )}
                                 </div>
                               );
