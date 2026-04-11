@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers } from 'lucide-react';
+import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers, MapPin } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
-import { getDisplayName } from './teamLogic';
+import { getDisplayName, parseCourtNumbers } from './teamLogic';
 
 /** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
@@ -17,11 +17,6 @@ const LEAGUE_COLORS = [
   { grad: 'from-fuchsia-500 to-purple-600', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', solid: 'bg-fuchsia-500' },
 ];
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
-
-/** 苗字のみ抽出（フォールバック用） */
-function familyName(name: string): string {
-  return name.trim().split(/[\s　]+/)[0] || name;
-}
 
 /** メンバー編集モーダル */
 function TeamEditModal({
@@ -38,8 +33,8 @@ function TeamEditModal({
   const [teamName, setTeamName] = useState(team.teamName);
   const color = getColor(colorIndex);
 
-  const addMember = () => {
-    setMembers([...members, { player: { name: '', affiliation: '' }, gender: 'F' }]);
+  const addMember = (gender: 'M' | 'F' = 'M') => {
+    setMembers([...members, { player: { name: '', affiliation: '' }, gender }]);
   };
 
   const updateMember = (idx: number, value: string) => {
@@ -48,6 +43,10 @@ function TeamEditModal({
 
   const updateDisplayName = (idx: number, value: string) => {
     setMembers(prev => prev.map((m, i) => i === idx ? { ...m, player: { ...m.player, displayName: value || undefined } } : m));
+  };
+
+  const updateGender = (idx: number, gender: 'M' | 'F') => {
+    setMembers(prev => prev.map((m, i) => i === idx ? { ...m, gender } : m));
   };
 
   const removeMember = (idx: number) => {
@@ -83,57 +82,80 @@ function TeamEditModal({
           </button>
         </div>
 
-        {/* メンバー編集 */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-xs font-bold text-slate-600">メンバー</span>
-              <span className="text-[10px] text-slate-400">({members.length}名)</span>
-            </div>
-            <button
-              onClick={addMember}
-              className={`flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold ${color.text} ${color.bg} hover:brightness-95 border ${color.border} rounded-lg transition-all`}
-            >
-              <Plus className="w-3 h-3" />
-              追加
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            {members.map((m, i) => {
-              const autoDisplay = getDisplayName(m.player, members);
-              return (
-                <div key={i} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={m.player.name}
-                    onChange={e => updateMember(i, e.target.value)}
-                    placeholder="選手名"
-                    className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                  />
-                  <input
-                    type="text"
-                    value={m.player.displayName ?? ''}
-                    onChange={e => updateDisplayName(i, e.target.value)}
-                    placeholder={autoDisplay}
-                    title="表示名（空欄で自動）"
-                    className={`w-14 text-center text-xs font-bold border rounded-lg px-1 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-100 shrink-0 ${
-                      m.player.displayName ? `${color.border} ${color.text} ${color.bg}` : 'border-slate-200 text-slate-400'
-                    }`}
-                  />
+        {/* メンバー編集（男女分割） */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {(['M', 'F'] as const).map(g => {
+            const groupMembers = members
+              .map((m, idx) => ({ m, idx }))
+              .filter(e => e.m.gender === g);
+            const isMale = g === 'M';
+            const groupLabel = isMale ? '男子' : '女子';
+            const groupColor = isMale
+              ? { text: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200', dot: 'bg-sky-500' }
+              : { text: 'text-pink-700', bg: 'bg-pink-50', border: 'border-pink-200', dot: 'bg-pink-500' };
+            return (
+              <div key={g}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${groupColor.bg} ${groupColor.text} border ${groupColor.border} text-[10px] font-black`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${groupColor.dot}`} />
+                      {groupLabel}
+                    </span>
+                    <span className="text-[10px] text-slate-400">({groupMembers.length}名)</span>
+                  </div>
                   <button
-                    onClick={() => removeMember(i)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                    onClick={() => addMember(g)}
+                    className={`flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold ${groupColor.text} ${groupColor.bg} hover:brightness-95 border ${groupColor.border} rounded-lg transition-all`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Plus className="w-3 h-3" />
+                    追加
                   </button>
                 </div>
-              );
-            })}
-            {members.length === 0 && (
-              <div className="text-center py-3 text-xs text-slate-300 italic">メンバーなし</div>
-            )}
-          </div>
+                <div className="space-y-1.5">
+                  {groupMembers.map(({ m, idx }) => {
+                    const autoDisplay = getDisplayName(m.player, members);
+                    return (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => updateGender(idx, isMale ? 'F' : 'M')}
+                          title="男女を切替"
+                          className={`shrink-0 w-7 text-center text-[10px] font-black rounded-lg px-1 py-1.5 border transition-colors ${groupColor.bg} ${groupColor.text} ${groupColor.border} hover:brightness-95`}
+                        >
+                          {isMale ? '男' : '女'}
+                        </button>
+                        <input
+                          type="text"
+                          value={m.player.name}
+                          onChange={e => updateMember(idx, e.target.value)}
+                          placeholder="選手名"
+                          className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                        />
+                        <input
+                          type="text"
+                          value={m.player.displayName ?? ''}
+                          onChange={e => updateDisplayName(idx, e.target.value)}
+                          placeholder={autoDisplay}
+                          title="表示名（空欄で自動）"
+                          className={`w-14 text-center text-xs font-bold border rounded-lg px-1 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-100 shrink-0 ${
+                            m.player.displayName ? `${color.border} ${color.text} ${color.bg}` : 'border-slate-200 text-slate-400'
+                          }`}
+                        />
+                        <button
+                          onClick={() => removeMember(idx)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {groupMembers.length === 0 && (
+                    <div className="text-center py-2 text-[11px] text-slate-300 italic">登録なし</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* フッター */}
@@ -171,7 +193,10 @@ function CompactTeamCard({
 }) {
   const color = getColor(colorIndex);
   const memberCount = team.members.length;
-  const families = team.members.map(m => getDisplayName(m.player, team.members)).filter(Boolean);
+  const maleMembers = team.members.filter(m => m.gender === 'M');
+  const femaleMembers = team.members.filter(m => m.gender === 'F');
+  const maleNames = maleMembers.map(m => getDisplayName(m.player, team.members)).filter(Boolean);
+  const femaleNames = femaleMembers.map(m => getDisplayName(m.player, team.members)).filter(Boolean);
 
   const statusStyles =
     team.status === 'entry'
@@ -197,18 +222,35 @@ function CompactTeamCard({
         <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-slate-500 shrink-0" />
       </button>
 
-      {/* メンバーサマリー（苗字＋人数） */}
+      {/* メンバーサマリー（男女別） */}
       <button
         onClick={onClick}
         className="w-full px-2.5 py-1.5 space-y-1 hover:bg-slate-50/80 active:bg-slate-100 transition-colors text-left"
       >
         {memberCount > 0 && (
-          <div className="flex items-start gap-1">
-            <span className={`text-[8px] font-black ${color.text} ${color.bg} border ${color.border} px-1 py-0.5 rounded shrink-0 mt-0.5`}>{memberCount}名</span>
-            <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
-              {families.slice(0, 6).join('・')}
-              {families.length > 6 && <span className="text-slate-400"> 他{families.length - 6}名</span>}
-            </div>
+          <div className="space-y-1">
+            {maleMembers.length > 0 && (
+              <div className="flex items-start gap-1">
+                <span className="text-[8px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-1 py-0.5 rounded shrink-0 mt-0.5">
+                  男{maleMembers.length}
+                </span>
+                <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
+                  {maleNames.slice(0, 5).join('・')}
+                  {maleNames.length > 5 && <span className="text-slate-400"> 他{maleNames.length - 5}名</span>}
+                </div>
+              </div>
+            )}
+            {femaleMembers.length > 0 && (
+              <div className="flex items-start gap-1">
+                <span className="text-[8px] font-black text-pink-700 bg-pink-50 border border-pink-200 px-1 py-0.5 rounded shrink-0 mt-0.5">
+                  女{femaleMembers.length}
+                </span>
+                <div className="flex-1 min-w-0 text-[10px] text-slate-600 leading-tight">
+                  {femaleNames.slice(0, 5).join('・')}
+                  {femaleNames.length > 5 && <span className="text-slate-400"> 他{femaleNames.length - 5}名</span>}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {team.members.length === 0 && (
@@ -287,12 +329,19 @@ function LeagueSection({
           <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white blur-2xl" />
         </div>
         <div className="relative flex items-center justify-between gap-2">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <span className="text-xl font-black tracking-tight">{league.leagueId}</span>
-            <span className="text-xs font-medium opacity-90">リーグ</span>
-            {league.courtName && (
-              <span className="text-[10px] opacity-75 truncate">・{league.courtName}</span>
-            )}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl font-black tracking-tight leading-none">{league.leagueId}</span>
+            <span className="text-xs font-medium opacity-90 leading-none">リーグ</span>
+            {(() => {
+              const nums = parseCourtNumbers(league.courtName);
+              if (nums.length === 0) return null;
+              return (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm">
+                  <MapPin className="w-3 h-3 opacity-90 shrink-0" />
+                  <span className="text-[10px] font-bold tabular-nums">{nums.join('・')}</span>
+                </span>
+              );
+            })()}
             <span className="text-[10px] opacity-80 tabular-nums ml-1">{entryCount}/{totalCount}</span>
           </div>
           <button
@@ -368,12 +417,6 @@ export default function TeamEntryView() {
               >
                 <Layers className="chrome-tab-icon" stroke="url(#rainbow-grad)" />
                 <span className="chrome-tab-label chrome-tab-label-rainbow">ALL</span>
-                <span
-                  className={`chrome-tab-progress ${allComplete ? 'chrome-tab-progress-done' : ''}`}
-                  style={{ color: allComplete ? '#059669' : '#64748b' }}
-                >
-                  {totalEntered}/{totalTeams}
-                </span>
                 {allComplete && (
                   <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
                 )}

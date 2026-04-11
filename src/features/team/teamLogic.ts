@@ -92,6 +92,50 @@ export const MATCH_TYPE_SHORT: Record<MatchType, string> = {
   MD: 'MD',
 };
 
+/**
+ * コート名文字列からコート番号の配列を抽出する。
+ * - "5～8番コート" / "5〜8コート" / "5-8" のような範囲表記は [5,6,7,8] に展開
+ * - "1・2コート" / "6,7コート" のような複数表記はそのまま列挙
+ * - "9コート" など単一はそのまま
+ */
+export function parseCourtNumbers(courtName: string | null | undefined): number[] {
+  if (!courtName) return [];
+  const str = courtName.replace(/[\s\u3000]+/g, '');
+  const result: number[] = [];
+  const seen = new Set<number>();
+  // 範囲指定 ("5～8" / "5〜8" / "5-8" / "5~8" / "5–8") を優先的に検出
+  const rangeRegex = /(\d+)\s*[～〜\-~–ー]\s*(\d+)/g;
+  const rangeMatches: Array<{ start: number; end: number; from: number; to: number }> = [];
+  let rm: RegExpExecArray | null;
+  while ((rm = rangeRegex.exec(str)) !== null) {
+    const from = parseInt(rm[1], 10);
+    const to = parseInt(rm[2], 10);
+    if (!isNaN(from) && !isNaN(to)) {
+      rangeMatches.push({ start: rm.index, end: rm.index + rm[0].length, from, to });
+    }
+  }
+  // 範囲マッチ部分を取り除いた残り文字列からも単発番号を拾う
+  let remaining = str;
+  for (const rm2 of rangeMatches) {
+    const lo = Math.min(rm2.from, rm2.to);
+    const hi = Math.max(rm2.from, rm2.to);
+    for (let n = lo; n <= hi; n++) {
+      if (!seen.has(n)) { seen.add(n); result.push(n); }
+    }
+    // 範囲部分を空白に置換
+    remaining = remaining.slice(0, rm2.start) + ' '.repeat(rm2.end - rm2.start) + remaining.slice(rm2.end);
+  }
+  const solo = remaining.match(/\d+/g);
+  if (solo) {
+    for (const s of solo) {
+      const n = parseInt(s, 10);
+      if (!isNaN(n) && !seen.has(n)) { seen.add(n); result.push(n); }
+    }
+  }
+  result.sort((a, b) => a - b);
+  return result;
+}
+
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
   { matchNumber: 1, team1Index: 1, team2Index: 2 },

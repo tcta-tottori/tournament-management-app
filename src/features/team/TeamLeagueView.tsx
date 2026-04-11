@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
+import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, parseCourtNumbers } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -475,9 +475,16 @@ export default function TeamLeagueView() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-black leading-none">{league.leagueId}</span>
                     <span className="text-[10px] font-bold opacity-80">リーグ</span>
-                    {league.courtName && (
-                      <span className="text-[10px] opacity-70 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{league.courtName}</span>
-                    )}
+                    {(() => {
+                      const nums = parseCourtNumbers(league.courtName);
+                      if (nums.length === 0) return null;
+                      return (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm">
+                          <MapPin className="w-3 h-3 opacity-90" />
+                          <span className="text-[10px] font-bold tabular-nums">{nums.join('・')}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     {complete && (
@@ -674,9 +681,16 @@ export default function TeamLeagueView() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-black leading-none">{selectedLeague.leagueId}</span>
             <span className="text-[10px] font-bold opacity-80">リーグ</span>
-            {selectedLeague.courtName && (
-              <span className="text-[10px] opacity-70 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{selectedLeague.courtName}</span>
-            )}
+            {(() => {
+              const nums = parseCourtNumbers(selectedLeague.courtName);
+              if (nums.length === 0) return null;
+              return (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-sm">
+                  <MapPin className="w-3 h-3 opacity-90" />
+                  <span className="text-[10px] font-bold tabular-nums">{nums.join('・')}</span>
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2">
             {leagueComplete && (

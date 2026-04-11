@@ -1013,13 +1013,41 @@ export default function TeamScoreInput({
       {picker && (() => {
         const pickerState = picker;
         const isTeam1 = pickerState.side === 1;
-        const roster = isTeam1 ? team1Roster : team2Roster;
+        const fullRoster = isTeam1 ? team1Roster : team2Roster;
         const tName = isTeam1 ? team1Name : team2Name;
         const tId = isTeam1 ? team1Id : team2Id;
         const tMembers = isTeam1 ? team1Members : team2Members;
         const theme = MATCH_TYPE_THEME[pickerState.mt];
         const teamTheme = TEAM_THEME[pickerState.side];
         const current = scores[pickerState.mt][pickerState.key];
+
+        // 種目別に性別で絞り込む:
+        //  MD → 男子のみ / WD → 女子のみ / MIX → MIX用のスロット (a=男子 / b=女子)
+        // メンバー情報が無い場合はフィルタせず全員表示 (後方互換)
+        const nameToGender = new Map<string, 'M' | 'F'>();
+        for (const m of tMembers) {
+          const displayA = getDisplayNameParts(m.player, tMembers).full;
+          const surname = m.player.name.trim().split(/[\s\u3000]+/)[0];
+          nameToGender.set(displayA, m.gender);
+          if (surname) nameToGender.set(surname, m.gender);
+          if (m.player.displayName) nameToGender.set(m.player.displayName, m.gender);
+        }
+        const filterForGender = (g: 'M' | 'F'): string[] => {
+          if (nameToGender.size === 0) return fullRoster;
+          const filtered = fullRoster.filter(n => nameToGender.get(n) === g);
+          // 1人も該当しない場合はフォールバックで全員 (性別未設定時の救済)
+          return filtered.length > 0 ? filtered : fullRoster;
+        };
+        let roster: string[];
+        if (pickerState.mt === 'MD') {
+          roster = filterForGender('M');
+        } else if (pickerState.mt === 'WD') {
+          roster = filterForGender('F');
+        } else {
+          // MIX: p1a/p2a = 男子、p1b/p2b = 女子
+          const slotIsMale = pickerState.key === 'p1a' || pickerState.key === 'p2a';
+          roster = filterForGender(slotIsMale ? 'M' : 'F');
+        }
 
         // 同チームの他スロットで既に使っている選手名を集める
         // （現在編集中のスロット自体は除外することで、再選択・クリアが自然に動く）

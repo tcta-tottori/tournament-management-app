@@ -3,7 +3,7 @@ import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Users, Sparkle
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket, TeamEntry } from './types';
-import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, familyName } from './teamLogic';
+import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, familyName, parseCourtNumbers, getDisplayName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { useTeamCallStore } from './teamCallStore';
@@ -783,11 +783,12 @@ export default function TeamBracketView() {
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {Array.from({ length: 16 }, (_, i) => `${i + 1}コート`).map(c => {
                   const inLeagueProgress = (() => {
+                    const courtNum = parseInt(c.replace('コート', ''), 10);
                     for (const l of leagues) {
                       const lm = useTeamStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
                       if (lm.length > 0 && lm.some(m => m.status !== 'finished')) {
-                        const nums = (l.courtName || '').match(/\d+/g);
-                        if (nums && nums.includes(c.replace('コート', ''))) return true;
+                        const nums = parseCourtNumbers(l.courtName);
+                        if (nums.includes(courtNum)) return true;
                       }
                     }
                     return false;
@@ -855,18 +856,31 @@ export default function TeamBracketView() {
       )}
 
       {/* スコア入力ダイアログ */}
-      {editingMatch && (
-        <TeamScoreInput
-          matchId={editingMatch.matchId}
-          team1Id={editingMatch.team1Id || ''}
-          team2Id={editingMatch.team2Id || ''}
-          team1Name={editingMatch.team1Name}
-          team2Name={editingMatch.team2Name}
-          subMatches={editingMatch.subMatches}
-          onClose={() => setEditingMatch(null)}
-          isBracket
-        />
-      )}
+      {editingMatch && (() => {
+        const t1 = allTeams.find(t => t.teamId === editingMatch.team1Id);
+        const t2 = allTeams.find(t => t.teamId === editingMatch.team2Id);
+        const t1Members = t1?.members || [];
+        const t2Members = t2?.members || [];
+        const makeRoster = (members: typeof t1Members) => Array.from(new Set(
+          members.map(m => getDisplayName(m.player, members)).filter(Boolean)
+        ));
+        return (
+          <TeamScoreInput
+            matchId={editingMatch.matchId}
+            team1Id={editingMatch.team1Id || ''}
+            team2Id={editingMatch.team2Id || ''}
+            team1Name={editingMatch.team1Name}
+            team2Name={editingMatch.team2Name}
+            subMatches={editingMatch.subMatches}
+            onClose={() => setEditingMatch(null)}
+            isBracket
+            team1Roster={makeRoster(t1Members)}
+            team2Roster={makeRoster(t2Members)}
+            team1Members={t1Members}
+            team2Members={t2Members}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { LeagueMatchScore, MixedLeague } from './types';
+import { parseCourtNumbers } from '../team/teamLogic';
 
 /** SVG コートライン（縦向き） */
 function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
@@ -89,13 +90,10 @@ export default function MixedLiveCourtView() {
       const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
       const cs = getLeagueCourtStatus(league, lm);
       const nextMatch = lm.filter(m => m.status !== 'finished').sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
-      // コート名から番号を抽出 (例: "6・7コート" → [6,7], "2 コート" → [2], "10・11 コート" → [10,11])
-      const courtStr = (league.courtName || '').replace(/[\s\u3000]+/g, '');
-      const nums = courtStr.match(/\d+/g);
-      if (nums) {
-        for (const n of nums) {
-          map.set(parseInt(n), { league, status: cs, nextMatch });
-        }
+      // コート名から番号を抽出 (例: "6・7コート" → [6,7], "5～8コート" → [5,6,7,8])
+      const nums = parseCourtNumbers(league.courtName);
+      for (const n of nums) {
+        map.set(n, { league, status: cs, nextMatch });
       }
     }
     return map;

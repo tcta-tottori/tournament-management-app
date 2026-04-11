@@ -69,10 +69,44 @@ interface ParseResult {
 }
 
 /**
+ * hex色文字列(FFRRGGBB または RRGGBB または #RRGGBB)から性別を推定する。
+ * 青系 → 'M'、ピンク/赤系 → 'F'、判定不能 → null
+ */
+function classifyGenderByFillColor(hex: string | undefined | null): 'M' | 'F' | null {
+  if (!hex) return null;
+  let h = hex.replace('#', '').toUpperCase();
+  if (h.length === 8) h = h.slice(2); // ARGB → RGB
+  if (h.length !== 6) return null;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some(v => isNaN(v))) return null;
+  // 白・黒・グレーは除外
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 20) return null;           // ほぼ黒
+  if (max - min < 15) return null;     // 無彩色
+  // 青系（B が大）→ 男
+  if (b > r + 15 && b >= g) return 'M';
+  // 赤/ピンク系（R が大）→ 女
+  if (r > b + 15 && r >= g - 10) return 'F';
+  return null;
+}
+
+/** セルの塗りつぶし色(hex)を取得 */
+function cellFillHex(ws: XLSX.WorkSheet, ref: string): string | null {
+  const cell = ws[ref] as (XLSX.CellObject & { s?: { fgColor?: { rgb?: string }; bgColor?: { rgb?: string }; patternType?: string } }) | undefined;
+  if (!cell || !cell.s) return null;
+  const s = cell.s;
+  const rgb = s.fgColor?.rgb || s.bgColor?.rgb;
+  return rgb || null;
+}
+
+/**
  * 団体戦Excelパーサー
  */
 export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const wb = XLSX.read(buffer, { type: 'array', cellStyles: true });
 
   // 大会情報を表紙シートから取得
   const info = parseTournamentInfo(wb);
@@ -436,11 +470,15 @@ function parseRoster(
     }
 
     // 3) 列範囲 × 行範囲の矩形からメンバー名を収集
+    //    各メンバーに対して位置(col)と塗りつぶし色を記録し、後段で男女分類を行う。
     team.members = [];
     const seenNames = new Set<string>();
+    type RawMember = { name: string; col: number; row: number; fillHex: string | null };
+    const raw: RawMember[] = [];
     for (let mr = rowStart; mr <= rowEnd; mr++) {
       for (let cc = colStart; cc <= colEnd; cc++) {
-        const v = cellStr(ws, colLetter(cc) + (mr + 1));
+        const ref = colLetter(cc) + (mr + 1);
+        const v = cellStr(ws, ref);
         if (!v) continue;
         // 丸数字セルはスキップ
         if ([...v].some(ch => circledNumbers.includes(ch))) continue;
@@ -449,11 +487,55 @@ function parseRoster(
         // 明らかに人名ではない文字列はスキップ（長すぎる・記号のみ）
         if (cleaned.length > 20) continue;
         seenNames.add(cleaned);
-        team.members.push({
-          player: { name: cleaned, affiliation: '' },
-          gender: 'F',
-        });
+        raw.push({ name: cleaned, col: cc, row: mr, fillHex: cellFillHex(ws, ref) });
       }
+    }
+
+    // 男女分類:
+    //  (a) セル塗りつぶし色が青系/ピンク系なら確定
+    //  (b) 色で確定できないメンバーは、行範囲内の列位置で前半/後半に分割
+    //      (典型的にはレイアウトが左=男子 / 右=女子 か、上=男子 / 下=女子)
+    //  (c) どちらでも決まらない場合は 'F' (後方互換)
+    const colorMembers: { m: RawMember; g: 'M' | 'F' }[] = [];
+    const uncolored: RawMember[] = [];
+    for (const m of raw) {
+      const g = classifyGenderByFillColor(m.fillHex);
+      if (g) colorMembers.push({ m, g });
+      else uncolored.push(m);
+    }
+
+    // 列の中央値を使い、前半=男子・後半=女子と仮定する (フォールバック)
+    const minCol = raw.reduce((a, m) => Math.min(a, m.col), Number.POSITIVE_INFINITY);
+    const maxCol = raw.reduce((a, m) => Math.max(a, m.col), Number.NEGATIVE_INFINITY);
+    const colMid = (minCol + maxCol) / 2;
+    // 色が付いている人がいれば、色の多数派を反対側の既定として尊重
+    const colorByCol: Record<'left' | 'right', { M: number; F: number }> = {
+      left:  { M: 0, F: 0 },
+      right: { M: 0, F: 0 },
+    };
+    for (const cm of colorMembers) {
+      const side = cm.m.col <= colMid ? 'left' : 'right';
+      colorByCol[side][cm.g]++;
+    }
+    const dominantLeft: 'M' | 'F' =
+      colorByCol.left.M >= colorByCol.left.F ? 'M' : 'F';
+    const dominantRight: 'M' | 'F' =
+      colorByCol.right.F >= colorByCol.right.M ? 'F' : 'M';
+
+    for (const m of raw) {
+      const colored = colorMembers.find(cm => cm.m === m);
+      let gender: 'M' | 'F';
+      if (colored) {
+        gender = colored.g;
+      } else if (raw.length > 1 && maxCol > minCol) {
+        gender = m.col <= colMid ? dominantLeft : dominantRight;
+      } else {
+        gender = 'F';
+      }
+      team.members.push({
+        player: { name: m.name, affiliation: '' },
+        gender,
+      });
     }
   }
 }
