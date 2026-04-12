@@ -412,14 +412,14 @@ export default function AppLayout() {
             : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
         const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
         return (
-          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs sticky top-0 z-20">
+          <div className="info-bar flex items-center shrink-0 h-11 overflow-hidden text-xs sticky top-0 z-20">
             {/* 左端：ハンバーガーボタン + メニュー名 */}
             <button
               className="hamburger-inline-btn"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="メニューを開く"
             >
-              <Menu style={{ width: 16, height: 16 }} />
+              <Menu style={{ width: 20, height: 20 }} />
               <span className="hamburger-inline-label">{currentPageLabel}</span>
             </button>
 

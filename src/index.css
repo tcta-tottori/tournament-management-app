@@ -375,13 +375,13 @@
 .hamburger-inline-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px 0 10px;
+  gap: 8px;
+  padding: 0 14px 0 12px;
   height: 100%;
   background: rgba(27, 77, 62, 0.9);
   border: none;
   border-right: 1px solid rgba(218, 185, 92, 0.2);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   white-space: nowrap;
   position: relative;
@@ -395,7 +395,7 @@
 }
 
 .hamburger-inline-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffd700;
   letter-spacing: 0.03em;
