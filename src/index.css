@@ -315,70 +315,56 @@
    ナビゲーションバー
    =========================================================== */
 .nav-bar {
-  background: #1b4d3e;
+  background: #163d31;
   box-shadow: 0 2px 12px rgba(15, 51, 38, 0.3);
-  border-bottom: 1px solid rgba(218, 185, 92, 0.1);
+  padding-top: 4px;
 }
 
 .nav-tab {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 10px 10px;
-  min-height: 44px;
-  font-size: 12px;
-  font-weight: 500;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  margin: 0 1px;
+  min-height: 40px;
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.5);
-  transition: color 0.25s ease, background 0.25s ease;
+  color: rgba(255, 255, 255, 0.55);
+  transition: all 0.2s ease;
   border: none;
-  background: none;
+  background: transparent;
   cursor: pointer;
+  border-radius: 10px 10px 0 0;
 }
 
 @media (min-width: 640px) {
   .nav-tab {
     gap: 6px;
-    padding: 12px 14px;
-    font-size: 13px;
+    padding: 9px 16px;
+    font-size: 12px;
   }
 }
 
 .nav-tab:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-/* アクティブタブ：ボトムライン（テニスボール→砂丘のグラデーション） */
 .nav-tab::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0;
-  height: 2.5px;
-  background: linear-gradient(90deg, #d4e157, #c4956a);
-  border-radius: 2px 2px 0 0;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.nav-tab:hover::after {
-  width: calc(100% - 16px);
-  left: 8px;
+  display: none;
 }
 
 .nav-bar .nav-tab-active {
-  color: #fff;
-  font-weight: 600;
+  color: #1b4d3e;
+  font-weight: 800;
+  background: #f0fdf4;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .nav-bar .nav-tab-active::after {
-  width: calc(100% - 16px);
-  left: 8px;
-  background: linear-gradient(90deg, #d4e157, #c4956a);
-  box-shadow: 0 0 10px rgba(212, 225, 87, 0.3), 0 0 4px rgba(196, 149, 106, 0.2);
+  display: none;
 }
 
 /* ===========================================================
@@ -452,8 +438,8 @@
 
 /* ===== 大会情報バー ===== */
 .info-bar {
-  background: linear-gradient(135deg, #145a32 0%, #1a7a42 30%, #196f3d 60%, #145a32 100%);
-  border-bottom: 2px solid #d4af37;
+  background: #1b4d3e;
+  border-bottom: 1px solid rgba(218, 185, 92, 0.15);
   position: relative;
 }
 .info-bar::after {
@@ -462,12 +448,12 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(212,175,55,0.8), rgba(255,215,0,1), rgba(212,175,55,0.8), transparent);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(218,185,92,0.3), transparent);
 }
 .info-bar-label {
-  background: rgba(20,90,50,0.9);
-  border-right: 1px solid rgba(212,175,55,0.4);
+  background: rgba(27,77,62,0.9);
+  border-right: 1px solid rgba(218,185,92,0.2);
   position: relative;
   z-index: 1;
   color: #ffd700;

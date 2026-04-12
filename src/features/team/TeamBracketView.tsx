@@ -311,10 +311,9 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト（{showAllBrackets ? '全体' : CATEGORY_SHORT_LABELS[selectedBracketCategory]}）
+          TEST
         </button>
         <button
           onClick={() => {
@@ -338,10 +337,9 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          テスト（一括）
+          TEST（ALL）
         </button>
       </div>
 
@@ -1003,14 +1001,7 @@ function TeamWaitingList({
     cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4・5位';
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
-          <ClipboardList className="w-3 h-3" />
-          {waitingMatches.length}試合
-        </span>
-        <span>控えています（1回戦優先で自動並べ替え）</span>
-      </div>
+    <div className="space-y-2.5">
       {waitingMatches.map(({ match, bracket, roundLabel }, idx) => {
         const cfg = CATEGORY_CONFIG[bracket.category];
         const ca = bracketCourtAssignments[match.matchId];
@@ -1018,56 +1009,60 @@ function TeamWaitingList({
         const s1 = getLeagueStyle(match.team1League);
         const s2 = getLeagueStyle(match.team2League);
         return (
-          <div key={match.matchId} className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-all ${
+          <div key={match.matchId} className={`rounded-xl border overflow-hidden transition-all ${
             hasCourtAssigned
-              ? 'border-blue-200 ring-1 ring-blue-100'
-              : 'border-slate-200'
+              ? 'border-blue-200 shadow-md ring-1 ring-blue-100/50'
+              : 'border-slate-200/80 shadow-sm'
           }`}>
-            {/* 上段: カテゴリ + チーム + 番号 */}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="text-[10px] font-bold text-slate-400 tabular-nums shrink-0">#{idx + 1}</span>
-              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black ${cfg.bg} ${cfg.text} shrink-0`}>
-                {catLabel(bracket.category)} {roundLabel}
-              </span>
-              <div className="flex-1 min-w-0 flex items-center gap-1 text-xs font-bold text-slate-800">
+            {/* ヘッダー: カテゴリ + ラウンド */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${cfg.grad} text-white`}>
+              <span className="text-[10px] font-black opacity-80 tabular-nums">#{idx + 1}</span>
+              <cfg.icon className="w-3 h-3 opacity-80" />
+              <span className="text-[10px] font-black tracking-wide">{catLabel(bracket.category)}T {roundLabel}</span>
+            </div>
+            {/* チーム情報 */}
+            <div className="px-3 py-2 bg-white">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
                 {match.team1League && (
-                  <span className={`w-4 h-4 rounded ${s1.bg} ${s1.text} text-[8px] font-black flex items-center justify-center shrink-0`}>{match.team1League}</span>
+                  <span className={`w-5 h-5 rounded-md ${s1.bg} ${s1.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team1League}</span>
                 )}
-                <span className="truncate">{match.team1Name}</span>
-                <span className="text-[9px] text-slate-300 font-bold mx-0.5 shrink-0">vs</span>
+                <span className="truncate flex-1">{match.team1Name}</span>
+              </div>
+              <div className="text-[9px] text-slate-300 font-black pl-6.5 my-0.5">VS</div>
+              <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
                 {match.team2League && (
-                  <span className={`w-4 h-4 rounded ${s2.bg} ${s2.text} text-[8px] font-black flex items-center justify-center shrink-0`}>{match.team2League}</span>
+                  <span className={`w-5 h-5 rounded-md ${s2.bg} ${s2.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team2League}</span>
                 )}
-                <span className="truncate">{match.team2Name}</span>
+                <span className="truncate flex-1">{match.team2Name}</span>
               </div>
             </div>
-            {/* 下段: コート状況 + ボタン */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/60 border-t border-slate-100">
+            {/* フッター: コート + ボタン */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/80 border-t border-slate-100">
               {hasCourtAssigned ? (
-                <span className="flex items-center gap-0.5 text-[11px] font-bold text-blue-600 tabular-nums">
-                  <MapPin className="w-3 h-3" />
+                <span className="flex items-center gap-1 text-[11px] font-bold text-blue-600 tabular-nums">
+                  <MapPin className="w-3.5 h-3.5" />
                   {ca.courtNames.map(extractCourtNumberShort).join('・')}
                 </span>
               ) : (
-                <span className="text-[10px] text-slate-400">コート未割当</span>
+                <span className="text-[10px] text-slate-400 italic">コート未割当</span>
               )}
-              <div className="ml-auto flex items-center gap-1.5">
+              <div className="ml-auto flex items-center gap-2">
                 {hasCourtAssigned && (
                   <button
                     onClick={() => onCall(match)}
-                    className="flex items-center justify-center p-1.5 text-white bg-red-500 border border-red-600 rounded-lg shadow-sm hover:bg-red-600 active:scale-95 transition-all"
-                    aria-label="試合コール"
+                    className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-black text-white bg-gradient-to-b from-red-500 to-red-600 rounded-lg shadow-sm hover:from-red-600 hover:to-red-700 active:scale-95 transition-all"
                     title="試合コール"
                   >
-                    <Volume2 className="w-4 h-4" />
+                    <Volume2 className="w-3.5 h-3.5" />
+                    コール
                   </button>
                 )}
                 <button
                   onClick={() => onAssignCourt(match)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-black rounded-lg active:scale-95 transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-black rounded-lg active:scale-95 transition-all ${
                     hasCourtAssigned
-                      ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
-                      : 'text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm'
+                      ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm'
+                      : 'text-white bg-gradient-to-b from-emerald-500 to-emerald-600 shadow-sm hover:from-emerald-600 hover:to-emerald-700'
                   }`}
                 >
                   <MapPin className="w-3.5 h-3.5" />

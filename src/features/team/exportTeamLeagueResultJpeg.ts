@@ -400,8 +400,7 @@ export async function generateTeamLeagueResultDataUrl(
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
     const x = tableX + numColW + nameColW + typeColW + scoreColW * i + scoreColW / 2;
-    const shortName = team.teamName.split(/[\s\u3000]+/)[0] || team.teamName;
-    drawText(shortName, x, tableY + colHeaderH / 2, 12, 'center', thColor, 'black', scoreColW - 14);
+    drawText(team.teamName, x, tableY + colHeaderH / 2, 10, 'center', thColor, 'black', scoreColW - 10);
   }
   let colCursor = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
   drawText('勝敗', colCursor + recordColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');

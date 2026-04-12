@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
-  Database, Users, Dices, Trophy,
+  Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, HardDrive,
   AlertTriangle, Network
@@ -20,10 +20,10 @@ const ALL_MAIN_TABS = [
   { id: 'S-02', path: '/entry', label: 'エントリー', icon: Users },
 
   { id: 'S-04', path: '/draw-lot', label: '抽選', icon: Dices },
-  { id: 'S-05', path: '/draw-table', label: 'ドロー表', icon: Trophy },
+  { id: 'S-05', path: '/draw-table', label: 'ドロー表', icon: Swords },
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
   { id: 'S-06b', path: '/schedule-sheet', label: 'タイムテーブル', icon: CalendarClock },
-  { id: 'S-07', path: '/score', label: 'スコア', icon: MonitorPlay },
+  { id: 'S-07', path: '/score', label: 'スコア', icon: Trophy },
   { id: 'S-07b', path: '/court-bracket', label: 'ドロー状況', icon: Network },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
@@ -380,6 +380,35 @@ export default function AppLayout() {
         </div>
       </header>
 
+      {/* ===== 大会情報バー ===== */}
+      {(tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo)) && (() => {
+        const displayName = isMixedImported && mixedTournamentInfo
+          ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+          : isTeamImported && teamTournamentInfo
+            ? teamTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+            : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
+        const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
+        return (
+          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
+            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+              <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
+                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                  </span>
+                )) : (
+                  <span className="info-ticker-item">
+                    <span>{displayName || '大会運営システム'}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ===== ナビゲーションバー ===== */}
       <nav className="nav-bar sticky top-0 z-20 shrink-0">
         <div className="flex items-center">
@@ -443,35 +472,6 @@ export default function AppLayout() {
 
         </div>
       </nav>
-
-      {/* ===== 大会情報バー ===== */}
-      {(tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo)) && (() => {
-        const displayName = isMixedImported && mixedTournamentInfo
-          ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
-          : isTeamImported && teamTournamentInfo
-            ? teamTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
-            : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
-        const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
-        return (
-          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
-            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-              <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
-                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
-                  </span>
-                )) : (
-                  <span className="info-ticker-item">
-                    <span>{displayName || '大会運営システム'}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
       <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
