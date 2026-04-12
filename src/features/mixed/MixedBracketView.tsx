@@ -1335,8 +1335,8 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
               <div className="absolute" style={{ left: colX, top: 4, width: MATCH_WIDTH }}>
                 <div className="text-center">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
-                    ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :
-                      round === totalRounds - 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                    ${round === totalRounds ? 'bg-gradient-to-r from-sky-400 to-sky-500 text-white' :
+                      round === totalRounds - 1 ? 'bg-sky-50 text-sky-700' : 'bg-gray-100 text-gray-600'}`}>
                     {getRoundLabel(round, totalRounds)}
                   </span>
                 </div>

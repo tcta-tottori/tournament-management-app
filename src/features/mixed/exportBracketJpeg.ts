@@ -5,6 +5,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   '3rd': '3位トーナメント', '4th': '4・5位トーナメント',
 };
 
+/** カテゴリ別ヘッダーカラー（ヘッダーバッジのみカテゴリごとに色分け） */
+const CATEGORY_HEADER_COLORS: Record<string, string> = {
+  '1st': '#d97706', // amber
+  '2nd': '#64748b', // slate
+  '3rd': '#ea580c', // orange
+  '4th': '#2563eb', // blue
+};
+
 const SCALE = 2;
 const SLOT_W = 170;
 const SLOT_H = 44;
@@ -210,12 +218,14 @@ export async function generateBracketDataUrl(
   ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
   ctx.stroke();
 
-  // ヘッダー
+  // ヘッダー（カテゴリ別カラーバッジ）
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
+  const headerColor = CATEGORY_HEADER_COLORS[bracket.category] || '#059669';
   const cw = approxW(catLabel, 16) + 30;
-  ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-  ctx.strokeRect(PADDING_X, PADDING_Y, cw, 30);
-  txt(ctx, catLabel, PADDING_X + cw / 2, PADDING_Y + 15, 16, { align: 'center', bold: true });
+  const chH = 30;
+  _rr(ctx, PADDING_X, PADDING_Y, cw, chH, 6);
+  ctx.fillStyle = headerColor; ctx.fill();
+  txt(ctx, catLabel, PADDING_X + cw / 2, PADDING_Y + 15, 16, { align: 'center', bold: true, color: '#fff' });
   txt(ctx, tournamentName, totalW - PADDING_X, PADDING_Y + 15, 14, { align: 'right', bold: true, color: '#333' });
   ln(ctx, PADDING_X, PADDING_Y + 34, totalW - PADDING_X, PADDING_Y + 34, '#ddd', 0.5);
 
@@ -511,7 +521,8 @@ export async function generateResultDataUrl(
   ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, PY + HDR); ctx.lineTo(totalW, PY + HDR); ctx.stroke();
 
-  // トーナメント名（緑背景+白文字の角丸バッジ）
+  // トーナメント名（カテゴリ別カラーバッジ）
+  const headerColor2 = CATEGORY_HEADER_COLORS[bracket.category] || '#059669';
   setFont(ctx, 28, true);
   const catTW = ctx.measureText(catLabel).width;
   const cbW = catTW + 44;
@@ -519,7 +530,7 @@ export async function generateResultDataUrl(
   const cbX = PX + 4;
   const cbY = PY + (HDR - cbH) / 2;
   _rr(ctx, cbX, cbY, cbW, cbH, 10);
-  ctx.fillStyle = '#059669'; ctx.fill();
+  ctx.fillStyle = headerColor2; ctx.fill();
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(catLabel, cbX + cbW / 2, cbY + cbH / 2);
 

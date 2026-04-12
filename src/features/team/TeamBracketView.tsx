@@ -377,10 +377,8 @@ export default function TeamBracketView() {
             };
             const r1count = bRoundMatches[0]?.length || 0;
             const svgHeight = r1count * GRID_UNIT + 36;
-            const catGradColors: Record<string, string> = {
-              '1st': '#f59e0b', '2nd': '#94a3b8', '3rd': '#f97316', '4th': '#3b82f6',
-            };
-            const lineColor = catGradColors[cat] || '#c9cdd3';
+            // ブラケット接続線はカテゴリに関係なく統一カラー
+            const lineColor = '#94a3b8';
 
             // ヘッダー用の進捗計算
             // 総試合数 = そのトーナメントに参加するチーム数 - 1（シングルエリミの定理）
@@ -470,9 +468,9 @@ export default function TeamBracketView() {
                             <div className="text-center">
                               <span className={`inline-block px-4 py-1 rounded-full text-xs font-black shadow-sm ${
                                 round === bTotalRounds
-                                  ? `bg-gradient-to-r ${cfg.grad} text-white`
+                                  ? 'bg-gradient-to-r from-sky-400 to-sky-500 text-white'
                                   : round === bTotalRounds - 1
-                                  ? `${cfg.bg} ${cfg.text} border border-current/20`
+                                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
                                   : 'bg-slate-100 text-slate-600 border border-slate-200'
                               }`}>
                                 {bGetRoundName(round)}
@@ -522,7 +520,7 @@ export default function TeamBracketView() {
                                   <div className={`flex items-center justify-between px-2 py-0.5 border-b text-[10px] ${
                                     isPlaying ? 'bg-green-50 border-green-100' :
                                     isFinished ? 'bg-emerald-50/50 border-emerald-100' :
-                                    `${cfg.bg} border-slate-100`
+                                    'bg-slate-50 border-slate-100'
                                   }`}>
                                     <div className="flex items-center gap-1 min-w-0">
                                       {court ? (

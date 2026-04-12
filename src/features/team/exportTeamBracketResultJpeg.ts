@@ -90,8 +90,8 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // 下部パディングはロゴのサイズに応じて動的に確保する
-  const bracketBottomPad = Math.max(90, tctaH + 36);
+  // 下部パディング（ロゴはブラケット内の空きスペースに配置するため最小限）
+  const bracketBottomPad = 40;
   const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
 
   const totalW = tableW + paddingX * 2;
@@ -306,8 +306,8 @@ export async function generateTeamBracketResultDataUrl(
     return `${round}回戦`;
   };
 
-  // ---- 接続線 ----
-  const lineColor = catColor.c2;
+  // ---- 接続線（カテゴリに関係なく統一カラー） ----
+  const lineColor = '#94a3b8';
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.5;
@@ -343,9 +343,10 @@ export async function generateTeamBracketResultDataUrl(
     const labelBoxY = labelY - labelH / 2;
 
     if (isFinal) {
+      // 決勝ラベルはカテゴリに関係なく統一カラー
       const grad = ctx.createLinearGradient(labelBoxX, 0, labelBoxX + labelW, 0);
-      grad.addColorStop(0, catColor.c1);
-      grad.addColorStop(1, catColor.c2);
+      grad.addColorStop(0, '#38bdf8'); // sky-400
+      grad.addColorStop(1, '#0ea5e9'); // sky-500
       drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, grad);
       ctx.fillStyle = COL.white;
     } else {
@@ -554,12 +555,14 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- TCTAロゴ: トーナメント表枠内の右下に配置（大きめ） ----
+  // ---- TCTAロゴ: トーナメント表の一番下のラインに合わせて、その上側に配置 ----
   if (tctaLogo) {
     const logoMarginX = 22;
-    const logoMarginY = 18;
+    // 1回戦の最後のマッチの下端Y座標を算出
+    const lastMatchBottomY = getMatchY(0, r1Count - 1) + matchH / 2;
     const logoX = paddingX + tableW - tctaW - logoMarginX;
-    const logoY = bracketAreaY + bracketH - tctaH - logoMarginY;
+    // ロゴの下端を最後のマッチの下端に合わせる
+    const logoY = lastMatchBottomY - tctaH;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
 
