@@ -17,7 +17,7 @@ const LEAGUE_BADGE_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
-  '1st': '1位T', '2nd': '2位T', '3rd': '3位T', '4th': '4・5位T',
+  '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント',
 };
 
 
@@ -217,8 +217,8 @@ export default function MixedWaitingList() {
         return (
           <div key={match.matchId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {/* ヘッダー: カテゴリ + 回戦 */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${CATEGORY_COLORS[category]}`}>
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border-b border-gray-100">
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${CATEGORY_COLORS[category]}`}>
                 {CATEGORY_LABELS[category]}
               </span>
               <span className="text-xs font-medium text-gray-600">{roundLabel}</span>

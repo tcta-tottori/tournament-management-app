@@ -95,6 +95,7 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
+  const { speak } = useSpeechSynthesis();
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -816,6 +817,7 @@ export default function TeamBracketView() {
           match={callMatch}
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
+          speak={speak}
         />
       )}
 
@@ -841,14 +843,15 @@ function TeamCallDialog({
   match,
   courtNames,
   onClose,
+  speak,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
+  speak: (text: string, settings: { rate: number; pitch: number; volume: number; repeatCount: number }, onComplete?: () => void) => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
-  const { speak } = useSpeechSynthesis();
   const isCalling = useTeamCallStore(s => s.isActive);
   const startCall = useTeamCallStore(s => s.start);
   const finishCall = useTeamCallStore(s => s.finish);
@@ -996,8 +999,8 @@ function TeamWaitingList({
     );
   }
 
-  const catLabel = (cat: PlacementCategory) =>
-    cat === '1st' ? '1位' : cat === '2nd' ? '2位' : cat === '3rd' ? '3位' : '4・5位';
+  const catFullLabel = (cat: PlacementCategory) =>
+    cat === '1st' ? '1位トーナメント' : cat === '2nd' ? '2位トーナメント' : cat === '3rd' ? '3位トーナメント' : '4・5位トーナメント';
 
   return (
     <div className="space-y-2.5">
@@ -1014,10 +1017,9 @@ function TeamWaitingList({
               : 'border-slate-200/80 shadow-sm'
           }`}>
             {/* ヘッダー: カテゴリ + ラウンド */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${cfg.grad} text-white`}>
-              <span className="text-[10px] font-black opacity-80 tabular-nums">#{idx + 1}</span>
-              <cfg.icon className="w-3 h-3 opacity-80" />
-              <span className="text-[10px] font-black tracking-wide">{catLabel(bracket.category)}T {roundLabel}</span>
+            <div className={`flex items-center gap-2 px-3 py-2 bg-gradient-to-r ${cfg.grad} text-white`}>
+              <span className="text-xs font-black opacity-80 tabular-nums">#{idx + 1}</span>
+              <span className="text-xs font-black tracking-wide">{catFullLabel(bracket.category)} {roundLabel}</span>
             </div>
             {/* チーム情報 */}
             <div className="px-3 py-2 bg-white">

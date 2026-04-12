@@ -90,8 +90,8 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // 下部パディングはロゴのサイズに応じて動的に確保する
-  const bracketBottomPad = Math.max(90, tctaH + 36);
+  // 下部パディングはロゴの高さ分＋最小余白で確保（無駄な空白を削減）
+  const bracketBottomPad = Math.max(56, tctaH + 16);
   const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
 
   const totalW = tableW + paddingX * 2;
@@ -126,8 +126,8 @@ export async function generateTeamBracketResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(scale, scale);
 
-  // 背景
-  ctx.fillStyle = COL.white;
+  // 背景（水色ベース）
+  ctx.fillStyle = COL.sky50;
   ctx.fillRect(0, 0, totalW, totalH);
 
   // ---- 上端アクセントバー ----
@@ -282,12 +282,12 @@ export async function generateTeamBracketResultDataUrl(
   const bracketAreaX = paddingX + Math.max(bracketSidePad, (tableW - bracketW) / 2);
   const bracketAreaY = paddingY + headerH;
 
-  // 背景カード
+  // 背景カード（水色ベース）
   ctx.save();
   ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
-  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
+  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.sky50);
   ctx.restore();
   drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.sky200, 1.5);
 
@@ -349,8 +349,8 @@ export async function generateTeamBracketResultDataUrl(
       drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, grad);
       ctx.fillStyle = COL.white;
     } else {
-      drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, COL.slate100, COL.slate200, 1);
-      ctx.fillStyle = COL.slate600;
+      drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, COL.sky100, COL.sky200, 1);
+      ctx.fillStyle = COL.sky700;
     }
     ctx.font = '900 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     ctx.textAlign = 'center';
@@ -372,14 +372,14 @@ export async function generateTeamBracketResultDataUrl(
       const byeH = 44;
       const byeY = cyCenter - byeH / 2;
 
-      // カード背景（影付き、通常マッチと同じ見た目）
+      // カード背景（影付き、水色ベース）
       ctx.save();
       ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
-      drawRoundRect(cx, byeY, matchW, byeH, 12, COL.white);
+      drawRoundRect(cx, byeY, matchW, byeH, 12, COL.sky100);
       ctx.restore();
-      drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.slate200, 1.5);
+      drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.sky200, 1.5);
 
       // リーグ色バッジ（通常のチーム行と統一）
       const bgBadgeX = cx + 10;
@@ -405,15 +405,15 @@ export async function generateTeamBracketResultDataUrl(
       return;
     }
 
-    // カード背景（影付き）
+    // カード背景（影付き、水色ベース）
     ctx.save();
     ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 3;
-    drawRoundRect(cx, cy, matchW, matchH, 12, COL.white);
+    drawRoundRect(cx, cy, matchW, matchH, 12, COL.sky100);
     ctx.restore();
 
-    const borderColor = isFinished ? '#a7f3d0' : COL.slate200;
+    const borderColor = isFinished ? '#a7f3d0' : COL.sky200;
     drawRoundRect(cx, cy, matchW, matchH, 12, undefined, borderColor, 1.5);
 
     // 上部: チーム名 × 2段
@@ -429,11 +429,11 @@ export async function generateTeamBracketResultDataUrl(
 
       const rowY = teamAreaY + idx * teamRowH;
 
-      // 勝者の背景ハイライト
+      // 勝者の背景ハイライト（水色テーマ強調）
       if (isWinner) {
         const hlGrad = ctx.createLinearGradient(cx + 6, rowY, cx + matchW - 6, rowY);
-        hlGrad.addColorStop(0, 'rgba(14, 165, 233, 0.09)');
-        hlGrad.addColorStop(1, 'rgba(14, 165, 233, 0.04)');
+        hlGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
+        hlGrad.addColorStop(1, 'rgba(14, 165, 233, 0.08)');
         ctx.fillStyle = hlGrad;
         ctx.fillRect(cx + 6, rowY + 2, matchW - 12, teamRowH - 2);
       }
@@ -554,10 +554,10 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- TCTAロゴ: トーナメント表枠内の右下に配置（大きめ） ----
+  // ---- TCTAロゴ: トーナメント表下部の下揃え・右側に配置（無駄な空白なし） ----
   if (tctaLogo) {
-    const logoMarginX = 22;
-    const logoMarginY = 18;
+    const logoMarginX = 16;
+    const logoMarginY = 8;
     const logoX = paddingX + tableW - tctaW - logoMarginX;
     const logoY = bracketAreaY + bracketH - tctaH - logoMarginY;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);

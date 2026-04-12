@@ -498,14 +498,14 @@ export async function generateResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(SC, SC);
 
-  // 背景
-  ctx.fillStyle = '#f8fafc';
+  // 背景（水色ベース）
+  ctx.fillStyle = '#f0f9ff';
   ctx.fillRect(0, 0, totalW, totalH);
 
   // ==== ヘッダー ====
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
   // ヘッダー背景
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = '#f0f9ff';
   ctx.fillRect(0, 0, totalW, PY + HDR);
   // 下線（太め）
   ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
@@ -554,7 +554,7 @@ export async function generateResultDataUrl(
     isWin: boolean, tb: number | null, isLose: boolean, defLabel?: string) => {
 
     if (isWin) {
-      ctx.fillStyle = '#ecfdf5';
+      ctx.fillStyle = '#bae6fd';
       ctx.fillRect(bx + 2, by + 1, bw - 4, SH - 2);
     }
     if (!teamId) return;
@@ -639,9 +639,9 @@ export async function generateResultDataUrl(
           const byeY = my2 + (MH - byeH) / 2;
           ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
           _rr(ctx, cx, byeY, mw, byeH, 10);
-          ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
+          ctx.fillStyle = '#e0f2fe'; ctx.fill(); ctx.restore();
           _rr(ctx, cx, byeY, mw, byeH, 10);
-          ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.stroke();
           drawTeam(cx, byeY, mw, round, wId, '', null, false, null, false);
         }
         continue;
@@ -649,9 +649,9 @@ export async function generateResultDataUrl(
 
       ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
       _rr(ctx, cx, my2, mw, MH, 10);
-      ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#e0f2fe'; ctx.fill(); ctx.restore();
       _rr(ctx, cx, my2, mw, MH, 10);
-      ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.stroke();
 
       ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx + 6, my2 + SH); ctx.lineTo(cx + mw - 6, my2 + SH); ctx.stroke();
