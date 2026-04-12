@@ -488,12 +488,11 @@ export default function AppLayout() {
         {/* 下部ロゴ */}
         <div className="hamburger-drawer-footer">
           <img
-            src={logoUrl}
+            src={`${import.meta.env.BASE_URL}logo-tcta.png`}
             alt="鳥取市テニス協会"
             className="hamburger-drawer-logo"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
-          <span className="hamburger-drawer-footer-text">鳥取市テニス協会</span>
         </div>
       </div>
 

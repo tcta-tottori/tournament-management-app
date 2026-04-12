@@ -879,8 +879,7 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // 既に他のコール中なら一旦止める
-    cancelCall();
+    // コール状態をセット（speak内でspeechSynthesis.cancelが呼ばれるので二重cancelは避ける）
     startCall({
       matchId: match.matchId,
       category: match.category,

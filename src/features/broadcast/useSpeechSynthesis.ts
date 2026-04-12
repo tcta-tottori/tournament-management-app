@@ -101,7 +101,8 @@ export function useSpeechSynthesis() {
 
       function speakNext() {
         if (cancelledRef.current) {
-          setIsSpeaking(false);
+          // コンポーネントがアンマウントされている可能性があるため try-catch で囲む
+          try { setIsSpeaking(false); } catch {}
           return;
         }
         if (index >= chunks.length) {
@@ -112,7 +113,7 @@ export function useSpeechSynthesis() {
               if (!cancelledRef.current) speakChunks();
             }, 2500);
           } else {
-            setIsSpeaking(false);
+            try { setIsSpeaking(false); } catch {}
             onComplete?.();
           }
           return;
@@ -144,7 +145,10 @@ export function useSpeechSynthesis() {
       speakNext();
     }
 
-    speakChunks();
+    // Chrome: cancel() 直後の speak() が無視されるバグ対策として少し遅延
+    setTimeout(() => {
+      if (!cancelledRef.current) speakChunks();
+    }, 50);
   }, []);
 
   const stop = useCallback(() => {
