@@ -402,8 +402,9 @@ export default function AppLayout() {
         </div>
       </header>
 
-      {/* ===== 大会情報バー ===== */}
-      {(tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo)) && (() => {
+      {/* ===== 大会情報バー（ハンバーガーメニュー内蔵） ===== */}
+      {(() => {
+        const hasTournament = tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo);
         const displayName = isMixedImported && mixedTournamentInfo
           ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
           : isTeamImported && teamTournamentInfo
@@ -411,50 +412,38 @@ export default function AppLayout() {
             : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
         const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
         return (
-          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs">
-            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-              <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
-                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
-                  </span>
-                )) : (
-                  <span className="info-ticker-item">
-                    <span>{displayName || '大会運営システム'}</span>
-                  </span>
-                )}
+          <div className="info-bar flex items-center shrink-0 h-8 overflow-hidden text-xs sticky top-0 z-20">
+            {/* 左端：ハンバーガーボタン + メニュー名 */}
+            <button
+              className="hamburger-inline-btn"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="メニューを開く"
+            >
+              <Menu style={{ width: 16, height: 16 }} />
+              <span className="hamburger-inline-label">{currentPageLabel}</span>
+            </button>
+
+            {/* 右側：ティッカー（流れる文字） */}
+            {hasTournament && (
+              <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+                <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                  {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
+                    <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                      {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                      <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                      {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                    </span>
+                  )) : (
+                    <span className="info-ticker-item">
+                      <span>{displayName || '大会運営システム'}</span>
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       })()}
-
-      {/* ===== ナビゲーションバー（ハンバーガーメニュー） ===== */}
-      <nav className="hamburger-bar sticky top-0 z-20 shrink-0">
-        <div className="flex items-center justify-between h-10 px-3">
-          {/* 左側：現在のページ名 */}
-          <div className="flex items-center gap-2 min-w-0">
-            {CurrentPageIcon && (
-              <CurrentPageIcon
-                className="shrink-0 text-white/70"
-                style={{ width: 16, height: 16 }}
-              />
-            )}
-            <span className="hamburger-current-label">{currentPageLabel}</span>
-          </div>
-
-          {/* 右側：ハンバーガーアイコン */}
-          <button
-            className="hamburger-icon-btn"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="メニューを開く"
-          >
-            {menuOpen ? <X style={{ width: 22, height: 22 }} /> : <Menu style={{ width: 22, height: 22 }} />}
-          </button>
-        </div>
-      </nav>
 
       {/* ===== スライドメニュー（右から展開） ===== */}
       {/* オーバーレイ */}
