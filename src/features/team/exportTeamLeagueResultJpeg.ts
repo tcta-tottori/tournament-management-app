@@ -11,6 +11,56 @@ const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }>
   MD:  { bg: '#e0f2fe', fg: '#0369a1', accent: '#0ea5e9' }, // sky
 };
 
+/** リーグ別カラー（TeamLeagueView.LEAGUE_COLORS と対応） */
+interface LeagueColor {
+  c1: string; c2: string; c3: string;
+  text: string;
+  headBg1: string; headBg2: string; headBg3: string;
+  shadow: string;
+}
+const LEAGUE_COLORS: LeagueColor[] = [
+  // A - Blue → Indigo
+  { c1: '#60a5fa', c2: '#3b82f6', c3: '#4338ca', text: '#1e3a8a',
+    headBg1: '#eff6ff', headBg2: '#dbeafe', headBg3: '#bfdbfe', shadow: 'rgba(30,58,138,0.32)' },
+  // B - Emerald → Teal
+  { c1: '#34d399', c2: '#10b981', c3: '#0f766e', text: '#064e3b',
+    headBg1: '#ecfdf5', headBg2: '#d1fae5', headBg3: '#a7f3d0', shadow: 'rgba(6,78,59,0.32)' },
+  // C - Purple → Violet
+  { c1: '#c084fc', c2: '#a855f7', c3: '#7c3aed', text: '#581c87',
+    headBg1: '#faf5ff', headBg2: '#f3e8ff', headBg3: '#e9d5ff', shadow: 'rgba(88,28,135,0.32)' },
+  // D - Rose → Pink
+  { c1: '#fb7185', c2: '#f43f5e', c3: '#be185d', text: '#881337',
+    headBg1: '#fff1f2', headBg2: '#ffe4e6', headBg3: '#fecdd3', shadow: 'rgba(136,19,55,0.32)' },
+  // E - Amber → Orange
+  { c1: '#fbbf24', c2: '#f59e0b', c3: '#ea580c', text: '#7c2d12',
+    headBg1: '#fffbeb', headBg2: '#fef3c7', headBg3: '#fde68a', shadow: 'rgba(124,45,18,0.32)' },
+  // F - Cyan → Sky
+  { c1: '#22d3ee', c2: '#06b6d4', c3: '#0284c7', text: '#0c4a6e',
+    headBg1: '#ecfeff', headBg2: '#cffafe', headBg3: '#a5f3fc', shadow: 'rgba(12,74,110,0.32)' },
+  // G - Lime → Green
+  { c1: '#a3e635', c2: '#84cc16', c3: '#16a34a', text: '#14532d',
+    headBg1: '#f7fee7', headBg2: '#ecfccb', headBg3: '#d9f99d', shadow: 'rgba(20,83,45,0.32)' },
+  // H - Fuchsia → Purple
+  { c1: '#e879f9', c2: '#d946ef', c3: '#9333ea', text: '#581c87',
+    headBg1: '#fdf4ff', headBg2: '#fae8ff', headBg3: '#f5d0fe', shadow: 'rgba(88,28,135,0.32)' },
+];
+
+/** リーグIDからカラーインデックスを取得（A=0, B=1, ...） */
+function getLeagueColorIndex(leagueId: string): number {
+  const code = leagueId.trim().toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+  if (code < 0 || code >= LEAGUE_COLORS.length) return 0;
+  return code;
+}
+
+/** 表示用選手名の短縮（苗字2文字） + 手動上書き */
+function shortenPlayerName(name: string, overrides: Record<string, string>): string {
+  if (overrides[name] !== undefined) return overrides[name];
+  const trimmed = name.trim();
+  // 既に2文字以下ならそのまま、3文字以上なら先頭2文字
+  if (trimmed.length <= 2) return trimmed;
+  return trimmed.substring(0, 2);
+}
+
 /** 画像を読み込むヘルパー（失敗時は null） */
 function tryLoadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -29,7 +79,11 @@ export async function generateTeamLeagueResultDataUrl(
   matches: TeamLeagueMatch[],
   _allTeams: TeamEntry[],
   tournamentName: string,
+  playerNameOverrides: Record<string, string> = {},
 ): Promise<string> {
+  // リーグカラー（A=青, B=緑, C=紫, D=ローズ, E=アンバー, ...）
+  const lc = LEAGUE_COLORS[getLeagueColorIndex(league.leagueId)];
+  const shortName = (name: string) => shortenPlayerName(name, playerNameOverrides);
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
   const [tctaLogo, venueLogo] = await Promise.all([
@@ -49,13 +103,15 @@ export async function generateTeamLeagueResultDataUrl(
   const measureCanvas = document.createElement('canvas');
   const mctx = measureCanvas.getContext('2d')!;
 
+  // 中央揃えスコアのため、左右それぞれの必要幅 = max(p1,p2) * 2 + score + 2*gap
+  const CELL_GAP = 6;
   let maxTextW = 160;
   for (const m of matches) {
     if (m.leagueId !== league.leagueId) continue;
     for (const sub of m.subMatches) {
       if (sub.score1 === null || sub.score2 === null) continue;
-      const p1 = (sub.players1 || []).join('/') || '　';
-      const p2 = (sub.players2 || []).join('/') || '　';
+      const p1 = (sub.players1 || []).map(shortName).join('/') || '　';
+      const p2 = (sub.players2 || []).map(shortName).join('/') || '　';
 
       mctx.font = NAME_FONT;
       const p1W = mctx.measureText(p1).width;
@@ -64,11 +120,13 @@ export async function generateTeamLeagueResultDataUrl(
       mctx.font = SCORE_FONT;
       const scoreW = mctx.measureText(`${sub.score1} - ${sub.score2}`).width;
 
-      const total = p1W + 6 + scoreW + 6 + p2W;
+      // 中央揃え: scoreW + 2*gap + 2*max(p1, p2)
+      const halfMax = Math.max(p1W, p2W);
+      const total = scoreW + 2 * CELL_GAP + 2 * halfMax;
       if (total > maxTextW) maxTextW = total;
     }
   }
-  const scoreColW = Math.min(300, Math.max(190, Math.ceil(maxTextW) + 30));
+  const scoreColW = Math.min(320, Math.max(190, Math.ceil(maxTextW) + 30));
 
   // ---- レイアウト定数 ----
   const scale = 2;
@@ -143,12 +201,12 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- リッチ装飾: キャンバス上端の細いアクセントバー（水色 → 紫） ----
+  // ---- リッチ装飾: キャンバス上端の細いアクセントバー（リーグカラー） ----
   const topBarH = 5;
   const topBarGrad = ctx.createLinearGradient(0, 0, totalW, 0);
-  topBarGrad.addColorStop(0,   '#0ea5e9'); // sky-500
-  topBarGrad.addColorStop(0.5, '#8b5cf6'); // violet-500
-  topBarGrad.addColorStop(1,   '#a855f7'); // purple-500
+  topBarGrad.addColorStop(0,   lc.c1);
+  topBarGrad.addColorStop(0.5, lc.c2);
+  topBarGrad.addColorStop(1,   lc.c3);
   ctx.fillStyle = topBarGrad;
   ctx.fillRect(0, 0, totalW, topBarH);
 
@@ -213,49 +271,47 @@ export async function generateTeamLeagueResultDataUrl(
   // ---- ヘッダー ----
   const leagueId = league.leagueId.trim();
 
-  // 左: 大きな角丸バッジ（アルファベット1文字のみ）
-  const badgeSize = 90;
-  const badgeX = paddingX;
-  const badgeY = paddingY + 4;
+  // 左: 「Aリーグ」を1つの大きな角丸ピルバッジにまとめる
+  const pillText = `${leagueId}リーグ`;
+  const pillH = 92;
+  ctx.save();
+  ctx.font = '900 52px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const pillTextW = ctx.measureText(pillText).width;
+  ctx.restore();
+  const pillPadX = 34;
+  const pillW = pillTextW + pillPadX * 2;
+  const pillX = paddingX;
+  const pillY = paddingY + 4;
 
   // 外側影
   ctx.save();
-  ctx.shadowColor = 'rgba(3, 105, 161, 0.32)';
+  ctx.shadowColor = lc.shadow;
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 10;
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeSize);
-  badgeGrad.addColorStop(0, COL.sky500);
-  badgeGrad.addColorStop(0.55, COL.sky600);
-  badgeGrad.addColorStop(1, COL.sky800);
-  drawRoundRect(badgeX, badgeY, badgeSize, badgeSize, 20, badgeGrad);
+  const pillGrad = ctx.createLinearGradient(pillX, pillY, pillX, pillY + pillH);
+  pillGrad.addColorStop(0, lc.c1);
+  pillGrad.addColorStop(0.55, lc.c2);
+  pillGrad.addColorStop(1, lc.c3);
+  drawRoundRect(pillX, pillY, pillW, pillH, pillH / 2, pillGrad);
   ctx.restore();
 
   // 内側ハイライト（上半分に微妙な明るさ）
-  const innerHL = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeSize * 0.55);
-  innerHL.addColorStop(0, 'rgba(255,255,255,0.22)');
+  const innerHL = ctx.createLinearGradient(pillX, pillY, pillX, pillY + pillH * 0.55);
+  innerHL.addColorStop(0, 'rgba(255,255,255,0.28)');
   innerHL.addColorStop(1, 'rgba(255,255,255,0)');
-  drawRoundRect(badgeX + 2, badgeY + 2, badgeSize - 4, badgeSize * 0.55, 18, innerHL);
+  drawRoundRect(pillX + 2, pillY + 2, pillW - 4, pillH * 0.55, pillH / 2 - 2, innerHL);
 
   // 内側ボーダー
-  drawRoundRect(badgeX + 1.5, badgeY + 1.5, badgeSize - 3, badgeSize - 3, 18.5, undefined, 'rgba(255,255,255,0.35)', 1);
+  drawRoundRect(pillX + 1.5, pillY + 1.5, pillW - 3, pillH - 3, pillH / 2 - 1.5, undefined, 'rgba(255,255,255,0.4)', 1);
 
-  // バッジ内の文字（大きく中央）
+  // バッジ内テキスト「Aリーグ」（大きく中央）
   ctx.fillStyle = COL.white;
-  ctx.font = '900 62px "Inter", "Helvetica Neue", sans-serif';
+  ctx.font = '900 52px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(leagueId, badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 3);
+  ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
 
-  // バッジ横の「リーグ」ラベル（大きく・バッジ下端揃え）
-  // バッジは [badgeY, badgeY + badgeSize] の範囲にあるので、
-  // 下端揃えのため textBaseline を 'alphabetic' に切り替えてバッジ下端付近に配置する。
-  ctx.save();
-  ctx.fillStyle = COL.slate800;
-  ctx.font = '900 38px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('リーグ', badgeX + badgeSize + 18, badgeY + badgeSize - 6);
-  ctx.restore();
+  const badgeSize = pillH; // 以降の参照用（ヘッダー配置のため）
 
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;
@@ -278,13 +334,21 @@ export async function generateTeamLeagueResultDataUrl(
     ctx.drawImage(venueLogo, vX, vY, vW, vH);
   }
 
-  // ---- ヘッダーと表の間の装飾アクセントライン ----
+  // ---- ヘッダーと表の間の装飾アクセントライン（リーグカラー） ----
   const accentY = paddingY + headerH - 4;
   const accentGrad = ctx.createLinearGradient(paddingX, accentY, paddingX + tableW, accentY);
-  accentGrad.addColorStop(0, 'rgba(14, 165, 233, 0)');
-  accentGrad.addColorStop(0.2, 'rgba(14, 165, 233, 0.45)');
-  accentGrad.addColorStop(0.8, 'rgba(14, 165, 233, 0.45)');
-  accentGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+  // リーグカラーの中間色(c2)を半透明で両端フェード
+  const hexToRgba = (hex: string, alpha: number) => {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+  accentGrad.addColorStop(0, hexToRgba(lc.c2, 0));
+  accentGrad.addColorStop(0.2, hexToRgba(lc.c2, 0.45));
+  accentGrad.addColorStop(0.8, hexToRgba(lc.c2, 0.45));
+  accentGrad.addColorStop(1, hexToRgba(lc.c2, 0));
   ctx.strokeStyle = accentGrad;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -303,7 +367,7 @@ export async function generateTeamLeagueResultDataUrl(
   drawRoundRect(tableX, tableY, tableW, tableH, 18, COL.white);
   ctx.restore();
 
-  // 列ヘッダー背景（角丸マスク + より深い水色グラデ）
+  // 列ヘッダー背景（角丸マスク + リーグカラーグラデ）
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(tableX + 18, tableY);
@@ -313,9 +377,9 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.arcTo(tableX, tableY, tableX + tableW, tableY, 18);
   ctx.clip();
   const headGrad = ctx.createLinearGradient(tableX, tableY, tableX, tableY + colHeaderH);
-  headGrad.addColorStop(0,   '#ecfeff');
-  headGrad.addColorStop(0.5, '#e0f2fe');
-  headGrad.addColorStop(1,   '#bae6fd');
+  headGrad.addColorStop(0,   lc.headBg1);
+  headGrad.addColorStop(0.5, lc.headBg2);
+  headGrad.addColorStop(1,   lc.headBg3);
   ctx.fillStyle = headGrad;
   ctx.fillRect(tableX, tableY, tableW, colHeaderH);
   // 列ヘッダー上端の細い光彩ライン
@@ -323,11 +387,11 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.fillRect(tableX, tableY, tableW, 1.5);
   ctx.restore();
 
-  // 列ヘッダー下の強めのライン (水色 → 紫 で統一)
+  // 列ヘッダー下の強めのライン（リーグカラー）
   const headerLineGrad = ctx.createLinearGradient(tableX, 0, tableX + tableW, 0);
-  headerLineGrad.addColorStop(0,   '#0ea5e9');
-  headerLineGrad.addColorStop(0.5, '#8b5cf6');
-  headerLineGrad.addColorStop(1,   '#a855f7');
+  headerLineGrad.addColorStop(0,   lc.c1);
+  headerLineGrad.addColorStop(0.5, lc.c2);
+  headerLineGrad.addColorStop(1,   lc.c3);
   ctx.strokeStyle = headerLineGrad;
   ctx.lineWidth = 1.8;
   ctx.beginPath();
@@ -335,8 +399,8 @@ export async function generateTeamLeagueResultDataUrl(
   ctx.lineTo(tableX + tableW, tableY + colHeaderH);
   ctx.stroke();
 
-  // ---- 列ヘッダー テキスト ----
-  const thColor = COL.sky800;
+  // ---- 列ヘッダー テキスト（リーグカラー文字） ----
+  const thColor = lc.text;
   drawText('No.', tableX + numColW / 2, tableY + colHeaderH / 2, 11, 'center', thColor, 'black');
   drawText('チーム', tableX + numColW + nameColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
   drawText('種目', tableX + numColW + nameColW + typeColW / 2, tableY + colHeaderH / 2, 11, 'center', thColor, 'black');
@@ -441,11 +505,11 @@ export async function generateTeamLeagueResultDataUrl(
       const myWins = isTeam1 ? match.winsTeam1 : match.winsTeam2;
       const oppWins = isTeam1 ? match.winsTeam2 : match.winsTeam1;
 
-      // 勝利側のセル淡水色ハイライト
+      // 勝利側のセル淡リーグカラーハイライト
       if (won) {
         const wonGrad = ctx.createLinearGradient(x, rowTop, x, rowTop + rowH);
-        wonGrad.addColorStop(0, '#f0f9ff');
-        wonGrad.addColorStop(1, '#e0f2fe');
+        wonGrad.addColorStop(0, lc.headBg1);
+        wonGrad.addColorStop(1, lc.headBg2);
         ctx.fillStyle = wonGrad;
         ctx.fillRect(x + 1, rowTop + 1, scoreColW - 2, rowH - 2);
       }
@@ -456,16 +520,15 @@ export async function generateTeamLeagueResultDataUrl(
       ctx.font = '900 16px "Inter", "Helvetica Neue", sans-serif';
       const badgeTextW = ctx.measureText(overallText).width;
       const badgePadX = 12;
-      const badgePadY = 5;
       const bw = badgeTextW + badgePadX * 2;
       const bh = 22;
       const bx2 = x + scoreColW / 2 - bw / 2;
       const by2 = overallY - bh / 2;
       if (won) {
-        // 勝利側: 水色グラデバッジ + 白文字
+        // 勝利側: リーグカラーグラデバッジ + 白文字
         const pillGrad = ctx.createLinearGradient(bx2, by2, bx2 + bw, by2 + bh);
-        pillGrad.addColorStop(0, COL.sky500);
-        pillGrad.addColorStop(1, COL.sky700);
+        pillGrad.addColorStop(0, lc.c2);
+        pillGrad.addColorStop(1, lc.c3);
         drawRoundRect(bx2, by2, bw, bh, bh / 2, pillGrad);
         ctx.fillStyle = COL.white;
       } else {
@@ -495,15 +558,13 @@ export async function generateTeamLeagueResultDataUrl(
         const subWon = sub.winnerId === team.teamId;
         const myPlayers = (isTeam1 ? sub.players1 : sub.players2) || [];
         const oppPlayers = (isTeam1 ? sub.players2 : sub.players1) || [];
-        const myP = myPlayers.join('/') || '　';
-        const oppP = oppPlayers.join('/') || '　';
-        // 数字とハイフンの隙間が無くて読みづらいので、半角スペースを挟んで描画する。
-        // 計測も同じテキストで行う。
+        // 苗字2文字に短縮（手動上書きがあれば優先）
+        const myP = myPlayers.map(shortName).join('/') || '　';
+        const oppP = oppPlayers.map(shortName).join('/') || '　';
         const displayScoreText = `${myScore} - ${oppScore}`;
 
         // 左 = 行チーム（自分）、右 = 対戦相手。
         // 「左側が勝者のセル（subWon）」では左の選手名のみ太字にして強調する。
-        // 文字色は両側とも統一し、太さの違いだけで勝敗を表現する（薄さを抑える）。
         const leftIsWinner = subWon;
         const myNameFont = leftIsWinner
           ? 'bold 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
@@ -512,37 +573,33 @@ export async function generateTeamLeagueResultDataUrl(
         const nameColor = COL.slate700;
         const scoreColor = leftIsWinner ? tc.fg : COL.slate500;
 
-        // 計測
-        ctx.font = myNameFont;
-        const myNameW = ctx.measureText(myP).width;
-        ctx.font = oppNameFont;
-        const oppNameW = ctx.measureText(oppP).width;
+        // 【中央揃えレイアウト】
+        // スコア（"6 - 4"）をセル中央に配置し、左右の選手名はスコアを挟むように配置する。
+        // これによりどの行のスコアも必ずセル中央で揃う。
+        const cellCx = x + scoreColW / 2;
+        const gap = CELL_GAP;
 
+        // スコアをセル中央に描画
         ctx.font = SCORE_FONT;
+        ctx.fillStyle = scoreColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayScoreText, cellCx, subY);
         const scoreW = ctx.measureText(displayScoreText).width;
 
-        const gap = 5;
-        const totalW = myNameW + gap + scoreW + gap + oppNameW;
-        const cellCx = x + scoreColW / 2;
-        const startX = cellCx - totalW / 2;
-
-        // 左選手名（自分側 / 勝者なら太字）
+        // 左選手名 — スコア左側に右揃えで描画
         ctx.font = myNameFont;
+        ctx.fillStyle = nameColor;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(myP, cellCx - scoreW / 2 - gap, subY);
+
+        // 右選手名 — スコア右側に左揃えで描画
+        ctx.font = oppNameFont;
         ctx.fillStyle = nameColor;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(myP, startX, subY);
-
-        // スコア（大・目立つ・種目色 / 敗者は控えめ）
-        // 数字とハイフンの間に隙間を入れて視認性を確保（"6 - 4" で描画）
-        ctx.font = SCORE_FONT;
-        ctx.fillStyle = scoreColor;
-        ctx.fillText(displayScoreText, startX + myNameW + gap, subY);
-
-        // 右選手名（対戦相手 / 常に普通表示）
-        ctx.font = oppNameFont;
-        ctx.fillStyle = nameColor;
-        ctx.fillText(oppP, startX + myNameW + gap + scoreW + gap, subY);
+        ctx.fillText(oppP, cellCx + scoreW / 2 + gap, subY);
       }
     }
 
@@ -566,8 +623,8 @@ export async function generateTeamLeagueResultDataUrl(
     }
   }
 
-  // 表の外枠（やや太め + 内側に薄い反射ライン）
-  drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, COL.sky300, 1.5);
+  // 表の外枠（リーグカラー + 内側に薄い反射ライン）
+  drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, hexToRgba(lc.c1, 0.55), 1.5);
   drawRoundRect(tableX + 1.2, tableY + 1.2, tableW - 2.4, tableH - 2.4, 17, undefined, 'rgba(255,255,255,0.6)', 1);
 
   // ---- フッター: TCTA公式ロゴを右下に最小余白で配置 ----
@@ -599,8 +656,9 @@ export async function exportTeamLeagueResultJpeg(
   matches: TeamLeagueMatch[],
   allTeams: TeamEntry[],
   tournamentName: string,
+  playerNameOverrides: Record<string, string> = {},
 ) {
-  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName);
+  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${league.leagueId.trim()}リーグ結果_団体戦.jpg`;
