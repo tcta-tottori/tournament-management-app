@@ -498,17 +498,17 @@ export async function generateResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(SC, SC);
 
-  // 背景（水色ベース）
-  ctx.fillStyle = '#f0f9ff';
+  // 背景（白）
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
 
   // ==== ヘッダー ====
   const catLabel = CATEGORY_LABELS[bracket.category] || bracket.category;
   // ヘッダー背景
-  ctx.fillStyle = '#f0f9ff';
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, PY + HDR);
-  // 下線（太め）
-  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
+  // 下線（太め、水色ベース）
+  ctx.strokeStyle = '#bae6fd'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, PY + HDR); ctx.lineTo(totalW, PY + HDR); ctx.stroke();
 
   // トーナメント名（緑背景+白文字の角丸バッジ）
@@ -531,12 +531,12 @@ export async function generateResultDataUrl(
   const mbr: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) mbr.push(roundMap.get(r) || []);
 
-  // ==== 接続線 ====
+  // ==== 接続線（水色ベース） ====
   for (let ri = 0; ri < mbr.length - 1; ri++) {
     const x1 = roundX(ri) + roundW(ri);
     const x2 = roundX(ri + 1);
     const xm = (x1 + x2) / 2;
-    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 1.5;
     for (let i = 0; i + 1 < mbr[ri].length; i += 2) {
       const y1 = mY(ri, i) + MH / 2;
       const y2 = mY(ri, i + 1) + MH / 2;
@@ -554,7 +554,7 @@ export async function generateResultDataUrl(
     isWin: boolean, tb: number | null, isLose: boolean, defLabel?: string) => {
 
     if (isWin) {
-      ctx.fillStyle = '#bae6fd';
+      ctx.fillStyle = '#e0f2fe';
       ctx.fillRect(bx + 2, by + 1, bw - 4, SH - 2);
     }
     if (!teamId) return;
@@ -639,7 +639,7 @@ export async function generateResultDataUrl(
           const byeY = my2 + (MH - byeH) / 2;
           ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
           _rr(ctx, cx, byeY, mw, byeH, 10);
-          ctx.fillStyle = '#e0f2fe'; ctx.fill(); ctx.restore();
+          ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
           _rr(ctx, cx, byeY, mw, byeH, 10);
           ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.stroke();
           drawTeam(cx, byeY, mw, round, wId, '', null, false, null, false);
@@ -649,7 +649,7 @@ export async function generateResultDataUrl(
 
       ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
       _rr(ctx, cx, my2, mw, MH, 10);
-      ctx.fillStyle = '#e0f2fe'; ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
       _rr(ctx, cx, my2, mw, MH, 10);
       ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.stroke();
 

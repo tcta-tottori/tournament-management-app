@@ -90,9 +90,12 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // 下部パディングはロゴの高さ分＋最小余白で確保（無駄な空白を削減）
-  const bracketBottomPad = Math.max(56, tctaH + 16);
-  const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
+  // 下部パディング: 最後のマッチ下端～ブラケット枠下端の余白
+  // ロゴはこの余白内に収める（ブラケット枠の下ラインより上に表示）
+  const bracketContentH = r1Count * gridUnit; // マッチ本体の高さ
+  const logoBottomMargin = 6; // ロゴ下端からブラケット枠下端までの余白
+  const bracketBottomPad = Math.max(24, tctaH + logoBottomMargin + 4);
+  const bracketH = bracketContentH + bracketTopPad + bracketBottomPad;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + bracketH;
@@ -126,16 +129,16 @@ export async function generateTeamBracketResultDataUrl(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(scale, scale);
 
-  // 背景（水色ベース）
-  ctx.fillStyle = COL.sky50;
+  // 背景（白）
+  ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- 上端アクセントバー ----
+  // ---- 上端アクセントバー（水色ベース） ----
   const topBarH = 5;
   const topBarGrad = ctx.createLinearGradient(0, 0, totalW, 0);
-  topBarGrad.addColorStop(0,   '#0ea5e9');
-  topBarGrad.addColorStop(0.5, '#8b5cf6');
-  topBarGrad.addColorStop(1,   '#a855f7');
+  topBarGrad.addColorStop(0,   COL.sky300);
+  topBarGrad.addColorStop(0.5, COL.sky500);
+  topBarGrad.addColorStop(1,   COL.sky300);
   ctx.fillStyle = topBarGrad;
   ctx.fillRect(0, 0, totalW, topBarH);
 
@@ -282,12 +285,12 @@ export async function generateTeamBracketResultDataUrl(
   const bracketAreaX = paddingX + Math.max(bracketSidePad, (tableW - bracketW) / 2);
   const bracketAreaY = paddingY + headerH;
 
-  // 背景カード（水色ベース）
+  // 背景カード（白 + 水色ボーダー）
   ctx.save();
   ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
-  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.sky50);
+  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
   drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.sky200, 1.5);
 
@@ -306,11 +309,11 @@ export async function generateTeamBracketResultDataUrl(
     return `${round}回戦`;
   };
 
-  // ---- 接続線 ----
-  const lineColor = catColor.c2;
+  // ---- 接続線（水色ベースで統一） ----
+  const lineColor = COL.sky300;
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = 0.7;
   for (let ri = 0; ri < roundMatches.length - 1; ri++) {
     const x1 = getRoundX(ri) + matchW;
     const x2 = getRoundX(ri + 1);
@@ -344,8 +347,8 @@ export async function generateTeamBracketResultDataUrl(
 
     if (isFinal) {
       const grad = ctx.createLinearGradient(labelBoxX, 0, labelBoxX + labelW, 0);
-      grad.addColorStop(0, catColor.c1);
-      grad.addColorStop(1, catColor.c2);
+      grad.addColorStop(0, COL.sky500);
+      grad.addColorStop(1, COL.sky600);
       drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, grad);
       ctx.fillStyle = COL.white;
     } else {
@@ -372,12 +375,12 @@ export async function generateTeamBracketResultDataUrl(
       const byeH = 44;
       const byeY = cyCenter - byeH / 2;
 
-      // カード背景（影付き、水色ベース）
+      // カード背景（影付き、白 + 水色ボーダー）
       ctx.save();
       ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
-      drawRoundRect(cx, byeY, matchW, byeH, 12, COL.sky100);
+      drawRoundRect(cx, byeY, matchW, byeH, 12, COL.white);
       ctx.restore();
       drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.sky200, 1.5);
 
@@ -405,15 +408,15 @@ export async function generateTeamBracketResultDataUrl(
       return;
     }
 
-    // カード背景（影付き、水色ベース）
+    // カード背景（影付き、白 + 水色ボーダー）
     ctx.save();
     ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 3;
-    drawRoundRect(cx, cy, matchW, matchH, 12, COL.sky100);
+    drawRoundRect(cx, cy, matchW, matchH, 12, COL.white);
     ctx.restore();
 
-    const borderColor = isFinished ? '#a7f3d0' : COL.sky200;
+    const borderColor = isFinished ? COL.sky300 : COL.sky200;
     drawRoundRect(cx, cy, matchW, matchH, 12, undefined, borderColor, 1.5);
 
     // 上部: チーム名 × 2段
@@ -429,12 +432,9 @@ export async function generateTeamBracketResultDataUrl(
 
       const rowY = teamAreaY + idx * teamRowH;
 
-      // 勝者の背景ハイライト（水色テーマ強調）
+      // 勝者の背景ハイライト（水色ベース）
       if (isWinner) {
-        const hlGrad = ctx.createLinearGradient(cx + 6, rowY, cx + matchW - 6, rowY);
-        hlGrad.addColorStop(0, 'rgba(14, 165, 233, 0.18)');
-        hlGrad.addColorStop(1, 'rgba(14, 165, 233, 0.08)');
-        ctx.fillStyle = hlGrad;
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.08)';
         ctx.fillRect(cx + 6, rowY + 2, matchW - 12, teamRowH - 2);
       }
 
@@ -554,12 +554,11 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- TCTAロゴ: トーナメント表下部の下揃え・右側に配置（無駄な空白なし） ----
+  // ---- TCTAロゴ: ブラケット枠内の右下、枠の下ラインより上に配置 ----
   if (tctaLogo) {
     const logoMarginX = 16;
-    const logoMarginY = 8;
     const logoX = paddingX + tableW - tctaW - logoMarginX;
-    const logoY = bracketAreaY + bracketH - tctaH - logoMarginY;
+    const logoY = bracketAreaY + bracketH - tctaH - logoBottomMargin;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
 

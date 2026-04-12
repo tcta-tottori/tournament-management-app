@@ -16,8 +16,10 @@ export interface TeamCallContent {
 interface TeamCallState {
   isActive: boolean;
   content: TeamCallContent | null;
+  /** useSpeechSynthesis.stop への参照（cancel 時に正しく停止するため） */
+  _stopFn: (() => void) | null;
   /** コール開始（ポップアップを表示） */
-  start: (content: TeamCallContent) => void;
+  start: (content: TeamCallContent, stopFn: () => void) => void;
   /** コール正常終了（onComplete から呼ばれる） */
   finish: () => void;
   /** コール強制停止（音声も即時停止） */
@@ -32,13 +34,19 @@ interface TeamCallState {
  * 状態として持つ。右下のステータスバブル (TeamCallStatusBubble) が
  * これを購読して常時表示する。
  */
-export const useTeamCallStore = create<TeamCallState>((set) => ({
+export const useTeamCallStore = create<TeamCallState>((set, get) => ({
   isActive: false,
   content: null,
-  start: (content) => set({ isActive: true, content }),
-  finish: () => set({ isActive: false, content: null }),
+  _stopFn: null,
+  start: (content, stopFn) => set({ isActive: true, content, _stopFn: stopFn }),
+  finish: () => set({ isActive: false, content: null, _stopFn: null }),
   cancel: () => {
-    try { window.speechSynthesis.cancel(); } catch {}
-    set({ isActive: false, content: null });
+    const { _stopFn } = get();
+    if (_stopFn) {
+      _stopFn(); // useSpeechSynthesis.stop() — cancelledRef=true + speechSynthesis.cancel()
+    } else {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+    set({ isActive: false, content: null, _stopFn: null });
   },
 }));

@@ -95,7 +95,7 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
-  const { speak } = useSpeechSynthesis();
+  const { speak, stop: stopSpeech } = useSpeechSynthesis();
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -818,6 +818,7 @@ export default function TeamBracketView() {
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
           speak={speak}
+          stopSpeech={stopSpeech}
         />
       )}
 
@@ -844,11 +845,13 @@ function TeamCallDialog({
   courtNames,
   onClose,
   speak,
+  stopSpeech,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
   speak: (text: string, settings: { rate: number; pitch: number; volume: number; repeatCount: number }, onComplete?: () => void) => void;
+  stopSpeech: () => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
@@ -882,7 +885,7 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // コール状態をセット（speak内でspeechSynthesis.cancelが呼ばれるので二重cancelは避ける）
+    // コール状態をセット（stopSpeech を渡すことで cancel 時に正しく停止できる）
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -892,7 +895,7 @@ function TeamCallDialog({
       team2Number: team2.teamNumber,
       team2Name: team2.teamName,
       courtNames,
-    });
+    }, stopSpeech);
     speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
       finishCall();
     });
