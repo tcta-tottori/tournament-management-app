@@ -68,16 +68,16 @@ export async function generateTeamBracketResultDataUrl(
   const r1Count = roundMatches[0]?.length || 0;
 
   // 接続線がはみ出さないよう、上部に余裕を持たせる
-  const bracketTopPad = 48; // ラウンドラベル用
-  // TCTAロゴをブラケット枠内右下に配置するため、下部パディングを確保する
-  const bracketBottomPad = 72;
-  const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
+  const bracketTopPad = 56; // ラウンドラベル用（少し広めに）
+  // ブラケット内側の左右マージン（カードが枠の縁に張り付かないように）
+  const bracketSidePad = 28;
   const bracketW = maxRound * matchW + (maxRound - 1) * roundGap;
-  const tableW = Math.max(bracketW, 720);
+  // tableW はブラケット幅 + 左右パディングを確保
+  const tableW = Math.max(bracketW + bracketSidePad * 2, 760);
 
-  // ---- TCTA横長ロゴのサイズ計算（ブラケット枠内に収める） ----
-  const tctaMaxH = 48;
-  const tctaMaxW = Math.min(240, tableW * 0.28);
+  // ---- TCTA横長ロゴのサイズ計算（大きめに表示） ----
+  const tctaMaxH = 96;
+  const tctaMaxW = Math.min(440, tableW * 0.5);
   let tctaW = 0;
   let tctaH = 0;
   if (tctaLogo) {
@@ -89,6 +89,10 @@ export async function generateTeamBracketResultDataUrl(
       tctaH = tctaW / ratio;
     }
   }
+
+  // 下部パディングはロゴのサイズに応じて動的に確保する
+  const bracketBottomPad = Math.max(90, tctaH + 36);
+  const bracketH = r1Count * gridUnit + bracketTopPad + bracketBottomPad;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + bracketH;
@@ -274,7 +278,8 @@ export async function generateTeamBracketResultDataUrl(
   ctx.stroke();
 
   // ---- ブラケット本体エリア ----
-  const bracketAreaX = paddingX + Math.max(0, (tableW - bracketW) / 2);
+  // 横方向は常にブラケットをフレーム内にセンタリング（左右に最低 bracketSidePad のマージン）
+  const bracketAreaX = paddingX + Math.max(bracketSidePad, (tableW - bracketW) / 2);
   const bracketAreaY = paddingY + headerH;
 
   // 背景カード
@@ -328,7 +333,7 @@ export async function generateTeamBracketResultDataUrl(
     const round = ri + 1;
     const roundName = getRoundName(round);
     const labelX = getRoundX(ri) + matchW / 2;
-    const labelY = bracketAreaY + 22;
+    const labelY = bracketAreaY + 26;
 
     const isFinal = round === maxRound;
     ctx.font = '900 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
@@ -549,10 +554,10 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- TCTAロゴ: トーナメント表枠内の右下に配置 ----
+  // ---- TCTAロゴ: トーナメント表枠内の右下に配置（大きめ） ----
   if (tctaLogo) {
-    const logoMarginX = 16;
-    const logoMarginY = 14;
+    const logoMarginX = 22;
+    const logoMarginY = 18;
     const logoX = paddingX + tableW - tctaW - logoMarginX;
     const logoY = bracketAreaY + bracketH - tctaH - logoMarginY;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);

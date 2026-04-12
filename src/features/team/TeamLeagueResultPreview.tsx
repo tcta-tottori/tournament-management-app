@@ -119,17 +119,17 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowEdit(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-colors active:scale-95 border ${
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-lg shadow transition-colors active:scale-95 border ${
                     showEdit
                       ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
                       : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
                   }`}
                   title="選手名を手動編集"
+                  aria-label="選手名を手動編集"
                 >
-                  <Pencil size={13} />
-                  選手名編集
+                  <Pencil size={15} />
                   {Object.keys(playerOverrides).length > 0 && (
-                    <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">
                       {Object.keys(playerOverrides).length}
                     </span>
                   )}
@@ -137,18 +137,20 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-sky-500 to-sky-600 text-white text-xs font-bold rounded-lg shadow hover:from-sky-600 hover:to-sky-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg shadow hover:from-sky-600 hover:to-sky-700 transition-colors active:scale-95"
+                    title="ダウンロード"
+                    aria-label="ダウンロード"
                   >
-                    <Download size={14} />
-                    ダウンロード
+                    <Download size={15} />
                   </button>
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-8 h-8 text-sky-500 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-sky-500 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
                   aria-label="閉じる"
+                  title="閉じる"
                 >
-                  <X size={14} />
+                  <X size={15} />
                 </button>
               </div>
             </div>
