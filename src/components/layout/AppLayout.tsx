@@ -1,10 +1,10 @@
-import { useMemo, useState, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, HardDrive,
-  AlertTriangle, Network
+  AlertTriangle, Network, Menu, X
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -87,6 +87,8 @@ export default function AppLayout() {
   const teamLeagues = useTeamStore((s) => s.leagues);
   const teamBrackets = useTeamStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
@@ -265,8 +267,28 @@ export default function AppLayout() {
   }, [events, isMixedImported, isTeamImported]);
 
 
-  // モバイル用: 全タブ表示
-  const mobileMainTabs = useMemo(() => allTabs, [allTabs]);
+  // 現在のページラベルを取得
+  const currentPageLabel = useMemo(() => {
+    const currentTab = allTabs.find(t => location.pathname.startsWith(t.path));
+    return currentTab?.label || '';
+  }, [allTabs, location.pathname]);
+
+  // 現在のページアイコンを取得
+  const CurrentPageIcon = useMemo(() => {
+    const currentTab = allTabs.find(t => location.pathname.startsWith(t.path));
+    return currentTab?.icon || null;
+  }, [allTabs, location.pathname]);
+
+  // メニュー項目タップ時
+  const handleMenuItemClick = useCallback((path: string) => {
+    navigate(path);
+    setMenuOpen(false);
+  }, [navigate]);
+
+  // パス変更時にメニューを閉じる
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex flex-col h-screen bg-bg-main overflow-hidden">
@@ -409,69 +431,72 @@ export default function AppLayout() {
         );
       })()}
 
-      {/* ===== ナビゲーションバー ===== */}
-      <nav className="nav-bar sticky top-0 z-20 shrink-0">
-        <div className="flex items-center">
-          {/* PC: 全タブ表示 */}
-          <div className="hidden lg:flex flex-1 overflow-x-auto scrollbar-hide">
-            <div className="flex">
-              {allTabs.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `nav-tab ${isActive ? 'nav-tab-active' : ''}`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon
-                        className="shrink-0"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
-                        }}
-                      />
-                      <span>{item.label}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
+      {/* ===== ナビゲーションバー（ハンバーガーメニュー） ===== */}
+      <nav className="hamburger-bar sticky top-0 z-20 shrink-0">
+        <div className="flex items-center justify-between h-10 px-3">
+          {/* 左側：現在のページ名 */}
+          <div className="flex items-center gap-2 min-w-0">
+            {CurrentPageIcon && (
+              <CurrentPageIcon
+                className="shrink-0 text-white/70"
+                style={{ width: 16, height: 16 }}
+              />
+            )}
+            <span className="hamburger-current-label">{currentPageLabel}</span>
           </div>
 
-          {/* モバイル: メインタブ + その他ドロップダウン */}
-          <div className="lg:hidden flex-1 overflow-x-auto scrollbar-hide">
-            <div className="flex">
-              {mobileMainTabs.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `nav-tab ${isActive ? 'nav-tab-active' : ''}`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon
-                        className="shrink-0"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
-                        }}
-                      />
-                      <span>{item.label}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-
+          {/* 右側：ハンバーガーアイコン */}
+          <button
+            className="hamburger-icon-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="メニューを開く"
+          >
+            {menuOpen ? <X style={{ width: 22, height: 22 }} /> : <Menu style={{ width: 22, height: 22 }} />}
+          </button>
         </div>
       </nav>
+
+      {/* ===== スライドメニュー（右から展開） ===== */}
+      {/* オーバーレイ */}
+      <div
+        className={`hamburger-overlay ${menuOpen ? 'hamburger-overlay-visible' : ''}`}
+        onClick={() => setMenuOpen(false)}
+      />
+      {/* ドロワー */}
+      <div className={`hamburger-drawer ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
+        <div className="hamburger-drawer-header">
+          <span>メニュー</span>
+          <button
+            className="hamburger-icon-btn"
+            onClick={() => setMenuOpen(false)}
+            aria-label="メニューを閉じる"
+          >
+            <X style={{ width: 20, height: 20 }} />
+          </button>
+        </div>
+        <div className="hamburger-drawer-list">
+          {allTabs.map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <button
+                key={item.id}
+                className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
+                onClick={() => handleMenuItemClick(item.path)}
+              >
+                <item.icon
+                  className="shrink-0"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
+                  }}
+                />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
       <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
