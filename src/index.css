@@ -435,18 +435,18 @@
   pointer-events: auto;
 }
 
-/* 右スライドドロワー */
+/* 左スライドドロワー */
 .hamburger-drawer {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   bottom: 0;
   z-index: 50;
   width: 280px;
   max-width: 80vw;
   background: linear-gradient(180deg, #0f3326 0%, #163d31 30%, #1b4d3e 100%);
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
-  transform: translateX(100%);
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+  transform: translateX(-100%);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
   flex-direction: column;
@@ -483,7 +483,7 @@
   padding: 12px 14px;
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.9);
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -493,8 +493,8 @@
 }
 
 .hamburger-drawer-item:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .hamburger-drawer-item-active {
@@ -505,6 +505,31 @@
 
 .hamburger-drawer-item-active:hover {
   background: rgba(212, 225, 87, 0.15);
+}
+
+/* ドロワー下部ロゴ */
+.hamburger-drawer-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.hamburger-drawer-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.hamburger-drawer-footer-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.08em;
 }
 
 /* ===========================================================
