@@ -90,15 +90,15 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // 下部パディング: 最後のマッチ下端～ブラケット枠下端の余白
-  // ロゴはこの余白内に収める（ブラケット枠の下ラインより上に表示）
+  // 下部パディング: 最後のマッチ下端～ブラケット枠下端の余白（最小限）
+  // ロゴはブラケットの空きスペース（右下）にオーバーラップ配置する
   const bracketContentH = r1Count * gridUnit; // マッチ本体の高さ
-  const logoBottomMargin = 6; // ロゴ下端からブラケット枠下端までの余白
-  const bracketBottomPad = Math.max(24, tctaH + logoBottomMargin + 4);
+  const bracketBottomPad = 14; // 枠線まで最小余白
   const bracketH = bracketContentH + bracketTopPad + bracketBottomPad;
 
   const totalW = tableW + paddingX * 2;
-  const totalH = paddingY * 2 + headerH + bracketH;
+  const paddingYBottom = 12; // 下部は最小限
+  const totalH = paddingY + paddingYBottom + headerH + bracketH;
 
   // ---- カラーパレット ----
   const COL = {
@@ -554,11 +554,13 @@ export async function generateTeamBracketResultDataUrl(
     }
   }
 
-  // ---- TCTAロゴ: ブラケット枠内の右下、枠の下ラインより上に配置 ----
+  // ---- TCTAロゴ: ブラケット枠内の右下空きスペースに配置 ----
+  // ブラケット枠の下ラインより上にロゴの下端が来るように配置
   if (tctaLogo) {
     const logoMarginX = 16;
+    const logoMarginBottom = 6;
     const logoX = paddingX + tableW - tctaW - logoMarginX;
-    const logoY = bracketAreaY + bracketH - tctaH - logoBottomMargin;
+    const logoY = bracketAreaY + bracketH - tctaH - logoMarginBottom;
     ctx.drawImage(tctaLogo, logoX, logoY, tctaW, tctaH);
   }
 
