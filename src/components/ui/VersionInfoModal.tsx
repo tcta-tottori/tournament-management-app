@@ -21,6 +21,58 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 2.2',
+    date: '2026-04-13',
+    highlights: 'マルチデバイス同期・ハンバーガーメニュー・UI全面リニューアル・結果画像改善',
+    timeGroups: [
+      {
+        time: '—',
+        summary: 'マルチデバイス同期機能',
+        changes: [
+          { type: 'feat', text: '複数端末からのリアルタイム同期編集機能を追加（BroadcastChannel＋WebSocket）' },
+          { type: 'feat', text: 'ルームコードベースの接続管理（作成・参加・再接続）' },
+          { type: 'feat', text: 'Dexie（IndexedDB）の変更を自動検知し他端末にリアルタイム配信' },
+          { type: 'feat', text: 'ミックスダブルス・団体戦のZustandストアもスナップショット同期' },
+          { type: 'feat', text: '初回接続時のフルデータスナップショット転送' },
+          { type: 'feat', text: '同期ステータスインジケーター・接続端末一覧UI' },
+          { type: 'feat', text: 'スタンドアロンWebSocket中継サーバー（sync-server/）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'ナビゲーション・UI全面リニューアル',
+        changes: [
+          { type: 'feat', text: 'タブナビゲーションをハンバーガーメニューに変更（左から展開・白文字）' },
+          { type: 'feat', text: 'ハンバーガーメニューを情報バー内に統合し、下部にロゴ追加' },
+          { type: 'feat', text: 'ティッカーを緑背景ゴールド文字に変更、PC分割表示対応' },
+          { type: 'feat', text: 'Chrome風タブUIを団体戦の全ページに適用' },
+          { type: 'design', text: '団体戦リーグ表・決勝トーナメント・対戦カードのデザイン刷新' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '結果画像・音声コール改善',
+        changes: [
+          { type: 'feat', text: '結果画像を白背景・水色テーマに統一、ロゴ位置をブラケット枠内に移動' },
+          { type: 'feat', text: '予選リーグ結果画像のバッジ化・色分け・スコア中央揃え・選手名編集対応' },
+          { type: 'fix', text: '決勝トーナメント音声コールが再生されない問題を修正' },
+          { type: 'fix', text: 'コール停止機能の修正' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '団体戦表示の改善',
+        changes: [
+          { type: 'fix', text: 'リーグ表にドロー表チーム番号列を追加、PC表示の文字サイズ・余白を拡大' },
+          { type: 'fix', text: '対戦カードのボタンを洗練されたデザインに統一（IN/変更/コール）' },
+          { type: 'fix', text: '順位タブの色分けバッジ化、全体表示追加' },
+          { type: 'fix', text: 'リーグ表斜線方向修正、タブ装飾削除、トーナメントヘッダー一体化' },
+          { type: 'fix', text: '経過時間をH:MM表示に統一' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 2.1',
     date: '2026-04-04',
     highlights: '決勝トーナメント旧データ残留修正・結果タブ完全削除・ストア永続化改善',
@@ -411,7 +463,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 1.6</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 2.2</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">
