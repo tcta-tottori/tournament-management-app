@@ -877,11 +877,16 @@ function TeamCallDialog({
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
     // ★ クリックハンドラの最初の操作として音声再生を試みる
-    //    React state 更新より前に実行（ユーザージェスチャー維持）
     try {
-      window.speechSynthesis.speak(
-        Object.assign(new SpeechSynthesisUtterance(text), { lang: 'ja-JP', rate: 0.95 })
-      );
+      const synth = window.speechSynthesis;
+      const voices = synth.getVoices();
+      const jaVoice = voices.find(v => v.lang === 'ja-JP' || v.lang === 'ja_JP') || null;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP';
+      u.rate = 0.95;
+      u.volume = 1.0;
+      if (jaVoice) u.voice = jaVoice;
+      synth.speak(u);
     } catch { /* speechSynthesis非対応でもUIは動く */ }
     // 右下バブルを表示
     startCall({
@@ -897,7 +902,6 @@ function TeamCallDialog({
     // ダイアログを閉じる
     onClose();
     // テキスト長から概算した再生時間後にバブルを自動で閉じる
-    // （onend/onerror イベントは一部端末で発火しないため使わない）
     const estimatedMs = Math.max(8000, text.length * 150);
     setTimeout(() => {
       useTeamCallStore.getState().finish();
