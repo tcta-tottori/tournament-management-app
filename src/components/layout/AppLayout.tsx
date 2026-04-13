@@ -14,6 +14,7 @@ import { useTeamStore } from '../../features/team/teamStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
+import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -378,8 +379,9 @@ export default function AppLayout() {
           })()}
         </div>
 
-        {/* 右側: リンク & バージョン */}
+        {/* 右側: 同期 & リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
+          <SyncStatusIndicator />
           <a
             href="https://www.tottori-tenis.net/"
             target="_blank"

@@ -1,0 +1,13 @@
+{
+  "name": "tournament-sync-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "大会運営マルチデバイス同期 WebSocket中継サーバー",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
