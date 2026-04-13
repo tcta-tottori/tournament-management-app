@@ -6,6 +6,7 @@ import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from '
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
+import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -94,6 +95,24 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
+  const { speak } = useSpeechSynthesis();
+
+  // ミックス大会と同じパターン: ダイアログの onConfirm コールバック
+  // ダイアログを閉じてから speak() を呼ぶ
+  const handleCallConfirm = useCallback((text: string, callContent: {
+    matchId: string; category: PlacementCategory; roundLabel: string;
+    team1Number: number; team1Name: string; team2Number: number; team2Name: string;
+    courtNames: string[];
+  }) => {
+    // 1. ダイアログを閉じる（ミックスと同じ: 先に閉じる）
+    setCallMatch(null);
+    // 2. 右下バブルを表示
+    useTeamCallStore.getState().start(callContent);
+    // 3. 音声再生（useSpeechSynthesis の speak を使用）
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
+      useTeamCallStore.getState().finish();
+    });
+  }, [speak]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -815,6 +834,7 @@ export default function TeamBracketView() {
           match={callMatch}
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
+          onConfirm={handleCallConfirm}
         />
       )}
 
@@ -835,20 +855,29 @@ export default function TeamBracketView() {
   );
 }
 
-/** 団体戦・決勝トーナメント用コールダイアログ */
+/** 団体戦・決勝トーナメント用コールダイアログ
+ *  ミックス大会の CallPreviewDialog と同じパターン:
+ *  ダイアログ内では text を編集し、onConfirm(text, content) で親に返す。
+ *  親側で「ダイアログを閉じてから speak() を呼ぶ」。
+ */
 function TeamCallDialog({
   match,
   courtNames,
   onClose,
+  onConfirm,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
+  onConfirm: (text: string, content: {
+    matchId: string; category: PlacementCategory; roundLabel: string;
+    team1Number: number; team1Name: string; team2Number: number; team2Name: string;
+    courtNames: string[];
+  }) => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
   const isCalling = useTeamCallStore(s => s.isActive);
-  const startCall = useTeamCallStore(s => s.start);
   const cancelCall = useTeamCallStore(s => s.cancel);
 
   const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
@@ -876,20 +905,9 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // ★ クリックハンドラの最初の操作として音声再生を試みる
-    try {
-      const synth = window.speechSynthesis;
-      const voices = synth.getVoices();
-      const jaVoice = voices.find(v => v.lang === 'ja-JP' || v.lang === 'ja_JP') || null;
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'ja-JP';
-      u.rate = 0.95;
-      u.volume = 1.0;
-      if (jaVoice) u.voice = jaVoice;
-      synth.speak(u);
-    } catch { /* speechSynthesis非対応でもUIは動く */ }
-    // 右下バブルを表示
-    startCall({
+    // 親コンポーネントの onConfirm に text と内容を渡す
+    // 親側で「ダイアログ閉じ → speak()」の順に実行される（ミックスと同じ）
+    onConfirm(text, {
       matchId: match.matchId,
       category: match.category,
       roundLabel,
@@ -899,13 +917,6 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     });
-    // ダイアログを閉じる
-    onClose();
-    // テキスト長から概算した再生時間後にバブルを自動で閉じる
-    const estimatedMs = Math.max(8000, text.length * 150);
-    setTimeout(() => {
-      useTeamCallStore.getState().finish();
-    }, estimatedMs);
   };
 
   const handleStop = () => {
