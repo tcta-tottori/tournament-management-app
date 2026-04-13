@@ -876,7 +876,14 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // 1. 右下バブルを表示
+    // ★ クリックハンドラの最初の操作として音声再生を試みる
+    //    React state 更新より前に実行（ユーザージェスチャー維持）
+    try {
+      window.speechSynthesis.speak(
+        Object.assign(new SpeechSynthesisUtterance(text), { lang: 'ja-JP', rate: 0.95 })
+      );
+    } catch { /* speechSynthesis非対応でもUIは動く */ }
+    // 右下バブルを表示
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -887,19 +894,14 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     });
-    // 2. 音声再生（ヘルパー関数を使わず直接呼び出し）
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'ja-JP';
-      u.rate = 0.95;
-      u.onend = () => { useTeamCallStore.getState().finish(); };
-      u.onerror = () => { useTeamCallStore.getState().finish(); };
-      window.speechSynthesis.speak(u);
-    } catch {
-      setTimeout(() => useTeamCallStore.getState().finish(), 8000);
-    }
-    // 3. ダイアログを閉じる
+    // ダイアログを閉じる
     onClose();
+    // テキスト長から概算した再生時間後にバブルを自動で閉じる
+    // （onend/onerror イベントは一部端末で発火しないため使わない）
+    const estimatedMs = Math.max(8000, text.length * 150);
+    setTimeout(() => {
+      useTeamCallStore.getState().finish();
+    }, estimatedMs);
   };
 
   const handleStop = () => {
