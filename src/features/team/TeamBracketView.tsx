@@ -5,7 +5,7 @@ import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
-import { useTeamCallStore, teamCallSpeak } from './teamCallStore';
+import { useTeamCallStore } from './teamCallStore';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -876,7 +876,7 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // 1. 右下バブルを必ず表示する（純粋なstate更新なので失敗しない）
+    // 1. 右下バブルを表示
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -887,17 +887,19 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     });
-    // 2. ダイアログを閉じる
-    onClose();
-    // 3. 音声再生を試みる（例外が出ても握りつぶす）
+    // 2. 音声再生（ヘルパー関数を使わず直接呼び出し）
     try {
-      teamCallSpeak(text, { rate: 0.95 }, () => {
-        useTeamCallStore.getState().finish();
-      });
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP';
+      u.rate = 0.95;
+      u.onend = () => { useTeamCallStore.getState().finish(); };
+      u.onerror = () => { useTeamCallStore.getState().finish(); };
+      window.speechSynthesis.speak(u);
     } catch {
-      // 音声が使えない場合は8秒後にバブルを自動で閉じる
       setTimeout(() => useTeamCallStore.getState().finish(), 8000);
     }
+    // 3. ダイアログを閉じる
+    onClose();
   };
 
   const handleStop = () => {
