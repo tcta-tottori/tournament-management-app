@@ -70,11 +70,6 @@ export function teamCallSpeak(
   _cancelled = false;
 
   const synth = window.speechSynthesis;
-
-  // Android Chrome: タブ切替後に一時停止している場合があるためリセット
-  try { synth.cancel(); } catch {}
-  try { synth.resume(); } catch {}
-
   const voice = getJaVoice();
   const chunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
   if (chunks.length === 0) {
@@ -110,7 +105,6 @@ export function teamCallSpeak(
       };
       utterance.onerror = () => {
         if (_cancelled) return;
-        // エラーでも次チャンクを試す
         index++;
         if (index < chunks.length) {
           setTimeout(speakNext, 100);
@@ -120,16 +114,13 @@ export function teamCallSpeak(
       };
       synth.speak(utterance);
     } catch {
-      // synth.speak() 自体がエラーの場合
       onComplete?.();
     }
   }
 
-  // cancel() の直後なので少し待ってから再生開始
-  // （cancel+即speakはChromeで無視されるバグあり）
-  setTimeout(() => {
-    if (!_cancelled) speakNext();
-  }, 60);
+  // cancel() も setTimeout() も使わず、直接同期的に実行
+  // （ユーザージェスチャーコンテキストを絶対に失わないため）
+  speakNext();
 }
 
 export function teamCallSpeechCancel() {

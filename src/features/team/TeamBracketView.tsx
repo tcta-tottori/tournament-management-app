@@ -876,7 +876,12 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // 1. 右下バブルを先に表示（音声失敗してもバブルは出す）
+    // ★ synth.speak() をクリックハンドラの最初に同期実行する
+    //    （モバイルではユーザージェスチャー内でないと音声がブロックされる）
+    teamCallSpeak(text, { rate: 0.95 }, () => {
+      useTeamCallStore.getState().finish();
+    });
+    // 右下バブルを表示
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -887,16 +892,7 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     });
-    // 2. 音声再生を試みる（失敗してもクラッシュしない）
-    try {
-      teamCallSpeak(text, { rate: 0.95 }, () => {
-        useTeamCallStore.getState().finish();
-      });
-    } catch {
-      // 音声エンジン利用不可時は5秒後にバブルを自動閉じ
-      setTimeout(() => useTeamCallStore.getState().finish(), 5000);
-    }
-    // 3. ダイアログを閉じる
+    // ダイアログを閉じる
     onClose();
   };
 
