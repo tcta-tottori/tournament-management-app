@@ -5,7 +5,6 @@ import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
-import { useTeamCallStore } from './teamCallStore';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
@@ -95,23 +94,6 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
-  const { speak } = useSpeechSynthesis();
-  const startCall = useTeamCallStore(s => s.start);
-  const finishCall = useTeamCallStore(s => s.finish);
-
-  // ミックス大会の handleConfirmCall と同じ書き方（useCallback不使用）
-  const handleCallConfirm = (text: string, callContent: {
-    matchId: string; category: PlacementCategory; roundLabel: string;
-    team1Number: number; team1Name: string; team2Number: number; team2Name: string;
-    courtNames: string[];
-  }) => {
-    // 1. ダイアログを閉じる
-    setCallMatch(null);
-    // 2. 右下バブルを表示
-    startCall(callContent);
-    // 3. 音声再生
-    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => finishCall());
-  };
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -833,7 +815,6 @@ export default function TeamBracketView() {
           match={callMatch}
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
-          onConfirm={handleCallConfirm}
         />
       )}
 
@@ -855,29 +836,21 @@ export default function TeamBracketView() {
 }
 
 /** 団体戦・決勝トーナメント用コールダイアログ
- *  ミックス大会の CallPreviewDialog と同じパターン:
- *  ダイアログ内では text を編集し、onConfirm(text, content) で親に返す。
- *  親側で「ダイアログを閉じてから speak() を呼ぶ」。
+ *  ダイアログ内で useSpeechSynthesis を直接使用。
+ *  ダイアログを開いたまま再生し、再生中は停止ボタンを表示。
  */
 function TeamCallDialog({
   match,
   courtNames,
   onClose,
-  onConfirm,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
-  onConfirm: (text: string, content: {
-    matchId: string; category: PlacementCategory; roundLabel: string;
-    team1Number: number; team1Name: string; team2Number: number; team2Name: string;
-    courtNames: string[];
-  }) => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
-  const isCalling = useTeamCallStore(s => s.isActive);
-  const cancelCall = useTeamCallStore(s => s.cancel);
+  const { speak, stop, isSpeaking } = useSpeechSynthesis();
 
   const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
   const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
@@ -903,23 +876,12 @@ function TeamCallDialog({
   useEffect(() => { setText(initialText); }, [initialText]);
 
   const handleSpeak = () => {
-    if (!text.trim() || !team1 || !team2) return;
-    // 親コンポーネントの onConfirm に text と内容を渡す
-    // 親側で「ダイアログ閉じ → speak()」の順に実行される（ミックスと同じ）
-    onConfirm(text, {
-      matchId: match.matchId,
-      category: match.category,
-      roundLabel,
-      team1Number: team1.teamNumber,
-      team1Name: team1.teamName,
-      team2Number: team2.teamNumber,
-      team2Name: team2.teamName,
-      courtNames,
-    });
+    if (!text.trim()) return;
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
   };
 
   const handleStop = () => {
-    cancelCall();
+    stop();
   };
 
   if (!team1 || !team2) {
@@ -958,7 +920,7 @@ function TeamCallDialog({
             >
               閉じる
             </button>
-            {isCalling ? (
+            {isSpeaking ? (
               <button
                 onClick={handleStop}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
