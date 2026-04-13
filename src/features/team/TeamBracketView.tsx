@@ -876,12 +876,7 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // 1. まず音声再生を直接開始（ユーザージェスチャーコンテキスト内で実行）
-    //    React の state 更新より前に synth.speak() を呼ぶことが重要
-    teamCallSpeak(text, { rate: 0.95 }, () => {
-      useTeamCallStore.getState().finish();
-    });
-    // 2. UI状態を更新（右下バブル表示）
+    // 1. 右下バブルを先に表示（音声失敗してもバブルは出す）
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -892,6 +887,15 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     });
+    // 2. 音声再生を試みる（失敗してもクラッシュしない）
+    try {
+      teamCallSpeak(text, { rate: 0.95 }, () => {
+        useTeamCallStore.getState().finish();
+      });
+    } catch {
+      // 音声エンジン利用不可時は5秒後にバブルを自動閉じ
+      setTimeout(() => useTeamCallStore.getState().finish(), 5000);
+    }
     // 3. ダイアログを閉じる
     onClose();
   };
