@@ -96,23 +96,22 @@ export default function TeamBracketView() {
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
   const { speak } = useSpeechSynthesis();
+  const startCall = useTeamCallStore(s => s.start);
+  const finishCall = useTeamCallStore(s => s.finish);
 
-  // ミックス大会と同じパターン: ダイアログの onConfirm コールバック
-  // ダイアログを閉じてから speak() を呼ぶ
-  const handleCallConfirm = useCallback((text: string, callContent: {
+  // ミックス大会の handleConfirmCall と同じ書き方（useCallback不使用）
+  const handleCallConfirm = (text: string, callContent: {
     matchId: string; category: PlacementCategory; roundLabel: string;
     team1Number: number; team1Name: string; team2Number: number; team2Name: string;
     courtNames: string[];
   }) => {
-    // 1. ダイアログを閉じる（ミックスと同じ: 先に閉じる）
+    // 1. ダイアログを閉じる
     setCallMatch(null);
     // 2. 右下バブルを表示
-    useTeamCallStore.getState().start(callContent);
-    // 3. 音声再生（useSpeechSynthesis の speak を使用）
-    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
-      useTeamCallStore.getState().finish();
-    });
-  }, [speak]);
+    startCall(callContent);
+    // 3. 音声再生
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => finishCall());
+  };
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
