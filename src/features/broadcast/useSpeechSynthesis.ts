@@ -140,11 +140,7 @@ export function useSpeechSynthesis() {
             speakNext();
           }
         };
-        utterance.onerror = (e) => {
-          // 'interrupted' はキャンセルによるエラーなので無視
-          if (e && (e as any).error === 'interrupted') {
-            return;
-          }
+        utterance.onerror = () => {
           index++;
           speakNext();
         };

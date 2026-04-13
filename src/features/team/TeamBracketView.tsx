@@ -6,7 +6,6 @@ import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from '
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
-import { useTeamCallStore } from './teamCallStore';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -95,7 +94,6 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
-  const { speak, stop: stopSpeech } = useSpeechSynthesis();
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -817,8 +815,6 @@ export default function TeamBracketView() {
           match={callMatch}
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
-          speak={speak}
-          stopSpeech={stopSpeech}
         />
       )}
 
@@ -839,26 +835,22 @@ export default function TeamBracketView() {
   );
 }
 
-/** 団体戦・決勝トーナメント用コールダイアログ */
+/** 団体戦・決勝トーナメント用コールダイアログ
+ *  ダイアログ内で useSpeechSynthesis を直接使用。
+ *  ダイアログを開いたまま再生し、再生中は停止ボタンを表示。
+ */
 function TeamCallDialog({
   match,
   courtNames,
   onClose,
-  speak,
-  stopSpeech,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
-  speak: (text: string, settings: { rate: number; pitch: number; volume: number; repeatCount: number }, onComplete?: () => void) => void;
-  stopSpeech: () => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
-  const isCalling = useTeamCallStore(s => s.isActive);
-  const startCall = useTeamCallStore(s => s.start);
-  const finishCall = useTeamCallStore(s => s.finish);
-  const cancelCall = useTeamCallStore(s => s.cancel);
+  const { speak, stop, isSpeaking } = useSpeechSynthesis();
 
   const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
   const totalRounds = bracket ? Math.log2(bracket.drawSize) : 1;
@@ -884,29 +876,12 @@ function TeamCallDialog({
   useEffect(() => { setText(initialText); }, [initialText]);
 
   const handleSpeak = () => {
-    if (!text.trim() || !team1 || !team2) return;
-    // コール状態をセット（stopSpeech を渡すことで cancel 時に正しく停止できる）
-    startCall({
-      matchId: match.matchId,
-      category: match.category,
-      roundLabel,
-      team1Number: team1.teamNumber,
-      team1Name: team1.teamName,
-      team2Number: team2.teamNumber,
-      team2Name: team2.teamName,
-      courtNames,
-    }, stopSpeech);
-    // 音声再生を開始（同期的に synth.speak() が呼ばれる）
-    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
-      finishCall();
-    });
-    // ダイアログを閉じる（音声再生開始後に閉じることで確実に再生される）
-    // requestAnimationFrame で次フレームまで待つことで再生開始を保証
-    requestAnimationFrame(() => onClose());
+    if (!text.trim()) return;
+    speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 });
   };
 
   const handleStop = () => {
-    cancelCall();
+    stop();
   };
 
   if (!team1 || !team2) {
@@ -945,7 +920,7 @@ function TeamCallDialog({
             >
               閉じる
             </button>
-            {isCalling ? (
+            {isSpeaking ? (
               <button
                 onClick={handleStop}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
