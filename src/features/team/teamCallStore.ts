@@ -60,7 +60,7 @@ function getJaVoice(): SpeechSynthesisVoice | null {
 
 /**
  * 音声コールを開始する。
- * **必ずクリックイベントハンドラの同期パスから呼ぶこと。**
+ * クリックイベントハンドラの同期パスから呼ぶこと。
  */
 export function teamCallSpeak(
   text: string,
@@ -70,57 +70,37 @@ export function teamCallSpeak(
   _cancelled = false;
 
   const synth = window.speechSynthesis;
+
+  // 過去にキューに残った発話をクリア
+  synth.cancel();
+
   const voice = getJaVoice();
-  const chunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
-  if (chunks.length === 0) {
-    onComplete?.();
-    return;
-  }
 
-  let index = 0;
+  // 単一 Utterance で全文を再生（チャンク分割しない）
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ja-JP';
+  utterance.rate = opts.rate ?? 0.95;
+  utterance.pitch = opts.pitch ?? 1.0;
+  utterance.volume = opts.volume ?? 1.0;
+  if (voice) utterance.voice = voice;
 
-  function speakNext() {
-    if (_cancelled) return;
-    if (index >= chunks.length) {
-      onComplete?.();
-      return;
-    }
+  utterance.onend = () => {
+    if (!_cancelled) onComplete?.();
+  };
+  utterance.onerror = () => {
+    if (!_cancelled) onComplete?.();
+  };
 
-    try {
-      const utterance = new SpeechSynthesisUtterance(chunks[index]);
-      utterance.lang = 'ja-JP';
-      utterance.rate = opts.rate ?? 0.95;
-      utterance.pitch = opts.pitch ?? 1.0;
-      utterance.volume = opts.volume ?? 1.0;
-      if (voice) utterance.voice = voice;
+  // 同期的に即座に speak() を呼ぶ
+  synth.speak(utterance);
 
-      utterance.onend = () => {
-        if (_cancelled) return;
-        index++;
-        if (index < chunks.length) {
-          setTimeout(speakNext, CHUNK_PAUSE_MS);
-        } else {
-          onComplete?.();
-        }
-      };
-      utterance.onerror = () => {
-        if (_cancelled) return;
-        index++;
-        if (index < chunks.length) {
-          setTimeout(speakNext, 100);
-        } else {
-          onComplete?.();
-        }
-      };
+  // Android Chrome 対策: cancel() 直後の speak() が無視される場合に備えて
+  // 200ms 後にまだ再生開始していなければ再試行
+  setTimeout(() => {
+    if (!_cancelled && !synth.speaking && !synth.pending) {
       synth.speak(utterance);
-    } catch {
-      onComplete?.();
     }
-  }
-
-  // cancel() も setTimeout() も使わず、直接同期的に実行
-  // （ユーザージェスチャーコンテキストを絶対に失わないため）
-  speakNext();
+  }, 200);
 }
 
 export function teamCallSpeechCancel() {
