@@ -77,9 +77,14 @@ export function useSpeechSynthesis() {
 
   const speak = useCallback((text: string, settings: VoiceSettings, onComplete?: () => void) => {
     const synth = window.speechSynthesis;
-    synth.cancel();
     cancelledRef.current = false;
     setIsSpeaking(true);
+
+    // 再生中の場合のみキャンセル（Chrome バグ対策で遅延が必要）
+    const wasSpeaking = synth.speaking || synth.pending;
+    if (wasSpeaking) {
+      synth.cancel();
+    }
 
     const savedKey = localStorage.getItem(VOICE_STORAGE_KEY) || 'kyoko';
     const voice = getSelectedVoice(savedKey);
@@ -135,7 +140,11 @@ export function useSpeechSynthesis() {
             speakNext();
           }
         };
-        utterance.onerror = () => {
+        utterance.onerror = (e) => {
+          // 'interrupted' はキャンセルによるエラーなので無視
+          if (e && (e as any).error === 'interrupted') {
+            return;
+          }
           index++;
           speakNext();
         };
@@ -145,10 +154,15 @@ export function useSpeechSynthesis() {
       speakNext();
     }
 
-    // Chrome: cancel() 直後の speak() が無視されるバグ対策として少し遅延
-    setTimeout(() => {
-      if (!cancelledRef.current) speakChunks();
-    }, 50);
+    // 再生中だった場合: cancel() 直後の speak() が無視される Chrome バグ対策で遅延
+    // そうでなければ即座に開始（モバイルのユーザージェスチャー制約を維持）
+    if (wasSpeaking) {
+      setTimeout(() => {
+        if (!cancelledRef.current) speakChunks();
+      }, 50);
+    } else {
+      speakChunks();
+    }
   }, []);
 
   const stop = useCallback(() => {

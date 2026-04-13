@@ -896,11 +896,13 @@ function TeamCallDialog({
       team2Name: team2.teamName,
       courtNames,
     }, stopSpeech);
+    // 音声再生を開始（同期的に synth.speak() が呼ばれる）
     speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
       finishCall();
     });
-    // 中央ポップアップを閉じ、右下のコール中バブルだけ表示する
-    onClose();
+    // ダイアログを閉じる（音声再生開始後に閉じることで確実に再生される）
+    // requestAnimationFrame で次フレームまで待つことで再生開始を保証
+    requestAnimationFrame(() => onClose());
   };
 
   const handleStop = () => {
