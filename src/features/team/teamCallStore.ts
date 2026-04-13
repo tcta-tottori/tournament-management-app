@@ -60,7 +60,6 @@ function getJaVoice(): SpeechSynthesisVoice | null {
 
 /**
  * 音声コールを開始する。
- * クリックイベントハンドラの同期パスから呼ぶこと。
  */
 export function teamCallSpeak(
   text: string,
@@ -69,38 +68,56 @@ export function teamCallSpeak(
 ) {
   _cancelled = false;
 
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    onComplete?.();
+    return;
+  }
+
   const synth = window.speechSynthesis;
 
-  // 過去にキューに残った発話をクリア
-  synth.cancel();
+  try {
+    // 過去にキューに残った発話をクリア
+    synth.cancel();
+  } catch { /* ignore */ }
 
-  const voice = getJaVoice();
+  try {
+    const voice = getJaVoice();
 
-  // 単一 Utterance で全文を再生（チャンク分割しない）
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'ja-JP';
-  utterance.rate = opts.rate ?? 0.95;
-  utterance.pitch = opts.pitch ?? 1.0;
-  utterance.volume = opts.volume ?? 1.0;
-  if (voice) utterance.voice = voice;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = opts.rate ?? 0.95;
+    utterance.pitch = opts.pitch ?? 1.0;
+    utterance.volume = opts.volume ?? 1.0;
+    if (voice) utterance.voice = voice;
 
-  utterance.onend = () => {
-    if (!_cancelled) onComplete?.();
-  };
-  utterance.onerror = () => {
-    if (!_cancelled) onComplete?.();
-  };
+    utterance.onend = () => {
+      if (!_cancelled) onComplete?.();
+    };
+    utterance.onerror = () => {
+      if (!_cancelled) onComplete?.();
+    };
 
-  // 同期的に即座に speak() を呼ぶ
-  synth.speak(utterance);
+    synth.speak(utterance);
 
-  // Android Chrome 対策: cancel() 直後の speak() が無視される場合に備えて
-  // 200ms 後にまだ再生開始していなければ再試行
-  setTimeout(() => {
-    if (!_cancelled && !synth.speaking && !synth.pending) {
-      synth.speak(utterance);
-    }
-  }, 200);
+    // cancel() 直後の speak() が無視された場合の再試行
+    setTimeout(() => {
+      try {
+        if (!_cancelled && !synth.speaking && !synth.pending) {
+          const u2 = new SpeechSynthesisUtterance(text);
+          u2.lang = 'ja-JP';
+          u2.rate = opts.rate ?? 0.95;
+          u2.pitch = opts.pitch ?? 1.0;
+          u2.volume = opts.volume ?? 1.0;
+          if (voice) u2.voice = voice;
+          u2.onend = () => { if (!_cancelled) onComplete?.(); };
+          u2.onerror = () => { if (!_cancelled) onComplete?.(); };
+          synth.speak(u2);
+        }
+      } catch { /* ignore */ }
+    }, 250);
+  } catch {
+    onComplete?.();
+  }
 }
 
 export function teamCallSpeechCancel() {
