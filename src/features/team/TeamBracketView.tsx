@@ -5,8 +5,7 @@ import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
-import { useTeamCallStore } from './teamCallStore';
+import { useTeamCallStore, teamCallSpeak } from './teamCallStore';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -95,7 +94,6 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
-  const { speak, stop: stopSpeech } = useSpeechSynthesis();
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
@@ -817,8 +815,6 @@ export default function TeamBracketView() {
           match={callMatch}
           courtNames={callCourts}
           onClose={() => setCallMatch(null)}
-          speak={speak}
-          stopSpeech={stopSpeech}
         />
       )}
 
@@ -844,20 +840,15 @@ function TeamCallDialog({
   match,
   courtNames,
   onClose,
-  speak,
-  stopSpeech,
 }: {
   match: TeamBracketMatch;
   courtNames: string[];
   onClose: () => void;
-  speak: (text: string, settings: { rate: number; pitch: number; volume: number; repeatCount: number }, onComplete?: () => void) => void;
-  stopSpeech: () => void;
 }) {
   const allTeams = useTeamStore(s => s.allTeams);
   const brackets = useTeamStore(s => s.brackets);
   const isCalling = useTeamCallStore(s => s.isActive);
   const startCall = useTeamCallStore(s => s.start);
-  const finishCall = useTeamCallStore(s => s.finish);
   const cancelCall = useTeamCallStore(s => s.cancel);
 
   const bracket = useMemo(() => brackets.find(b => b.category === match.category), [brackets, match.category]);
@@ -885,7 +876,12 @@ function TeamCallDialog({
 
   const handleSpeak = () => {
     if (!text.trim() || !team1 || !team2) return;
-    // コール状態をセット（stopSpeech を渡すことで cancel 時に正しく停止できる）
+    // 1. まず音声再生を直接開始（ユーザージェスチャーコンテキスト内で実行）
+    //    React の state 更新より前に synth.speak() を呼ぶことが重要
+    teamCallSpeak(text, { rate: 0.95 }, () => {
+      useTeamCallStore.getState().finish();
+    });
+    // 2. UI状態を更新（右下バブル表示）
     startCall({
       matchId: match.matchId,
       category: match.category,
@@ -895,14 +891,9 @@ function TeamCallDialog({
       team2Number: team2.teamNumber,
       team2Name: team2.teamName,
       courtNames,
-    }, stopSpeech);
-    // 音声再生を開始（同期的に synth.speak() が呼ばれる）
-    speak(text, { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => {
-      finishCall();
     });
-    // ダイアログを閉じる（音声再生開始後に閉じることで確実に再生される）
-    // requestAnimationFrame で次フレームまで待つことで再生開始を保証
-    requestAnimationFrame(() => onClose());
+    // 3. ダイアログを閉じる
+    onClose();
   };
 
   const handleStop = () => {
