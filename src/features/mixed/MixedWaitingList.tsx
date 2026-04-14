@@ -4,6 +4,7 @@ import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import CallPreviewDialog from './CallPreviewDialog';
+import { expandCourtNumbers } from '../../utils/courtUtils';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
@@ -129,8 +130,8 @@ export default function MixedWaitingList() {
     for (const l of leagues) {
       const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
       if (lm.some(m => m.status !== 'finished')) {
-        const nums = l.courtName?.match(/\d+/g);
-        if (nums) for (const n of nums) set.add(`${n}コート`);
+        const nums = expandCourtNumbers(l.courtName);
+        for (const n of nums) set.add(`${n}コート`);
       }
     }
     return set;

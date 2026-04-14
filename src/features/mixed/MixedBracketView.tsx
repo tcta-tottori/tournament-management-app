@@ -6,6 +6,7 @@ import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } fro
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import CallPreviewDialog from './CallPreviewDialog';
 import { generateBracketDataUrl, generateResultDataUrl } from './exportBracketJpeg';
+import { expandCourtNumbers } from '../../utils/courtUtils';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -562,8 +563,8 @@ export default function MixedBracketView() {
         for (const l of leagues) {
           const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
           if (lm.some(m => m.status !== 'finished')) {
-            const nums = l.courtName?.match(/\d+/g);
-            if (nums) for (const n of nums) leagueInProgress.add(`${n}コート`);
+            const nums = expandCourtNumbers(l.courtName);
+            for (const n of nums) leagueInProgress.add(`${n}コート`);
           }
         }
         return createPortal(
@@ -1547,8 +1548,8 @@ function WaitingList({ waitingMatches, leagues }: {
     for (const l of leagues) {
       const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
       if (lm.some(m => m.status !== 'finished')) {
-        const nums = l.courtName?.match(/\d+/g);
-        if (nums) for (const n of nums) set.add(`${n}コート`);
+        const nums = expandCourtNumbers(l.courtName);
+        for (const n of nums) set.add(`${n}コート`);
       }
     }
     return set;

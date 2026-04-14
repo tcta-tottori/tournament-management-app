@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTeamStore } from './teamStore';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { TeamLeague, TeamLeagueMatch } from './types';
+import { expandCourtNumbers } from '../../utils/courtUtils';
 
 /** SVG コートライン（縦向き） */
 function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
@@ -87,12 +88,9 @@ export default function TeamLiveCourtView() {
       const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
       const cs = getLeagueCourtStatus(league, lm);
       const nextMatch = lm.filter(m => m.status !== 'finished').sort((a, b) => a.matchNumber - b.matchNumber)[0] || null;
-      const courtStr = (league.courtName || '').replace(/[\s\u3000]+/g, '');
-      const nums = courtStr.match(/\d+/g);
-      if (nums) {
-        for (const n of nums) {
-          map.set(parseInt(n), { league, status: cs, nextMatch });
-        }
+      const nums = expandCourtNumbers(league.courtName);
+      for (const n of nums) {
+        map.set(n, { league, status: cs, nextMatch });
       }
     }
     return map;

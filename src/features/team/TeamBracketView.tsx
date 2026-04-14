@@ -8,6 +8,7 @@ import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
+import { expandCourtNumbers } from '../../utils/courtUtils';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -767,8 +768,8 @@ export default function TeamBracketView() {
                     for (const l of leagues) {
                       const lm = useTeamStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);
                       if (lm.length > 0 && lm.some(m => m.status !== 'finished')) {
-                        const nums = (l.courtName || '').match(/\d+/g);
-                        if (nums && nums.includes(c.replace('コート', ''))) return true;
+                        const nums = expandCourtNumbers(l.courtName);
+                        if (nums.includes(parseInt(c.replace('コート', '')))) return true;
                       }
                     }
                     return false;
