@@ -347,22 +347,44 @@ export function nextPowerOf2(n: number): number {
 }
 
 /**
- * 団体戦ドロー表に記載された順位別トーナメントのスロット配置
+ * 団体戦ドロー表に記載された順位別トーナメントのデフォルトスロット配置
  * drawSize=8 (5リーグ→最大5チーム)
  *
- * 2位: C2, B2, D2, A2, E2
- * 3位: D3, C3, E3, B3, A3
- * 4・5位: B4, D4, E5, A4, D5, E4, C4
- *
- * ※ 5チーム+3BYEの場合、null の配置は必ず「各R1マッチに1つずつ」
- * 分散させる必要がある。隣り合わせ（同じマッチの両側）に置くと
- * 空試合（ゴーストマッチ）となり、決勝T が正しく進まない。
+ * ※ bracketOrders が Excel から読み込まれた場合はそちらが優先される
  */
 export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
   '2nd': ['C', null, 'B', null, 'D', 'A', 'E', null],
   '3rd': ['D', null, 'C', null, 'E', 'B', 'A', null],
   '4th': ['B', 'D', 'E5', 'A', 'D5', 'E', 'C', null],
 };
+
+/**
+ * bracketOrders（Excelから読み込んだ "A2","E2" 等のリスト）を
+ * ブラケットスロット配列に変換する。
+ * drawSize に合わせて null (BYE) を挿入して分散させる。
+ */
+function bracketOrdersToSlots(entries: string[], drawSizeIn: number): (string | null)[] {
+  const drawSize = Math.max(drawSizeIn, nextPowerOf2(entries.length));
+  const byeCount = drawSize - entries.length;
+  const slots: (string | null)[] = [];
+
+  if (byeCount <= 0) {
+    // BYEなし: そのまま配置
+    return entries.slice(0, drawSize);
+  }
+
+  // BYE を分散配置：各 R1 マッチ（ペア）に最大1つの BYE を入れる
+  // entries をインデックスの偶数位置に配置し、奇数位置に BYE/残りを入れる
+  // 戦略: 上位シードに BYE を付与（トーナメント下部から BYE を配置）
+  // まず全エントリを配置し、残りを null で埋める
+  for (let i = 0; i < entries.length; i++) {
+    slots.push(entries[i]);
+  }
+  while (slots.length < drawSize) {
+    slots.push(null);
+  }
+  return slots;
+}
 
 /** 空のブラケットサブマッチを生成 */
 function createEmptyBracketSubMatches(): BracketSubMatchScore[] {
@@ -382,26 +404,48 @@ export function generateAllBrackets(
   standings: Map<string, TeamLeagueStanding[]>,
   _allTeams: TeamEntry[],
   leagues: TeamLeague[],
-  _bracketOrders?: TeamTournamentInfo['bracketOrders']
+  bracketOrders?: TeamTournamentInfo['bracketOrders']
 ): TeamPlacementBracket[] {
+  // 3位と4位を分けるかどうかをbracketOrdersから判定
+  const has3rd = bracketOrders?.['3rd'] && bracketOrders['3rd'].length > 0;
+  const has4th = bracketOrders?.['4th'] && bracketOrders['4th']!.length > 0;
+
   const categories: { cat: PlacementCategory; label: string; rank: number }[] = [
     { cat: '1st', label: '1位トーナメント', rank: 1 },
     { cat: '2nd', label: '2位トーナメント', rank: 2 },
-    { cat: '3rd', label: '3位トーナメント', rank: 3 },
-    { cat: '4th', label: '4・5位トーナメント', rank: 4 },
   ];
+
+  // bracketOrders に "3rd" があればそれを3位・4位統合として使う
+  // bracketOrders がない場合はデフォルト（3位と4・5位を分ける）
+  if (has3rd && !has4th) {
+    // "3rd" キーが3位・4位統合トーナメント
+    categories.push({ cat: '3rd', label: '3位・4位トーナメント', rank: 3 });
+  } else {
+    categories.push({ cat: '3rd', label: '3位トーナメント', rank: 3 });
+    categories.push({ cat: '4th', label: '4・5位トーナメント', rank: 4 });
+  }
 
   const brackets: TeamPlacementBracket[] = [];
 
   for (const { cat, label, rank } of categories) {
+    // bracketOrders からスロット配列を取得
+    const orderEntries = bracketOrders?.[cat === '4th' ? '4th' : cat === '3rd' ? '3rd' : cat === '2nd' ? '2nd' : undefined as never];
+
+    // standings からチーム情報を収集
     const teamByLeague = new Map<string, { teamId: string; teamName: string; leagueId: string }[]>();
     for (const lid of leagues.map(l => l.leagueId)) {
       const normalizedLid = lid.trim();
       const ls = standings.get(normalizedLid) || standings.get(lid);
       if (!ls) continue;
-      if (rank <= 3) {
+      if (rank <= 3 && !(has3rd && !has4th && rank === 3)) {
         const entry = ls.find(s => s.rank === rank);
         if (entry) teamByLeague.set(normalizedLid, [{ teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid }]);
+      } else if (has3rd && !has4th && rank === 3) {
+        // 3位・4位統合: 3位以下のすべてのチーム
+        const entries = ls.filter(s => s.rank >= 3).map(entry => ({
+          teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid
+        }));
+        if (entries.length > 0) teamByLeague.set(normalizedLid, entries);
       } else {
         const entries = ls.filter(s => s.rank >= 4).map(entry => ({
           teamId: entry.teamId, teamName: entry.teamName, leagueId: normalizedLid
@@ -410,50 +454,89 @@ export function generateAllBrackets(
       }
     }
 
-    const slotMap = BRACKET_SLOT_MAP[cat];
-    if (slotMap) {
-      const drawSize = 8;
+    // bracketOrders がある場合はそれに基づいてスロットを配置
+    if (orderEntries && orderEntries.length > 0) {
+      const drawSize = nextPowerOf2(orderEntries.length);
+      const slotCodes = bracketOrdersToSlots(orderEntries, drawSize);
       const slots: ({ teamId: string; teamName: string; leagueId: string } | null)[] = [];
-      for (const lid of slotMap) {
-        if (lid === null) {
+
+      for (const code of slotCodes) {
+        if (code === null) {
           slots.push(null);
         } else {
-          // 4・5位の場合、"D5" のような特殊キーを処理
-          let leagueKey = lid;
-          let rankNum = rank;
-          const m = lid.match(/^([A-E])(\d)$/);
+          // "A2" → league=A, rank=2
+          const m = code.match(/^([A-Z])(\d)$/);
           if (m) {
-            leagueKey = m[1];
-            rankNum = parseInt(m[2]);
-          }
-          const teamList = teamByLeague.get(leagueKey);
-          if (teamList && teamList.length > 0) {
-            if (rank >= 4 && m) {
-              // 特定順位のチームを探す
-              const ls = standings.get(leagueKey);
-              const specific = ls?.find(s => s.rank === rankNum);
-              if (specific) {
-                const idx = teamList.findIndex(t => t.teamId === specific.teamId);
-                if (idx >= 0) {
-                  slots.push(teamList.splice(idx, 1)[0]);
-                } else {
-                  slots.push(null);
-                }
-              } else {
-                slots.push(null);
-              }
+            const leagueKey = m[1];
+            const rankNum = parseInt(m[2]);
+            const ls = standings.get(leagueKey);
+            const entry = ls?.find(s => s.rank === rankNum);
+            if (entry) {
+              slots.push({ teamId: entry.teamId, teamName: entry.teamName, leagueId: leagueKey });
             } else {
-              slots.push(teamList.shift()!);
+              slots.push(null);
             }
           } else {
-            slots.push(null);
+            // 単純なリーグ名の場合（デフォルトランク）
+            const teamList = teamByLeague.get(code);
+            if (teamList && teamList.length > 0) {
+              slots.push(teamList.shift()!);
+            } else {
+              slots.push(null);
+            }
           }
         }
       }
+
       const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
         .map((t, i) => ({ ...t, seedPosition: i + 1 }));
       const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+    } else if (cat !== '1st') {
+      // デフォルトのスロットマップを使用
+      const slotMap = BRACKET_SLOT_MAP[cat];
+      if (slotMap) {
+        const drawSize = 8;
+        const slots: ({ teamId: string; teamName: string; leagueId: string } | null)[] = [];
+        for (const lid of slotMap) {
+          if (lid === null) {
+            slots.push(null);
+          } else {
+            let leagueKey = lid;
+            let rankNum = rank;
+            const m = lid.match(/^([A-Z])(\d)$/);
+            if (m) {
+              leagueKey = m[1];
+              rankNum = parseInt(m[2]);
+            }
+            const teamList = teamByLeague.get(leagueKey);
+            if (teamList && teamList.length > 0) {
+              if (rank >= 4 && m) {
+                const ls = standings.get(leagueKey);
+                const specific = ls?.find(s => s.rank === rankNum);
+                if (specific) {
+                  const idx = teamList.findIndex(t => t.teamId === specific.teamId);
+                  if (idx >= 0) {
+                    slots.push(teamList.splice(idx, 1)[0]);
+                  } else {
+                    slots.push(null);
+                  }
+                } else {
+                  slots.push(null);
+                }
+              } else {
+                slots.push(teamList.shift()!);
+              }
+            } else {
+              slots.push(null);
+            }
+          }
+        }
+        const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
+          .map((t, i) => ({ ...t, seedPosition: i + 1 }));
+        const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
+        brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+      }
     } else {
       // 1位トーナメント: 抽選
       const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];

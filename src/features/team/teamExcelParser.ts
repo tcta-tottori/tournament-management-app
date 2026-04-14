@@ -5,6 +5,13 @@ import type {
 } from './types';
 import { MATCH_TYPE_ORDER } from './teamLogic';
 
+/** 3チームリーグの対戦順 */
+const MATCH_ORDER_3: MatchOrderEntry[] = [
+  { matchNumber: 1, team1Index: 1, team2Index: 2 },
+  { matchNumber: 2, team1Index: 2, team2Index: 3 },
+  { matchNumber: 3, team1Index: 1, team2Index: 3 },
+];
+
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
   { matchNumber: 1, team1Index: 1, team2Index: 2 },
@@ -34,6 +41,7 @@ function toHalf(s: string): string {
   return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 }
+
 
 /** セル値を文字列に変換 */
 function cellStr(ws: XLSX.WorkSheet, ref: string): string {
@@ -69,10 +77,55 @@ interface ParseResult {
 }
 
 /**
+ * Excelのセルフォント色を取得するためのマッピングを構築する。
+ * XLSX.CFB を使って xlsx 内部の worksheet XML から各セルの style index を取得し、
+ * wb.Styles.CellXf → wb.Styles.Fonts で font color を解決する。
+ */
+function buildCellFontColorMap(
+  buffer: ArrayBuffer,
+  wb: XLSX.WorkBook,
+  sheetPath: string,
+): Map<string, string> {
+  const colorMap = new Map<string, string>();
+  try {
+    const CFB = (XLSX as any).CFB;
+    if (!CFB) return colorMap;
+    const cfb = CFB.read(new Uint8Array(buffer), { type: 'array' });
+    const entry = CFB.find(cfb, sheetPath);
+    if (!entry || !entry.content) return colorMap;
+    const xml = typeof entry.content === 'string'
+      ? entry.content
+      : new TextDecoder().decode(entry.content);
+    const cellRegex = /<c r="([A-Z]+\d+)"[^>]*s="(\d+)"[^>]*>/g;
+    let match: RegExpExecArray | null;
+    while ((match = cellRegex.exec(xml)) !== null) {
+      const ref = match[1];
+      const styleIdx = parseInt(match[2]);
+      const xf = wb.Styles?.CellXf?.[styleIdx];
+      if (!xf) continue;
+      const font = wb.Styles?.Fonts?.[xf.fontId];
+      if (!font?.color?.rgb) continue;
+      colorMap.set(ref, font.color.rgb);
+    }
+  } catch {
+    // CFBが使えない場合はフォールバック（色情報なし）
+  }
+  return colorMap;
+}
+
+/** フォント色から性別を判定 */
+function genderFromFontColor(color: string | undefined): 'M' | 'F' {
+  if (!color) return 'F'; // デフォルトは女性
+  if (color === '0070C0' || color === 'FF0070C0') return 'M'; // 青 = 男性
+  if (color === 'FF0000' || color === 'FFFF0000') return 'F'; // 赤 = 女性
+  return 'F'; // デフォルト
+}
+
+/**
  * 団体戦Excelパーサー
  */
 export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const wb = XLSX.read(buffer, { type: 'array', cellStyles: true });
 
   // 大会情報を表紙シートから取得
   const info = parseTournamentInfo(wb);
@@ -92,18 +145,33 @@ export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
   const leagueWs = wb.Sheets[leagueSheetName];
   const rosterWs = rosterSheetName ? wb.Sheets[rosterSheetName] : null;
 
+  // 選手名簿シートのフォント色マップを構築（性別判定用）
+  const rosterSheetIndex = rosterSheetName
+    ? wb.SheetNames.indexOf(rosterSheetName)
+    : -1;
+  const rosterColorMap = rosterSheetIndex >= 0
+    ? buildCellFontColorMap(buffer, wb, `/xl/worksheets/sheet${rosterSheetIndex + 1}.xml`)
+    : new Map<string, string>();
+
   // リーグ・チーム情報をパース
   const { leagues, teamNumberMap } = parseLeagues(leagueWs);
 
-  // 選手名簿からメンバー情報を取得
+  // 選手名簿からメンバー情報を取得（色による性別判定付き）
   if (rosterWs) {
-    parseRoster(rosterWs, leagues, teamNumberMap);
+    parseRoster(rosterWs, leagues, teamNumberMap, rosterColorMap);
   }
+
+  // 予選リーグシートから決勝トーナメントのブラケット順を取得
+  parseBracketOrders(leagueWs, info);
 
   // 試合データ生成
   const matches: TeamLeagueMatch[] = [];
   for (const league of leagues) {
-    const matchOrder = league.teams.length <= 4 ? MATCH_ORDER_4 : MATCH_ORDER_5;
+    const matchOrder = league.teams.length <= 3
+      ? MATCH_ORDER_3
+      : league.teams.length <= 4
+        ? MATCH_ORDER_4
+        : MATCH_ORDER_5;
     league.matchOrder = matchOrder;
     for (const mo of matchOrder) {
       const team1 = league.teams[mo.team1Index - 1];
@@ -184,35 +252,43 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
       }
       pickTitle(clean);
 
-      // 日付検出: "3/15" "3月15日" "2026/4/8" "R7.4.8" 等
+      // 日付検出: "3/15" "3月15日" "2026/4/8" "R7.4.8" "令和８年４月29日" 等
+      // ※ 全角数字にも対応
       if (!info.date) {
-        const dateMatch = clean.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
-                          clean.match(/^\d{1,2}\/\d{1,2}$/);
-        if (dateMatch && !isRuleLike(clean) && !/令和\s*\d+\s*年度/.test(clean)) {
+        const halfClean = toHalf(clean);
+        const dateMatch = halfClean.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
+                          halfClean.match(/^\d{1,2}\/\d{1,2}$/);
+        if (dateMatch && !isRuleLike(clean) && !/令和\s*[\d０-９]+\s*年度/.test(clean)) {
           info.date = dateMatch[0];
         }
       }
 
-      if (!info.date && (val.includes('日　時') || val.includes('日 時') || val.includes('日時') || val.includes('開催日'))) {
-        const stripped = val.replace(/^(日\s*時|開催日)\s*[：:]?\s*/, '').trim();
+      // "日　時" "日 時" "日時" "開催日" ラベルの検出（全角スペースや複数スペースに対応）
+      if (!info.date && (/日[\s\u3000]*時/.test(val) || val.includes('開催日'))) {
+        // ラベル部分を除去して日付を抽出
+        const stripped = val.replace(/^日[\s\u3000]*時[\s\u3000]*[：:]?\s*/, '').trim();
         if (stripped && stripped !== val.trim()) {
-          info.date = stripped;
+          // "令和８年４月29日（祝）　予備日　..." → "令和8年4月29日" を抽出
+          const halfStripped = toHalf(stripped);
+          const dateInStr = halfStripped.match(/(?:令和|R|平成|H)?\s*\d{1,4}年\s*\d{1,2}月\s*\d{1,2}日/);
+          info.date = dateInStr ? dateInStr[0] : stripped.split(/予備日/)[0].replace(/[（(].*/g, '').trim();
         } else {
           // ラベルのみ → 右・下の隣接セルから値を取得
           for (const adj of [colLetter(c + 1) + (r + 1), colLetter(c + 2) + (r + 1), colLetter(c) + (r + 2)]) {
             const v = cellStr(ws, adj);
-            if (v && !/^(日\s*時|開催日|会\s*場|会場)/.test(v)) { info.date = v.trim(); break; }
+            if (v && !/^(日[\s\u3000]*時|開催日|会[\s\u3000]*場|会場)/.test(v)) { info.date = v.trim(); break; }
           }
         }
       }
-      if (!info.venue && (val.includes('会　場') || val.includes('会 場') || val.includes('会場'))) {
-        const stripped = val.replace(/^会\s*場\s*[：:]?\s*/, '').trim();
+      if (!info.venue && /会[\s\u3000]*場/.test(val)) {
+        const stripped = val.replace(/^会[\s\u3000]*場[\s\u3000]*[：:]?\s*/, '').trim();
         if (stripped && stripped !== val.trim()) {
-          info.venue = stripped;
+          // "ヤマタスポーツパークテニスコート（予備日：千代コート）" → メイン会場名を抽出
+          info.venue = stripped.split(/[（(]予備日/)[0].replace(/[（(].*$/, '').trim() || stripped;
         } else {
           for (const adj of [colLetter(c + 1) + (r + 1), colLetter(c + 2) + (r + 1), colLetter(c) + (r + 2)]) {
             const v = cellStr(ws, adj);
-            if (v && !/^(日\s*時|開催日|会\s*場|会場)/.test(v)) { info.venue = v.trim(); break; }
+            if (v && !/^(日[\s\u3000]*時|開催日|会[\s\u3000]*場|会場)/.test(v)) { info.venue = v.trim(); break; }
           }
         }
       }
@@ -239,9 +315,10 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
           }
           pickTitle(clean);
           if (!info.date) {
-            const dateMatch = clean.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
-                              clean.match(/^\d{1,2}\/\d{1,2}$/);
-            if (dateMatch && !isRuleLike(clean) && !/令和\s*\d+\s*年度/.test(clean)) {
+            const halfClean2 = toHalf(clean);
+            const dateMatch = halfClean2.match(/(?:令和|R|平成|H)?\s*\d{0,4}[\/\.年]\s*\d{1,2}[\/\.月]\s*\d{1,2}日?/) ||
+                              halfClean2.match(/^\d{1,2}\/\d{1,2}$/);
+            if (dateMatch && !isRuleLike(clean) && !/令和\s*[\d０-９]+\s*年度/.test(clean)) {
               info.date = dateMatch[0];
             }
           }
@@ -256,15 +333,23 @@ function parseTournamentInfo(wb: XLSX.WorkBook): TeamTournamentInfo {
   // ゲームルール解析
   info.gameRules = {};
   for (const r of info.rules) {
-    if (r.includes('4') && r.includes('チーム') && /ゲーム/.test(r)) {
-      info.gameRules[4] = r;
+    const halfR = toHalf(r);
+    if (/[34].*チーム.*ゲーム|3チームリーグ/i.test(halfR)) {
+      if (!info.gameRules[3]) info.gameRules[3] = r;
     }
-    if (r.includes('5') && r.includes('チーム') && /ゲーム/.test(r)) {
+    if (/[4].*チーム.*ゲーム|4チームリーグ/i.test(halfR)) {
+      if (!info.gameRules[4]) info.gameRules[4] = r;
+    }
+    if (/[5].*チーム.*ゲーム|5チームリーグ/i.test(halfR)) {
       info.gameRules[5] = r;
     }
   }
+  // デフォルト値の設定
+  if (!info.gameRules[3]) {
+    info.gameRules[3] = info.gameRules[4] || '6ゲームマッチ（6-6タイブレーク・ノーアド）';
+  }
   if (!info.gameRules[4]) {
-    info.gameRules[4] = '6ゲームマッチ（6-6タイブレーク・ノーアド）';
+    info.gameRules[4] = '6ゲーム先取（ノーアド）';
   }
   if (!info.gameRules[5]) {
     info.gameRules[5] = '6ゲーム先取（ノーアド）';
@@ -291,8 +376,8 @@ function parseLeagues(ws: XLSX.WorkSheet): {
     const aVal = cellStr(ws, 'A' + (r + 1));
     if (!aVal) continue;
 
-    // "Aリーグ", "Bリーグ" などを検出
-    const m = aVal.match(/([A-EＡ-Ｅ])\s*リーグ/);
+    // "Aリーグ", "Bリーグ" ... "Gリーグ" などを検出
+    const m = aVal.match(/([A-ZＡ-Ｚ])\s*リーグ/);
     if (m) {
       const leagueId = toHalf(m[1]).trim();
       // コート名を取得（同じセル内の改行後テキスト or 括弧内テキスト）
@@ -312,9 +397,8 @@ function parseLeagues(ws: XLSX.WorkSheet): {
     const row = lr.row + 1; // 1-based
     const teams: TeamEntry[] = [];
 
-    // 左半分（予選リーグ部分）のみスキャン
-    // 右側（BB列=column 53以降）は別セクションなので除外
-    for (let c = range.s.c; c <= Math.min(range.e.c, 50); c++) {
+    // チーム情報のセルをスキャン（全列を対象とする）
+    for (let c = range.s.c; c <= range.e.c; c++) {
       const ref = colLetter(c) + row;
       const val = cellStr(ws, ref);
       if (!val) continue;
@@ -350,7 +434,7 @@ function parseLeagues(ws: XLSX.WorkSheet): {
     }
 
     if (teams.length > 0) {
-      const matchOrder = teams.length <= 4 ? MATCH_ORDER_4 : MATCH_ORDER_5;
+      const matchOrder = teams.length <= 3 ? MATCH_ORDER_3 : teams.length <= 4 ? MATCH_ORDER_4 : MATCH_ORDER_5;
       leagues.push({
         leagueId: lr.leagueId,
         courtName: lr.courtName,
@@ -363,11 +447,12 @@ function parseLeagues(ws: XLSX.WorkSheet): {
   return { leagues, teamNumberMap };
 }
 
-/** 選手名簿からメンバー情報をパース */
+/** 選手名簿からメンバー情報をパース（フォント色による性別判定付き） */
 function parseRoster(
   ws: XLSX.WorkSheet,
   leagues: TeamLeague[],
-  teamNumberMap: Map<number, TeamEntry>
+  teamNumberMap: Map<number, TeamEntry>,
+  colorMap: Map<string, string> = new Map(),
 ) {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AO40');
   const circledNumbers = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒';
@@ -440,7 +525,8 @@ function parseRoster(
     const seenNames = new Set<string>();
     for (let mr = rowStart; mr <= rowEnd; mr++) {
       for (let cc = colStart; cc <= colEnd; cc++) {
-        const v = cellStr(ws, colLetter(cc) + (mr + 1));
+        const cellRef = colLetter(cc) + (mr + 1);
+        const v = cellStr(ws, cellRef);
         if (!v) continue;
         // 丸数字セルはスキップ
         if ([...v].some(ch => circledNumbers.includes(ch))) continue;
@@ -449,9 +535,14 @@ function parseRoster(
         // 明らかに人名ではない文字列はスキップ（長すぎる・記号のみ）
         if (cleaned.length > 20) continue;
         seenNames.add(cleaned);
+
+        // フォント色から性別を判定（赤=女性、青=男性）
+        const fontColor = colorMap.get(cellRef);
+        const gender = genderFromFontColor(fontColor);
+
         team.members.push({
           player: { name: cleaned, affiliation: '' },
-          gender: 'F',
+          gender,
         });
       }
     }
@@ -472,7 +563,7 @@ function parseResultSheet(
       const val = cellStr(ws, colLetter(c) + (r + 1));
       if (!val) continue;
 
-      const m = val.match(/([A-EＡ-Ｅ])\s*リーグ\s*成績表/);
+      const m = val.match(/([A-ZＡ-Ｚ])\s*リーグ\s*成績表/);
       if (!m) continue;
       const leagueId = toHalf(m[1]).trim();
       const league = leagues.find(l => l.leagueId === leagueId);
@@ -549,6 +640,83 @@ function parseResultSheet(
           match.status = 'finished';
         }
       }
+    }
+  }
+}
+
+/**
+ * 予選リーグシートから決勝トーナメントのブラケット順をパース
+ *
+ * シートの下部に以下のような構造がある:
+ *   "■決勝トーナメント" ラベル
+ *   "１位トーナメント" → 組合せは抽選
+ *   "２位トーナメント"
+ *   "３位・４位トーナメント"
+ *   ブラケット位置に "A2", "E2", "G4" などのリーグ+順位コードが配置
+ */
+function parseBracketOrders(ws: XLSX.WorkSheet, info: TeamTournamentInfo) {
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AY60');
+
+  // "決勝トーナメント" ラベルを探す
+  let bracketStartRow = -1;
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const val = cellStr(ws, colLetter(c) + (r + 1));
+      if (val.includes('決勝トーナメント')) {
+        bracketStartRow = r;
+        break;
+      }
+    }
+    if (bracketStartRow >= 0) break;
+  }
+  if (bracketStartRow < 0) return;
+
+  // ２位トーナメント、３位・４位トーナメント のラベル位置とセル範囲を検出
+  type BracketSection = { label: string; key: '2nd' | '3rd'; col: number; row: number };
+  const sections: BracketSection[] = [];
+  for (let r = bracketStartRow; r <= Math.min(range.e.r, bracketStartRow + 20); r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const val = cellStr(ws, colLetter(c) + (r + 1));
+      if (!val) continue;
+      if (/２位トーナメント|2位トーナメント/.test(val)) {
+        sections.push({ label: val, key: '2nd', col: c, row: r });
+      }
+      if (/[３3]位.*[４4]位|[３3]位トーナメント/.test(val)) {
+        sections.push({ label: val, key: '3rd', col: c, row: r });
+      }
+    }
+  }
+
+  // セクションを列順にソートし、各セクションの列範囲を決定
+  sections.sort((a, b) => a.col - b.col);
+
+  // 各セクションのブラケット順を検出
+  // パターン: "[A-G][1-5]" 形式のセル値をスキャン
+  const bracketCodeRe = /^([A-ZＡ-Ｚ])([1-5１-５])$/;
+
+  for (let si = 0; si < sections.length; si++) {
+    const section = sections[si];
+    const entries: string[] = [];
+    // 次のセクションの開始列 - 1 を境界として使用
+    const nextSectionCol = si + 1 < sections.length ? sections[si + 1].col - 1 : range.e.c;
+    // セクション位置の下方を走査
+    for (let r = section.row; r <= Math.min(range.e.r, section.row + 15); r++) {
+      const startCol = Math.max(section.col - 2, 0);
+      const endCol = Math.min(range.e.c, nextSectionCol);
+      for (let c = startCol; c <= endCol; c++) {
+        const val = cellStr(ws, colLetter(c) + (r + 1));
+        if (!val) continue;
+        const m = val.match(bracketCodeRe);
+        if (m) {
+          const league = toHalf(m[1]);
+          const rank = toHalf(m[2]);
+          entries.push(league + rank);
+        }
+      }
+    }
+    if (entries.length > 0) {
+      if (!info.bracketOrders) info.bracketOrders = {};
+      info.bracketOrders[section.key] = entries;
     }
   }
 }
