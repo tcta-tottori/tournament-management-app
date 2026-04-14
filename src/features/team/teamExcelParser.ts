@@ -696,7 +696,10 @@ function parseBracketOrders(ws: XLSX.WorkSheet, info: TeamTournamentInfo) {
 
   for (let si = 0; si < sections.length; si++) {
     const section = sections[si];
-    const entries: string[] = [];
+    // エントリをセル位置付きで収集し、列順にソートする
+    // （ブラケットツリーではエントリが異なる行に交互配置されるため、
+    //   行順ではなく列順が正しいドロー表の並びになる）
+    const rawEntries: { code: string; col: number; row: number }[] = [];
     // 次のセクションの開始列 - 1 を境界として使用
     const nextSectionCol = si + 1 < sections.length ? sections[si + 1].col - 1 : range.e.c;
     // セクション位置の下方を走査
@@ -710,10 +713,13 @@ function parseBracketOrders(ws: XLSX.WorkSheet, info: TeamTournamentInfo) {
         if (m) {
           const league = toHalf(m[1]);
           const rank = toHalf(m[2]);
-          entries.push(league + rank);
+          rawEntries.push({ code: league + rank, col: c, row: r });
         }
       }
     }
+    // 列位置でソート（同一列なら行順）→ ドロー表の左→右順
+    rawEntries.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row);
+    const entries = rawEntries.map(e => e.code);
     if (entries.length > 0) {
       if (!info.bracketOrders) info.bracketOrders = {};
       info.bracketOrders[section.key] = entries;

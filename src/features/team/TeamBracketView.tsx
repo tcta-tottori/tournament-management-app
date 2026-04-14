@@ -12,14 +12,14 @@ import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
   '2nd': '2位トーナメント',
-  '3rd': '3位トーナメント',
+  '3rd': '3位・4位トーナメント',
   '4th': '4・5位トーナメント',
 };
 
 const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位T',
   '2nd': '2位T',
-  '3rd': '3位T',
+  '3rd': '3·4位T',
   '4th': '4·5位T',
 };
 
@@ -240,10 +240,10 @@ export default function TeamBracketView() {
       )}
       </div>
 
-      {/* PC: 左=控えリスト / 右=トーナメント の2カラム分割 */}
+      {/* PC: 左=トーナメント / 右=控えリスト の2カラム分割 */}
       <div className="lg:flex lg:gap-4">
-        {/* PC左カラム: 控えリスト（PCのみ表示） */}
-        <div className="hidden lg:block lg:w-1/2 lg:shrink-0">
+        {/* PC右カラム: 控えリスト（PCのみ表示） */}
+        <div className="hidden lg:block lg:w-1/2 lg:shrink-0 lg:order-2">
           <div className="sticky top-0">
             <div className="flex items-center gap-2 mb-3 px-1">
               <ClipboardList className="w-4 h-4 text-slate-500" />
@@ -261,8 +261,8 @@ export default function TeamBracketView() {
           </div>
         </div>
 
-        {/* 右カラム（PC）/ フルワイド（モバイル）: トーナメント表示 */}
-        <div className={`lg:w-1/2 lg:shrink-0 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
+        {/* 左カラム（PC）/ フルワイド（モバイル）: トーナメント表示 */}
+        <div className={`lg:w-1/2 lg:shrink-0 lg:order-1 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
       {/* カテゴリタブ（リッチカラー文字） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
@@ -409,7 +409,7 @@ export default function TeamBracketView() {
                 {/* 一体型ヘッダー（アイコン削除、右側に進捗ゲージ） */}
                 <div className={`px-4 py-3 flex items-center gap-3 bg-gradient-to-r ${cfg.grad} text-white`}>
                   <div className="flex-1 min-w-0">
-                    <div className="text-base font-black tracking-tight">{CATEGORY_LABELS[cat]}</div>
+                    <div className="text-base font-black tracking-tight">{bracket.label || CATEGORY_LABELS[cat]}</div>
                     <div className="text-[10px] opacity-80">{bracket.drawSize}チームドロー</div>
                   </div>
                   {/* 右側: 結果画像ボタン + 進捗ゲージ */}
@@ -733,7 +733,7 @@ export default function TeamBracketView() {
         `}</style>
         </>);
       })()}
-        </div>{/* 右カラム end */}
+        </div>{/* 左カラム end */}
       </div>{/* PC flex / モバイル wrapper end */}
 
       {/* コート割当ダイアログ（複数選択可） */}

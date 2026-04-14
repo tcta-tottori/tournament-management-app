@@ -560,7 +560,7 @@ export function generateAllBrackets(
 export const PLACEMENT_CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
   '2nd': '2位トーナメント',
-  '3rd': '3位トーナメント',
+  '3rd': '3位・4位トーナメント',
   '4th': '4・5位トーナメント',
 };
 
