@@ -713,6 +713,12 @@ function parseBracketOrders(ws: XLSX.WorkSheet, info: TeamTournamentInfo) {
         if (m) {
           const league = toHalf(m[1]);
           const rank = toHalf(m[2]);
+          const rankNum = parseInt(rank);
+          // セクションに応じたランクフィルタ:
+          // 2位セクション → rank=2 のみ（隣接する3位セクションのエントリを除外）
+          // 3位セクション → rank>=3（3位・4位の両方を含む）
+          if (section.key === '2nd' && rankNum !== 2) continue;
+          if (section.key === '3rd' && rankNum < 3) continue;
           rawEntries.push({ code: league + rank, col: c, row: r });
         }
       }
