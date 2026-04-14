@@ -18,6 +18,7 @@ import type {
   SnapshotResponsePayload,
   SyncConnectionState,
 } from './types';
+import { getAutoServerUrl } from './autoDetectUrl';
 
 /** リモートから適用中の変更を再ブロードキャストしないためのフラグ */
 let isApplyingRemote = false;
@@ -74,8 +75,8 @@ class SyncEngine {
     // BroadcastChannel 接続（常に有効）
     this.broadcastTransport.connect(roomCode);
 
-    // WebSocket 接続（サーバーURLが設定されている場合）
-    const wsUrl = serverUrl || store.serverUrl;
+    // WebSocket 接続（明示指定 → ストア設定 → 自動検出 の優先順位）
+    const wsUrl = serverUrl || store.serverUrl || getAutoServerUrl();
     if (wsUrl) {
       this.wsTransport.setServerUrl(wsUrl);
       this.wsTransport.connect(roomCode);
@@ -531,7 +532,8 @@ class SyncEngine {
     const ws = wsState ?? this.wsTransport.getState();
 
     // WebSocket が使われていない場合は BroadcastChannel のみで判定
-    if (!store.serverUrl) {
+    const hasWsUrl = store.serverUrl || getAutoServerUrl();
+    if (!hasWsUrl) {
       store.setConnectionState(bc);
       return;
     }
