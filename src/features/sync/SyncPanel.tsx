@@ -3,15 +3,17 @@
 // ルームの作成・参加、接続設定、接続端末一覧
 // =============================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Wifi, WifiOff, Monitor, Smartphone,
   Copy, Check, Play, Square, Settings2,
   Users, RefreshCw, AlertCircle, Info,
+  Zap,
 } from 'lucide-react';
 import { useSyncStore, generateRoomCode } from './syncStore';
 import { syncEngine } from './syncEngine';
+import { getAutoServerUrl } from './autoDetectUrl';
 
 interface Props {
   open: boolean;
@@ -26,36 +28,43 @@ export default function SyncPanel({ open, onClose }: Props) {
     setDeviceName, setServerUrl,
   } = useSyncStore();
 
-  const [editingServerUrl, setEditingServerUrl] = useState(serverUrl);
   const [editingDeviceName, setEditingDeviceName] = useState(deviceName);
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editingServerUrl, setEditingServerUrl] = useState(serverUrl);
+
+  // 有効なサーバーURL（明示設定 or 自動検出）
+  const effectiveUrl = useMemo(() => serverUrl || getAutoServerUrl(), [serverUrl]);
+  const isAutoDetected = !serverUrl && !!getAutoServerUrl();
 
   // ルーム作成
   const handleCreateRoom = useCallback(() => {
     const code = generateRoomCode();
     setDeviceName(editingDeviceName);
-    setServerUrl(editingServerUrl);
-    syncEngine.start(code, editingServerUrl || undefined);
-  }, [editingDeviceName, editingServerUrl, setDeviceName, setServerUrl]);
+    if (showAdvanced && editingServerUrl !== serverUrl) {
+      setServerUrl(editingServerUrl);
+    }
+    syncEngine.start(code);
+  }, [editingDeviceName, editingServerUrl, serverUrl, showAdvanced, setDeviceName, setServerUrl]);
 
   // ルーム参加
   const handleJoinRoom = useCallback(() => {
     const code = joinCode.trim().toUpperCase();
     if (code.length < 4) return;
     setDeviceName(editingDeviceName);
-    setServerUrl(editingServerUrl);
-    syncEngine.start(code, editingServerUrl || undefined);
-  }, [joinCode, editingDeviceName, editingServerUrl, setDeviceName, setServerUrl]);
+    if (showAdvanced && editingServerUrl !== serverUrl) {
+      setServerUrl(editingServerUrl);
+    }
+    syncEngine.start(code);
+  }, [joinCode, editingDeviceName, editingServerUrl, serverUrl, showAdvanced, setDeviceName, setServerUrl]);
 
   // 前回のルームに再接続
   const handleRejoin = useCallback(() => {
     if (!lastRoomCode) return;
     setDeviceName(editingDeviceName);
-    setServerUrl(editingServerUrl);
-    syncEngine.start(lastRoomCode, editingServerUrl || undefined);
-  }, [lastRoomCode, editingDeviceName, editingServerUrl, setDeviceName, setServerUrl]);
+    syncEngine.start(lastRoomCode);
+  }, [lastRoomCode, editingDeviceName, setDeviceName]);
 
   // 切断
   const handleDisconnect = useCallback(() => {
@@ -210,6 +219,27 @@ export default function SyncPanel({ open, onClose }: Props) {
           ) : (
             <>
               {/* 未接続の場合 */}
+
+              {/* サーバー接続状態 */}
+              {effectiveUrl ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
+                  <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <p className="text-[10px] text-emerald-700 flex-1">
+                    {isAutoDetected
+                      ? '中継サーバーを自動検出しました。すぐに同期を開始できます。'
+                      : '中継サーバーが設定済みです。'}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
+                  <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-700">
+                    別端末との同期には中継サーバーが必要です。詳細設定からURLを入力してください。
+                    同一端末のタブ間はサーバーなしで同期できます。
+                  </p>
+                </div>
+              )}
+
               {/* 端末名 */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -285,31 +315,27 @@ export default function SyncPanel({ open, onClose }: Props) {
                 <div className="space-y-3 pt-1">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                      中継サーバーURL (別端末同期用)
+                      中継サーバーURL
                     </label>
                     <input
                       type="text"
                       value={editingServerUrl}
                       onChange={(e) => setEditingServerUrl(e.target.value)}
                       className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none transition-all"
-                      placeholder="ws://192.168.1.100:8787"
+                      placeholder={effectiveUrl || 'ws://192.168.1.100:8787'}
                     />
+                    {isAutoDetected && !editingServerUrl && (
+                      <p className="text-[10px] text-emerald-500 mt-1">
+                        自動検出: {effectiveUrl}
+                      </p>
+                    )}
                     <p className="text-[10px] text-slate-400 mt-1">
-                      未設定の場合、同一端末の複数タブ間のみ同期されます
+                      空欄の場合、自動検出を試みます。
+                      本番環境では sync-server を起動しURLを入力してください。
                     </p>
                   </div>
                 </div>
               )}
-
-              {/* 説明 */}
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-100">
-                <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <div className="text-[10px] text-amber-700 leading-relaxed">
-                  <p className="font-bold mb-0.5">マルチデバイス同期について</p>
-                  <p>同じルームに接続した端末間で、エントリー・スコア等のデータがリアルタイムに同期されます。</p>
-                  <p className="mt-1">別端末間の同期には中継サーバーが必要です。同一端末の別タブ間はサーバー不要で同期できます。</p>
-                </div>
-              </div>
             </>
           )}
         </div>

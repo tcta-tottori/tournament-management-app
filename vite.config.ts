@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { syncRelayPlugin } from './vite-plugin-sync-relay'
 
 // ビルド時のタイムスタンプを環境変数として埋め込み
 const buildTimestamp = new Date().toLocaleString('ja-JP', {
@@ -19,6 +20,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    syncRelayPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
