@@ -104,12 +104,12 @@ export default function TeamBracketView() {
     team1Number: number; team1Name: string; team2Number: number; team2Name: string;
     courtNames: string[];
   }) => {
-    // 1. ダイアログを閉じる
-    setCallMatch(null);
-    // 2. 右下バブルを表示
-    startCall(callContent);
-    // 3. 音声再生
+    // 1. 音声再生を最初に実行（モバイルのユーザージェスチャー制約を維持するため）
     speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => finishCall());
+    // 2. ダイアログを閉じる
+    setCallMatch(null);
+    // 3. 右下バブルを表示
+    startCall(callContent);
   };
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
