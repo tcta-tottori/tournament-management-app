@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
-  HelpCircle, ExternalLink, HardDrive,
+  HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -382,6 +382,16 @@ export default function AppLayout() {
         {/* 右側: 同期 & リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
           <SyncStatusIndicator />
+          <a
+            href={`${import.meta.env.BASE_URL}view/league`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-link"
+            title="参加者・HP向け公開ビューを別タブで開く"
+          >
+            <Eye className="w-3 h-3" />
+            <span className="hidden sm:inline">観戦用</span>
+          </a>
           <a
             href="https://www.tottori-tenis.net/"
             target="_blank"
