@@ -15,13 +15,21 @@ const SILENT_WAV =
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-type Listener = (isSpeaking: boolean) => void;
+export interface GeminiTtsState {
+  /** 音声取得〜再生終了までの間 true */
+  isSpeaking: boolean;
+  /** API から音声データを取得中 true（再生開始すると false） */
+  isLoading: boolean;
+}
+
+type Listener = (state: GeminiTtsState) => void;
 
 class GeminiTtsService {
   private audio: HTMLAudioElement | null = null;
   private unlocked = false;
   private currentUrl: string | null = null;
   private _isSpeaking = false;
+  private _isLoading = false;
   private listeners = new Set<Listener>();
   private abortCtrl: AbortController | null = null;
 
@@ -38,19 +46,35 @@ class GeminiTtsService {
     return this._isSpeaking;
   }
 
+  get isLoading(): boolean {
+    return this._isLoading;
+  }
+
+  get state(): GeminiTtsState {
+    return { isSpeaking: this._isSpeaking, isLoading: this._isLoading };
+  }
+
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    listener(this._isSpeaking);
+    listener(this.state);
     return () => { this.listeners.delete(listener); };
   }
 
   private emit() {
-    for (const l of this.listeners) l(this._isSpeaking);
+    const s = this.state;
+    for (const l of this.listeners) l(s);
   }
 
   private setSpeaking(v: boolean) {
     if (this._isSpeaking !== v) {
       this._isSpeaking = v;
+      this.emit();
+    }
+  }
+
+  private setLoading(v: boolean) {
+    if (this._isLoading !== v) {
+      this._isLoading = v;
       this.emit();
     }
   }
@@ -119,6 +143,7 @@ class GeminiTtsService {
 
   stop(): void {
     this.stopInternal();
+    this.setLoading(false);
     this.setSpeaking(false);
   }
 
@@ -138,9 +163,15 @@ class GeminiTtsService {
 
   private async synthesizeAndPlay(text: string): Promise<void> {
     const cfg = getVoiceSettings();
-    const audioBlob = cfg.mode === 'direct'
-      ? await this.synthesizeDirect(text, cfg)
-      : await this.synthesizeViaProxy(text, cfg);
+    this.setLoading(true);
+    let audioBlob: Blob;
+    try {
+      audioBlob = cfg.mode === 'direct'
+        ? await this.synthesizeDirect(text, cfg)
+        : await this.synthesizeViaProxy(text, cfg);
+    } finally {
+      this.setLoading(false);
+    }
 
     const objectUrl = URL.createObjectURL(audioBlob);
     if (this.currentUrl) URL.revokeObjectURL(this.currentUrl);

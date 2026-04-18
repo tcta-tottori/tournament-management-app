@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { geminiTts } from './geminiTts';
+import { geminiTts, type GeminiTtsState } from './geminiTts';
 import type { VoiceSettings } from './types';
 
 /**
@@ -8,10 +8,10 @@ import type { VoiceSettings } from './types';
  * 直近のエラーは `lastError` で取得可能。
  */
 export function useGeminiTts() {
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(geminiTts.isSpeaking);
+  const [state, setState] = useState<GeminiTtsState>(geminiTts.state);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  useEffect(() => geminiTts.subscribe(setIsSpeaking), []);
+  useEffect(() => geminiTts.subscribe(setState), []);
 
   const speak = useCallback(
     (
@@ -40,5 +40,12 @@ export function useGeminiTts() {
 
   const clearError = useCallback(() => setLastError(null), []);
 
-  return { isSpeaking, speak, stop, lastError, clearError };
+  return {
+    isSpeaking: state.isSpeaking,
+    isLoading: state.isLoading,
+    speak,
+    stop,
+    lastError,
+    clearError,
+  };
 }
