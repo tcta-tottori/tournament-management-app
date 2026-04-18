@@ -32,7 +32,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   }[] | null>(null);
   const [listingModels, setListingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const { isSpeaking, speak, stop, lastError, clearError } = useGeminiTts();
+  const { isSpeaking, isLoading, speak, stop, lastError, clearError } = useGeminiTts();
 
   const persist = useCallback((patch: Parameters<typeof setVoiceSettings>[0]) => {
     setVoiceSettings(patch);
@@ -362,8 +362,17 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 onClick={stop}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-500 text-white rounded-lg text-sm font-bold hover:bg-red-600 transition-colors"
               >
-                <Square className="w-4 h-4" />
-                停止
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    読込中... (タップで中止)
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-4 h-4" />
+                    停止
+                  </>
+                )}
               </button>
             ) : (
               <button

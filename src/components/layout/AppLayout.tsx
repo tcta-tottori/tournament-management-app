@@ -16,6 +16,7 @@ import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
 import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
+import GeminiLoadingIndicator from '../ui/GeminiLoadingIndicator';
 import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
 import { geminiTts } from '../../features/broadcast/geminiTts';
 
@@ -536,6 +537,9 @@ export default function AppLayout() {
 
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />
+
+      {/* Gemini TTS 音声取得中のグローバルインジケータ */}
+      <GeminiLoadingIndicator />
     </div>
   );
 }
