@@ -283,7 +283,22 @@ class GeminiTtsService {
     const cfg = getVoiceSettings();
     if (cfg.mode === 'direct') {
       if (!cfg.apiKey) return { available: false, error: 'APIキーが未設定です' };
-      return { available: true, model: cfg.model };
+      // モデル情報の取得で API キーの有効性を実際に検証
+      try {
+        const res = await fetch(
+          `${GEMINI_API_BASE}/${encodeURIComponent(cfg.model)}?key=${encodeURIComponent(cfg.apiKey)}`,
+        );
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          return {
+            available: false,
+            error: `HTTP ${res.status}: ${body.slice(0, 160) || '詳細不明'}`,
+          };
+        }
+        return { available: true, model: cfg.model };
+      } catch (err) {
+        return { available: false, error: String(err) };
+      }
     }
     if (!cfg.serverUrl) return { available: false, error: '中継サーバーURLが未設定です' };
     try {

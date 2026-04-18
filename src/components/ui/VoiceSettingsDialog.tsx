@@ -25,7 +25,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const [styleInstruction, setStyleInstruction] = useState(initial.styleInstruction);
   const [status, setStatus] = useState<{ available: boolean; model?: string; error?: string } | null>(null);
   const [checking, setChecking] = useState(false);
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop, lastError, clearError } = useGeminiTts();
 
   // 開くたびに最新の設定を反映
   useEffect(() => {
@@ -63,6 +63,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
 
   const handleTest = () => {
     persist({ mode, apiKey, serverUrl, voiceName, styleInstruction });
+    clearError();
     speak('音声テストです。放送コールシステムをご利用いただきありがとうございます。', { repeatCount: 1 });
   };
 
@@ -237,6 +238,19 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               感情・話速・トーンなどを自然言語で指定できます（例:「明るく元気に」）。
             </p>
           </div>
+
+          {/* 直近の再生エラー */}
+          {lastError && (
+            <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[11px] text-red-700 leading-snug space-y-1">
+              <div className="font-bold">再生エラー</div>
+              <div className="break-all font-mono text-[10px]">{lastError}</div>
+              <div className="text-red-600">
+                ・403 の場合: APIキーにリファラー制限があるか、TTSプレビューモデル（gemini-2.5-flash-preview-tts）へのアクセス権が無い可能性があります<br/>
+                ・404 の場合: モデル名が間違っている / 地域制限<br/>
+                ・他のGoogleサービス用のキーでも <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">AI Studio</a> で発行したものであれば動作します
+              </div>
+            </div>
+          )}
 
           {/* テスト / 停止 */}
           <div className="flex gap-2 pt-2 border-t border-gray-100">
