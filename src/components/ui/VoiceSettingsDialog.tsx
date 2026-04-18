@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Mic, RefreshCw, Square, Volume2, X, Key, Server } from 'lucide-react';
 import {
   GEMINI_VOICES,
+  GEMINI_TTS_MODELS,
   getVoiceSettings,
   setVoiceSettings,
   type VoiceMode,
@@ -21,6 +22,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const [apiKey, setApiKey] = useState(initial.apiKey);
   const [showApiKey, setShowApiKey] = useState(false);
   const [serverUrl, setServerUrl] = useState(initial.serverUrl);
+  const [model, setModel] = useState(initial.model);
   const [voiceName, setVoiceName] = useState(initial.voiceName);
   const [styleInstruction, setStyleInstruction] = useState(initial.styleInstruction);
   const [status, setStatus] = useState<{ available: boolean; model?: string; error?: string } | null>(null);
@@ -34,6 +36,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
       setMode(cur.mode);
       setApiKey(cur.apiKey);
       setServerUrl(cur.serverUrl);
+      setModel(cur.model);
       setVoiceName(cur.voiceName);
       setStyleInstruction(cur.styleInstruction);
     }
@@ -44,7 +47,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   }, []);
 
   const handleCheck = useCallback(async () => {
-    persist({ mode, apiKey, serverUrl });
+    persist({ mode, apiKey, serverUrl, model });
     setChecking(true);
     try {
       const res = await geminiTts.checkAvailability();
@@ -52,7 +55,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
     } finally {
       setChecking(false);
     }
-  }, [persist, mode, apiKey, serverUrl]);
+  }, [persist, mode, apiKey, serverUrl, model]);
 
   useEffect(() => {
     if (open) handleCheck();
@@ -62,7 +65,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   if (!open) return null;
 
   const handleTest = () => {
-    persist({ mode, apiKey, serverUrl, voiceName, styleInstruction });
+    persist({ mode, apiKey, serverUrl, model, voiceName, styleInstruction });
     clearError();
     speak('音声テストです。放送コールシステムをご利用いただきありがとうございます。', { repeatCount: 1 });
   };
@@ -205,6 +208,40 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 HTTPS のアプリから HTTP へは接続できない（mixed content）ため、
                 <code className="bg-gray-100 px-1 rounded mx-1">npm run dev</code>
                 でローカル起動するか、sync-server を HTTPS 化してください。
+              </p>
+            </div>
+          )}
+
+          {/* モデル選択（direct モード時のみ） */}
+          {mode === 'direct' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">モデル</label>
+              <div className="flex flex-col gap-1.5">
+                <select
+                  value={GEMINI_TTS_MODELS.some(m => m.id === model) ? model : '__custom__'}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') return;
+                    setModel(e.target.value);
+                    persist({ model: e.target.value });
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                >
+                  {GEMINI_TTS_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                  <option value="__custom__">カスタム（下に入力）</option>
+                </select>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  onBlur={() => persist({ model })}
+                  placeholder="gemini-3.1-flash-preview-tts"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                直接モードで使用するモデル名。新モデルが公開されたら上書きできます。
               </p>
             </div>
           )}
