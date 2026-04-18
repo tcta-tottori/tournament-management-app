@@ -4,6 +4,8 @@ import { Mic, RefreshCw, Square, Volume2, X, Key, Server, Search } from 'lucide-
 import {
   GEMINI_VOICES,
   GEMINI_TTS_MODELS,
+  IS_KEY_LOCKED,
+  IS_MODEL_LOCKED,
   getVoiceSettings,
   setVoiceSettings,
   type VoiceMode,
@@ -107,7 +109,15 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
-          {/* 接続モード */}
+          {/* ビルド時埋め込みの説明（API キーがロック済み） */}
+          {IS_KEY_LOCKED && (
+            <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-snug">
+              ✨ このアプリは API キーとモデルがビルド時に設定済みです。音声・話し方の指示のみ変更できます。
+            </div>
+          )}
+
+          {/* 接続モード（ロック時は非表示） */}
+          {!IS_KEY_LOCKED && (
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-2">接続モード</label>
             <div className="grid grid-cols-2 gap-2">
@@ -141,8 +151,9 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               </button>
             </div>
           </div>
+          )}
 
-          {/* 接続ステータス */}
+          {/* 接続ステータス（ロック時は簡略表示） */}
           <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${
             status?.available ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
           }`}>
@@ -174,8 +185,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
             </button>
           </div>
 
-          {/* モード別の設定 */}
-          {mode === 'direct' ? (
+          {/* モード別の設定（ロック時は API キー入力も非表示） */}
+          {!IS_KEY_LOCKED && (mode === 'direct' ? (
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-gray-700">Gemini API キー</label>
               <div className="flex gap-1">
@@ -228,10 +239,10 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 でローカル起動するか、sync-server を HTTPS 化してください。
               </p>
             </div>
-          )}
+          ))}
 
-          {/* モデル選択（direct モード時のみ） */}
-          {mode === 'direct' && (
+          {/* モデル選択（direct モード時のみ + 未ロック時） */}
+          {mode === 'direct' && !IS_MODEL_LOCKED && (
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">モデル</label>
               <div className="flex flex-col gap-1.5">
