@@ -34,6 +34,10 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const [modelsError, setModelsError] = useState<string | null>(null);
   const { isSpeaking, speak, stop, lastError, clearError } = useGeminiTts();
 
+  const persist = useCallback((patch: Parameters<typeof setVoiceSettings>[0]) => {
+    setVoiceSettings(patch);
+  }, []);
+
   const handleListModels = useCallback(async () => {
     persist({ apiKey });
     setListingModels(true);
@@ -59,10 +63,6 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
       setStyleInstruction(cur.styleInstruction);
     }
   }, [open]);
-
-  const persist = useCallback((patch: Parameters<typeof setVoiceSettings>[0]) => {
-    setVoiceSettings(patch);
-  }, []);
 
   const handleCheck = useCallback(async () => {
     persist({ mode, apiKey, serverUrl, model });
