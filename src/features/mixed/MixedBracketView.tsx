@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList, Download, ImageIcon, Loader2, X, Printer } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useCallSpeech } from '../broadcast/useCallSpeech';
 import CallPreviewDialog from './CallPreviewDialog';
 import { generateBracketDataUrl, generateResultDataUrl } from './exportBracketJpeg';
 
@@ -209,7 +209,7 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
-  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const { speak, stop, isSpeaking } = useCallSpeech();
   const [speakingText, setSpeakingText] = useState('');
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
   const [courtAssignValue, setCourtAssignValue] = useState('');

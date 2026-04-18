@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ClipboardList, Printer, Volume2, VolumeX, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useCallSpeech } from '../broadcast/useCallSpeech';
 import CallPreviewDialog from './CallPreviewDialog';
 
 /** リーグバッジの色 */
@@ -107,7 +107,7 @@ interface WaitingMatch {
 
 export default function MixedWaitingList() {
   const { brackets, allTeams, leagues, tournamentInfo, assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
-  const { speak, stop, isSpeaking } = useSpeechSynthesis();
+  const { speak, stop, isSpeaking } = useCallSpeech();
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<Record<string, string>>({});
 

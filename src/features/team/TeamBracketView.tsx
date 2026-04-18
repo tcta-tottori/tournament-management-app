@@ -6,7 +6,7 @@ import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from '
 import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useCallSpeech } from '../broadcast/useCallSpeech';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -95,7 +95,7 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
-  const { speak } = useSpeechSynthesis();
+  const { speak } = useCallSpeech();
   const startCall = useTeamCallStore(s => s.start);
   const finishCall = useTeamCallStore(s => s.finish);
 
