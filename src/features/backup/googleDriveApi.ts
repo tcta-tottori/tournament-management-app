@@ -155,10 +155,30 @@ function headers(token: string) {
   };
 }
 
+/** fetch に 30 秒のタイムアウトを付けるラッパ。応答が無く無限待ちになる問題を防ぐ */
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 30000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Drive API が ${Math.round(timeoutMs / 1000)} 秒応答しませんでした（ネットワーク/権限を確認してください）`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** トークンの有効性とスコープを確認 */
 export async function validateToken(token: string): Promise<boolean> {
   try {
-    const infoRes = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${encodeURIComponent(token)}`);
+    const infoRes = await fetchWithTimeout(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${encodeURIComponent(token)}`);
     if (!infoRes.ok) return false;
     const info = await infoRes.json();
     const scopes = (info.scope || '').split(' ');
@@ -177,7 +197,7 @@ export async function validateToken(token: string): Promise<boolean> {
 
 /** ユーザー情報を取得 */
 export async function getUserEmail(token: string): Promise<string> {
-  const res = await fetch(`${DRIVE_API}/about?fields=user(emailAddress)`, {
+  const res = await fetchWithTimeout(`${DRIVE_API}/about?fields=user(emailAddress)`, {
     headers: headers(token),
   });
   if (!res.ok) return '';
@@ -199,7 +219,7 @@ async function findFolder(
   if (parentId) q += ` and '${parentId}' in parents`;
 
   const params = new URLSearchParams({ q, fields: 'files(id,name)', pageSize: '10' });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     console.error(`[GDrive] findFolder "${name}" failed:`, res.status, err.error?.message);
@@ -222,7 +242,7 @@ async function createFolder(
   };
   if (parentId) metadata.parents = [parentId];
 
-  const res = await fetch(`${DRIVE_API}/files`, {
+  const res = await fetchWithTimeout(`${DRIVE_API}/files`, {
     method: 'POST',
     headers: {
       ...headers(token),
@@ -301,7 +321,7 @@ async function getLatestXlsx(
     orderBy: 'modifiedTime desc',
     pageSize: '1',
   });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) return null;
   const data = await res.json();
   const file = data.files?.[0];
@@ -311,7 +331,7 @@ async function getLatestXlsx(
 
 /** ファイルのバイナリをダウンロード */
 async function downloadFileBlob(token: string, fileId: string): Promise<ArrayBuffer> {
-  const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+  const res = await fetchWithTimeout(`${DRIVE_API}/files/${fileId}?alt=media`, {
     headers: headers(token),
   });
   if (!res.ok) throw new Error(`ダウンロード失敗 (${res.status})`);
@@ -348,7 +368,7 @@ async function uploadXlsxToFolder(
   // 既存ファイルを検索して上書き
   const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
   const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
-  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchRes = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
   const existingId = searchData.files?.[0]?.id;
 
@@ -377,7 +397,7 @@ async function uploadXlsxToFolder(
     : `${UPLOAD_API}/files?uploadType=multipart`;
   const method = existingId ? 'PATCH' : 'POST';
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method,
     headers: {
       ...headers(token),
@@ -421,7 +441,7 @@ export async function listScheduleExcelFiles(token: string): Promise<GoogleDrive
     orderBy: 'modifiedTime desc',
     pageSize: '50',
   });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `時間割一覧取得失敗 (${res.status})`);
@@ -466,7 +486,7 @@ export async function listTournamentExcelFiles(token: string): Promise<GoogleDri
     orderBy: 'modifiedTime desc',
     pageSize: '50',
   });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `大会一覧取得失敗 (${res.status})`);
@@ -510,7 +530,7 @@ export async function uploadBackupJson(
   // 既存ファイルを検索して上書き
   const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
   const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
-  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchRes = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
   const existingId = searchData.files?.[0]?.id;
 
@@ -533,7 +553,7 @@ export async function uploadBackupJson(
     : `${UPLOAD_API}/files?uploadType=multipart`;
   const method = existingId ? 'PATCH' : 'POST';
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method,
     headers: {
       ...headers(token),
@@ -559,7 +579,7 @@ export async function listBackupFiles(token: string): Promise<GoogleDriveFile[]>
     orderBy: 'modifiedTime desc',
     pageSize: '50',
   });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `バックアップ一覧取得失敗 (${res.status})`);
@@ -576,7 +596,7 @@ export async function listBackupFiles(token: string): Promise<GoogleDriveFile[]>
 
 /** バックアップファイルをテキスト文字列としてダウンロード */
 export async function downloadBackupFile(token: string, fileId: string): Promise<string> {
-  const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+  const res = await fetchWithTimeout(`${DRIVE_API}/files/${fileId}?alt=media`, {
     headers: headers(token),
   });
   if (!res.ok) throw new Error(`バックアップダウンロード失敗 (${res.status})`);
@@ -599,7 +619,7 @@ export async function uploadResultFile(
   // 既存ファイルを検索して上書き
   const q = `'${folderId}' in parents and trashed=false and name='${fileName}'`;
   const params = new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' });
-  const searchRes = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const searchRes = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   const searchData = searchRes.ok ? await searchRes.json() : { files: [] };
   const existingId = searchData.files?.[0]?.id;
 
@@ -633,7 +653,7 @@ export async function uploadResultFile(
     : `${UPLOAD_API}/files?uploadType=multipart`;
   const method = existingId ? 'PATCH' : 'POST';
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method,
     headers: {
       ...headers(token),
@@ -659,7 +679,7 @@ export async function listResultFiles(token: string): Promise<GoogleDriveFile[]>
     orderBy: 'modifiedTime desc',
     pageSize: '50',
   });
-  const res = await fetch(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
+  const res = await fetchWithTimeout(`${DRIVE_API}/files?${params}`, { headers: headers(token) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `大会結果一覧取得失敗 (${res.status})`);
