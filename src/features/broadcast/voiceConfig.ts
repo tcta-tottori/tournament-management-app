@@ -2,9 +2,21 @@
 // 音声（Gemini TTS）設定
 // =============================================================================
 
+export type VoiceMode = 'direct' | 'proxy';
+
 export interface VoiceConfig {
+  /** `direct` = ブラウザから直接 Gemini API を叩く（APIキーが必要）
+   *  `proxy`  = sync-server 経由（APIキーはサーバー側） */
+  mode: VoiceMode;
+  /** direct モード時に使用する API キー（localStorage に保存） */
+  apiKey: string;
+  /** proxy モード時に使用する sync-server の HTTP URL */
   serverUrl: string;
+  /** direct モード時のモデル名 */
+  model: string;
+  /** Gemini の組み込み音声名 */
   voiceName: string;
+  /** 自然言語で指定する話し方の指示 */
   styleInstruction: string;
 }
 
@@ -24,30 +36,39 @@ function defaultServerUrl(): string {
   } catch {
     // 無視
   }
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    return `http://${window.location.hostname}:8787`;
-  }
-  return 'http://localhost:8787';
+  // ホスト名だけに 8787 を付けるのは通常誤設定のため、空にしてユーザーに入力させる
+  return '';
 }
 
+const KEY_MODE = 'voice_mode';
+const KEY_API = 'voice_api_key';
 const KEY_SERVER = 'voice_server_url';
+const KEY_MODEL = 'voice_model';
 const KEY_VOICE = 'voice_name';
 const KEY_STYLE = 'voice_style';
 const EVENT_CHANGED = 'voice-settings-changed';
 
+const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
 
 export function getVoiceSettings(): VoiceConfig {
+  const mode = (localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct';
   return {
+    mode,
+    apiKey: localStorage.getItem(KEY_API) || '',
     serverUrl: localStorage.getItem(KEY_SERVER) || defaultServerUrl(),
+    model: localStorage.getItem(KEY_MODEL) || DEFAULT_MODEL,
     voiceName: localStorage.getItem(KEY_VOICE) || 'Kore',
     styleInstruction: localStorage.getItem(KEY_STYLE) ?? DEFAULT_STYLE,
   };
 }
 
 export function setVoiceSettings(patch: Partial<VoiceConfig>): void {
+  if (patch.mode !== undefined) localStorage.setItem(KEY_MODE, patch.mode);
+  if (patch.apiKey !== undefined) localStorage.setItem(KEY_API, patch.apiKey);
   if (patch.serverUrl !== undefined) localStorage.setItem(KEY_SERVER, patch.serverUrl);
+  if (patch.model !== undefined) localStorage.setItem(KEY_MODEL, patch.model);
   if (patch.voiceName !== undefined) localStorage.setItem(KEY_VOICE, patch.voiceName);
   if (patch.styleInstruction !== undefined) localStorage.setItem(KEY_STYLE, patch.styleInstruction);
   try {
