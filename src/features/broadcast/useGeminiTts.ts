@@ -4,20 +4,32 @@ import type { VoiceSettings } from './types';
 
 /**
  * Gemini TTS 用フック。
- * 既存の `useSpeechSynthesis` と互換性のあるシグネチャを提供するため、
- * `speak(text, settings, onComplete)` として呼び出せる。
- * ただし利用するのは `settings.repeatCount` のみ（rate/pitch/volume は
- * Gemini では無効）。
+ * `speak(text, settings, onComplete, onError)` の形で呼び出せる。
+ * 直近のエラーは `lastError` で取得可能。
  */
 export function useGeminiTts() {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(geminiTts.isSpeaking);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => geminiTts.subscribe(setIsSpeaking), []);
 
   const speak = useCallback(
-    (text: string, settings?: Partial<VoiceSettings>, onComplete?: () => void) => {
+    (
+      text: string,
+      settings?: Partial<VoiceSettings>,
+      onComplete?: () => void,
+      onError?: (err: Error) => void,
+    ) => {
       const repeatCount = settings?.repeatCount ?? 1;
-      geminiTts.speak(text, { repeatCount, onComplete });
+      setLastError(null);
+      geminiTts.speak(text, {
+        repeatCount,
+        onComplete,
+        onError: (err) => {
+          setLastError(err.message || String(err));
+          onError?.(err);
+        },
+      });
     },
     [],
   );
@@ -26,5 +38,7 @@ export function useGeminiTts() {
     geminiTts.stop();
   }, []);
 
-  return { isSpeaking, speak, stop };
+  const clearError = useCallback(() => setLastError(null), []);
+
+  return { isSpeaking, speak, stop, lastError, clearError };
 }
