@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
 
@@ -428,19 +428,20 @@ export default function MatchManager() {
   }, [globalSortedMatches, courts]);
 
   // --- 音声コール ---
-  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
-    rate: 0.95,
+  // Gemini TTS では話速・音程は「音声設定」のスタイル指示で制御するため、
+  // ここでは互換のための固定値のみ保持する
+  const voiceSettings: VoiceSettings = {
+    rate: 1.0,
     pitch: 1.0,
     volume: 1.0,
     repeatCount: 1,
-  });
+  };
   const [callTargetMatchId, setCallTargetMatchId] = useState<string | null>(null);
   const [callCourtNumber, setCallCourtNumber] = useState('');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { isSpeaking, voiceName, speak, stop, testVoice, selectedVoiceKey, setSelectedVoiceKey, availableVoices } = useSpeechSynthesis();
+  const { isSpeaking, speak, stop } = useGeminiTts();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(
@@ -1490,104 +1491,26 @@ ${printableMatches.map(m => {
                 全コート初戦一斉コール
               </button>
             )}
-            {/* 音声コール設定 */}
+            {/* 音声コール設定: 詳細はヘッダーの「音声」ボタンから */}
             <div>
-              <button
-                onClick={() => setShowVoiceSettings(!showVoiceSettings)}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors"
-              >
-                {showVoiceSettings ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-                <Settings2 className="w-4 h-4 text-emerald-500" />
-                音声コール設定
-              </button>
-              {showVoiceSettings && (
-                <div className="mt-3 bg-gradient-to-br from-slate-50 to-emerald-50/50 rounded-xl border border-emerald-100 p-4 space-y-4">
-                  {/* 音声エンジン情報 */}
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-emerald-100 shadow-sm">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm">
-                      <Volume2 className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-800">大会運営システム 音声エンジン</p>
-                      <p className="text-[10px] text-gray-500">Web Speech API — {voiceName || '日本語音声'}</p>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">Active</span>
-                  </div>
-
-                  {/* 音声選択 */}
-                  {availableVoices.length > 1 && (
-                    <div>
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-2">
-                        <Mic className="w-3.5 h-3.5 text-emerald-500" />
-                        音声タイプ
-                      </label>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {availableVoices.map(v => (
-                          <button
-                            key={v.key}
-                            onClick={() => setSelectedVoiceKey(v.key)}
-                            className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all ${
-                              selectedVoiceKey === v.key
-                                ? 'bg-emerald-100 border-emerald-400 text-emerald-700 shadow-sm'
-                                : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200 hover:text-emerald-600'
-                            }`}
-                          >
-                            {v.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 速度スライダー */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                        <Gauge className="w-3.5 h-3.5 text-emerald-500" />
-                        読み上げ速度
-                      </label>
-                      <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                        {voiceSettings.rate.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="1.2"
-                        step="0.05"
-                        value={voiceSettings.rate}
-                        onChange={e => setVoiceSettings(s => ({ ...s, rate: parseFloat(e.target.value) }))}
-                        className="w-full h-2 accent-emerald-500 cursor-pointer"
-                      />
-                      <div className="flex justify-between mt-1">
-                        <span className="text-[9px] text-gray-400">ゆっくり</span>
-                        <span className="text-[9px] text-gray-400">はやい</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* テスト・停止ボタン */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      onClick={() => testVoice(voiceSettings)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-white text-emerald-600 rounded-lg text-xs font-bold border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm"
-                    >
-                      <Mic className="w-3.5 h-3.5" />
-                      テスト再生
-                    </button>
-                    {isSpeaking && (
-                      <button
-                        onClick={handleVoiceStop}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200 hover:bg-red-100 transition-all"
-                      >
-                        <Square className="w-3.5 h-3.5" />
-                        停止
-                      </button>
-                    )}
-                  </div>
+              <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-emerald-100 shadow-sm">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm">
+                  <Volume2 className="w-4 h-4 text-white" />
                 </div>
-              )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-800">音声エンジン: Gemini TTS</p>
+                  <p className="text-[10px] text-gray-500">ヘッダーの「音声」ボタンから設定・テストできます</p>
+                </div>
+                {isSpeaking && (
+                  <button
+                    onClick={handleVoiceStop}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200 hover:bg-red-100 transition-all"
+                  >
+                    <Square className="w-3 h-3" />
+                    停止
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

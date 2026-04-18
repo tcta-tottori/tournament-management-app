@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { PlacementCategory } from './types';
-import { stopAllSpeech } from '../broadcast/useCallSpeech';
+import { geminiTts } from '../broadcast/geminiTts';
 
 /** コール内容（ポップアップ表示用メタ情報） */
 export interface TeamCallContent {
@@ -28,9 +28,7 @@ export const useTeamCallStore = create<TeamCallState>((set) => ({
   start: (content) => set({ isActive: true, content }),
   finish: () => set({ isActive: false, content: null }),
   cancel: () => {
-    // 全エンジン（Web Speech / VOICEVOX / Gemini）を停止
-    stopAllSpeech();
-    try { window.speechSynthesis.cancel(); } catch {}
+    geminiTts.stop();
     set({ isActive: false, content: null });
   },
 }));
