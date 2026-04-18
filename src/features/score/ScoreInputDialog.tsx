@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText } from '../broadcast/callTextBuilder';
-import { useCallSpeech } from '../broadcast/useCallSpeech';
+import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
@@ -110,7 +110,7 @@ export default function ScoreInputDialog({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const { isSpeaking, speak, stop } = useCallSpeech();
+  const { isSpeaking, speak, stop } = useSpeechSynthesis();
 
   // 所属ふりがなマップ（音声コール用）
   const affiliationFuriganaMap = useLiveQuery(async () => {
