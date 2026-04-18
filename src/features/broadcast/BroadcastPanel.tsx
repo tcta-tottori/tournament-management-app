@@ -7,8 +7,9 @@ import type { MatchCall, CallLogEntry, VoiceSettings } from './types';
 import { buildCallText } from './callTextBuilder';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
 import { useVoicevoxSynthesis } from './useVoicevoxSynthesis';
+import { useGeminiSynthesis, GEMINI_VOICES } from './useGeminiSynthesis';
 
-type AudioEngine = 'webSpeech' | 'voicevox';
+type AudioEngine = 'webSpeech' | 'voicevox' | 'gemini';
 
 // CSVパーサー
 function parseCSV(text: string): { type: 'singles' | 'doubles'; matches: MatchCall[] } {
@@ -117,8 +118,12 @@ export default function BroadcastPanel() {
 
   const webSpeech = useSpeechSynthesis();
   const voicevox = useVoicevoxSynthesis();
+  const gemini = useGeminiSynthesis();
 
-  const isSpeaking = engine === 'voicevox' ? voicevox.isSpeaking : webSpeech.isSpeaking;
+  const isSpeaking =
+    engine === 'voicevox' ? voicevox.isSpeaking
+    : engine === 'gemini' ? gemini.isSpeaking
+    : webSpeech.isSpeaking;
 
   const handleEngineChange = useCallback((newEngine: AudioEngine) => {
     setEngine(newEngine);
@@ -127,8 +132,10 @@ export default function BroadcastPanel() {
       voicevox.checkAvailability().then(ok => {
         if (ok) voicevox.fetchSpeakers();
       });
+    } else if (newEngine === 'gemini') {
+      gemini.checkAvailability();
     }
-  }, [voicevox]);
+  }, [voicevox, gemini]);
 
   // データベースから種目一覧を取得
   const dbEvents = useLiveQuery(
@@ -402,10 +409,12 @@ export default function BroadcastPanel() {
 
     if (engine === 'voicevox') {
       voicevox.speak(text, settings.repeatCount).then(onComplete);
+    } else if (engine === 'gemini') {
+      gemini.speak(text, settings.repeatCount).then(onComplete);
     } else {
       webSpeech.speak(text, settings, onComplete);
     }
-  }, [settings, engine, webSpeech, voicevox, affiliationFuriganaMap]);
+  }, [settings, engine, webSpeech, voicevox, gemini, affiliationFuriganaMap]);
 
   // 再コール
   const handleRecall = useCallback((match: MatchCall) => {
@@ -416,11 +425,12 @@ export default function BroadcastPanel() {
   const handleStop = useCallback(() => {
     voicevox.stop();
     webSpeech.stop();
+    gemini.stop();
     setSpeakingMatchId(null);
     setMatches(prev => prev.map(m =>
       m.status === 'speaking' ? { ...m, status: 'pending' as const } : m
     ));
-  }, [voicevox, webSpeech]);
+  }, [voicevox, webSpeech, gemini]);
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-5xl mx-auto space-y-4">
@@ -491,7 +501,7 @@ export default function BroadcastPanel() {
             {/* 音声エンジン選択 */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-gray-700">音声エンジン</label>
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -512,10 +522,20 @@ export default function BroadcastPanel() {
                   />
                   <span className="text-sm text-gray-700">VOICEVOX (高品質・要ローカル起動)</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="engine"
+                    checked={engine === 'gemini'}
+                    onChange={() => handleEngineChange('gemini')}
+                    className="accent-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Gemini TTS (クラウドAI・要サーバー)</span>
+                </label>
               </div>
             </div>
 
-            {engine === 'webSpeech' ? (
+            {engine === 'webSpeech' && (
               <>
                 {/* Web Speech API 設定 */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-pink-50 rounded-lg border border-pink-200">
@@ -581,7 +601,9 @@ export default function BroadcastPanel() {
                   </div>
                 </div>
               </>
-            ) : (
+            )}
+
+            {engine === 'voicevox' && (
               <>
                 {/* VOICEVOX 設定 */}
                 <div className="space-y-3">
@@ -731,6 +753,122 @@ export default function BroadcastPanel() {
                 </div>
               </>
             )}
+
+            {engine === 'gemini' && (
+              <>
+                {/* Gemini TTS 設定 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <span className={`text-lg ${gemini.isAvailable ? '' : 'grayscale'}`}>&#x2728;</span>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-emerald-700">
+                        Gemini TTS {gemini.isAvailable ? '接続OK' : '未接続'}
+                      </div>
+                      <div className="text-[10px] text-emerald-600">
+                        {gemini.isAvailable
+                          ? '中継サーバー経由でGoogleの最新音声AIを利用'
+                          : '中継サーバーに GEMINI_API_KEY を設定してください'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => gemini.checkAvailability()}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200 transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      接続確認
+                    </button>
+                  </div>
+
+                  {!gemini.isAvailable && (
+                    <div className="px-3 py-2 bg-red-50 rounded-lg border border-red-200 text-sm text-red-700">
+                      中継サーバーに接続できないか、GEMINI_API_KEY が未設定です。<br/>
+                      sync-server を <code className="px-1 bg-red-100 rounded">GEMINI_API_KEY=...</code> 付きで起動してください。
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">中継サーバーURL</label>
+                      <input
+                        type="text"
+                        value={gemini.serverUrl}
+                        onChange={e => gemini.setServerUrl(e.target.value)}
+                        placeholder="http://192.168.1.100:8787"
+                        className="w-full border border-border-main rounded-lg px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">音声</label>
+                      <select
+                        value={gemini.voiceName}
+                        onChange={e => gemini.setVoiceName(e.target.value)}
+                        className="w-full border border-border-main rounded-lg px-3 py-2 text-sm bg-white"
+                      >
+                        {GEMINI_VOICES.map(v => (
+                          <option key={v.name} value={v.name}>{v.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        スタイル指示（自然言語で話し方を指定）
+                      </label>
+                      <textarea
+                        value={gemini.styleInstruction}
+                        onChange={e => gemini.setStyleInstruction(e.target.value)}
+                        placeholder="例: 落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください"
+                        rows={2}
+                        className="w-full border border-border-main rounded-lg px-3 py-2 text-sm bg-white"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        感情・話速・トーンなどを自然言語で指定できます（例:「落ち着いた声で」「明るく元気に」など）。
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">繰り返し回数</label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => setSettings(s => ({ ...s, repeatCount: n }))}
+                            className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                              settings.repeatCount === n
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-primary-50 text-gray-500 hover:bg-primary-100'
+                            }`}
+                          >
+                            {n}回
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-end gap-2">
+                      <button
+                        onClick={() => gemini.speak('音声テストです。放送コールシステムをご利用いただきありがとうございます。')}
+                        disabled={!gemini.isAvailable}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Mic className="w-4 h-4" />
+                        音声テスト
+                      </button>
+                      {isSpeaking && (
+                        <button
+                          onClick={handleStop}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                        >
+                          <Square className="w-4 h-4" />
+                          停止
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -821,7 +959,10 @@ export default function BroadcastPanel() {
                       onUpdateMatch={updateMatch}
                       onCall={handleCall}
                       onStop={handleStop}
-                      engineDisabled={engine === 'voicevox' && !voicevox.isAvailable}
+                      engineDisabled={
+                        (engine === 'voicevox' && !voicevox.isAvailable) ||
+                        (engine === 'gemini' && !gemini.isAvailable)
+                      }
                     />
                   ))}
                 </div>
