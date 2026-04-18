@@ -8,10 +8,11 @@ import { createPortal } from 'react-dom';
 import {
   X, Wifi, WifiOff, Monitor, Smartphone,
   Copy, Check, Play, Square, Settings2,
-  Users, RefreshCw, AlertCircle, Info,
+  Users, RefreshCw, AlertCircle, Info, Share2,
 } from 'lucide-react';
 import { useSyncStore, generateRoomCode } from './syncStore';
 import { syncEngine } from './syncEngine';
+import PublicShareDialog from './PublicShareDialog';
 
 interface Props {
   open: boolean;
@@ -31,6 +32,7 @@ export default function SyncPanel({ open, onClose }: Props) {
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // ルーム作成
   const handleCreateRoom = useCallback(() => {
@@ -149,6 +151,15 @@ export default function SyncPanel({ open, onClose }: Props) {
                   他の端末でこのコードを入力して同じルームに参加できます
                 </p>
               </div>
+
+              {/* 観戦用URL発行 */}
+              <button
+                onClick={() => setShareOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md transition-all active:scale-[0.98]"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>観戦用URLを発行</span>
+              </button>
 
               {/* 接続中の端末一覧 */}
               <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -313,6 +324,13 @@ export default function SyncPanel({ open, onClose }: Props) {
             </>
           )}
         </div>
+
+        <PublicShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          roomCode={roomCode}
+          serverUrl={serverUrl}
+        />
       </div>
     </div>,
     document.body
