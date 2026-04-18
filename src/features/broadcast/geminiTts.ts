@@ -278,6 +278,50 @@ class GeminiTtsService {
     });
   }
 
+  /**
+   * 現在の API キーで利用可能なモデルを一覧する（direct モード時）。
+   * TTS 対応と思われるモデル（名前に "tts" を含む、または
+   * `supportedGenerationMethods` に generateContent を含むもの）を先頭に並べる。
+   */
+  async listAvailableModels(): Promise<{
+    models: { id: string; displayName?: string; description?: string; ttsLikely: boolean }[];
+    error?: string;
+  }> {
+    const cfg = getVoiceSettings();
+    if (cfg.mode !== 'direct') {
+      return { models: [], error: '直接モード時のみ利用可能です' };
+    }
+    if (!cfg.apiKey) return { models: [], error: 'APIキーが未設定です' };
+    try {
+      const res = await fetch(
+        `${GEMINI_API_BASE}?key=${encodeURIComponent(cfg.apiKey)}&pageSize=200`,
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        return { models: [], error: `HTTP ${res.status}: ${body.slice(0, 200)}` };
+      }
+      const json = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw: any[] = Array.isArray(json?.models) ? json.models : [];
+      const list = raw.map((m) => {
+        const id: string = (m.name || '').replace(/^models\//, '');
+        const methods: string[] = m.supportedGenerationMethods || [];
+        const ttsLikely = /tts/i.test(id) || methods.some((x: string) => /tts/i.test(x));
+        return {
+          id,
+          displayName: m.displayName,
+          description: m.description,
+          ttsLikely,
+        };
+      });
+      // TTS 候補を先頭に
+      list.sort((a, b) => (a.ttsLikely === b.ttsLikely ? a.id.localeCompare(b.id) : a.ttsLikely ? -1 : 1));
+      return { models: list };
+    } catch (err) {
+      return { models: [], error: String(err) };
+    }
+  }
+
   /** 現在のモードに応じて利用可能性を確認 */
   async checkAvailability(): Promise<{ available: boolean; model?: string; error?: string }> {
     const cfg = getVoiceSettings();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Mic, RefreshCw, Square, Volume2, X, Key, Server } from 'lucide-react';
+import { Mic, RefreshCw, Square, Volume2, X, Key, Server, Search } from 'lucide-react';
 import {
   GEMINI_VOICES,
   GEMINI_TTS_MODELS,
@@ -27,7 +27,25 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const [styleInstruction, setStyleInstruction] = useState(initial.styleInstruction);
   const [status, setStatus] = useState<{ available: boolean; model?: string; error?: string } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [availableModels, setAvailableModels] = useState<{
+    id: string; displayName?: string; ttsLikely: boolean
+  }[] | null>(null);
+  const [listingModels, setListingModels] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const { isSpeaking, speak, stop, lastError, clearError } = useGeminiTts();
+
+  const handleListModels = useCallback(async () => {
+    persist({ apiKey });
+    setListingModels(true);
+    setModelsError(null);
+    try {
+      const res = await geminiTts.listAvailableModels();
+      if (res.error) setModelsError(res.error);
+      setAvailableModels(res.models);
+    } finally {
+      setListingModels(false);
+    }
+  }, [apiKey, persist]);
 
   // 開くたびに最新の設定を反映
   useEffect(() => {
@@ -243,6 +261,54 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               <p className="text-[10px] text-gray-500 mt-1">
                 直接モードで使用するモデル名。新モデルが公開されたら上書きできます。
               </p>
+
+              {/* モデル一覧取得 */}
+              <div className="mt-2">
+                <button
+                  onClick={handleListModels}
+                  disabled={!apiKey || listingModels}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Search className={`w-3 h-3 ${listingModels ? 'animate-spin' : ''}`} />
+                  APIキーで使えるモデルを一覧
+                </button>
+
+                {modelsError && (
+                  <div className="mt-2 px-2 py-1.5 bg-red-50 border border-red-200 rounded text-[10px] text-red-700 break-all font-mono">
+                    {modelsError}
+                  </div>
+                )}
+
+                {availableModels && availableModels.length > 0 && (
+                  <div className="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                    {availableModels.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setModel(m.id); persist({ model: m.id }); }}
+                        className={`w-full px-3 py-2 text-left text-[11px] hover:bg-emerald-50 transition-colors ${
+                          m.id === model ? 'bg-emerald-100' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-1">
+                          {m.ttsLikely && (
+                            <span className="px-1.5 py-0.5 bg-emerald-500 text-white rounded text-[9px] font-bold shrink-0">
+                              TTS
+                            </span>
+                          )}
+                          <span className="font-mono break-all">{m.id}</span>
+                        </div>
+                        {m.displayName && m.displayName !== m.id && (
+                          <div className="text-[10px] text-gray-500 mt-0.5">{m.displayName}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {availableModels && availableModels.length === 0 && !modelsError && (
+                  <div className="mt-2 text-[10px] text-gray-500">利用可能なモデルが見つかりませんでした</div>
+                )}
+              </div>
             </div>
           )}
 

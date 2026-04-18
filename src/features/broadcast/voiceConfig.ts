@@ -48,7 +48,7 @@ const KEY_VOICE = 'voice_name';
 const KEY_STYLE = 'voice_style';
 const EVENT_CHANGED = 'voice-settings-changed';
 
-const DEFAULT_MODEL = 'gemini-3.1-flash-preview-tts';
+const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
 
