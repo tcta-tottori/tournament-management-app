@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../../db/database';
 import { buildCallText } from '../broadcast/callTextBuilder';
-import { useSpeechSynthesis } from '../broadcast/useSpeechSynthesis';
+import { useCallSpeech } from '../broadcast/useCallSpeech';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import {
   Play,
@@ -83,7 +83,7 @@ export default function MatchActionPanel({
   const [scoreInput, setScoreInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { isSpeaking, speak, stop } = useSpeechSynthesis();
+  const { isSpeaking, speak, stop } = useCallSpeech();
 
   // Sync score input when a different match is selected
   useEffect(() => {
