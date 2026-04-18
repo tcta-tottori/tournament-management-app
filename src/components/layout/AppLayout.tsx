@@ -4,7 +4,7 @@ import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, MonitorPlay, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
-  AlertTriangle, Network, Menu, X
+  AlertTriangle, Network, Menu, X, Volume2
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -15,7 +15,9 @@ import { useSyncStore } from '../../features/sync/syncStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
+import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
 import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
+import { geminiTts } from '../../features/broadcast/geminiTts';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -89,8 +91,20 @@ export default function AppLayout() {
   const teamLeagues = useTeamStore((s) => s.leagues);
   const teamBrackets = useTeamStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  // モバイルの自動再生制約対策: 最初のユーザー操作でオーディオをアンロックする
+  useEffect(() => {
+    const unlock = () => { geminiTts.unlockAudio(); };
+    document.addEventListener('click', unlock, { once: true, capture: true });
+    document.addEventListener('touchstart', unlock, { once: true, capture: true });
+    return () => {
+      document.removeEventListener('click', unlock, true);
+      document.removeEventListener('touchstart', unlock, true);
+    };
+  }, []);
 
   // 現在の大会情報を取得
   const tournament = useLiveQuery(
@@ -383,6 +397,15 @@ export default function AppLayout() {
         {/* 右側: 同期 & リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
           <SyncStatusIndicator />
+          <button
+            onClick={() => setVoiceSettingsOpen(true)}
+            className="header-link"
+            title="音声設定（Gemini TTS）"
+            aria-label="音声設定"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">音声</span>
+          </button>
           <PublicViewHeaderLink />
           <a
             href="https://www.tottori-tenis.net/"
@@ -509,6 +532,7 @@ export default function AppLayout() {
 
       {/* バージョン情報モーダル */}
       <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />
+      <VoiceSettingsDialog open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
 
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />

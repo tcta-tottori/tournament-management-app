@@ -2,88 +2,28 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Megaphone, Square, Volume2 } from 'lucide-react';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import { db } from '../../db/database';
+import { geminiTts } from '../../features/broadcast/geminiTts';
 
-/** 利用可能な日本語女性音声を取得 */
-function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
-  const voices = speechSynthesis.getVoices();
-  const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang === 'ja_JP');
-  const preferredKeywords = ['nanami', 'kyoko', 'o-ren', 'haruka', 'sayaka', 'ayumi', 'mei', 'mizuki', 'google', 'female'];
-  for (const kw of preferredKeywords) {
-    const found = jaVoices.find(v => v.name.toLowerCase().includes(kw));
-    if (found) return found;
-  }
-  return jaVoices[0] || null;
+/** 「続きまして。」のつなぎフレーズを Gemini で話す */
+async function speakBridge(signal: { aborted: boolean }): Promise<void> {
+  if (signal.aborted) return;
+  await geminiTts.speak('続きまして。', { repeatCount: 1 });
+  await new Promise(resolve => setTimeout(resolve, 400));
 }
 
-const CHUNK_PAUSE_MS = 600;
-
-/** テキストを音声再生する Promise */
-function speakText(text: string, rate: number, _repeatCount: number, abortRef: React.RefObject<boolean>): Promise<void> {
-  return new Promise((resolve) => {
-    const synth = window.speechSynthesis;
-    const voice = getJapaneseFemaleVoice();
-    const chunks = text.split('。').filter(s => s.trim()).map(s => s + '。');
-    let index = 0;
-
-    function speakNext() {
-      if (abortRef.current) { resolve(); return; }
-      if (index >= chunks.length) {
-        resolve();
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(chunks[index]);
-      utterance.lang = 'ja-JP';
-      utterance.rate = rate;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      if (voice) utterance.voice = voice;
-
-      utterance.onend = () => {
-        index++;
-        if (index < chunks.length) {
-          setTimeout(() => speakNext(), CHUNK_PAUSE_MS);
-        } else {
-          speakNext();
-        }
-      };
-      utterance.onerror = () => {
-        index++;
-        speakNext();
-      };
-      synth.speak(utterance);
-    }
-    speakNext();
-  });
-}
-
-/** 「続きまして」を話す Promise */
-function speakBridge(rate: number, abortRef: React.RefObject<boolean>): Promise<void> {
-  return new Promise((resolve) => {
-    if (abortRef.current) { resolve(); return; }
-    const synth = window.speechSynthesis;
-    const voice = getJapaneseFemaleVoice();
-    const utterance = new SpeechSynthesisUtterance('続きまして。');
-    utterance.lang = 'ja-JP';
-    utterance.rate = rate;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    if (voice) utterance.voice = voice;
-    utterance.onend = () => {
-      setTimeout(() => resolve(), 400);
-    };
-    utterance.onerror = () => resolve();
-    synth.speak(utterance);
-  });
+/** コール本文を Gemini で話す */
+async function speakCall(text: string, repeatCount: number, signal: { aborted: boolean }): Promise<void> {
+  if (signal.aborted) return;
+  await geminiTts.speak(text, { repeatCount });
 }
 
 export default function BulkCallOverlay() {
-  const { isActive, items, currentIndex, rate, aborted, setRate, abort, reset } = useBulkCallStore();
-  const abortRef = useRef(false);
+  const { isActive, items, currentIndex, aborted, abort, reset } = useBulkCallStore();
+  const abortRef = useRef({ aborted: false });
   const runningRef = useRef(false);
 
   // sync abortRef
-  useEffect(() => { abortRef.current = aborted; }, [aborted]);
+  useEffect(() => { abortRef.current.aborted = aborted; }, [aborted]);
 
   const runSequence = useCallback(async () => {
     if (runningRef.current) return;
@@ -100,8 +40,8 @@ export default function BulkCallOverlay() {
 
       // つなぎ言葉（2番目以降）
       if (i > 0) {
-        await speakBridge(latestState.rate, abortRef);
-        if (abortRef.current) break;
+        await speakBridge(abortRef.current);
+        if (abortRef.current.aborted) break;
       }
 
       // DB更新: playing状態にする
@@ -114,22 +54,20 @@ export default function BulkCallOverlay() {
       }
 
       // 音声再生
-      await speakText(item.callText, latestState.rate, latestState.repeatCount, abortRef);
-      if (abortRef.current) break;
+      await speakCall(item.callText, latestState.repeatCount, abortRef.current);
+      if (abortRef.current.aborted) break;
 
       // 次へ進む
       useBulkCallStore.getState().next();
     }
 
     runningRef.current = false;
-    // 全完了
     const finalState = useBulkCallStore.getState();
     if (!finalState.aborted && finalState.currentIndex >= finalState.items.length) {
       setTimeout(() => reset(), 3000);
     }
   }, [reset]);
 
-  // コール開始時に自動で実行
   useEffect(() => {
     if (isActive && !aborted && !runningRef.current) {
       runSequence();
@@ -137,15 +75,13 @@ export default function BulkCallOverlay() {
   }, [isActive, aborted, runSequence]);
 
   const handleAbort = useCallback(() => {
-    window.speechSynthesis.cancel();
+    geminiTts.stop();
     abort();
   }, [abort]);
 
-  // 完了/中断の判定（hooks の前に計算）
   const isComplete = !isActive && !aborted && currentIndex >= items.length && items.length > 0;
   const wasAborted = aborted && items.length > 0;
 
-  // 完了/中断後は3秒で消える
   useEffect(() => {
     if (isComplete || wasAborted) {
       const timer = setTimeout(() => reset(), 3000);
@@ -153,7 +89,6 @@ export default function BulkCallOverlay() {
     }
   }, [isComplete, wasAborted, reset]);
 
-  // 全ての hooks の後に条件付き return
   if (!isActive && items.length === 0) return null;
   if (!isActive && !isComplete && !wasAborted) return null;
 
@@ -163,7 +98,6 @@ export default function BulkCallOverlay() {
   return (
     <div className="fixed top-[56px] right-3 z-50 w-80">
       <div className="bg-white rounded-xl shadow-2xl border border-emerald-200 overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 flex items-center gap-2">
           <div className="relative">
             <Megaphone className="w-5 h-5 text-white" />
@@ -195,9 +129,7 @@ export default function BulkCallOverlay() {
           )}
         </div>
 
-        {/* Content */}
         <div className="px-4 py-3 space-y-2.5">
-          {/* Progress bar */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-gray-500 font-medium">進捗</span>
@@ -211,7 +143,6 @@ export default function BulkCallOverlay() {
             </div>
           </div>
 
-          {/* Current call info */}
           {current && isActive && (
             <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
               <Volume2 className="w-4 h-4 text-emerald-500 shrink-0 animate-pulse" />
@@ -226,24 +157,6 @@ export default function BulkCallOverlay() {
             </div>
           )}
 
-          {/* Speed control */}
-          {isActive && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-gray-500 font-medium shrink-0">速度</span>
-              <input
-                type="range"
-                min="0.5"
-                max="1.2"
-                step="0.05"
-                value={rate}
-                onChange={e => setRate(parseFloat(e.target.value))}
-                className="flex-1 h-1 accent-emerald-500"
-              />
-              <span className="text-[10px] font-mono text-emerald-600 font-bold w-8 text-right">{rate.toFixed(2)}</span>
-            </div>
-          )}
-
-          {/* Court list mini */}
           {isActive && items.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {items.map((item, i) => (
