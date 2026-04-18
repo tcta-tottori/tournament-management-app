@@ -31,6 +31,8 @@ class SyncEngine {
   private zustandUnsubscribers: (() => void)[] = [];
   private active = false;
   private roomCode = '';
+  /** 観戦用の読み取り専用モード（変更の送信を行わない） */
+  private viewerMode = false;
 
   /** Zustand スナップショット送信のデバウンスタイマー */
   private mixedDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -59,11 +61,15 @@ class SyncEngine {
   // 公開 API
   // ===========================
 
-  /** 同期を開始（ルームに接続） */
-  start(roomCode: string, serverUrl?: string): void {
+  /**
+   * 同期を開始（ルームに接続）
+   * @param viewerMode true の場合、変更の送信を行わない読み取り専用モード
+   */
+  start(roomCode: string, serverUrl?: string, viewerMode = false): void {
     if (this.active) this.stop();
     this.roomCode = roomCode;
     this.active = true;
+    this.viewerMode = viewerMode;
 
     const store = useSyncStore.getState();
     store.setRoomCode(roomCode);
@@ -81,10 +87,11 @@ class SyncEngine {
       this.wsTransport.connect(roomCode);
     }
 
-    // Dexie フックを登録
-    this.setupDexieHooks();
-    // Zustand サブスクリプションを登録
-    this.setupZustandSubscriptions();
+    // 送信系フック/サブスクリプションは観戦モードでは登録しない
+    if (!viewerMode) {
+      this.setupDexieHooks();
+      this.setupZustandSubscriptions();
+    }
 
     // 自分の参加を通知
     this.broadcast({
@@ -107,6 +114,11 @@ class SyncEngine {
     });
   }
 
+  /** 観戦モードかどうか */
+  isViewerMode(): boolean {
+    return this.viewerMode;
+  }
+
   /** 同期を停止 */
   stop(): void {
     const store = useSyncStore.getState();
@@ -125,6 +137,7 @@ class SyncEngine {
 
     this.active = false;
     this.roomCode = '';
+    this.viewerMode = false;
 
     // トランスポート切断
     for (const t of this.transports) {
@@ -216,7 +229,10 @@ class SyncEngine {
         break;
 
       case 'request-snapshot':
-        this.sendFullSnapshot(msg.deviceId);
+        // 観戦モードでは自身のデータを配信しない
+        if (!this.viewerMode) {
+          this.sendFullSnapshot(msg.deviceId);
+        }
         break;
 
       case 'snapshot-response':

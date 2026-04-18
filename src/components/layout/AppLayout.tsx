@@ -11,6 +11,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../../features/mixed/mixedStore';
 import { useTeamStore } from '../../features/team/teamStore';
+import { useSyncStore } from '../../features/sync/syncStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
@@ -382,16 +383,7 @@ export default function AppLayout() {
         {/* 右側: 同期 & リンク & バージョン */}
         <div className="flex items-center gap-2 shrink-0">
           <SyncStatusIndicator />
-          <a
-            href={`${import.meta.env.BASE_URL}view/league`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-link"
-            title="参加者・HP向け公開ビューを別タブで開く"
-          >
-            <Eye className="w-3 h-3" />
-            <span className="hidden sm:inline">観戦用</span>
-          </a>
+          <PublicViewHeaderLink />
           <a
             href="https://www.tottori-tenis.net/"
             target="_blank"
@@ -521,5 +513,42 @@ export default function AppLayout() {
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />
     </div>
+  );
+}
+
+/**
+ * ヘッダーの「観戦用」リンク
+ * 同期ルーム接続中なら ?room=XXX&server=YYY を付与し、
+ * 別端末からアクセスしても観戦者として同じ大会データを受信できる。
+ */
+function PublicViewHeaderLink() {
+  const roomCode = useSyncStore((s) => s.roomCode);
+  const serverUrl = useSyncStore((s) => s.serverUrl);
+  const syncEnabled = useSyncStore((s) => s.syncEnabled);
+
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  let href = `${base}/view/league`;
+  if (syncEnabled && roomCode) {
+    const qs = new URLSearchParams();
+    qs.set('room', roomCode);
+    if (serverUrl) qs.set('server', serverUrl);
+    href = `${base}/view/league?${qs.toString()}`;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="header-link"
+      title={
+        syncEnabled && roomCode
+          ? `参加者・HP向け公開ビューを別タブで開く（ルーム ${roomCode}）`
+          : '参加者・HP向け公開ビューを別タブで開く'
+      }
+    >
+      <Eye className="w-3 h-3" />
+      <span className="hidden sm:inline">観戦用</span>
+    </a>
   );
 }
