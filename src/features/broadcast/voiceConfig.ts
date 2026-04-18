@@ -52,31 +52,46 @@ const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
 
+/**
+ * ビルド時に `VITE_GEMINI_API_KEY` / `VITE_GEMINI_MODEL` が設定されていれば、
+ * それらをロックされた既定値として使用する（ユーザーが編集不可）。
+ * GitHub Actions の secrets から注入される想定。
+ */
+export const BAKED_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) || '';
+export const BAKED_MODEL = (import.meta.env.VITE_GEMINI_MODEL as string | undefined) || '';
+/** API キーがビルド時に埋め込まれているか（UI を簡略化するために使用） */
+export const IS_KEY_LOCKED = BAKED_API_KEY.length > 0;
+/** モデルがビルド時に埋め込まれているか */
+export const IS_MODEL_LOCKED = BAKED_MODEL.length > 0;
+
 /** 選択可能な既知モデル（カスタム入力も可） */
 export const GEMINI_TTS_MODELS: { id: string; label: string }[] = [
-  { id: 'gemini-3.1-flash-preview-tts', label: 'Gemini 3.1 Flash TTS（最新・高速）' },
-  { id: 'gemini-3.1-pro-preview-tts', label: 'Gemini 3.1 Pro TTS（最新・高品質）' },
+  { id: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS（最新・高速）' },
+  { id: 'gemini-3.1-pro-tts-preview', label: 'Gemini 3.1 Pro TTS（最新・高品質）' },
   { id: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS（安定）' },
   { id: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro TTS（高品質）' },
 ];
 
 export function getVoiceSettings(): VoiceConfig {
-  const mode = (localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct';
+  const mode: VoiceMode = IS_KEY_LOCKED
+    ? 'direct'
+    : ((localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct');
   return {
     mode,
-    apiKey: localStorage.getItem(KEY_API) || '',
+    apiKey: IS_KEY_LOCKED ? BAKED_API_KEY : (localStorage.getItem(KEY_API) || ''),
     serverUrl: localStorage.getItem(KEY_SERVER) || defaultServerUrl(),
-    model: localStorage.getItem(KEY_MODEL) || DEFAULT_MODEL,
+    model: IS_MODEL_LOCKED ? BAKED_MODEL : (localStorage.getItem(KEY_MODEL) || DEFAULT_MODEL),
     voiceName: localStorage.getItem(KEY_VOICE) || 'Kore',
     styleInstruction: localStorage.getItem(KEY_STYLE) ?? DEFAULT_STYLE,
   };
 }
 
 export function setVoiceSettings(patch: Partial<VoiceConfig>): void {
-  if (patch.mode !== undefined) localStorage.setItem(KEY_MODE, patch.mode);
-  if (patch.apiKey !== undefined) localStorage.setItem(KEY_API, patch.apiKey);
+  // ロック済みの値はユーザー編集を無視する
+  if (patch.mode !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_MODE, patch.mode);
+  if (patch.apiKey !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_API, patch.apiKey);
   if (patch.serverUrl !== undefined) localStorage.setItem(KEY_SERVER, patch.serverUrl);
-  if (patch.model !== undefined) localStorage.setItem(KEY_MODEL, patch.model);
+  if (patch.model !== undefined && !IS_MODEL_LOCKED) localStorage.setItem(KEY_MODEL, patch.model);
   if (patch.voiceName !== undefined) localStorage.setItem(KEY_VOICE, patch.voiceName);
   if (patch.styleInstruction !== undefined) localStorage.setItem(KEY_STYLE, patch.styleInstruction);
   try {

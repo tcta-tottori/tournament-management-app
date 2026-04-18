@@ -35,6 +35,13 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Build
+        env:
+          # GitHub Secrets に GEMINI_API_KEY を登録すると、ビルド時に埋め込まれ
+          # ユーザーはキー入力なしで音声を利用できる。未設定ならユーザーが
+          # 音声設定ダイアログでキーを入れるフォールバックになる。
+          VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # 任意: 既定モデルを固定したい場合に設定（例: gemini-3.1-flash-tts-preview）
+          VITE_GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
         run: npx vite build
 
       - name: Create 404.html for SPA routing
