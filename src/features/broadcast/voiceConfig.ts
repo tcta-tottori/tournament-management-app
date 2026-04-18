@@ -48,9 +48,17 @@ const KEY_VOICE = 'voice_name';
 const KEY_STYLE = 'voice_style';
 const EVENT_CHANGED = 'voice-settings-changed';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
+const DEFAULT_MODEL = 'gemini-3.1-flash-preview-tts';
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
+
+/** 選択可能な既知モデル（カスタム入力も可） */
+export const GEMINI_TTS_MODELS: { id: string; label: string }[] = [
+  { id: 'gemini-3.1-flash-preview-tts', label: 'Gemini 3.1 Flash TTS（最新・高速）' },
+  { id: 'gemini-3.1-pro-preview-tts', label: 'Gemini 3.1 Pro TTS（最新・高品質）' },
+  { id: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS（安定）' },
+  { id: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro TTS（高品質）' },
+];
 
 export function getVoiceSettings(): VoiceConfig {
   const mode = (localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct';
