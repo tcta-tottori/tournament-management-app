@@ -17,7 +17,7 @@ export default function PublicLayout() {
 
   const tabs = [
     { to: 'league', label: '予選リーグ', icon: Users },
-    { to: 'bracket', label: '決勝トーナメント', icon: Trophy },
+    { to: 'bracket', label: '全トーナメント', icon: Trophy },
     { to: 'live', label: 'LIVE', icon: Radio },
   ];
 

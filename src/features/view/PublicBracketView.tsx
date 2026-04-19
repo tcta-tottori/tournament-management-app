@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Trophy, Medal, Award, Users, Info } from 'lucide-react';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
@@ -12,12 +12,13 @@ import type {
   TeamBracketMatch,
 } from '../team/types';
 
-const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
-  { id: '1st', label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
-  { id: '2nd', label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
-  { id: '3rd', label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
-  { id: '4th', label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
-];
+const CATEGORY_META: Record<PlacementCategory, { label: string; icon: React.ElementType; color: string }> = {
+  '1st': { label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
+  '2nd': { label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
+  '3rd': { label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
+  '4th': { label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
+};
+const CATEGORY_ORDER: PlacementCategory[] = ['1st', '2nd', '3rd', '4th'];
 
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
   A: 'bg-emerald-100 text-emerald-700',
@@ -43,7 +44,9 @@ function getRoundLabel(round: number, total: number): string {
 }
 
 /**
- * 決勝トーナメント公開ビュー
+ * 全トーナメント公開ビュー
+ * - 1位/2位/3位/4・5位の各順位別ブラケットを縦に並べて一覧表示
+ * - タブ切替なし、すべて同時に閲覧可能
  */
 export default function PublicBracketView() {
   const mixedImported = useMixedStore(s => s.isImported);
@@ -51,53 +54,64 @@ export default function PublicBracketView() {
   const mixedBrackets = useMixedStore(s => s.brackets);
   const teamBrackets = useTeamStore(s => s.brackets);
 
-  const [category, setCategory] = useState<PlacementCategory>('1st');
-
   const brackets = mixedImported ? mixedBrackets : teamImported ? teamBrackets : [];
-  const selected = brackets.find(b => b.category === category) || brackets[0];
 
-  if (!selected) {
+  if (brackets.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
         <Info className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-gray-500 text-sm">決勝トーナメントデータがまだありません。</p>
+        <p className="text-gray-500 text-sm">トーナメントデータがまだありません。</p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {/* Category tabs */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORY_TABS.map(t => {
-          const isActive = (selected.category === t.id);
-          const exists = brackets.some(b => b.category === t.id);
-          return (
-            <button
-              key={t.id}
-              disabled={!exists}
-              onClick={() => exists && setCategory(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all border ${
-                isActive
-                  ? `bg-gradient-to-r ${t.color} text-white border-transparent shadow-sm`
-                  : exists
-                  ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  : 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
-              }`}
-            >
-              <t.icon className="w-4 h-4" />
-              {t.label}トーナメント
-            </button>
-          );
-        })}
-      </div>
+  // 定義順（1位→4位）に並べる
+  const orderedBrackets = CATEGORY_ORDER
+    .map(cat => brackets.find(b => b.category === cat))
+    .filter((b): b is (typeof brackets)[number] => !!b);
 
-      {mixedImported ? (
-        <MixedBracketDisplay bracket={selected as PlacementBracket} />
-      ) : (
-        <TeamBracketDisplay bracket={selected as TeamPlacementBracket} />
-      )}
+  return (
+    <div className="space-y-8">
+      {orderedBrackets.map(b => (
+        <BracketSection
+          key={b.category}
+          bracket={b}
+          isMixed={mixedImported}
+        />
+      ))}
     </div>
+  );
+}
+
+function BracketSection({
+  bracket,
+  isMixed,
+}: {
+  bracket: PlacementBracket | TeamPlacementBracket;
+  isMixed: boolean;
+}) {
+  const meta = CATEGORY_META[bracket.category];
+  return (
+    <section className="space-y-3">
+      <div
+        className={`bg-gradient-to-r ${meta.color} text-white rounded-xl shadow-sm px-4 py-3 flex items-center gap-3`}
+      >
+        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+          <meta.icon className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold leading-tight">{meta.label}トーナメント</h2>
+          <p className="text-[11px] text-white/80 mt-0.5">
+            {bracket.label || `${meta.label}決定戦`} ({bracket.teams.length}チーム)
+          </p>
+        </div>
+      </div>
+      {isMixed ? (
+        <MixedBracketDisplay bracket={bracket as PlacementBracket} />
+      ) : (
+        <TeamBracketDisplay bracket={bracket as TeamPlacementBracket} />
+      )}
+    </section>
   );
 }
 
