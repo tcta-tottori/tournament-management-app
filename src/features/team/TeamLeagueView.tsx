@@ -571,6 +571,7 @@ export default function TeamLeagueView() {
                                       const myScore = isTeam1 ? sub?.score1 : sub?.score2;
                                       const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
                                       const won = sub?.winnerId === rowTeam.teamId;
+                                      const isTerminated = !!sub?.terminated;
                                       const hasScore = myScore != null && oppScore != null;
                                       const myPlayers = (isTeam1 ? sub?.players1 : sub?.players2) || [];
                                       const oppPlayers = (isTeam1 ? sub?.players2 : sub?.players1) || [];
@@ -579,11 +580,19 @@ export default function TeamLeagueView() {
                                           key={matchType}
                                           className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px]"
                                         >
-                                          {hasScore ? (<>
+                                          {hasScore || isTerminated ? (<>
                                             <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
                                               <PlayerListDisplay players={myPlayers} />
                                             </span>
-                                            <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-500'}`}>{myScore}-{oppScore}</span>
+                                            <span className={`col-start-2 font-black whitespace-nowrap text-center ${
+                                              isTerminated ? 'text-slate-400 line-through decoration-rose-400' :
+                                              won ? 'text-blue-700' : 'text-rose-500'
+                                            }`}>
+                                              {hasScore ? `${myScore}-${oppScore}` : '打'}
+                                              {isTerminated && hasScore && (
+                                                <span className="ml-0.5 text-[8px] text-rose-500 no-underline align-top font-black">打</span>
+                                              )}
+                                            </span>
                                             <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
                                               <PlayerListDisplay players={oppPlayers} />
                                             </span>

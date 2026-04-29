@@ -54,6 +54,8 @@ export interface SubMatchScore {
   players1?: string[];
   /** team2側の選手苗字（最大2名） */
   players2?: string[];
+  /** 打ち切り（途中終了）。true の場合チーム勝利数にはカウントしない */
+  terminated?: boolean;
 }
 
 /** リーグ戦の1対戦（3種目セット） */
@@ -98,6 +100,8 @@ export interface BracketSubMatchScore {
   winnerId: string | null;
   players1?: string[];
   players2?: string[];
+  /** 打ち切り（途中終了）。true の場合チーム勝利数にはカウントしない */
+  terminated?: boolean;
 }
 
 /** タイブレーク判定ルール */

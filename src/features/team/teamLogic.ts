@@ -165,7 +165,7 @@ export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
   return matches;
 }
 
-/** 種目勝利数からチーム勝敗を判定 */
+/** 種目勝利数からチーム勝敗を判定。打ち切り種目はカウントから除外 */
 export function determineTeamWinner(
   subMatches: SubMatchScore[],
   team1Id: string,
@@ -174,16 +174,16 @@ export function determineTeamWinner(
   let winsTeam1 = 0;
   let winsTeam2 = 0;
   for (const sm of subMatches) {
+    if (sm.terminated) continue; // 打ち切りは勝利数にカウントしない
     if (sm.winnerId === team1Id) winsTeam1++;
     else if (sm.winnerId === team2Id) winsTeam2++;
   }
   let winnerId: string | null = null;
   if (winsTeam1 >= 2) winnerId = team1Id;
   else if (winsTeam2 >= 2) winnerId = team2Id;
-  // 3種目全て終了している場合のみ、3-0でなくても勝者確定
-  const allFinished = subMatches.every(sm => sm.winnerId !== null);
-  if (allFinished && !winnerId) {
-    // 全種目終了で同率の場合は存在しないはず（3種目あるので）
+  // 全種目（打ち切り含む）が確定している場合のみ、3-0でなくても勝者確定
+  const allFinished = subMatches.every(sm => sm.winnerId !== null || sm.terminated);
+  if (allFinished && !winnerId && winsTeam1 !== winsTeam2) {
     winnerId = winsTeam1 > winsTeam2 ? team1Id : team2Id;
   }
   return { winnerId, winsTeam1, winsTeam2 };
