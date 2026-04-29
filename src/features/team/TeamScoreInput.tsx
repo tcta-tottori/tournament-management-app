@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useId } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil } from 'lucide-react';
+import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil, OctagonX } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { SubMatchScore, MatchType, BracketSubMatchScore } from './types';
 import { MATCH_TYPE_ORDER, MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
@@ -438,6 +438,16 @@ export default function TeamScoreInput({
     return init;
   });
 
+  // 種目ごとの「打ち切り」フラグ（途中終了し勝利数にカウントしない）
+  const [terminated, setTerminated] = useState<Record<MatchType, boolean>>(() => {
+    const init: Record<MatchType, boolean> = {} as any;
+    for (const mt of MATCH_TYPE_ORDER) {
+      const sm = subMatches.find(s => s.type === mt);
+      init[mt] = !!sm?.terminated;
+    }
+    return init;
+  });
+
   const handlePlayerChange = useCallback((mt: MatchType, key: 'p1a'|'p1b'|'p2a'|'p2b', value: string) => {
     setScores(prev => ({ ...prev, [mt]: { ...prev[mt], [key]: value } }));
   }, []);
@@ -514,16 +524,17 @@ export default function TeamScoreInput({
     return result;
   }, [scores]);
 
-  // Win tally
+  // Win tally（打ち切り種目はカウントしない）
   const winTally = useMemo(() => {
     let t1 = 0, t2 = 0;
     for (const mt of MATCH_TYPE_ORDER) {
+      if (terminated[mt]) continue;
       const w = subMatchWinners[mt].winner;
       if (w === 1) t1++;
       if (w === 2) t2++;
     }
     return { t1, t2 };
-  }, [subMatchWinners]);
+  }, [subMatchWinners, terminated]);
 
   // Overall winner detection (2+ wins)
   const overallWinner = useMemo(() => {
@@ -615,25 +626,33 @@ export default function TeamScoreInput({
   const validate = useCallback((): boolean => {
     for (const mt of MATCH_TYPE_ORDER) {
       const s = scores[mt];
+      const isTerminated = terminated[mt];
       const s1 = parseInt(s.score1);
       const s2 = parseInt(s.score2);
       // Skip empty sub-matches
       if (s.score1 === '' && s.score2 === '') continue;
+      // 打ち切りはスコア未入力や同点を許容
+      if (isTerminated) {
+        if (s.score1 !== '' && (isNaN(s1) || s1 < 0)) return false;
+        if (s.score2 !== '' && (isNaN(s2) || s2 < 0)) return false;
+        continue;
+      }
       if (isNaN(s1) || isNaN(s2)) return false;
       if (s1 < 0 || s2 < 0) return false;
       if (s1 === s2) return false;
       if (s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) return false;
     }
     return true;
-  }, [scores]);
+  }, [scores, terminated]);
 
-  // Count how many sub-matches have been filled
+  // Count how many sub-matches have been filled (打ち切りも件数に含む)
   const filledCount = useMemo(() => {
     return MATCH_TYPE_ORDER.filter(mt => {
+      if (terminated[mt]) return true;
       const s = scores[mt];
       return s.score1 !== '' && s.score2 !== '';
     }).length;
-  }, [scores]);
+  }, [scores, terminated]);
 
   const handleSave = useCallback(() => {
     if (!validate()) return;
@@ -643,13 +662,17 @@ export default function TeamScoreInput({
 
     for (const mt of MATCH_TYPE_ORDER) {
       const s = scores[mt];
-      const s1 = parseInt(s.score1);
-      const s2 = parseInt(s.score2);
+      const isTerminated = terminated[mt];
+      const s1raw = parseInt(s.score1);
+      const s2raw = parseInt(s.score2);
+      // 打ち切り時はスコア未入力を 0 として保存（カウントには影響しない）
+      const s1 = s.score1 === '' ? (isTerminated ? 0 : NaN) : s1raw;
+      const s2 = s.score2 === '' ? (isTerminated ? 0 : NaN) : s2raw;
 
-      if (s.score1 === '' && s.score2 === '') {
+      if (s.score1 === '' && s.score2 === '' && !isTerminated) {
         // Clear this sub-match if previously had score
         const existing = subMatches.find(sm => sm.type === mt);
-        if (existing && existing.score1 !== null) {
+        if (existing && (existing.score1 !== null || existing.terminated)) {
           clearFn(matchId, mt);
         }
         continue;
@@ -657,9 +680,9 @@ export default function TeamScoreInput({
 
       if (isNaN(s1) || isNaN(s2)) continue;
 
-      const isTb = (s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1);
+      const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
       const tb = isTb && s.tiebreakScore ? parseInt(s.tiebreakScore) : null;
-      updateFn(matchId, mt, s1, s2, tb);
+      updateFn(matchId, mt, s1, s2, tb, isTerminated);
     }
 
     // 選手名は団体戦リーグのみ保存
@@ -673,7 +696,7 @@ export default function TeamScoreInput({
     }
 
     onClose();
-  }, [scores, matchId, isBracket, subMatches, onClose, validate,
+  }, [scores, terminated, matchId, isBracket, subMatches, onClose, validate,
       updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore, updateSubMatchPlayers]);
 
   const handleClearAll = useCallback(() => {
@@ -798,13 +821,33 @@ export default function TeamScoreInput({
                         {MATCH_TYPE_SHORT[mt]}
                       </span>
                       <span className={`text-xs font-bold ${theme.text}`}>{MATCH_TYPE_LABELS[mt]}</span>
+                      {terminated[mt] && (
+                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-300 px-1.5 py-0.5 rounded-full tracking-wider">
+                          打ち切り
+                        </span>
+                      )}
                     </div>
-                    {hasScores && info.winner > 0 && (
-                      <span className="text-[10px] font-bold text-emerald-600 bg-white border border-emerald-300 px-2 py-0.5 rounded-full">
-                        <Trophy className="w-2.5 h-2.5 inline mr-0.5" />
-                        {info.winner === 1 ? team1Name : team2Name}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {hasScores && info.winner > 0 && !terminated[mt] && (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-white border border-emerald-300 px-2 py-0.5 rounded-full">
+                          <Trophy className="w-2.5 h-2.5 inline mr-0.5" />
+                          {info.winner === 1 ? team1Name : team2Name}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setTerminated(prev => ({ ...prev, [mt]: !prev[mt] }))}
+                        className={`flex items-center gap-1 px-2 h-6 rounded-md text-[10px] font-bold border transition-colors ${
+                          terminated[mt]
+                            ? 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600'
+                            : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
+                        }`}
+                        title="この種目を打ち切り（勝利数にカウントしない）"
+                      >
+                        <OctagonX size={11} />
+                        {terminated[mt] ? '打ち切り中' : '打ち切り'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Score inputs */}

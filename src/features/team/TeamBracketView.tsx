@@ -696,15 +696,20 @@ export default function TeamBracketView() {
                                         <div className="flex gap-1 overflow-hidden items-center">
                                           {match.subMatches.map(sm => {
                                             const tag = MATCH_TYPE_COLORS[sm.type];
+                                            const isTerminated = !!sm.terminated;
                                             return (
                                               <span key={sm.type} className="inline-flex items-center gap-0.5 whitespace-nowrap">
                                                 <span className={`inline-flex items-center justify-center px-1 h-3.5 rounded text-[8px] font-black tracking-wider ${tag.bg} ${tag.text} border ${tag.border}`}>
                                                   {MATCH_TYPE_SHORT[sm.type]}
                                                 </span>
                                                 <span className={`font-mono font-black tabular-nums ${
+                                                  isTerminated ? 'text-slate-400 line-through decoration-rose-400' :
                                                   sm.winnerId === match.team1Id ? 'text-blue-600' :
                                                   sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
                                                 }`}>{sm.score1}-{sm.score2}</span>
+                                                {isTerminated && (
+                                                  <span className="text-[8px] font-black text-rose-500">打</span>
+                                                )}
                                                 {sm.tiebreakScore !== null && <span className="text-slate-400 font-mono">({sm.tiebreakScore})</span>}
                                               </span>
                                             );
