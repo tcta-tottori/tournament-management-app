@@ -246,7 +246,7 @@ export default function TeamBracketView() {
       {/* PC: 左=控えリスト / 右=トーナメント の2カラム分割 */}
       <div className="lg:flex lg:gap-4">
         {/* PC左カラム: 控えリスト（PCのみ表示） */}
-        <div className="hidden lg:block lg:w-1/2 lg:shrink-0">
+        <div className="hidden lg:block lg:w-1/3 lg:shrink-0">
           <div className="sticky top-0">
             <div className="flex items-center gap-2 mb-3 px-1">
               <ClipboardList className="w-4 h-4 text-slate-500" />
@@ -266,7 +266,7 @@ export default function TeamBracketView() {
         </div>
 
         {/* 右カラム（PC）/ フルワイド（モバイル）: トーナメント表示 */}
-        <div className={`lg:w-1/2 lg:shrink-0 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
+        <div className={`lg:w-2/3 lg:shrink-0 space-y-4 ${viewMode !== 'bracket' ? 'hidden lg:block' : ''}`}>
       {/* カテゴリタブ（リッチカラー文字） */}
       <div className="-mx-2 px-2">
         <div className="chrome-tab-bar">
