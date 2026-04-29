@@ -1367,17 +1367,18 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
 
 /**
  * 決勝トーナメントのR1スロット並べ替えパネル。
- * 既に組み上がったブラケットの並びがおかしい場合に、2つのスロットを
- * タップで選択して入れ替える。BYEスロットは固定（ロック）。
- * 確定時に rebuildBracketFromSlots を呼び、ブラケット全体を再構築する
- * （副作用として入力済みのスコアはリセットされるため確認ダイアログを表示）。
+ *  - 2スロットをタップで入れ替え（BYEスロットも入れ替え可能）
+ *  - 各スロット右の「BYE化/解除」でチームを未配置プールに退避／BYE解除
+ *  - 未配置プールのチップをタップ → 空きスロットへ配置
+ *  - 対戦中・終了済みの試合があっても並び替え可。確定時に強い警告を表示。
+ *    確定で rebuildBracketFromSlots を呼び、ブラケット全体（スコア含む）を再構築。
  */
 function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
   bracket: TeamPlacementBracket;
   onClose: () => void;
   onRebuild: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
 }) {
-  const { initialSlots, byePositions } = useMemo(() => {
+  const { initialSlots, initialByes } = useMemo(() => {
     const drawSize = bracket.drawSize;
     const slots: (string | null)[] = Array(drawSize).fill(null);
     const byes = new Set<number>();
@@ -1388,7 +1389,6 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
       const i1 = i * 2;
       const i2 = i * 2 + 1;
       if (m.isBye) {
-        // BYE試合: 片側にチームが入っており、もう片側がBYE
         if (m.team1Id && (!m.team2Id || m.team2Name === 'BYE')) {
           slots[i1] = m.team1Id;
           byes.add(i2);
@@ -1396,7 +1396,6 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
           slots[i2] = m.team2Id;
           byes.add(i1);
         } else {
-          // 両側不明な場合は両方BYEとして扱う
           byes.add(i1); byes.add(i2);
         }
       } else {
@@ -1404,11 +1403,13 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
         slots[i2] = m.team2Id;
       }
     });
-    return { initialSlots: slots, byePositions: byes };
+    return { initialSlots: slots, initialByes: byes };
   }, [bracket]);
 
   const [slots, setSlots] = useState<(string | null)[]>(initialSlots);
+  const [byes, setByes] = useState<Set<number>>(initialByes);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   const teamMap = useMemo(() => {
     const m = new Map<string, { teamName: string; leagueId: string }>();
@@ -1416,10 +1417,17 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
     return m;
   }, [bracket.teams]);
 
-  const dirty = useMemo(
-    () => slots.some((s, i) => s !== initialSlots[i]),
-    [slots, initialSlots]
+  const usedTeamIds = useMemo(() => new Set(slots.filter((s): s is string => s !== null)), [slots]);
+  const unassignedTeams = useMemo(
+    () => bracket.teams.filter(t => !usedTeamIds.has(t.teamId)),
+    [bracket.teams, usedTeamIds]
   );
+
+  const dirty = useMemo(() => {
+    const slotsChanged = slots.some((s, i) => s !== initialSlots[i]);
+    const byesChanged = byes.size !== initialByes.size || [...byes].some(i => !initialByes.has(i));
+    return slotsChanged || byesChanged;
+  }, [slots, byes, initialSlots, initialByes]);
 
   const hasInProgress = useMemo(
     () => bracket.matches.some(m => m.status === 'playing'),
@@ -1431,7 +1439,18 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
   );
 
   const handleSlotClick = (i: number) => {
-    if (byePositions.has(i)) return;
+    // 未配置チームを選択中なら、そのスロットに配置
+    if (selectedTeamId) {
+      const newSlots = [...slots];
+      // 既存のチームがあれば未配置に戻す（newSlotsから外す）
+      newSlots[i] = selectedTeamId;
+      const newByes = new Set(byes);
+      newByes.delete(i);
+      setSlots(newSlots);
+      setByes(newByes);
+      setSelectedTeamId(null);
+      return;
+    }
     if (selectedIdx === null) {
       setSelectedIdx(i);
       return;
@@ -1440,26 +1459,55 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
       setSelectedIdx(null);
       return;
     }
-    const next = [...slots];
-    [next[selectedIdx], next[i]] = [next[i], next[selectedIdx]];
-    setSlots(next);
+    const a = selectedIdx;
+    const b = i;
+    const newSlots = [...slots];
+    [newSlots[a], newSlots[b]] = [newSlots[b], newSlots[a]];
+    const newByes = new Set(byes);
+    const aWasBye = newByes.has(a);
+    const bWasBye = newByes.has(b);
+    if (aWasBye !== bWasBye) {
+      if (aWasBye) { newByes.delete(a); newByes.add(b); }
+      else { newByes.delete(b); newByes.add(a); }
+    }
+    setSlots(newSlots);
+    setByes(newByes);
+    setSelectedIdx(null);
+  };
+
+  const toggleBye = (i: number) => {
+    const newByes = new Set(byes);
+    if (newByes.has(i)) {
+      // BYE解除 → 空きスロットへ
+      newByes.delete(i);
+      setByes(newByes);
+    } else {
+      // BYE化 → チームがいれば未配置に戻し、BYEに
+      const newSlots = [...slots];
+      newSlots[i] = null;
+      newByes.add(i);
+      setSlots(newSlots);
+      setByes(newByes);
+    }
     setSelectedIdx(null);
   };
 
   const reset = () => {
     setSlots(initialSlots);
+    setByes(initialByes);
     setSelectedIdx(null);
+    setSelectedTeamId(null);
   };
 
   const apply = () => {
-    if (hasInProgress) {
-      alert('対戦中の試合があるため並べ替えできません。試合終了後にお試しください。');
-      return;
+    const warnings: string[] = [];
+    if (hasInProgress) warnings.push('● 対戦中の試合があります。');
+    if (hasFinished) warnings.push('● 入力済みのスコアがあります。');
+    if (warnings.length > 0) {
+      const msg = `以下の試合が初期化されます:\n${warnings.join('\n')}\n\n本当に並べ替えますか？`;
+      if (!confirm(msg)) return;
     }
-    if (hasFinished) {
-      if (!confirm('入力済みのスコアがリセットされます。本当に並べ替えますか？')) return;
-    }
-    onRebuild(bracket.category, slots, byePositions);
+    onRebuild(bracket.category, slots, byes);
     onClose();
   };
 
@@ -1491,18 +1539,13 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
 
       <div className="p-3">
         <div className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-          並びがおかしいスロットを2つタップすると入れ替わります。
-          <span className="text-slate-400">（BYEは固定）</span>
+          スロット2つタップで入れ替え。右の「BYE/解除」でBYE化／解除。
+          未配置チームをタップ後、配置先スロットをタップで移動。
         </div>
 
-        {hasInProgress && (
-          <div className="mb-2 px-2 py-1.5 bg-rose-50 border border-rose-200 rounded text-[10px] text-rose-700 font-bold">
-            ⚠ 対戦中の試合があります。並べ替えはできません。
-          </div>
-        )}
-        {!hasInProgress && hasFinished && (
+        {(hasInProgress || hasFinished) && (
           <div className="mb-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 font-bold">
-            ⚠ 確定すると入力済みのスコアはリセットされます。
+            ⚠ 確定すると{hasInProgress ? '対戦中の試合と' : ''}入力済みのスコアがリセットされます。
           </div>
         )}
 
@@ -1513,36 +1556,59 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
             return (
               <div key={matchIdx} className="rounded border border-slate-200 overflow-hidden">
                 {indices.map((si, k) => {
-                  const isBye = byePositions.has(si);
+                  const isBye = byes.has(si);
                   const teamId = slots[si];
                   const team = teamId ? teamMap.get(teamId) : null;
                   const isSelected = selectedIdx === si;
-                  const moved = slots[si] !== initialSlots[si];
+                  const slotMoved = slots[si] !== initialSlots[si];
+                  const byeChanged = isBye !== initialByes.has(si);
+                  const moved = slotMoved || byeChanged;
+                  const canPlaceTeam = !!selectedTeamId && !team;
+
                   return (
                     <div key={si}>
                       {k === 1 && <div className="border-t border-slate-100" />}
-                      <button
-                        type="button"
-                        onClick={() => handleSlotClick(si)}
-                        disabled={isBye}
-                        className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-left transition-all ${
-                          isBye ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
-                          isSelected ? 'bg-indigo-200 ring-2 ring-indigo-400' :
-                          moved ? 'bg-emerald-50 hover:bg-emerald-100' :
-                          'bg-white hover:bg-indigo-50'
-                        }`}
-                      >
-                        <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
-                        {isBye ? (
-                          <span className="text-slate-300 italic">BYE</span>
-                        ) : team ? (
-                          <span className="font-bold text-slate-800 truncate">
-                            <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">―</span>
-                        )}
-                      </button>
+                      <div className={`w-full flex items-stretch text-[10px] transition-all ${
+                        isSelected ? 'bg-indigo-200 ring-2 ring-indigo-400' :
+                        canPlaceTeam ? 'bg-yellow-50' :
+                        moved ? 'bg-emerald-50' :
+                        isBye ? 'bg-slate-50' :
+                        'bg-white'
+                      }`}>
+                        <button
+                          type="button"
+                          onClick={() => handleSlotClick(si)}
+                          className={`flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 text-left ${
+                            canPlaceTeam ? 'hover:bg-yellow-100 cursor-pointer' :
+                            'hover:bg-indigo-50'
+                          }`}
+                        >
+                          <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
+                          {isBye ? (
+                            <span className="text-slate-400 italic">BYE</span>
+                          ) : team ? (
+                            <span className="font-bold text-slate-800 truncate">
+                              <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                            </span>
+                          ) : canPlaceTeam ? (
+                            <span className="text-yellow-600">← ここに配置</span>
+                          ) : (
+                            <span className="text-slate-300">―</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleBye(si)}
+                          className={`px-1.5 text-[9px] font-bold border-l shrink-0 transition-colors ${
+                            isBye
+                              ? 'border-slate-200 text-indigo-500 hover:bg-indigo-100'
+                              : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-rose-500'
+                          }`}
+                          title={isBye ? 'BYE解除' : 'BYE化'}
+                        >
+                          {isBye ? '解除' : 'BYE'}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1550,6 +1616,34 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
             );
           })}
         </div>
+
+        {/* 未配置チームプール */}
+        {unassignedTeams.length > 0 && (
+          <div className="mb-3 p-2 rounded-lg border border-amber-200 bg-amber-50/50">
+            <div className="text-[9px] text-amber-700 font-bold mb-1.5">
+              未配置チーム（タップ → 配置先スロットをタップ）
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {unassignedTeams.map(t => {
+                const isSelected = selectedTeamId === t.teamId;
+                return (
+                  <button
+                    key={t.teamId}
+                    type="button"
+                    onClick={() => setSelectedTeamId(prev => prev === t.teamId ? null : t.teamId)}
+                    className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                      isSelected
+                        ? 'bg-yellow-200 border-yellow-500 text-yellow-900 ring-2 ring-yellow-300'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-amber-300'
+                    }`}
+                  >
+                    <span className="text-slate-400">{t.leagueId}</span> {t.teamName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button
@@ -1560,7 +1654,7 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
           </button>
           <button
             onClick={apply}
-            disabled={!dirty || hasInProgress}
+            disabled={!dirty}
             className="flex-1 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ✓ 確定
