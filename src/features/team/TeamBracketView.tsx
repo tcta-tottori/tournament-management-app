@@ -85,7 +85,7 @@ export default function TeamBracketView() {
   const {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
-    allTeams, leagues, rebuildBracketFromSlots, tournamentInfo,
+    allTeams, leagues, rebuildBracketFromSlots, applyBracketReorder, tournamentInfo,
   } = useTeamStore();
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
@@ -465,8 +465,9 @@ export default function TeamBracketView() {
                   <div className="p-3 border-b border-slate-100">
                     <TeamBracketReorderPanel
                       bracket={bracket}
+                      allBrackets={brackets}
                       onClose={() => setReorderingCategory(null)}
-                      onRebuild={rebuildBracketFromSlots}
+                      onApply={applyBracketReorder}
                     />
                   </div>
                 )}
@@ -1370,13 +1371,21 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
  *  - 2スロットをタップで入れ替え（BYEスロットも入れ替え可能）
  *  - 各スロット右の「BYE化/解除」でチームを未配置プールに退避／BYE解除
  *  - 未配置プールのチップをタップ → 空きスロットへ配置
+ *  - 他カテゴリの順位トーナメントからチームを取り込み可能。元カテゴリからは
+ *    そのチームが取り除かれ、空いたスロットは BYE になる
  *  - 対戦中・終了済みの試合があっても並び替え可。確定時に強い警告を表示。
- *    確定で rebuildBracketFromSlots を呼び、ブラケット全体（スコア含む）を再構築。
+ *    確定で applyBracketReorder を呼び、関係するブラケット全体（スコア含む）を再構築。
  */
-function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
+function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
   bracket: TeamPlacementBracket;
+  allBrackets: TeamPlacementBracket[];
   onClose: () => void;
-  onRebuild: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
+  onApply: (
+    targetCategory: PlacementCategory,
+    targetSlots: (string | null)[],
+    targetByes: Set<number>,
+    externalImports: Array<{ teamId: string; fromCategory: PlacementCategory }>
+  ) => void;
 }) {
   const { initialSlots, initialByes } = useMemo(() => {
     const drawSize = bracket.drawSize;
@@ -1410,24 +1419,57 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
   const [byes, setByes] = useState<Set<number>>(initialByes);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // teamId → 取り込み元カテゴリ。ターゲットへ取り込んだ他カテゴリのチームを記録
+  const [importedSources, setImportedSources] = useState<Map<string, PlacementCategory>>(new Map());
 
+  // 全ブラケットのチームを統合した検索マップ（他カテゴリのチーム表示にも使う）
   const teamMap = useMemo(() => {
     const m = new Map<string, { teamName: string; leagueId: string }>();
-    bracket.teams.forEach(t => m.set(t.teamId, { teamName: t.teamName, leagueId: t.leagueId }));
+    for (const b of allBrackets) {
+      for (const t of b.teams) {
+        if (!m.has(t.teamId)) m.set(t.teamId, { teamName: t.teamName, leagueId: t.leagueId });
+      }
+    }
     return m;
-  }, [bracket.teams]);
+  }, [allBrackets]);
+
+  const otherBrackets = useMemo(
+    () => allBrackets.filter(b => b.category !== bracket.category),
+    [allBrackets, bracket.category]
+  );
 
   const usedTeamIds = useMemo(() => new Set(slots.filter((s): s is string => s !== null)), [slots]);
-  const unassignedTeams = useMemo(
+  // 自カテゴリの未配置（自カテゴリ teams からスロットに無いもの）
+  const localUnassigned = useMemo(
     () => bracket.teams.filter(t => !usedTeamIds.has(t.teamId)),
     [bracket.teams, usedTeamIds]
+  );
+  // 他カテゴリから取り込み候補のチーム（スロットに既に入っているものは除外）
+  const externalCandidates = useMemo(() => {
+    const out: { teamId: string; teamName: string; leagueId: string; fromCategory: PlacementCategory }[] = [];
+    for (const ob of otherBrackets) {
+      for (const t of ob.teams) {
+        if (!usedTeamIds.has(t.teamId)) {
+          out.push({ teamId: t.teamId, teamName: t.teamName, leagueId: t.leagueId, fromCategory: ob.category });
+        }
+      }
+    }
+    return out;
+  }, [otherBrackets, usedTeamIds]);
+
+  // 確定時に実際に取り込まれるチーム（ターゲットのスロットに残っているもののみ）
+  const effectiveImports = useMemo(
+    () => Array.from(importedSources.entries())
+      .filter(([teamId]) => usedTeamIds.has(teamId))
+      .map(([teamId, fromCategory]) => ({ teamId, fromCategory })),
+    [importedSources, usedTeamIds]
   );
 
   const dirty = useMemo(() => {
     const slotsChanged = slots.some((s, i) => s !== initialSlots[i]);
     const byesChanged = byes.size !== initialByes.size || [...byes].some(i => !initialByes.has(i));
-    return slotsChanged || byesChanged;
-  }, [slots, byes, initialSlots, initialByes]);
+    return slotsChanged || byesChanged || effectiveImports.length > 0;
+  }, [slots, byes, initialSlots, initialByes, effectiveImports]);
 
   const hasInProgress = useMemo(
     () => bracket.matches.some(m => m.status === 'playing'),
@@ -1497,17 +1539,23 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
     setByes(initialByes);
     setSelectedIdx(null);
     setSelectedTeamId(null);
+    setImportedSources(new Map());
   };
 
   const apply = () => {
     const warnings: string[] = [];
     if (hasInProgress) warnings.push('● 対戦中の試合があります。');
     if (hasFinished) warnings.push('● 入力済みのスコアがあります。');
+    if (effectiveImports.length > 0) {
+      const sourceCats = Array.from(new Set(effectiveImports.map(i => i.fromCategory)));
+      const labels = sourceCats.map(c => CATEGORY_LABELS[c]).join('・');
+      warnings.push(`● ${labels} のスコアもリセットされ、移籍チームのスロットはBYEになります。`);
+    }
     if (warnings.length > 0) {
-      const msg = `以下の試合が初期化されます:\n${warnings.join('\n')}\n\n本当に並べ替えますか？`;
+      const msg = `以下の影響があります:\n${warnings.join('\n')}\n\n本当に並べ替えますか？`;
       if (!confirm(msg)) return;
     }
-    onRebuild(bracket.category, slots, byes);
+    onApply(bracket.category, slots, byes, effectiveImports);
     onClose();
   };
 
@@ -1559,6 +1607,8 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
                   const isBye = byes.has(si);
                   const teamId = slots[si];
                   const team = teamId ? teamMap.get(teamId) : null;
+                  const importSource = teamId ? importedSources.get(teamId) : undefined;
+                  const isImported = !!importSource;
                   const isSelected = selectedIdx === si;
                   const slotMoved = slots[si] !== initialSlots[si];
                   const byeChanged = isBye !== initialByes.has(si);
@@ -1587,9 +1637,16 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
                           {isBye ? (
                             <span className="text-slate-400 italic">BYE</span>
                           ) : team ? (
-                            <span className="font-bold text-slate-800 truncate">
-                              <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
-                            </span>
+                            <>
+                              <span className="font-bold text-slate-800 truncate">
+                                <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                              </span>
+                              {isImported && (
+                                <span className="ml-1 px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-bold shrink-0">
+                                  ←{CATEGORY_SHORT_LABELS[importSource!]}
+                                </span>
+                              )}
+                            </>
                           ) : canPlaceTeam ? (
                             <span className="text-yellow-600">← ここに配置</span>
                           ) : (
@@ -1617,20 +1674,23 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
           })}
         </div>
 
-        {/* 未配置チームプール */}
-        {unassignedTeams.length > 0 && (
-          <div className="mb-3 p-2 rounded-lg border border-amber-200 bg-amber-50/50">
+        {/* 未配置チームプール（自カテゴリ） */}
+        {localUnassigned.length > 0 && (
+          <div className="mb-2 p-2 rounded-lg border border-amber-200 bg-amber-50/50">
             <div className="text-[9px] text-amber-700 font-bold mb-1.5">
               未配置チーム（タップ → 配置先スロットをタップ）
             </div>
             <div className="flex flex-wrap gap-1">
-              {unassignedTeams.map(t => {
+              {localUnassigned.map(t => {
                 const isSelected = selectedTeamId === t.teamId;
                 return (
                   <button
                     key={t.teamId}
                     type="button"
-                    onClick={() => setSelectedTeamId(prev => prev === t.teamId ? null : t.teamId)}
+                    onClick={() => {
+                      setSelectedTeamId(prev => prev === t.teamId ? null : t.teamId);
+                      setSelectedIdx(null);
+                    }}
                     className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                       isSelected
                         ? 'bg-yellow-200 border-yellow-500 text-yellow-900 ring-2 ring-yellow-300'
@@ -1638,6 +1698,49 @@ function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
                     }`}
                   >
                     <span className="text-slate-400">{t.leagueId}</span> {t.teamName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 他カテゴリから取り込み候補 */}
+        {externalCandidates.length > 0 && (
+          <div className="mb-3 p-2 rounded-lg border border-violet-200 bg-violet-50/50">
+            <div className="text-[9px] text-violet-700 font-bold mb-1.5">
+              他カテゴリから取り込み（選択 → スロットをタップで移籍）
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {externalCandidates.map(t => {
+                const isSelected = selectedTeamId === t.teamId;
+                return (
+                  <button
+                    key={`${t.fromCategory}-${t.teamId}`}
+                    type="button"
+                    onClick={() => {
+                      if (selectedTeamId === t.teamId) {
+                        setSelectedTeamId(null);
+                      } else {
+                        setSelectedTeamId(t.teamId);
+                        setSelectedIdx(null);
+                        setImportedSources(prev => {
+                          const next = new Map(prev);
+                          if (!next.has(t.teamId)) next.set(t.teamId, t.fromCategory);
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                      isSelected
+                        ? 'bg-violet-200 border-violet-500 text-violet-900 ring-2 ring-violet-300'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-violet-300'
+                    }`}
+                  >
+                    <span className="px-1 rounded bg-violet-100 text-violet-700 text-[8px] font-bold">
+                      {CATEGORY_SHORT_LABELS[t.fromCategory]}
+                    </span>
+                    <span><span className="text-slate-400">{t.leagueId}</span> {t.teamName}</span>
                   </button>
                 );
               })}

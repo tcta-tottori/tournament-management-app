@@ -8,6 +8,124 @@ import type {
 } from './types';
 import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
 
+/**
+ * ブラケット再構築用ヘルパ。slotsArray と byePositions から R1 のマッチを組み、
+ * BYE分は次ラウンドへ自動進出させた状態の bracket オブジェクトを返す。
+ * excludeTeamIds を渡すと、そのチームをこのブラケットの teams からも除外する
+ * （他ブラケットへ移籍したチームの後始末用）。
+ */
+function rebuildBracketObject(
+  bracket: TeamPlacementBracket,
+  slotsArray: (string | null)[],
+  byePositions: Set<number> | undefined,
+  allTeams: TeamEntry[],
+  excludeTeamIds?: Set<string>,
+): TeamPlacementBracket {
+  const drawSize = slotsArray.length;
+  const totalRounds = Math.log2(drawSize);
+  const matches: TeamBracketMatch[] = [];
+
+  for (let round = 1; round <= totalRounds; round++) {
+    const matchesInRound = drawSize / Math.pow(2, round);
+    for (let pos = 1; pos <= matchesInRound; pos++) {
+      const matchId = `bracket-${bracket.category}-R${round}-${pos}`;
+      const nextRound = round + 1;
+      const nextPos = Math.ceil(pos / 2);
+      const nextMatchId = round < totalRounds ? `bracket-${bracket.category}-R${nextRound}-${nextPos}` : null;
+      const nextSlot = pos % 2 === 1 ? 'team1' as const : 'team2' as const;
+      matches.push({
+        matchId, category: bracket.category, round, position: pos,
+        team1Id: null, team2Id: null, team1Name: '', team2Name: '',
+        team1League: '', team2League: '',
+        subMatches: MATCH_TYPE_ORDER.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
+        winsTeam1: 0, winsTeam2: 0,
+        winnerId: null, status: 'waiting' as const, isBye: false,
+        nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
+      });
+    }
+  }
+
+  const r1 = matches.filter(m => m.round === 1);
+  for (let i = 0; i < r1.length; i++) {
+    const tid1 = slotsArray[i * 2];
+    const tid2 = slotsArray[i * 2 + 1];
+    const t1 = tid1 ? allTeams.find(t => t.teamId === tid1) : null;
+    const t2 = tid2 ? allTeams.find(t => t.teamId === tid2) : null;
+    if (t1) { r1[i].team1Id = t1.teamId; r1[i].team1Name = t1.teamName; r1[i].team1League = t1.leagueId; }
+    if (t2) { r1[i].team2Id = t2.teamId; r1[i].team2Name = t2.teamName; r1[i].team2League = t2.leagueId; }
+    const s1IsBye = byePositions ? byePositions.has(i * 2) : !tid1;
+    const s2IsBye = byePositions ? byePositions.has(i * 2 + 1) : !tid2;
+    if (r1[i].team1Id && !r1[i].team2Id && s2IsBye) {
+      r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team1Id; r1[i].team2Name = 'BYE';
+    } else if (!r1[i].team1Id && r1[i].team2Id && s1IsBye) {
+      r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team2Id; r1[i].team1Name = 'BYE';
+    } else if (r1[i].team1Id && r1[i].team2Id) {
+      r1[i].status = 'ready';
+    }
+  }
+
+  for (const m of r1) {
+    if (m.isBye && m.winnerId && m.nextMatchId) {
+      const next = matches.find(nm => nm.matchId === m.nextMatchId);
+      if (next) {
+        const team = allTeams.find(t => t.teamId === m.winnerId);
+        if (m.nextSlot === 'team1') {
+          next.team1Id = m.winnerId; next.team1Name = team?.teamName || ''; next.team1League = team?.leagueId || '';
+        } else {
+          next.team2Id = m.winnerId; next.team2Name = team?.teamName || ''; next.team2League = team?.leagueId || '';
+        }
+        if (next.team1Id && next.team2Id) next.status = 'ready';
+      }
+    }
+  }
+
+  const assignedTeams = slotsArray.filter((id): id is string => id !== null)
+    .map((teamId, i) => {
+      const existing = bracket.teams.find(t => t.teamId === teamId)
+        || (() => { const a = allTeams.find(t => t.teamId === teamId); return a ? { teamId: a.teamId, teamName: a.teamName, leagueId: a.leagueId, seedPosition: 0 } : null; })();
+      return existing ? { ...existing, seedPosition: i + 1 } : null;
+    }).filter((t): t is NonNullable<typeof t> => t !== null);
+  const assignedIds = new Set(assignedTeams.map(t => t.teamId));
+  const unassignedTeams = bracket.teams.filter(t =>
+    !assignedIds.has(t.teamId) && !(excludeTeamIds && excludeTeamIds.has(t.teamId))
+  );
+  const allBracketTeams = [...assignedTeams, ...unassignedTeams];
+
+  return { ...bracket, teams: allBracketTeams, matches };
+}
+
+/**
+ * 既存ブラケットの R1 マッチからスロット配列と BYE 集合を抽出する。
+ */
+function extractSlotsFromBracket(bracket: TeamPlacementBracket): {
+  slots: (string | null)[];
+  byes: Set<number>;
+} {
+  const drawSize = bracket.drawSize;
+  const slots: (string | null)[] = Array(drawSize).fill(null);
+  const byes = new Set<number>();
+  const r1 = bracket.matches.filter(m => m.round === 1).sort((a, b) => a.position - b.position);
+  r1.forEach((m, i) => {
+    const i1 = i * 2;
+    const i2 = i * 2 + 1;
+    if (m.isBye) {
+      if (m.team1Id && (!m.team2Id || m.team2Name === 'BYE')) {
+        slots[i1] = m.team1Id;
+        byes.add(i2);
+      } else if (m.team2Id && (!m.team1Id || m.team1Name === 'BYE')) {
+        slots[i2] = m.team2Id;
+        byes.add(i1);
+      } else {
+        byes.add(i1); byes.add(i2);
+      }
+    } else {
+      slots[i1] = m.team1Id;
+      slots[i2] = m.team2Id;
+    }
+  });
+  return { slots, byes };
+}
+
 interface TeamState {
   // Data
   tournamentInfo: TeamTournamentInfo | null;
@@ -75,6 +193,17 @@ interface TeamState {
   // Shuffle & rebuild
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
   rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
+  /**
+   * 並べ替えパネル用: 複数ブラケットへの変更を一括適用する。
+   * targetCategory のスロット/BYEを更新し、externalImports で指定されたチームを
+   * 元ブラケットから取り除く（取り除いたスロットはBYEになる）。
+   */
+  applyBracketReorder: (
+    targetCategory: PlacementCategory,
+    targetSlots: (string | null)[],
+    targetByes: Set<number>,
+    externalImports: Array<{ teamId: string; fromCategory: PlacementCategory }>
+  ) => void;
   autoPopulateBrackets: () => void;
   regenerateBrackets: () => void;
 }
@@ -573,76 +702,47 @@ export const useTeamStore = create<TeamState>()(
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
           if (bracketIdx === -1) return state;
           const bracket = state.brackets[bracketIdx];
-          const drawSize = slotsArray.length;
-          const totalRounds = Math.log2(drawSize);
-          const matches: TeamBracketMatch[] = [];
+          const newBracket = rebuildBracketObject(bracket, slotsArray, byePositions, state.allTeams);
+          const newBrackets = [...state.brackets];
+          newBrackets[bracketIdx] = newBracket;
+          return { brackets: newBrackets };
+        });
+      },
 
-          for (let round = 1; round <= totalRounds; round++) {
-            const matchesInRound = drawSize / Math.pow(2, round);
-            for (let pos = 1; pos <= matchesInRound; pos++) {
-              const matchId = `bracket-${category}-R${round}-${pos}`;
-              const nextRound = round + 1;
-              const nextPos = Math.ceil(pos / 2);
-              const nextMatchId = round < totalRounds ? `bracket-${category}-R${nextRound}-${nextPos}` : null;
-              const nextSlot = pos % 2 === 1 ? 'team1' as const : 'team2' as const;
-              matches.push({
-                matchId, category, round, position: pos,
-                team1Id: null, team2Id: null, team1Name: '', team2Name: '',
-                team1League: '', team2League: '',
-                subMatches: MATCH_TYPE_ORDER.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
-                winsTeam1: 0, winsTeam2: 0,
-                winnerId: null, status: 'waiting', isBye: false,
-                nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
-              });
-            }
+      applyBracketReorder: (targetCategory, targetSlots, targetByes, externalImports) => {
+        set(state => {
+          const newBrackets = [...state.brackets];
+
+          // Step 1: 元ブラケットからチームを取り除き、それぞれを再構築
+          const importsBySource = new Map<PlacementCategory, Set<string>>();
+          for (const imp of externalImports) {
+            const set = importsBySource.get(imp.fromCategory) ?? new Set<string>();
+            set.add(imp.teamId);
+            importsBySource.set(imp.fromCategory, set);
           }
-
-          const r1 = matches.filter(m => m.round === 1);
-          for (let i = 0; i < r1.length; i++) {
-            const tid1 = slotsArray[i * 2];
-            const tid2 = slotsArray[i * 2 + 1];
-            const t1 = tid1 ? state.allTeams.find(t => t.teamId === tid1) : null;
-            const t2 = tid2 ? state.allTeams.find(t => t.teamId === tid2) : null;
-            if (t1) { r1[i].team1Id = t1.teamId; r1[i].team1Name = t1.teamName; r1[i].team1League = t1.leagueId; }
-            if (t2) { r1[i].team2Id = t2.teamId; r1[i].team2Name = t2.teamName; r1[i].team2League = t2.leagueId; }
-            const s1IsBye = byePositions ? byePositions.has(i * 2) : !tid1;
-            const s2IsBye = byePositions ? byePositions.has(i * 2 + 1) : !tid2;
-            if (r1[i].team1Id && !r1[i].team2Id && s2IsBye) {
-              r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team1Id; r1[i].team2Name = 'BYE';
-            } else if (!r1[i].team1Id && r1[i].team2Id && s1IsBye) {
-              r1[i].isBye = true; r1[i].status = 'bye'; r1[i].winnerId = r1[i].team2Id; r1[i].team1Name = 'BYE';
-            } else if (r1[i].team1Id && r1[i].team2Id) {
-              r1[i].status = 'ready';
-            }
-          }
-
-          for (const m of r1) {
-            if (m.isBye && m.winnerId && m.nextMatchId) {
-              const next = matches.find(nm => nm.matchId === m.nextMatchId);
-              if (next) {
-                const team = state.allTeams.find(t => t.teamId === m.winnerId);
-                if (m.nextSlot === 'team1') {
-                  next.team1Id = m.winnerId; next.team1Name = team?.teamName || ''; next.team1League = team?.leagueId || '';
-                } else {
-                  next.team2Id = m.winnerId; next.team2Name = team?.teamName || ''; next.team2League = team?.leagueId || '';
-                }
-                if (next.team1Id && next.team2Id) next.status = 'ready';
+          for (const [sourceCategory, removedIds] of importsBySource) {
+            const idx = newBrackets.findIndex(b => b.category === sourceCategory);
+            if (idx === -1) continue;
+            const source = newBrackets[idx];
+            const { slots: srcSlots, byes: srcByes } = extractSlotsFromBracket(source);
+            // 取り除いたチームのスロットは BYE にする
+            for (let i = 0; i < srcSlots.length; i++) {
+              const id = srcSlots[i];
+              if (id && removedIds.has(id)) {
+                srcSlots[i] = null;
+                srcByes.add(i);
               }
             }
+            newBrackets[idx] = rebuildBracketObject(source, srcSlots, srcByes, state.allTeams, removedIds);
           }
 
-          const assignedTeams = slotsArray.filter((id): id is string => id !== null)
-            .map((teamId, i) => {
-              const existing = bracket.teams.find(t => t.teamId === teamId)
-                || (() => { const a = state.allTeams.find(t => t.teamId === teamId); return a ? { teamId: a.teamId, teamName: a.teamName, leagueId: a.leagueId, seedPosition: 0 } : null; })();
-              return existing ? { ...existing, seedPosition: i + 1 } : null;
-            }).filter((t): t is NonNullable<typeof t> => t !== null);
-          const assignedIds = new Set(assignedTeams.map(t => t.teamId));
-          const unassignedTeams = bracket.teams.filter(t => !assignedIds.has(t.teamId));
-          const allBracketTeams = [...assignedTeams, ...unassignedTeams];
+          // Step 2: ターゲットブラケットを再構築
+          const targetIdx = newBrackets.findIndex(b => b.category === targetCategory);
+          if (targetIdx !== -1) {
+            const target = newBrackets[targetIdx];
+            newBrackets[targetIdx] = rebuildBracketObject(target, targetSlots, targetByes, state.allTeams);
+          }
 
-          const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: allBracketTeams, matches };
           return { brackets: newBrackets };
         });
       },
