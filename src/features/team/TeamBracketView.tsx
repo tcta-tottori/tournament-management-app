@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers, ArrowLeftRight } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers, ArrowLeftRight, Pencil } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel } from './teamLogic';
+import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -14,13 +14,6 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '2nd': '2位トーナメント',
   '3rd': '3位トーナメント',
   '4th': '4・5位トーナメント',
-};
-
-const CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
-  '1st': '1位T',
-  '2nd': '2位T',
-  '3rd': '3位T',
-  '4th': '4·5位T',
 };
 
 /** カテゴリタブのリッチカラー文字 */
@@ -86,7 +79,12 @@ export default function TeamBracketView() {
     brackets, selectedBracketCategory, setSelectedBracketCategory,
     advanceWinner, bracketCourtAssignments, assignBracketMatchToCourt,
     allTeams, leagues, rebuildBracketFromSlots, applyBracketReorder, tournamentInfo,
+    updateBracketLabel,
   } = useTeamStore();
+
+  const customLabels = tournamentInfo?.bracketLabels;
+  const getLabel = (cat: PlacementCategory) => resolveBracketLabel(cat, customLabels);
+  const getShortLabel = (cat: PlacementCategory) => resolveBracketShortLabel(cat, customLabels);
 
   const [editingMatch, setEditingMatch] = useState<TeamBracketMatch | null>(null);
   const [courtAssignMatch, setCourtAssignMatch] = useState<TeamBracketMatch | null>(null);
@@ -96,6 +94,9 @@ export default function TeamBracketView() {
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
   const [reorderingCategory, setReorderingCategory] = useState<PlacementCategory | null>(null);
+  // ブラケット名のインライン編集
+  const [editingLabelCategory, setEditingLabelCategory] = useState<PlacementCategory | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState('');
   const { speak } = useGeminiTts();
   const startCall = useTeamCallStore(s => s.start);
   const finishCall = useTeamCallStore(s => s.finish);
@@ -237,6 +238,7 @@ export default function TeamBracketView() {
           onAssignCourt={openCourtAssign}
           onCall={openCall}
           bracketCourtAssignments={bracketCourtAssignments}
+          customLabels={customLabels}
         />
       )}
       </div>
@@ -258,6 +260,7 @@ export default function TeamBracketView() {
               onAssignCourt={openCourtAssign}
               onCall={openCall}
               bracketCourtAssignments={bracketCourtAssignments}
+              customLabels={customLabels}
             />
           </div>
         </div>
@@ -291,7 +294,7 @@ export default function TeamBracketView() {
                   className={`chrome-tab-label ${bracketDone ? 'chrome-tab-label-done' : ''}`}
                   style={{ color: isSelected ? colors.active : colors.inactive }}
                 >
-                  {renderCategoryShortLabel(CATEGORY_SHORT_LABELS[b.category])}
+                  {renderCategoryShortLabel(getShortLabel(b.category))}
                 </span>
                 {bracketDone && (
                   <Check className="w-3 h-3" strokeWidth={3} style={{ color: isSelected ? colors.active : colors.inactive }} />
@@ -307,7 +310,7 @@ export default function TeamBracketView() {
         <button
           onClick={() => {
             const target = showAllBrackets ? brackets : (currentBracket ? [currentBracket] : []);
-            const label = showAllBrackets ? '全トーナメント' : CATEGORY_LABELS[selectedBracketCategory];
+            const label = showAllBrackets ? '全トーナメント' : getLabel(selectedBracketCategory);
             if (!confirm(`${label}の全試合を 田中/山本 6-4 田中/山本 で埋めます。よろしいですか？`)) return;
             for (const bracket of target) {
               const totalRounds = Math.log2(bracket.drawSize);
@@ -410,7 +413,58 @@ export default function TeamBracketView() {
                 {/* 一体型ヘッダー（アイコン削除、右側に進捗ゲージ） */}
                 <div className={`px-4 py-3 flex items-center gap-3 bg-gradient-to-r ${cfg.grad} text-white`}>
                   <div className="flex-1 min-w-0">
-                    <div className="text-base font-black tracking-tight">{CATEGORY_LABELS[cat]}</div>
+                    {editingLabelCategory === cat ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editingLabelValue}
+                          onChange={e => setEditingLabelValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              updateBracketLabel(cat, editingLabelValue);
+                              setEditingLabelCategory(null);
+                            } else if (e.key === 'Escape') {
+                              setEditingLabelCategory(null);
+                            }
+                          }}
+                          placeholder={CATEGORY_LABELS[cat]}
+                          className="flex-1 min-w-0 px-2 py-1 text-sm font-bold text-slate-800 bg-white/95 rounded border border-white/40 focus:outline-none focus:ring-2 focus:ring-white/60"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateBracketLabel(cat, editingLabelValue);
+                            setEditingLabelCategory(null);
+                          }}
+                          className="px-2 py-1 rounded bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold"
+                          title="保存"
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingLabelCategory(null)}
+                          className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold"
+                          title="キャンセル"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingLabelCategory(cat);
+                          setEditingLabelValue(getLabel(cat));
+                        }}
+                        className="group flex items-center gap-1.5 text-base font-black tracking-tight hover:opacity-90"
+                        title="名前を変更"
+                      >
+                        <span className="text-left">{getLabel(cat)}</span>
+                        <Pencil size={11} className="opacity-60 group-hover:opacity-100" />
+                      </button>
+                    )}
                     <div className="text-[10px] opacity-80">{bracket.drawSize}チームドロー</div>
                   </div>
                   {/* 右側: 並べ替え + 結果画像ボタン + 進捗ゲージ */}
@@ -434,6 +488,7 @@ export default function TeamBracketView() {
                         bracket={bracket}
                         allTeams={allTeams}
                         tournamentName={tournamentInfo?.name || ''}
+                        customLabels={customLabels}
                       />
                     )}
                     <div className="flex flex-col items-end gap-1 min-w-[130px]">
@@ -466,6 +521,7 @@ export default function TeamBracketView() {
                     <TeamBracketReorderPanel
                       bracket={bracket}
                       allBrackets={brackets}
+                      customLabels={customLabels}
                       onClose={() => setReorderingCategory(null)}
                       onApply={applyBracketReorder}
                     />
@@ -917,6 +973,7 @@ function TeamCallDialog({
   const team1 = allTeams.find(t => t.teamId === match.team1Id);
   const team2 = allTeams.find(t => t.teamId === match.team2Id);
 
+  const customLabels = useTeamStore(s => s.tournamentInfo?.bracketLabels);
   const initialText = useMemo(() => {
     if (!team1 || !team2) return '';
     return buildTeamBracketCallText({
@@ -927,8 +984,9 @@ function TeamCallDialog({
       team2Number: team2.teamNumber,
       team2Name: team2.teamName,
       courtNames,
+      customLabels,
     });
-  }, [match.category, roundLabel, team1, team2, courtNames]);
+  }, [match.category, roundLabel, team1, team2, courtNames, customLabels]);
 
   const [text, setText] = useState(initialText);
   useEffect(() => { setText(initialText); }, [initialText]);
@@ -1019,11 +1077,13 @@ function TeamWaitingList({
   onAssignCourt,
   onCall,
   bracketCourtAssignments,
+  customLabels,
 }: {
   waitingMatches: { match: TeamBracketMatch; bracket: TeamPlacementBracket; roundLabel: string }[];
   onAssignCourt: (match: TeamBracketMatch) => void;
   onCall: (match: TeamBracketMatch) => void;
   bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
+  customLabels?: Partial<Record<PlacementCategory, string>>;
 }) {
   const leagues = useTeamStore(s => s.leagues);
   const leagueStyleMap = useMemo(() => {
@@ -1046,8 +1106,7 @@ function TeamWaitingList({
     );
   }
 
-  const catFullLabel = (cat: PlacementCategory) =>
-    cat === '1st' ? '1位トーナメント' : cat === '2nd' ? '2位トーナメント' : cat === '3rd' ? '3位トーナメント' : '4・5位トーナメント';
+  const catFullLabel = (cat: PlacementCategory) => resolveBracketLabel(cat, customLabels);
 
   return (
     <div className="space-y-2.5">
@@ -1381,9 +1440,10 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
  *  - 対戦中・終了済みの試合があっても並び替え可。確定時に強い警告を表示。
  *    確定で applyBracketReorder を呼び、関係するブラケット全体（スコア含む）を再構築。
  */
-function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
+function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, onApply }: {
   bracket: TeamPlacementBracket;
   allBrackets: TeamPlacementBracket[];
+  customLabels?: Partial<Record<PlacementCategory, string>>;
   onClose: () => void;
   onApply: (
     targetCategory: PlacementCategory,
@@ -1392,6 +1452,8 @@ function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
     externalImports: Array<{ teamId: string; fromCategory: PlacementCategory }>
   ) => void;
 }) {
+  const labelOf = (c: PlacementCategory) => resolveBracketLabel(c, customLabels);
+  const shortOf = (c: PlacementCategory) => resolveBracketShortLabel(c, customLabels);
   const { initialSlots, initialByes } = useMemo(() => {
     const drawSize = bracket.drawSize;
     const slots: (string | null)[] = Array(drawSize).fill(null);
@@ -1553,7 +1615,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
     if (hasFinished) warnings.push('● 入力済みのスコアがあります。');
     if (effectiveImports.length > 0) {
       const sourceCats = Array.from(new Set(effectiveImports.map(i => i.fromCategory)));
-      const labels = sourceCats.map(c => CATEGORY_LABELS[c]).join('・');
+      const labels = sourceCats.map(c => labelOf(c)).join('・');
       warnings.push(`● ${labels} のスコアもリセットされ、移籍チームのスロットはBYEになります。`);
     }
     if (warnings.length > 0) {
@@ -1648,7 +1710,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
                               </span>
                               {isImported && (
                                 <span className="ml-1 px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-bold shrink-0">
-                                  ←{CATEGORY_SHORT_LABELS[importSource!]}
+                                  ←{shortOf(importSource!)}
                                 </span>
                               )}
                             </>
@@ -1743,7 +1805,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, onClose, onApply }: {
                     }`}
                   >
                     <span className="px-1 rounded bg-violet-100 text-violet-700 text-[8px] font-bold">
-                      {CATEGORY_SHORT_LABELS[t.fromCategory]}
+                      {shortOf(t.fromCategory)}
                     </span>
                     <span><span className="text-slate-400">{t.leagueId}</span> {t.teamName}</span>
                   </button>

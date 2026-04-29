@@ -154,6 +154,8 @@ export interface TeamTournamentInfo {
     '3rd'?: string[];
     '4th'?: string[];
   };
+  /** 順位トーナメントの表示名カスタマイズ（例: '3位' を '3・4位' に） */
+  bracketLabels?: Partial<Record<PlacementCategory, string>>;
 }
 
 /** Excelシート生データ */
