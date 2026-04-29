@@ -1,6 +1,7 @@
 import { Volume2, X, MapPin } from 'lucide-react';
 import { useTeamCallStore } from './teamCallStore';
-import { PLACEMENT_CATEGORY_LABELS, toCourtCallName } from './teamLogic';
+import { useTeamStore } from './teamStore';
+import { resolveBracketLabel, toCourtCallName } from './teamLogic';
 
 /**
  * コール中に右下に常時表示するステータスバブル。
@@ -11,6 +12,7 @@ import { PLACEMENT_CATEGORY_LABELS, toCourtCallName } from './teamLogic';
  */
 export default function TeamCallStatusBubble() {
   const { isActive, content, cancel } = useTeamCallStore();
+  const customLabels = useTeamStore(s => s.tournamentInfo?.bracketLabels);
 
   if (!isActive || !content) return null;
 
@@ -38,7 +40,7 @@ export default function TeamCallStatusBubble() {
         </div>
         <div className="px-4 py-3 space-y-1.5">
           <div className="text-[10px] font-bold text-emerald-700">
-            {PLACEMENT_CATEGORY_LABELS[content.category]} {content.roundLabel}
+            {resolveBracketLabel(content.category, customLabels)} {content.roundLabel}
           </div>
           <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
             <span className="text-slate-400 font-mono text-xs shrink-0">{content.team1Number}番</span>

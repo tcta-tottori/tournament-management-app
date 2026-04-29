@@ -2,22 +2,17 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, ImageIcon, Loader2, X } from 'lucide-react';
 import { generateTeamBracketResultDataUrl } from './exportTeamBracketResultJpeg';
+import { resolveBracketLabel } from './teamLogic';
 import type { TeamPlacementBracket, TeamEntry, PlacementCategory } from './types';
-
-const CATEGORY_LABELS: Record<PlacementCategory, string> = {
-  '1st': '1位トーナメント',
-  '2nd': '2位トーナメント',
-  '3rd': '3位トーナメント',
-  '4th': '4・5位トーナメント',
-};
 
 interface Props {
   bracket: TeamPlacementBracket;
   allTeams: TeamEntry[];
   tournamentName: string;
+  customLabels?: Partial<Record<PlacementCategory, string>>;
 }
 
-export function TeamBracketResultPreview({ bracket, allTeams, tournamentName }: Props) {
+export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, customLabels }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +27,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName }: 
     let isMounted = true;
     setIsLoading(true);
 
-    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName)
+    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -45,9 +40,9 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName }: 
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, bracket, allTeams, tournamentName]);
+  }, [isOpen, bracket, allTeams, tournamentName, customLabels]);
 
-  const label = CATEGORY_LABELS[bracket.category];
+  const label = resolveBracketLabel(bracket.category, customLabels);
 
   const handleDownload = () => {
     if (!dataUrl) return;

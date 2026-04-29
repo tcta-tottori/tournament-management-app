@@ -556,13 +556,47 @@ export function generateAllBrackets(
   return brackets;
 }
 
-/** カテゴリラベル */
+/** カテゴリラベル（既定値） */
 export const PLACEMENT_CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
   '2nd': '2位トーナメント',
   '3rd': '3位トーナメント',
   '4th': '4・5位トーナメント',
 };
+
+/** カテゴリ短縮ラベル（既定値） */
+export const PLACEMENT_CATEGORY_SHORT_LABELS: Record<PlacementCategory, string> = {
+  '1st': '1位T',
+  '2nd': '2位T',
+  '3rd': '3位T',
+  '4th': '4·5位T',
+};
+
+/**
+ * 大会情報のカスタムラベルを優先してカテゴリのフルラベルを取得する。
+ */
+export function resolveBracketLabel(
+  category: PlacementCategory,
+  customLabels?: Partial<Record<PlacementCategory, string>>
+): string {
+  const custom = customLabels?.[category];
+  if (custom && custom.trim()) return custom;
+  return PLACEMENT_CATEGORY_LABELS[category];
+}
+
+/**
+ * 短縮ラベル。カスタムラベルがあれば「トーナメント」を除いて末尾に「T」を付ける。
+ */
+export function resolveBracketShortLabel(
+  category: PlacementCategory,
+  customLabels?: Partial<Record<PlacementCategory, string>>
+): string {
+  const custom = customLabels?.[category];
+  if (custom && custom.trim()) {
+    return custom.replace(/トーナメント$/, '').trim() + 'T';
+  }
+  return PLACEMENT_CATEGORY_SHORT_LABELS[category];
+}
 
 /** ラウンドラベル（決勝/準決勝/準々決勝/N回戦） */
 export function getBracketRoundLabel(round: number, totalRounds: number): string {
@@ -642,9 +676,10 @@ export function buildTeamBracketCallText(args: {
   team2Number: number;
   team2Name: string;
   courtNames: string[];
+  customLabels?: Partial<Record<PlacementCategory, string>>;
 }): string {
-  const { category, roundLabel, team1Number, team1Name, team2Number, team2Name, courtNames } = args;
-  const categoryLabel = PLACEMENT_CATEGORY_LABELS[category];
+  const { category, roundLabel, team1Number, team1Name, team2Number, team2Name, courtNames, customLabels } = args;
+  const categoryLabel = resolveBracketLabel(category, customLabels);
   const courtsText = formatCourtsForCall(courtNames);
   const cleanTeam1Name = sanitizeForSpeech(team1Name);
   const cleanTeam2Name = sanitizeForSpeech(team2Name);

@@ -1,4 +1,5 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory } from './types';
+import { resolveBracketLabel } from './teamLogic';
 
 /** 種目表示順 */
 const TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
@@ -35,6 +36,7 @@ export async function generateTeamBracketResultDataUrl(
   bracket: TeamPlacementBracket,
   _allTeams: TeamEntry[],
   tournamentName: string,
+  customLabels?: Partial<Record<PlacementCategory, string>>,
 ): Promise<string> {
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
@@ -203,11 +205,7 @@ export async function generateTeamBracketResultDataUrl(
   // ---- ヘッダー ----
   // 左: "◯位トーナメント" を一体化した横長バッジ
   const catColor = CATEGORY_COLORS[bracket.category];
-  const catText =
-    bracket.category === '1st' ? '1位トーナメント' :
-    bracket.category === '2nd' ? '2位トーナメント' :
-    bracket.category === '3rd' ? '3位トーナメント' :
-    '4・5位トーナメント';
+  const catText = resolveBracketLabel(bracket.category, customLabels);
 
   // バッジサイズをテキスト幅に合わせて決定
   const badgeFontSize = 30;
@@ -584,16 +582,11 @@ export async function exportTeamBracketResultJpeg(
   bracket: TeamPlacementBracket,
   allTeams: TeamEntry[],
   tournamentName: string,
+  customLabels?: Partial<Record<PlacementCategory, string>>,
 ) {
-  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName);
-  const labels: Record<PlacementCategory, string> = {
-    '1st': '1位トーナメント',
-    '2nd': '2位トーナメント',
-    '3rd': '3位トーナメント',
-    '4th': '4・5位トーナメント',
-  };
+  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels);
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = `${labels[bracket.category]}_結果_団体戦.jpg`;
+  a.download = `${resolveBracketLabel(bracket.category, customLabels)}_結果_団体戦.jpg`;
   a.click();
 }

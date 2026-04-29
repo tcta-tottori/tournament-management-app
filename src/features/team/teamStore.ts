@@ -187,6 +187,8 @@ interface TeamState {
   setImportFileName: (name: string) => void;
   updateGameRule: (teamCount: number, rule: string) => void;
   updateBracketGameRule: (rule: string) => void;
+  /** 順位トーナメントの表示名を更新（空文字で既定値に戻す） */
+  updateBracketLabel: (category: PlacementCategory, label: string) => void;
   updateCourtName: (leagueId: string, courtName: string) => void;
   updateTournamentInfo: (field: 'name' | 'date' | 'venue', value: string) => void;
 
@@ -603,6 +605,17 @@ export const useTeamStore = create<TeamState>()(
       updateBracketGameRule: (rule) => set(state => ({
         tournamentInfo: state.tournamentInfo ? { ...state.tournamentInfo, bracketGameRule: rule } : null,
       })),
+      updateBracketLabel: (category, label) => set(state => {
+        if (!state.tournamentInfo) return state;
+        const trimmed = label.trim();
+        const next = { ...(state.tournamentInfo.bracketLabels || {}) };
+        if (trimmed) {
+          next[category] = trimmed;
+        } else {
+          delete next[category];
+        }
+        return { tournamentInfo: { ...state.tournamentInfo, bracketLabels: next } };
+      }),
       updateCourtName: (leagueId, courtName) => {
         set(state => ({
           leagues: state.leagues.map(l =>
