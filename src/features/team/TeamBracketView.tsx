@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers } from 'lucide-react';
+import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuffle, RotateCcw, ClipboardList, Volume2, VolumeX, X, Layers, ArrowLeftRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
@@ -95,6 +95,7 @@ export default function TeamBracketView() {
   const [showAllBrackets, setShowAllBrackets] = useState(false);
   const [callMatch, setCallMatch] = useState<TeamBracketMatch | null>(null);
   const [callCourts, setCallCourts] = useState<string[]>([]);
+  const [reorderingCategory, setReorderingCategory] = useState<PlacementCategory | null>(null);
   const { speak } = useGeminiTts();
   const startCall = useTeamCallStore(s => s.start);
   const finishCall = useTeamCallStore(s => s.finish);
@@ -412,8 +413,22 @@ export default function TeamBracketView() {
                     <div className="text-base font-black tracking-tight">{CATEGORY_LABELS[cat]}</div>
                     <div className="text-[10px] opacity-80">{bracket.drawSize}チームドロー</div>
                   </div>
-                  {/* 右側: 結果画像ボタン + 進捗ゲージ */}
+                  {/* 右側: 並べ替え + 結果画像ボタン + 進捗ゲージ */}
                   <div className="shrink-0 flex items-center gap-2">
+                    {!showAllBrackets && (
+                      <button
+                        onClick={() => setReorderingCategory(prev => prev === cat ? null : cat)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          reorderingCategory === cat
+                            ? 'bg-white text-slate-700 shadow-sm'
+                            : 'bg-white/20 text-white hover:bg-white/30'
+                        }`}
+                        title="トーナメントの並べ替え"
+                      >
+                        <ArrowLeftRight className="w-3 h-3" />
+                        並べ替え
+                      </button>
+                    )}
                     {bracketDone && (
                       <TeamBracketResultPreview
                         bracket={bracket}
@@ -442,6 +457,17 @@ export default function TeamBracketView() {
                 {!showAllBrackets && cat === '1st' && showDrawPanel && (
                   <div className="p-3 border-b border-slate-100">
                     <TeamRouletteDrawPanel bracket={bracket} onRebuild={rebuildBracketFromSlots} />
+                  </div>
+                )}
+
+                {/* 並べ替えパネル（任意のカテゴリで利用可） */}
+                {!showAllBrackets && reorderingCategory === cat && (
+                  <div className="p-3 border-b border-slate-100">
+                    <TeamBracketReorderPanel
+                      bracket={bracket}
+                      onClose={() => setReorderingCategory(null)}
+                      onRebuild={rebuildBracketFromSlots}
+                    />
                   </div>
                 )}
 
@@ -1334,6 +1360,212 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
             <p className="text-xs text-slate-500">トーナメント表に反映されました</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 決勝トーナメントのR1スロット並べ替えパネル。
+ * 既に組み上がったブラケットの並びがおかしい場合に、2つのスロットを
+ * タップで選択して入れ替える。BYEスロットは固定（ロック）。
+ * 確定時に rebuildBracketFromSlots を呼び、ブラケット全体を再構築する
+ * （副作用として入力済みのスコアはリセットされるため確認ダイアログを表示）。
+ */
+function TeamBracketReorderPanel({ bracket, onClose, onRebuild }: {
+  bracket: TeamPlacementBracket;
+  onClose: () => void;
+  onRebuild: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
+}) {
+  const { initialSlots, byePositions } = useMemo(() => {
+    const drawSize = bracket.drawSize;
+    const slots: (string | null)[] = Array(drawSize).fill(null);
+    const byes = new Set<number>();
+    const r1 = bracket.matches
+      .filter(m => m.round === 1)
+      .sort((a, b) => a.position - b.position);
+    r1.forEach((m, i) => {
+      const i1 = i * 2;
+      const i2 = i * 2 + 1;
+      if (m.isBye) {
+        // BYE試合: 片側にチームが入っており、もう片側がBYE
+        if (m.team1Id && (!m.team2Id || m.team2Name === 'BYE')) {
+          slots[i1] = m.team1Id;
+          byes.add(i2);
+        } else if (m.team2Id && (!m.team1Id || m.team1Name === 'BYE')) {
+          slots[i2] = m.team2Id;
+          byes.add(i1);
+        } else {
+          // 両側不明な場合は両方BYEとして扱う
+          byes.add(i1); byes.add(i2);
+        }
+      } else {
+        slots[i1] = m.team1Id;
+        slots[i2] = m.team2Id;
+      }
+    });
+    return { initialSlots: slots, byePositions: byes };
+  }, [bracket]);
+
+  const [slots, setSlots] = useState<(string | null)[]>(initialSlots);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  const teamMap = useMemo(() => {
+    const m = new Map<string, { teamName: string; leagueId: string }>();
+    bracket.teams.forEach(t => m.set(t.teamId, { teamName: t.teamName, leagueId: t.leagueId }));
+    return m;
+  }, [bracket.teams]);
+
+  const dirty = useMemo(
+    () => slots.some((s, i) => s !== initialSlots[i]),
+    [slots, initialSlots]
+  );
+
+  const hasInProgress = useMemo(
+    () => bracket.matches.some(m => m.status === 'playing'),
+    [bracket.matches]
+  );
+  const hasFinished = useMemo(
+    () => bracket.matches.some(m => !m.isBye && m.status === 'finished'),
+    [bracket.matches]
+  );
+
+  const handleSlotClick = (i: number) => {
+    if (byePositions.has(i)) return;
+    if (selectedIdx === null) {
+      setSelectedIdx(i);
+      return;
+    }
+    if (selectedIdx === i) {
+      setSelectedIdx(null);
+      return;
+    }
+    const next = [...slots];
+    [next[selectedIdx], next[i]] = [next[i], next[selectedIdx]];
+    setSlots(next);
+    setSelectedIdx(null);
+  };
+
+  const reset = () => {
+    setSlots(initialSlots);
+    setSelectedIdx(null);
+  };
+
+  const apply = () => {
+    if (hasInProgress) {
+      alert('対戦中の試合があるため並べ替えできません。試合終了後にお試しください。');
+      return;
+    }
+    if (hasFinished) {
+      if (!confirm('入力済みのスコアがリセットされます。本当に並べ替えますか？')) return;
+    }
+    onRebuild(bracket.category, slots, byePositions);
+    onClose();
+  };
+
+  const drawSize = bracket.drawSize;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-2.5 border-b border-indigo-100 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
+          <ArrowLeftRight size={14} className="text-indigo-600" />
+          並べ替え
+        </h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={reset}
+            disabled={!dirty}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RotateCcw size={12} />リセット
+          </button>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+          >
+            <X size={12} />閉じる
+          </button>
+        </div>
+      </div>
+
+      <div className="p-3">
+        <div className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+          並びがおかしいスロットを2つタップすると入れ替わります。
+          <span className="text-slate-400">（BYEは固定）</span>
+        </div>
+
+        {hasInProgress && (
+          <div className="mb-2 px-2 py-1.5 bg-rose-50 border border-rose-200 rounded text-[10px] text-rose-700 font-bold">
+            ⚠ 対戦中の試合があります。並べ替えはできません。
+          </div>
+        )}
+        {!hasInProgress && hasFinished && (
+          <div className="mb-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 font-bold">
+            ⚠ 確定すると入力済みのスコアはリセットされます。
+          </div>
+        )}
+
+        {/* スロット表示（対戦ペアで2列表示） */}
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mb-3">
+          {Array.from({ length: drawSize / 2 }, (_, matchIdx) => {
+            const indices = [matchIdx * 2, matchIdx * 2 + 1];
+            return (
+              <div key={matchIdx} className="rounded border border-slate-200 overflow-hidden">
+                {indices.map((si, k) => {
+                  const isBye = byePositions.has(si);
+                  const teamId = slots[si];
+                  const team = teamId ? teamMap.get(teamId) : null;
+                  const isSelected = selectedIdx === si;
+                  const moved = slots[si] !== initialSlots[si];
+                  return (
+                    <div key={si}>
+                      {k === 1 && <div className="border-t border-slate-100" />}
+                      <button
+                        type="button"
+                        onClick={() => handleSlotClick(si)}
+                        disabled={isBye}
+                        className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-left transition-all ${
+                          isBye ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
+                          isSelected ? 'bg-indigo-200 ring-2 ring-indigo-400' :
+                          moved ? 'bg-emerald-50 hover:bg-emerald-100' :
+                          'bg-white hover:bg-indigo-50'
+                        }`}
+                      >
+                        <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
+                        {isBye ? (
+                          <span className="text-slate-300 italic">BYE</span>
+                        ) : team ? (
+                          <span className="font-bold text-slate-800 truncate">
+                            <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">―</span>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={apply}
+            disabled={!dirty || hasInProgress}
+            className="flex-1 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✓ 確定
+          </button>
+        </div>
       </div>
     </div>
   );
