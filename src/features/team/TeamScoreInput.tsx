@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil, OctagonX } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { SubMatchScore, MatchType, BracketSubMatchScore } from './types';
-import { MATCH_TYPE_ORDER, MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
+import { MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts, getMatchTypeOrderForInfo, isSinglesMatchType } from './teamLogic';
 import type { TeamMember } from './types';
 
 /** Full-width to half-width number conversion */
@@ -57,6 +57,62 @@ const MATCH_TYPE_THEME: Record<MatchType, MatchTheme> = {
     accentBorder: 'border-sky-300',
     softBg: 'bg-sky-100/60',
     btn: 'bg-white hover:bg-sky-50 border-sky-200 text-sky-700',
+  },
+  // クラブ対抗戦 (5対戦制) — ダブルス3種類は青系、シングルス2種類は緑系
+  D3: {
+    grad: 'from-blue-500 to-indigo-500',
+    bg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
+    border: 'border-blue-200',
+    text: 'text-blue-700',
+    badge: 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white',
+    ring: 'focus:ring-blue-400 focus:border-blue-500',
+    accentBorder: 'border-blue-300',
+    softBg: 'bg-blue-100/60',
+    btn: 'bg-white hover:bg-blue-50 border-blue-200 text-blue-700',
+  },
+  D2: {
+    grad: 'from-cyan-500 to-sky-500',
+    bg: 'bg-gradient-to-br from-cyan-50 to-sky-50',
+    border: 'border-cyan-200',
+    text: 'text-cyan-700',
+    badge: 'bg-gradient-to-br from-cyan-500 to-sky-500 text-white',
+    ring: 'focus:ring-cyan-400 focus:border-cyan-500',
+    accentBorder: 'border-cyan-300',
+    softBg: 'bg-cyan-100/60',
+    btn: 'bg-white hover:bg-cyan-50 border-cyan-200 text-cyan-700',
+  },
+  D1: {
+    grad: 'from-indigo-500 to-violet-500',
+    bg: 'bg-gradient-to-br from-indigo-50 to-violet-50',
+    border: 'border-indigo-200',
+    text: 'text-indigo-700',
+    badge: 'bg-gradient-to-br from-indigo-500 to-violet-500 text-white',
+    ring: 'focus:ring-indigo-400 focus:border-indigo-500',
+    accentBorder: 'border-indigo-300',
+    softBg: 'bg-indigo-100/60',
+    btn: 'bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700',
+  },
+  S2: {
+    grad: 'from-emerald-500 to-teal-500',
+    bg: 'bg-gradient-to-br from-emerald-50 to-teal-50',
+    border: 'border-emerald-200',
+    text: 'text-emerald-700',
+    badge: 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white',
+    ring: 'focus:ring-emerald-400 focus:border-emerald-500',
+    accentBorder: 'border-emerald-300',
+    softBg: 'bg-emerald-100/60',
+    btn: 'bg-white hover:bg-emerald-50 border-emerald-200 text-emerald-700',
+  },
+  S1: {
+    grad: 'from-lime-500 to-green-500',
+    bg: 'bg-gradient-to-br from-lime-50 to-green-50',
+    border: 'border-lime-200',
+    text: 'text-lime-700',
+    badge: 'bg-gradient-to-br from-lime-500 to-green-500 text-white',
+    ring: 'focus:ring-lime-400 focus:border-lime-500',
+    accentBorder: 'border-lime-300',
+    softBg: 'bg-lime-100/60',
+    btn: 'bg-white hover:bg-lime-50 border-lime-200 text-lime-700',
   },
 };
 
@@ -418,7 +474,13 @@ export default function TeamScoreInput({
     updateSubMatchScore, clearSubMatchScore, updateSubMatchPlayers,
     updateBracketSubMatchScore, clearBracketSubMatchScore,
     updatePlayerDisplayName,
+    tournamentInfo,
   } = useTeamStore();
+  // クラブ対抗戦（5対戦制）はリーグ戦のみ。ブラケットは常に3対戦制を使用。
+  const MATCH_TYPE_ORDER = useMemo(
+    () => (isBracket ? getMatchTypeOrderForInfo(undefined) : getMatchTypeOrderForInfo(tournamentInfo)),
+    [isBracket, tournamentInfo],
+  );
 
   // Local state for each sub-match (MIX, WD, MD)
   const [scores, setScores] = useState<Record<MatchType, SubMatchState>>(() => {
@@ -536,12 +598,13 @@ export default function TeamScoreInput({
     return { t1, t2 };
   }, [subMatchWinners, terminated]);
 
-  // Overall winner detection (2+ wins)
+  // Overall winner detection (規定勝利数: 3対戦制=2, 5対戦制=3)
+  const requiredWins = MATCH_TYPE_ORDER.length >= 5 ? 3 : 2;
   const overallWinner = useMemo(() => {
-    if (winTally.t1 >= 2) return 1;
-    if (winTally.t2 >= 2) return 2;
+    if (winTally.t1 >= requiredWins) return 1;
+    if (winTally.t2 >= requiredWins) return 2;
     return 0;
-  }, [winTally]);
+  }, [winTally, requiredWins]);
 
   // Input handlers
   const handleScoreChange = useCallback((matchType: MatchType, field: 'score1' | 'score2', value: string) => {
@@ -721,7 +784,7 @@ export default function TeamScoreInput({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-sm">団体戦スコア入力</h3>
-              <div className="text-xs text-indigo-200 mt-0.5">3種目のスコアを入力</div>
+              <div className="text-xs text-indigo-200 mt-0.5">{MATCH_TYPE_ORDER.length}種目のスコアを入力</div>
             </div>
             <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
               <X size={18} />
@@ -973,42 +1036,52 @@ export default function TeamScoreInput({
                   </div>
 
                   {/* 選手名選択（対戦チーム別カラー: 左=オレンジ, 右=グリーン） */}
+                  {/* シングルス種目（S1/S2）は1名のみ表示 */}
+                  {(() => {
+                    const singles = isSinglesMatchType(mt);
+                    return (
                   <div className="mt-3 pt-2.5 border-t border-white/60 grid grid-cols-2 gap-2">
                     <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[1].bg}`}>
                       <div className={`text-[9px] font-black truncate ${TEAM_THEME[1].textStrong} uppercase tracking-wider`}>{team1Name}</div>
-                      <div className="grid grid-cols-2 gap-1">
+                      <div className={`grid ${singles ? 'grid-cols-1' : 'grid-cols-2'} gap-1`}>
                         <PlayerPickerButton
                           value={s.p1a}
-                          placeholder="選手1"
+                          placeholder="選手"
                           teamTheme={TEAM_THEME[1]}
                           onClick={() => setPicker({ mt, key: 'p1a', side: 1 })}
                         />
-                        <PlayerPickerButton
-                          value={s.p1b}
-                          placeholder="選手2"
-                          teamTheme={TEAM_THEME[1]}
-                          onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
-                        />
+                        {!singles && (
+                          <PlayerPickerButton
+                            value={s.p1b}
+                            placeholder="選手2"
+                            teamTheme={TEAM_THEME[1]}
+                            onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
+                          />
+                        )}
                       </div>
                     </div>
                     <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[2].bg}`}>
                       <div className={`text-[9px] font-black truncate ${TEAM_THEME[2].textStrong} uppercase tracking-wider`}>{team2Name}</div>
-                      <div className="grid grid-cols-2 gap-1">
+                      <div className={`grid ${singles ? 'grid-cols-1' : 'grid-cols-2'} gap-1`}>
                         <PlayerPickerButton
                           value={s.p2a}
-                          placeholder="選手1"
+                          placeholder="選手"
                           teamTheme={TEAM_THEME[2]}
                           onClick={() => setPicker({ mt, key: 'p2a', side: 2 })}
                         />
-                        <PlayerPickerButton
-                          value={s.p2b}
-                          placeholder="選手2"
-                          teamTheme={TEAM_THEME[2]}
-                          onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
-                        />
+                        {!singles && (
+                          <PlayerPickerButton
+                            value={s.p2b}
+                            placeholder="選手2"
+                            teamTheme={TEAM_THEME[2]}
+                            onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
+                    );
+                  })()}
                 </div>
               );
             })}

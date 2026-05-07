@@ -6,8 +6,10 @@ import TeamBracketView from './TeamBracketView';
 export default function TeamScoreView() {
   const {
     brackets, leagues, leagueMatches, rankOverrides, allTeams,
-    lastStandingsHash, autoPopulateBrackets, tiebreakOrder,
+    lastStandingsHash, autoPopulateBrackets, tiebreakOrder, tournamentInfo,
   } = useTeamStore();
+  // クラブ対抗戦（5対戦制）はリーグ戦のみ。決勝トーナメントは無し。
+  const isClubFormat = tournamentInfo?.matchFormat === 'club';
 
   // ハッシュには順位だけでなく「リーグ完了状態」も含める。
   // 初期状態（全0勝）は stable sort によりチーム順がそのまま 1,2,3... の
@@ -47,11 +49,12 @@ export default function TeamScoreView() {
 
   useEffect(() => {
     if (leagues.length === 0) return;
+    if (isClubFormat) return; // クラブ対抗戦は決勝トーナメント無し
     if (brackets.length === 0) {
       autoPopulateBrackets();
       useTeamStore.setState({ lastStandingsHash: currentHash });
     }
-  }, [leagues.length, brackets.length, autoPopulateBrackets, currentHash]);
+  }, [leagues.length, brackets.length, autoPopulateBrackets, currentHash, isClubFormat]);
 
   useEffect(() => {
     if (brackets.length === 0 || !currentHash) return;
@@ -62,6 +65,20 @@ export default function TeamScoreView() {
     if (currentHash === lastStandingsHash) return;
     useTeamStore.setState({ brackets: [], bracketCourtAssignments: {}, lastStandingsHash: '' });
   }, [currentHash, lastStandingsHash]);
+
+  if (isClubFormat) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+          <h2 className="text-base font-bold text-slate-700 mb-2">クラブ対抗戦はリーグ戦のみ</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            この大会は予選・決勝トーナメントは行いません。<br />
+            「予選リーグ」タブで結果を入力してください。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

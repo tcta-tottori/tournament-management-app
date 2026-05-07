@@ -25,8 +25,15 @@ export interface TeamEntry {
   status: 'none' | 'entry' | 'def';
 }
 
-/** 対戦種目 */
-export type MatchType = 'MIX' | 'WD' | 'MD';
+/**
+ * 対戦種目
+ * - 団体戦 (3対戦制): MIX / WD / MD
+ * - クラブ対抗戦 (5対戦制): D3 / D2 / D1 / S2 / S1（全て男子）
+ */
+export type MatchType = 'MIX' | 'WD' | 'MD' | 'D3' | 'D2' | 'D1' | 'S2' | 'S1';
+
+/** 対戦フォーマット */
+export type TournamentMatchFormat = 'team' | 'club';
 
 /** 対戦順定義 */
 export interface MatchOrderEntry {
@@ -67,8 +74,8 @@ export interface TeamLeagueMatch {
   team2Id: string;
   subMatches: SubMatchScore[];  // MIX, WD, MD の3種目
   winnerId: string | null;      // 2本先取で勝利したチーム
-  winsTeam1: number;           // team1の種目勝利数 (0-3)
-  winsTeam2: number;           // team2の種目勝利数 (0-3)
+  winsTeam1: number;           // team1の種目勝利数 (0-3 / 0-5)
+  winsTeam2: number;           // team2の種目勝利数 (0-3 / 0-5)
   status: 'waiting' | 'playing' | 'finished';
 }
 
@@ -156,6 +163,11 @@ export interface TeamTournamentInfo {
   };
   /** 順位トーナメントの表示名カスタマイズ（例: '3位' を '3・4位' に） */
   bracketLabels?: Partial<Record<PlacementCategory, string>>;
+  /**
+   * 対戦フォーマット。'team'(既定)はMIX/WD/MDの3対戦、'club'はD3/D2/D1/S2/S1の5対戦。
+   * 'club' の場合は順位別トーナメントを実施せず、リーグ戦のみで完結する。
+   */
+  matchFormat?: TournamentMatchFormat;
 }
 
 /** Excelシート生データ */

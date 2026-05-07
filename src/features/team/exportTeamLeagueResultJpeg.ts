@@ -1,14 +1,24 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
 
-/** 種目表示順 */
-const TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
-const TYPE_LABEL: Record<MatchType, string> = { MIX: 'Mix', WD: 'WD', MD: 'MD' };
+/** 種目表示順（既定: 団体戦） */
+const TEAM_TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
+/** 種目表示順（クラブ対抗戦・5対戦制） */
+const CLUB_TYPE_ORDER: MatchType[] = ['D3', 'D2', 'D1', 'S2', 'S1'];
+const TYPE_LABEL: Record<MatchType, string> = {
+  MIX: 'Mix', WD: 'WD', MD: 'MD',
+  D3: 'D3', D2: 'D2', D1: 'D1', S2: 'S2', S1: 'S1',
+};
 
 /** 種目別カラー（画面側と統一） */
 const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }> = {
   MIX: { bg: '#ede9fe', fg: '#6d28d9', accent: '#8b5cf6' }, // violet
   WD:  { bg: '#fce7f3', fg: '#be185d', accent: '#ec4899' }, // pink
   MD:  { bg: '#e0f2fe', fg: '#0369a1', accent: '#0ea5e9' }, // sky
+  D3:  { bg: '#dbeafe', fg: '#1d4ed8', accent: '#3b82f6' }, // blue
+  D2:  { bg: '#cffafe', fg: '#0e7490', accent: '#06b6d4' }, // cyan
+  D1:  { bg: '#e0e7ff', fg: '#4338ca', accent: '#6366f1' }, // indigo
+  S2:  { bg: '#d1fae5', fg: '#047857', accent: '#10b981' }, // emerald
+  S1:  { bg: '#ecfccb', fg: '#4d7c0f', accent: '#84cc16' }, // lime
 };
 
 /** リーグ別カラー（TeamLeagueView.LEAGUE_COLORS と対応） */
@@ -84,6 +94,9 @@ export async function generateTeamLeagueResultDataUrl(
   // リーグカラー（A=青, B=緑, C=紫, D=ローズ, E=アンバー, ...）
   const lc = LEAGUE_COLORS[getLeagueColorIndex(league.leagueId)];
   const shortName = (name: string) => shortenPlayerName(name, playerNameOverrides);
+  // 試合データから対戦種目数を判定して表示順を決定（5種目あればクラブ対抗戦）
+  const sampleSubMatches = matches.find(m => m.leagueId === league.leagueId)?.subMatches || [];
+  const TYPE_ORDER: MatchType[] = sampleSubMatches.length >= 5 ? CLUB_TYPE_ORDER : TEAM_TYPE_ORDER;
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
   const [tctaLogo, venueLogo] = await Promise.all([

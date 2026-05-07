@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
+import { calculateTeamStandings, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, getMatchTypeOrderForInfo } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -176,28 +176,33 @@ function PlayerListDisplay({ players }: { players: string[] }) {
 
 /**
  * テスト入力用：チームのメンバーを上から順に取り出し、
- * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
+ * 各種目に必要な人数（ダブルス=2名、シングルス=1名）を割り当てた配列を返す。
  * メンバーが足りない場合は先頭に戻って巡回する。
  */
-function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
+function getTestPlayersForTeam(team: TeamEntry | undefined, matchTypes: readonly string[]): Record<string, string[]> {
   const fallback = ['田中', '山本'];
   if (!team || team.members.length === 0) {
-    return { MIX: fallback, WD: fallback, MD: fallback };
+    const r: Record<string, string[]> = {};
+    for (const mt of matchTypes) r[mt] = mt.startsWith('S') ? [fallback[0]] : fallback;
+    return r;
   }
   const names = team.members.map(m => {
     const n = familyName(m.player.name || '').trim();
     return n || '名無し';
   });
-  const pick = (startIdx: number): string[] => {
-    const a = names[startIdx % names.length];
-    const b = names[(startIdx + 1) % names.length];
-    return [a, b];
+  const pick = (startIdx: number, count: number): string[] => {
+    const out: string[] = [];
+    for (let i = 0; i < count; i++) out.push(names[(startIdx + i) % names.length]);
+    return out;
   };
-  return {
-    MIX: pick(0),
-    WD: pick(2),
-    MD: pick(4),
-  };
+  const r: Record<string, string[]> = {};
+  let cursor = 0;
+  for (const mt of matchTypes) {
+    const count = mt.startsWith('S') ? 1 : 2;
+    r[mt] = pick(cursor, count);
+    cursor += count;
+  }
+  return r;
 }
 
 /** 種目カラー */
@@ -205,6 +210,11 @@ const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   MIX: { bg: 'bg-violet-100', text: 'text-violet-700' },
   WD:  { bg: 'bg-pink-100',   text: 'text-pink-700' },
   MD:  { bg: 'bg-sky-100',    text: 'text-sky-700' },
+  D3:  { bg: 'bg-blue-100',   text: 'text-blue-700' },
+  D2:  { bg: 'bg-cyan-100',   text: 'text-cyan-700' },
+  D1:  { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  S2:  { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  S1:  { bg: 'bg-lime-100',   text: 'text-lime-700' },
 };
 
 /** 順位（プレーンテキスト） */
@@ -347,6 +357,10 @@ export default function TeamLeagueView() {
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const MATCH_TYPE_ORDER = useMemo(
+    () => getMatchTypeOrderForInfo(tournamentInfo),
+    [tournamentInfo],
+  );
 
   const { rankOverrides } = useTeamStore();
   const allStandings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, tiebreakOrder);
@@ -641,8 +655,8 @@ export default function TeamLeagueView() {
             for (const m of leagueMatchList) {
               const t1 = allTeams.find(t => t.teamId === m.team1Id);
               const t2 = allTeams.find(t => t.teamId === m.team2Id);
-              const p1 = getTestPlayersForTeam(t1);
-              const p2 = getTestPlayersForTeam(t2);
+              const p1 = getTestPlayersForTeam(t1, MATCH_TYPE_ORDER);
+              const p2 = getTestPlayersForTeam(t2, MATCH_TYPE_ORDER);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
                 updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
@@ -659,8 +673,8 @@ export default function TeamLeagueView() {
             for (const m of leagueMatches) {
               const t1 = allTeams.find(t => t.teamId === m.team1Id);
               const t2 = allTeams.find(t => t.teamId === m.team2Id);
-              const p1 = getTestPlayersForTeam(t1);
-              const p2 = getTestPlayersForTeam(t2);
+              const p1 = getTestPlayersForTeam(t1, MATCH_TYPE_ORDER);
+              const p2 = getTestPlayersForTeam(t2, MATCH_TYPE_ORDER);
               for (const mt of MATCH_TYPE_ORDER) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
                 updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);

@@ -1,15 +1,23 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory } from './types';
 import { resolveBracketLabel } from './teamLogic';
 
-/** 種目表示順 */
+/** 種目表示順（団体戦のブラケットは3対戦制を前提） */
 const TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
-const TYPE_LABEL: Record<MatchType, string> = { MIX: 'Mix', WD: 'WD', MD: 'MD' };
+const TYPE_LABEL: Record<MatchType, string> = {
+  MIX: 'Mix', WD: 'WD', MD: 'MD',
+  D3: 'D3', D2: 'D2', D1: 'D1', S2: 'S2', S1: 'S1',
+};
 
 /** 種目別カラー（画面側・予選リーグ結果と統一） */
 const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }> = {
   MIX: { bg: '#ede9fe', fg: '#6d28d9', accent: '#8b5cf6' }, // violet
   WD:  { bg: '#fce7f3', fg: '#be185d', accent: '#ec4899' }, // pink
   MD:  { bg: '#e0f2fe', fg: '#0369a1', accent: '#0ea5e9' }, // sky
+  D3:  { bg: '#dbeafe', fg: '#1d4ed8', accent: '#3b82f6' }, // blue
+  D2:  { bg: '#cffafe', fg: '#0e7490', accent: '#06b6d4' }, // cyan
+  D1:  { bg: '#e0e7ff', fg: '#4338ca', accent: '#6366f1' }, // indigo
+  S2:  { bg: '#d1fae5', fg: '#047857', accent: '#10b981' }, // emerald
+  S1:  { bg: '#ecfccb', fg: '#4d7c0f', accent: '#84cc16' }, // lime
 };
 
 /** カテゴリ別カラー（ヘッダーのバッジに使用） */

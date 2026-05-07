@@ -6,7 +6,7 @@ import type {
   TeamPhase, TeamTournamentInfo, ExcelSheetData, SubMatchScore,
   MatchType, BracketSubMatchScore, TeamMember, TiebreakRuleId
 } from './types';
-import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
+import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER, DEFAULT_TIEBREAK_ORDER, getRequiredWinsFor } from './teamLogic';
 
 /**
  * ブラケット再構築用ヘルパ。slotsArray と byePositions から R1 のマッチを組み、
@@ -287,6 +287,7 @@ export const useTeamStore = create<TeamState>()(
 
       updateSubMatchScore: (matchId, matchType, score1, score2, tiebreakScore, terminated) => {
         set(state => {
+          const format = state.tournamentInfo?.matchFormat;
           const newMatches = state.leagueMatches.map(m => {
             if (m.matchId !== matchId) return m;
             const newSubMatches = m.subMatches.map(sm => {
@@ -295,7 +296,7 @@ export const useTeamStore = create<TeamState>()(
               const winnerId = score1 > score2 ? m.team1Id : score2 > score1 ? m.team2Id : null;
               return { ...sm, score1, score2, tiebreakScore: tb, winnerId, terminated: terminated || false };
             });
-            const { winnerId, winsTeam1, winsTeam2 } = determineTeamWinner(newSubMatches, m.team1Id, m.team2Id);
+            const { winnerId, winsTeam1, winsTeam2 } = determineTeamWinner(newSubMatches, m.team1Id, m.team2Id, format);
             const allFinished = newSubMatches.every(sm => sm.winnerId !== null || sm.terminated);
             return {
               ...m,
@@ -312,13 +313,14 @@ export const useTeamStore = create<TeamState>()(
 
       clearSubMatchScore: (matchId, matchType) => {
         set(state => {
+          const format = state.tournamentInfo?.matchFormat;
           const newMatches = state.leagueMatches.map(m => {
             if (m.matchId !== matchId) return m;
             const newSubMatches = m.subMatches.map(sm => {
               if (sm.type !== matchType) return sm;
               return { ...sm, score1: null, score2: null, tiebreakScore: null, winnerId: null, terminated: false };
             });
-            const { winnerId, winsTeam1, winsTeam2 } = determineTeamWinner(newSubMatches, m.team1Id, m.team2Id);
+            const { winnerId, winsTeam1, winsTeam2 } = determineTeamWinner(newSubMatches, m.team1Id, m.team2Id, format);
             const allFinished = newSubMatches.every(sm => sm.winnerId !== null || sm.terminated);
             return {
               ...m,
@@ -356,6 +358,7 @@ export const useTeamStore = create<TeamState>()(
       updateBracketSubMatchScore: (matchId, matchType, score1, score2, tiebreakScore, terminated) => {
         set(state => {
           let becameFinished = false;
+          const required = getRequiredWinsFor(state.tournamentInfo?.matchFormat);
           const brackets = state.brackets.map(b => ({
             ...b,
             matches: b.matches.map(m => {
@@ -375,8 +378,8 @@ export const useTeamStore = create<TeamState>()(
               }
               const allFinished = newSubMatches.every(sm => sm.winnerId !== null || sm.terminated);
               let winnerId: string | null = null;
-              if (winsTeam1 >= 2) winnerId = m.team1Id;
-              else if (winsTeam2 >= 2) winnerId = m.team2Id;
+              if (winsTeam1 >= required) winnerId = m.team1Id;
+              else if (winsTeam2 >= required) winnerId = m.team2Id;
               else if (allFinished && winsTeam1 !== winsTeam2) winnerId = winsTeam1 > winsTeam2 ? m.team1Id : m.team2Id;
               const nextStatus = (winnerId ? 'finished' : m.status) as TeamBracketMatch['status'];
               if (nextStatus === 'finished' && m.status !== 'finished') becameFinished = true;
@@ -482,17 +485,18 @@ export const useTeamStore = create<TeamState>()(
           if (status === 'def') {
             newLeagueMatches = state.leagueMatches.map(m => {
               if (m.status === 'finished') return m;
+              const totalSubMatches = m.subMatches.length;
               if (m.team1Id === teamId) {
                 const subMatches = m.subMatches.map(sm => ({
                   ...sm, score1: 0, score2: 0, winnerId: m.team2Id,
                 }));
-                return { ...m, subMatches, winnerId: m.team2Id, winsTeam1: 0, winsTeam2: 3, status: 'finished' as const };
+                return { ...m, subMatches, winnerId: m.team2Id, winsTeam1: 0, winsTeam2: totalSubMatches, status: 'finished' as const };
               }
               if (m.team2Id === teamId) {
                 const subMatches = m.subMatches.map(sm => ({
                   ...sm, score1: 0, score2: 0, winnerId: m.team1Id,
                 }));
-                return { ...m, subMatches, winnerId: m.team1Id, winsTeam1: 3, winsTeam2: 0, status: 'finished' as const };
+                return { ...m, subMatches, winnerId: m.team1Id, winsTeam1: totalSubMatches, winsTeam2: 0, status: 'finished' as const };
               }
               return m;
             });

@@ -1,9 +1,9 @@
 import * as XLSX from 'xlsx';
 import type {
   TeamEntry, TeamLeague, TeamLeagueMatch, TeamTournamentInfo,
-  MatchOrderEntry, TeamMember, SubMatchScore, MatchType
+  MatchOrderEntry, TeamMember, SubMatchScore, MatchType, TournamentMatchFormat
 } from './types';
-import { MATCH_TYPE_ORDER } from './teamLogic';
+import { getMatchTypeOrderForInfo, MATCH_TYPE_ORDER } from './teamLogic';
 
 /** 3チームリーグの対戦順 */
 const MATCH_ORDER_3: MatchOrderEntry[] = [
@@ -130,6 +130,14 @@ export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
   // 大会情報を表紙シートから取得
   const info = parseTournamentInfo(wb);
 
+  // 大会フォーマット（団体戦 or クラブ対抗戦）を表紙の文言から自動判定
+  // 「クラブ対抗戦」「ダブルス3」「シングルス2」等が含まれていれば 5対戦制
+  const isClubFormat = detectClubFormat(wb, info);
+  if (isClubFormat) {
+    info.matchFormat = 'club';
+  }
+  const matchTypeOrder = getMatchTypeOrderForInfo(info);
+
   // 予選リーグシートからリーグ・チーム情報を取得
   const leagueSheetName = wb.SheetNames.find(n => n.includes('予選リーグ'));
   // 選手名簿シートからメンバー情報を取得
@@ -158,7 +166,7 @@ export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
 
   // 選手名簿からメンバー情報を取得（色による性別判定付き）
   if (rosterWs) {
-    parseRoster(rosterWs, leagues, teamNumberMap, rosterColorMap);
+    parseRoster(rosterWs, leagues, teamNumberMap, rosterColorMap, info.matchFormat);
   }
 
   // 予選リーグシートから決勝トーナメントのブラケット順を取得
@@ -183,7 +191,7 @@ export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
         matchNumber: mo.matchNumber,
         team1Id: team1.teamId,
         team2Id: team2.teamId,
-        subMatches: MATCH_TYPE_ORDER.map(type => ({
+        subMatches: matchTypeOrder.map(type => ({
           type,
           score1: null, score2: null, tiebreakScore: null, winnerId: null,
         })),
@@ -198,14 +206,39 @@ export function parseTeamExcel(buffer: ArrayBuffer): ParseResult {
   // 成績表からスコアを読み取り
   if (resultSheet4Name) {
     const ws4 = wb.Sheets[resultSheet4Name];
-    parseResultSheet(ws4, leagues, matches);
+    parseResultSheet(ws4, leagues, matches, matchTypeOrder);
   }
   if (resultSheet5Name) {
     const ws5 = wb.Sheets[resultSheet5Name];
-    parseResultSheet(ws5, leagues, matches);
+    parseResultSheet(ws5, leagues, matches, matchTypeOrder);
   }
 
   return { info, leagues, matches };
+}
+
+/**
+ * 大会フォーマット（クラブ対抗戦の5対戦制）かを検出。
+ * - 大会名やルール文言に「クラブ対抗戦」、または対戦種目に
+ *   「ダブルス3」「シングルス2」などが含まれていれば true。
+ */
+function detectClubFormat(wb: XLSX.WorkBook, info: TeamTournamentInfo): boolean {
+  const haystack: string[] = [info.name, ...info.rules];
+  // 表紙・予選リーグ等に明示的なシングルス/ダブルス3 等が出ていれば検出
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z80');
+    for (let r = range.s.r; r <= Math.min(range.e.r, 80); r++) {
+      for (let c = range.s.c; c <= Math.min(range.e.c, 30); c++) {
+        const v = cellStr(ws, colLetter(c) + (r + 1));
+        if (v) haystack.push(v);
+      }
+    }
+  }
+  const text = haystack.join(' ');
+  if (/クラブ対抗戦/.test(text)) return true;
+  // ダブルス3, シングルス2 のような表記が出ていれば 5対戦制
+  if (/ダブルス\s*[3３]/.test(text) && /シングルス\s*[12１２]/.test(text)) return true;
+  return false;
 }
 
 /** 表紙から大会情報をパース */
@@ -453,6 +486,7 @@ function parseRoster(
   leagues: TeamLeague[],
   teamNumberMap: Map<number, TeamEntry>,
   colorMap: Map<string, string> = new Map(),
+  format?: TournamentMatchFormat,
 ) {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AO40');
   const circledNumbers = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒';
@@ -537,8 +571,9 @@ function parseRoster(
         seenNames.add(cleaned);
 
         // フォント色から性別を判定（赤=女性、青=男性）
+        // クラブ対抗戦は全て男子のため M 固定
         const fontColor = colorMap.get(cellRef);
-        const gender = genderFromFontColor(fontColor);
+        const gender = format === 'club' ? 'M' : genderFromFontColor(fontColor);
 
         team.members.push({
           player: { name: cleaned, affiliation: '' },
@@ -553,9 +588,11 @@ function parseRoster(
 function parseResultSheet(
   ws: XLSX.WorkSheet,
   leagues: TeamLeague[],
-  matches: TeamLeagueMatch[]
+  matches: TeamLeagueMatch[],
+  matchTypeOrder: MatchType[] = MATCH_TYPE_ORDER,
 ) {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z60');
+  const subMatchCount = matchTypeOrder.length;
 
   // "Xリーグ 成績表" を検出して成績表ブロックを特定
   for (let r = range.s.r; r <= range.e.r; r++) {
@@ -576,7 +613,7 @@ function parseResultSheet(
 
       // 各チーム行のスコアを読み取り
       for (let ti = 0; ti < teamCount; ti++) {
-        const baseRow = headerRow + 1 + ti * 3; // 各チーム3行（MIX, WD, MD）
+        const baseRow = headerRow + 1 + ti * subMatchCount; // 各チーム subMatchCount 行（MIX/WD/MD or D3/D2/D1/S2/S1）
 
         for (let tj = 0; tj < teamCount; tj++) {
           if (ti === tj) continue;
@@ -584,7 +621,7 @@ function parseResultSheet(
           // 対戦相手のスコア列を計算
           const scoreColBase = c + 2 + tj * 3; // 各チーム3列
 
-          for (let si = 0; si < 3; si++) {
+          for (let si = 0; si < subMatchCount; si++) {
             const scoreRow = baseRow + si;
             const s1Ref = colLetter(scoreColBase) + (scoreRow + 1);
             const s2Ref = colLetter(scoreColBase + 2) + (scoreRow + 1);
@@ -601,7 +638,7 @@ function parseResultSheet(
                  (m.team1Id === team2.teamId && m.team2Id === team1.teamId))
               );
               if (match) {
-                const matchType = MATCH_TYPE_ORDER[si];
+                const matchType = matchTypeOrder[si];
                 const sub = match.subMatches.find(sm => sm.type === matchType);
                 if (sub) {
                   const isTeam1 = match.team1Id === team1.teamId;

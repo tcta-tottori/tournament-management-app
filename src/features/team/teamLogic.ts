@@ -2,7 +2,7 @@ import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
   MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType,
-  TiebreakRuleId, TeamPlayer, TeamMember
+  TiebreakRuleId, TeamPlayer, TeamMember, TournamentMatchFormat
 } from './types';
 
 /** 苗字のみ抽出 */
@@ -75,14 +75,48 @@ export const TIEBREAK_RULE_LABELS: Record<TiebreakRuleId, string> = {
 /** デフォルト判定順序 */
 export const DEFAULT_TIEBREAK_ORDER: TiebreakRuleId[] = ['points', 'gameRatio', 'headToHead'];
 
-/** 種目の対戦順（固定） */
-export const MATCH_TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
+/** 種目の対戦順（団体戦・3対戦制） */
+export const TEAM_MATCH_TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
+
+/** 種目の対戦順（クラブ対抗戦・5対戦制） */
+export const CLUB_MATCH_TYPE_ORDER: MatchType[] = ['D3', 'D2', 'D1', 'S2', 'S1'];
+
+/** 既定の対戦順（後方互換のため団体戦） */
+export const MATCH_TYPE_ORDER: MatchType[] = TEAM_MATCH_TYPE_ORDER;
+
+/**
+ * 大会フォーマットに応じた対戦順を取得。
+ * info?.matchFormat === 'club' のときに5対戦制を返す。
+ */
+export function getMatchTypeOrderFor(format?: TournamentMatchFormat): MatchType[] {
+  return format === 'club' ? CLUB_MATCH_TYPE_ORDER : TEAM_MATCH_TYPE_ORDER;
+}
+
+/**
+ * 大会情報から対戦順を取得（info が無い場合は団体戦扱い）
+ */
+export function getMatchTypeOrderForInfo(info?: TeamTournamentInfo | null): MatchType[] {
+  return getMatchTypeOrderFor(info?.matchFormat);
+}
+
+/**
+ * 対戦勝利に必要な種目勝利数を取得。
+ * 3対戦制(team)は2勝で確定、5対戦制(club)は3勝で確定。
+ */
+export function getRequiredWinsFor(format?: TournamentMatchFormat): number {
+  return format === 'club' ? 3 : 2;
+}
 
 /** 種目ラベル */
 export const MATCH_TYPE_LABELS: Record<MatchType, string> = {
   MIX: 'ミックスダブルス',
   WD: '女子ダブルス',
   MD: '男子ダブルス',
+  D3: 'ダブルス3',
+  D2: 'ダブルス2',
+  D1: 'ダブルス1',
+  S2: 'シングルス2',
+  S1: 'シングルス1',
 };
 
 /** 種目短縮ラベル */
@@ -90,7 +124,17 @@ export const MATCH_TYPE_SHORT: Record<MatchType, string> = {
   MIX: 'Mix',
   WD: 'WD',
   MD: 'MD',
+  D3: 'D3',
+  D2: 'D2',
+  D1: 'D1',
+  S2: 'S2',
+  S1: 'S1',
 };
+
+/** 種目がシングルスかどうか */
+export function isSinglesMatchType(t: MatchType): boolean {
+  return t === 'S1' || t === 'S2';
+}
 
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
@@ -130,9 +174,9 @@ function generateMatchOrder(n: number): MatchOrderEntry[] {
   return order;
 }
 
-/** 空のサブマッチ配列を生成 */
-function createEmptySubMatches(): SubMatchScore[] {
-  return MATCH_TYPE_ORDER.map(type => ({
+/** 空のサブマッチ配列を生成（フォーマットに応じた対戦数） */
+export function createEmptySubMatches(format?: TournamentMatchFormat): SubMatchScore[] {
+  return getMatchTypeOrderFor(format).map(type => ({
     type,
     score1: null,
     score2: null,
@@ -142,7 +186,10 @@ function createEmptySubMatches(): SubMatchScore[] {
 }
 
 /** リーグの試合データを再生成 */
-export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
+export function regenerateLeagueMatches(
+  league: TeamLeague,
+  format?: TournamentMatchFormat,
+): TeamLeagueMatch[] {
   const matchOrder = generateMatchOrder(league.teams.length);
   const matches: TeamLeagueMatch[] = [];
   for (const mo of matchOrder) {
@@ -155,7 +202,7 @@ export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
       matchNumber: mo.matchNumber,
       team1Id: team1.teamId,
       team2Id: team2.teamId,
-      subMatches: createEmptySubMatches(),
+      subMatches: createEmptySubMatches(format),
       winnerId: null,
       winsTeam1: 0,
       winsTeam2: 0,
@@ -169,7 +216,8 @@ export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
 export function determineTeamWinner(
   subMatches: SubMatchScore[],
   team1Id: string,
-  team2Id: string
+  team2Id: string,
+  format?: TournamentMatchFormat,
 ): { winnerId: string | null; winsTeam1: number; winsTeam2: number } {
   let winsTeam1 = 0;
   let winsTeam2 = 0;
@@ -178,10 +226,11 @@ export function determineTeamWinner(
     if (sm.winnerId === team1Id) winsTeam1++;
     else if (sm.winnerId === team2Id) winsTeam2++;
   }
+  const required = getRequiredWinsFor(format);
   let winnerId: string | null = null;
-  if (winsTeam1 >= 2) winnerId = team1Id;
-  else if (winsTeam2 >= 2) winnerId = team2Id;
-  // 全種目（打ち切り含む）が確定している場合のみ、3-0でなくても勝者確定
+  if (winsTeam1 >= required) winnerId = team1Id;
+  else if (winsTeam2 >= required) winnerId = team2Id;
+  // 全種目（打ち切り含む）が確定している場合のみ、規定数未到達でも勝者確定
   const allFinished = subMatches.every(sm => sm.winnerId !== null || sm.terminated);
   if (allFinished && !winnerId && winsTeam1 !== winsTeam2) {
     winnerId = winsTeam1 > winsTeam2 ? team1Id : team2Id;
@@ -387,8 +436,8 @@ function bracketOrdersToSlots(entries: string[], drawSizeIn: number): (string | 
 }
 
 /** 空のブラケットサブマッチを生成 */
-function createEmptyBracketSubMatches(): BracketSubMatchScore[] {
-  return MATCH_TYPE_ORDER.map(type => ({
+function createEmptyBracketSubMatches(format?: TournamentMatchFormat): BracketSubMatchScore[] {
+  return getMatchTypeOrderFor(format).map(type => ({
     type,
     score1: null,
     score2: null,
