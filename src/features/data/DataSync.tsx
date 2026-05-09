@@ -809,11 +809,13 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           if (result.reserveVenue) setWizardSourceReserveVenue(result.reserveVenue);
           setWizardDateMode('normal');
           setWizardVenueMode('normal');
-          // 種目名にミックス/団体が含まれるかチェック
+          // 種目名にミックス/団体/クラブ対抗が含まれるかチェック（時間割不要）
           const hasSpecialEvent = result.events.some(e =>
-            /ミックス|団体|mixed|team/i.test(e.eventName)
+            /ミックス|団体|mixed|team|クラブ対抗/i.test(e.eventName)
           );
-          if (hasSpecialEvent) isMixedOrTeam = true;
+          // クラブ対抗戦は種目名に出ない場合があるので大会名・ファイル名でも判定
+          const isClubTournament = /クラブ対抗/.test(result.tournamentName || '') || /クラブ対抗/.test(file.name);
+          if (hasSpecialEvent || isClubTournament) isMixedOrTeam = true;
         }
       } catch {
         // パースに失敗しても確認画面に進む（ファイル名から名前を設定）
