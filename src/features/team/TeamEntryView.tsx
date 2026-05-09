@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers } from 'lucide-react';
+import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers, ClipboardList } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
 import { getDisplayName } from './teamLogic';
@@ -327,11 +327,78 @@ const LEAGUE_SOLID_COLORS = [
   '#f59e0b', '#06b6d4', '#84cc16', '#d946ef',
 ];
 
+/** リーグ別ロスター表示（ドロー表風: チーム名×メンバー一覧） */
+function LeagueRosterTable({ league, leagueIndex }: { league: TeamLeague; leagueIndex: number }) {
+  const color = getColor(leagueIndex);
+  const maxMembers = Math.max(0, ...league.teams.map(t => t.members.length));
+  const rowCount = Math.max(maxMembers, 1);
+
+  return (
+    <div className={`rounded-2xl border ${color.border} bg-white overflow-hidden shadow-sm`}>
+      <div className={`bg-gradient-to-br ${color.grad} px-4 py-2.5 text-white flex items-center justify-between`}>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xl font-black tracking-tight">{league.leagueId}</span>
+          <span className="text-xs font-medium opacity-90">リーグ</span>
+          {league.courtName && (
+            <span className="text-[10px] opacity-75">・{league.courtName}</span>
+          )}
+        </div>
+        <span className="text-[10px] opacity-80 tabular-nums">{league.teams.length}チーム</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className={`${color.bg}`}>
+              <th className={`px-2 py-2 w-10 text-center text-[10px] font-bold ${color.text} border-b ${color.border}`}>No.</th>
+              {league.teams.map(t => (
+                <th key={t.teamId} className={`px-2 py-2 text-center font-bold ${color.text} border-b border-l ${color.border} min-w-[140px]`}>
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="inline-flex w-5 h-5 rounded-full bg-white text-[10px] font-black items-center justify-center" style={{ color: 'inherit' }}>
+                      {t.teamNumber}
+                    </span>
+                    <span className="text-[12px] font-black truncate max-w-[150px]" title={t.teamName}>{t.teamName}</span>
+                    {t.status === 'entry' && <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />}
+                    {t.status === 'def' && <X className="w-3 h-3 text-rose-500" strokeWidth={3} />}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rowCount }).map((_, rowIdx) => (
+              <tr key={rowIdx} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'}`}>
+                <td className={`px-2 py-1.5 text-center text-[10px] font-bold text-slate-400 tabular-nums border-r ${color.border}`}>
+                  {rowIdx + 1}
+                </td>
+                {league.teams.map(t => {
+                  const member = t.members[rowIdx];
+                  return (
+                    <td key={t.teamId} className={`px-2 py-1.5 text-center border-l ${color.border} text-[12px]`}>
+                      {member ? (
+                        <span className={member.gender === 'F' ? 'text-rose-600' : 'text-slate-700'}>
+                          {member.player.name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-200">―</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /** メインコンポーネント */
 export default function TeamEntryView() {
   const { leagues, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus } = useTeamStore();
   const [editingTeam, setEditingTeam] = useState<{ team: TeamEntry; colorIndex: number } | null>(null);
   const [selectedTab, setSelectedTab] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'card' | 'roster'>('card');
 
   if (leagues.length === 0) {
     return (
@@ -413,11 +480,33 @@ export default function TeamEntryView() {
         </div>
       </div>
 
-      {/* 全体一括エントリー */}
+      {/* 全体一括エントリー + 表示モード切替 */}
       <div className="flex items-center gap-2 px-1">
         <div className="flex-1 text-xs text-slate-500">
           <span className="font-bold tabular-nums text-slate-700">{totalEntered}</span>
           <span className="text-slate-400"> / {totalTeams} チーム Entry</span>
+        </div>
+        <div className="inline-flex bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <button
+            onClick={() => setViewMode('card')}
+            className={`flex items-center gap-1 px-2.5 py-2 text-[11px] font-bold transition-colors ${
+              viewMode === 'card' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-50'
+            }`}
+            title="カード表示（受付・編集）"
+          >
+            <Edit3 className="w-3 h-3" />
+            受付
+          </button>
+          <button
+            onClick={() => setViewMode('roster')}
+            className={`flex items-center gap-1 px-2.5 py-2 text-[11px] font-bold transition-colors border-l border-slate-200 ${
+              viewMode === 'roster' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-50'
+            }`}
+            title="ドロー表（チーム×メンバー一覧）"
+          >
+            <ClipboardList className="w-3 h-3" />
+            ドロー表
+          </button>
         </div>
         <button
           onClick={() => setAllTeamsStatus(allEntered ? 'none' : 'entry')}
@@ -435,7 +524,13 @@ export default function TeamEntryView() {
       {/* リーグ別セクション */}
       {visibleLeagues.map((league) => {
         const index = leagues.findIndex(l => l.leagueId === league.leagueId);
-        return (
+        return viewMode === 'roster' ? (
+          <LeagueRosterTable
+            key={league.leagueId}
+            league={league}
+            leagueIndex={index}
+          />
+        ) : (
           <LeagueSection
             key={league.leagueId}
             league={league}
