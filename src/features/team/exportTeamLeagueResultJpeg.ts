@@ -168,7 +168,7 @@ export async function generateTeamLeagueResultDataUrl(
   const paddingX = 30;
   const paddingY = 26;
   const headerH = 110; // 角丸バッジ + 大会名 + 会場ロゴ
-  const colHeaderH = 44;
+  const colHeaderH = 54;
   // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて行高を調整
   const _subCountForRow = TYPE_ORDER.length;
   const _baseOverallH = 38;
@@ -225,7 +225,8 @@ export async function generateTeamLeagueResultDataUrl(
     slate800: '#1e293b',
     slate900: '#0f172a',
     // 勝敗スコア用：勝ち=赤、負け=グレー
-    winRed: '#dc2626',
+    // スコア色：勝者=緑、敗者=グレー
+    winGreen: '#059669',
     loseGray: '#94a3b8',
     // 上位3チームのメダル風グラデ
     gold:   { c1: '#fde68a', c2: '#f59e0b', c3: '#b45309', text: '#7c2d12' },
@@ -443,7 +444,7 @@ export async function generateTeamLeagueResultDataUrl(
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
     const x = tableX + numColW + nameColW + typeColW + scoreColW * i + scoreColW / 2;
-    drawText(team.teamName, x, tableY + colHeaderH / 2, 10, 'center', thColor, 'black', scoreColW - 10);
+    drawText(team.teamName, x, tableY + colHeaderH / 2, 14, 'center', thColor, 'black', scoreColW - 10);
   }
   let colCursor = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
   drawText('勝敗', colCursor + recordColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
@@ -575,32 +576,54 @@ export async function generateTeamLeagueResultDataUrl(
         ctx.fillRect(x + 1, rowTop + 1, scoreColW - 2, rowH - 2);
       }
 
-      // 総合勝敗（各対戦セル上部）— ピルバッジ型で描画
+      // 総合勝敗（各対戦セル上部）— ピルバッジ型で描画。
+      // 数字は大きく、「勝/敗」は小さく描画する。
       const overallY = rowTop + overallAreaH / 2;
-      const overallText = `${myWins} - ${oppWins}`;
-      ctx.font = '900 16px "Inter", "Helvetica Neue", sans-serif';
-      const badgeTextW = ctx.measureText(overallText).width;
+      const numFont = '900 18px "Inter", "Helvetica Neue", sans-serif';
+      const labelFont = '700 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+      // 幅測定：myWins(大) + 勝(小) + ギャップ + oppWins(大) + 敗(小)
+      ctx.font = numFont;
+      const wWins = ctx.measureText(String(myWins)).width;
+      const wLoss = ctx.measureText(String(oppWins)).width;
+      ctx.font = labelFont;
+      const wKachi = ctx.measureText('勝').width;
+      const wMake = ctx.measureText('敗').width;
+      const gap = 4;
+      const inner = wWins + wKachi + gap + wLoss + wMake;
       const badgePadX = 12;
-      const bw = badgeTextW + badgePadX * 2;
-      const bh = 22;
+      const bw = inner + badgePadX * 2;
+      const bh = 24;
       const bx2 = x + scoreColW / 2 - bw / 2;
       const by2 = overallY - bh / 2;
       if (won) {
-        // 勝利側: 水色グラデバッジ + 白文字
         const pillGrad = ctx.createLinearGradient(bx2, by2, bx2 + bw, by2 + bh);
         pillGrad.addColorStop(0, COL.sky500);
         pillGrad.addColorStop(1, COL.sky700);
         drawRoundRect(bx2, by2, bw, bh, bh / 2, pillGrad);
-        ctx.fillStyle = COL.white;
       } else {
-        // 敗北側: 淡い枠線バッジ + 薄テキスト
         drawRoundRect(bx2, by2, bw, bh, bh / 2, '#f8fafc', COL.slate300, 1);
-        ctx.fillStyle = COL.slate400;
       }
-      ctx.font = '900 16px "Inter", "Helvetica Neue", sans-serif';
-      ctx.textAlign = 'center';
+      // 描画開始位置（左端）
+      let bcx = bx2 + badgePadX;
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(overallText, x + scoreColW / 2, overallY);
+      const numColor = won ? COL.white : COL.slate500;
+      const labelColor = won ? 'rgba(255,255,255,0.75)' : COL.slate400;
+      ctx.fillStyle = numColor;
+      ctx.font = numFont;
+      ctx.fillText(String(myWins), bcx, overallY);
+      bcx += wWins;
+      ctx.fillStyle = labelColor;
+      ctx.font = labelFont;
+      ctx.fillText('勝', bcx, overallY + 1);
+      bcx += wKachi + gap;
+      ctx.fillStyle = numColor;
+      ctx.font = numFont;
+      ctx.fillText(String(oppWins), bcx, overallY);
+      bcx += wLoss;
+      ctx.fillStyle = labelColor;
+      ctx.font = labelFont;
+      ctx.fillText('敗', bcx, overallY + 1);
 
       // 種目ごとの対戦結果行（選手名＋大きなスコア）
       for (let i = 0; i < TYPE_ORDER.length; i++) {
@@ -626,7 +649,7 @@ export async function generateTeamLeagueResultDataUrl(
         const leftIsWinner = subWon;
         const nameColor = COL.slate700;
         // 自チームの勝ち試合は赤、負け試合はグレー
-        const scoreColor = leftIsWinner ? COL.winRed : COL.loseGray;
+        const scoreColor = leftIsWinner ? COL.winGreen : COL.loseGray;
 
         // 【中央揃えレイアウト】
         // スコア（"6 - 4"）をセル中央に配置し、左右の選手名はスコアを挟むように配置する。
@@ -703,21 +726,67 @@ export async function generateTeamLeagueResultDataUrl(
       }
     }
 
-    // --- 勝敗列 ---
+    // --- 勝敗列 --- 数字大きく / "勝"・"敗" 小さく
     const wins = standing?.wins ?? 0;
     const losses = standing?.losses ?? 0;
     const recL = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
     drawLine(recL, tableY + colHeaderH, recL, tableY + tableH, COL.slate200, 1);
-    drawText(`${wins}勝${losses}敗`, recL + recordColW / 2, rowTop + rowH / 2, 15, 'center', COL.slate800, 'bold');
+    {
+      const numFont = '900 26px "Inter", "Helvetica Neue", sans-serif';
+      const labelFont = '700 14px "Hiragino Sans", "Yu Gothic", sans-serif';
+      ctx.font = numFont;
+      const wWins = ctx.measureText(String(wins)).width;
+      const wLoss = ctx.measureText(String(losses)).width;
+      ctx.font = labelFont;
+      const wKachi = ctx.measureText('勝').width;
+      const wMake = ctx.measureText('敗').width;
+      const gap = 4;
+      const total = wWins + wKachi + gap + wLoss + wMake;
+      let cx = recL + (recordColW - total) / 2;
+      const cy = rowTop + rowH / 2;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = COL.slate800;
+      ctx.font = numFont;
+      ctx.fillText(String(wins), cx, cy);
+      cx += wWins;
+      ctx.fillStyle = COL.slate500;
+      ctx.font = labelFont;
+      ctx.fillText('勝', cx, cy + 2);
+      cx += wKachi + gap;
+      ctx.fillStyle = COL.slate800;
+      ctx.font = numFont;
+      ctx.fillText(String(losses), cx, cy);
+      cx += wLoss;
+      ctx.fillStyle = COL.slate500;
+      ctx.font = labelFont;
+      ctx.fillText('敗', cx, cy + 2);
+    }
 
-    // --- 順位列 ---
+    // --- 順位列 --- 数字大きく / "位" 小さく
     const rkL = recL + recordColW;
     drawLine(rkL, tableY + colHeaderH, rkL, tableY + tableH, COL.slate200, 1);
     const rank = standing?.rank ?? 0;
     const rankCx = rkL + rankColW / 2;
     const rankCy = rowTop + rowH / 2;
     if (rank > 0) {
-      drawText(`${rank}位`, rankCx, rankCy, 20, 'center', COL.slate800, 'black');
+      const numFont = '900 36px "Inter", "Helvetica Neue", sans-serif';
+      const labelFont = '700 16px "Hiragino Sans", "Yu Gothic", sans-serif';
+      ctx.font = numFont;
+      const wNum = ctx.measureText(String(rank)).width;
+      ctx.font = labelFont;
+      const wKurai = ctx.measureText('位').width;
+      const total = wNum + wKurai + 2;
+      let cx = rankCx - total / 2;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = COL.slate800;
+      ctx.font = numFont;
+      ctx.fillText(String(rank), cx, rankCy);
+      cx += wNum + 2;
+      ctx.fillStyle = COL.slate500;
+      ctx.font = labelFont;
+      ctx.fillText('位', cx, rankCy + 4);
     } else {
       drawText('-', rankCx, rankCy, 16, 'center', COL.slate300, 'normal');
     }
