@@ -366,23 +366,26 @@ export async function generateTeamLeagueResultDataUrl(
   // バッジ内テキスト
   ctx.fillStyle = COL.white;
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
+  // 数字と文字でサイズが異なる場合は alphabetic ベースラインで揃え（＝下揃え）
+  ctx.textBaseline = 'alphabetic';
   if (numberMatch) {
     const [, prefix, num, suffix] = numberMatch;
     let cx = pillX + (pillW - pillTextW) / 2;
-    const cy = pillY + pillH / 2 + 2;
+    // 64px の数字を視覚的に中央配置する baseline 位置
+    const baselineY = pillY + pillH / 2 + 64 * 0.34;
     ctx.font = smallFont;
     const wPre = ctx.measureText(prefix).width;
-    ctx.fillText(prefix, cx, cy);
+    ctx.fillText(prefix, cx, baselineY);
     cx += wPre;
     ctx.font = bigFont;
     const wNum = ctx.measureText(num).width;
-    ctx.fillText(num, cx, cy);
+    ctx.fillText(num, cx, baselineY);
     cx += wNum;
     ctx.font = smallFont;
-    ctx.fillText(suffix, cx, cy);
+    ctx.fillText(suffix, cx, baselineY);
   } else {
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.font = bigFont;
     ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
   }
@@ -633,27 +636,28 @@ export async function generateTeamLeagueResultDataUrl(
       } else {
         drawRoundRect(bx2, by2, bw, bh, bh / 2, '#f8fafc', COL.slate300, 1);
       }
-      // 描画開始位置（左端）
+      // 描画開始位置（左端）。混合サイズは下揃え（alphabetic baseline）で描画
       let bcx = bx2 + badgePadX;
       ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'alphabetic';
+      const baselineY = overallY + 18 * 0.34;
       const numColor = won ? COL.white : COL.slate500;
       const labelColor = won ? 'rgba(255,255,255,0.75)' : COL.slate400;
       ctx.fillStyle = numColor;
       ctx.font = numFont;
-      ctx.fillText(String(myWins), bcx, overallY);
+      ctx.fillText(String(myWins), bcx, baselineY);
       bcx += wWins;
       ctx.fillStyle = labelColor;
       ctx.font = labelFont;
-      ctx.fillText('勝', bcx, overallY + 1);
+      ctx.fillText('勝', bcx, baselineY);
       bcx += wKachi + gap;
       ctx.fillStyle = numColor;
       ctx.font = numFont;
-      ctx.fillText(String(oppWins), bcx, overallY);
+      ctx.fillText(String(oppWins), bcx, baselineY);
       bcx += wLoss;
       ctx.fillStyle = labelColor;
       ctx.font = labelFont;
-      ctx.fillText('敗', bcx, overallY + 1);
+      ctx.fillText('敗', bcx, baselineY);
 
       // 種目ごとの対戦結果行（選手名＋大きなスコア）
       for (let i = 0; i < TYPE_ORDER.length; i++) {
@@ -775,22 +779,24 @@ export async function generateTeamLeagueResultDataUrl(
       let cx = recL + (recordColW - total) / 2;
       const cy = rowTop + rowH / 2;
       ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
+      // 数字（26px）と文字（14px）を下揃え
+      ctx.textBaseline = 'alphabetic';
+      const baselineY = cy + 26 * 0.34;
       ctx.fillStyle = COL.slate800;
       ctx.font = numFont;
-      ctx.fillText(String(wins), cx, cy);
+      ctx.fillText(String(wins), cx, baselineY);
       cx += wWins;
       ctx.fillStyle = COL.slate500;
       ctx.font = labelFont;
-      ctx.fillText('勝', cx, cy + 2);
+      ctx.fillText('勝', cx, baselineY);
       cx += wKachi + gap;
       ctx.fillStyle = COL.slate800;
       ctx.font = numFont;
-      ctx.fillText(String(losses), cx, cy);
+      ctx.fillText(String(losses), cx, baselineY);
       cx += wLoss;
       ctx.fillStyle = COL.slate500;
       ctx.font = labelFont;
-      ctx.fillText('敗', cx, cy + 2);
+      ctx.fillText('敗', cx, baselineY);
     }
 
     // --- 順位列 --- 数字大きく / "位" 小さく
@@ -809,14 +815,16 @@ export async function generateTeamLeagueResultDataUrl(
       const total = wNum + wKurai + 4;
       let cx = rankCx - total / 2;
       ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
+      // 数字（52px）と「位」（18px）を下揃え
+      ctx.textBaseline = 'alphabetic';
+      const baselineY = rankCy + 52 * 0.34;
       ctx.fillStyle = COL.slate800;
       ctx.font = numFont;
-      ctx.fillText(String(rank), cx, rankCy);
+      ctx.fillText(String(rank), cx, baselineY);
       cx += wNum + 4;
       ctx.fillStyle = COL.slate500;
       ctx.font = labelFont;
-      ctx.fillText('位', cx, rankCy + 6);
+      ctx.fillText('位', cx, baselineY);
     } else {
       drawText('-', rankCx, rankCy, 16, 'center', COL.slate300, 'normal');
     }
