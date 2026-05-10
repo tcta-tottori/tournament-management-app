@@ -583,6 +583,54 @@ export default function TeamScoreInput({
     inputRefs.current[key] = el;
   }, []);
 
+  // 自動保存：スコア・打ち切りフラグの変更を即時 store に反映（リーグ・トーナメント共通）。
+  // 不完全（片側のみ・同点）な状態はスキップし、完全に空＆打ち切りなしならクリアする。
+  useEffect(() => {
+    const updateFn = isBracket ? updateBracketSubMatchScore : updateSubMatchScore;
+    const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
+    for (const mt of matchTypeOrder) {
+      const s = scores[mt];
+      if (!s) continue;
+      const existing = subMatches.find(sm => sm.type === mt);
+      if (!existing) continue;
+      const isTerminated = !!terminated[mt];
+      const s1Empty = s.score1 === '';
+      const s2Empty = s.score2 === '';
+
+      // 完全に空 + 打ち切りなし → 既に保存済みならクリア
+      if (s1Empty && s2Empty && !isTerminated) {
+        if (existing.score1 !== null || existing.score2 !== null || existing.terminated) {
+          clearFn(matchId, mt);
+        }
+        continue;
+      }
+
+      const s1 = s1Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score1);
+      const s2 = s2Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score2);
+      // 入力途中（NaN）はスキップ
+      if (isNaN(s1) || isNaN(s2)) continue;
+      // 範囲外もスキップ
+      if (s1 < 0 || s2 < 0 || s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) continue;
+      // 同点（打ち切り以外）はスキップ
+      if (!isTerminated && s1 === s2) continue;
+
+      const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
+      const tb = isTb && s.tiebreakScore ? parseInt(s.tiebreakScore) : null;
+
+      // 既存値と同じなら何もしない（無駄な書き込み回避）
+      if (
+        existing.score1 === s1 &&
+        existing.score2 === s2 &&
+        (existing.tiebreakScore ?? null) === tb &&
+        (existing.terminated ?? false) === isTerminated
+      ) {
+        continue;
+      }
+      updateFn(matchId, mt, s1, s2, tb, isTerminated);
+    }
+  }, [scores, terminated, isBracket, matchTypeOrder, subMatches, matchId,
+      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore]);
+
   // Auto-focus first input
   useEffect(() => {
     const timer = setTimeout(() => {
