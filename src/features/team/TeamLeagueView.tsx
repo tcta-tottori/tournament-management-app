@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
-import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
+import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, getClubPromotionStatus } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -278,6 +278,75 @@ function TiebreakRuleSettings() {
 }
 
 /** 判定詳細ポップアップ */
+/**
+ * 勝率詳細ポップアップ：勝率の計算式・分母分子・参考統計（取得ポイント / ゲーム率）を提示。
+ * クラブ対抗戦の特別ルール「勝率 → 取得ポイント → ゲーム率 → 直接対決」が分かるように
+ * 並べる。
+ */
+function WinRateDetailPopup({ standing, onClose }: { standing: TeamLeagueStanding; onClose: () => void }) {
+  const totalMatches = standing.wins + standing.losses;
+  const winRate = totalMatches === 0 ? 0 : standing.wins / totalMatches;
+  const totalGames = standing.gamesWon + standing.gamesLost;
+  const gameRatio = totalGames === 0 ? 0 : standing.gamesWon / totalGames;
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 px-5 py-3 text-white flex items-center justify-between">
+          <div>
+            <div className="text-[10px] opacity-80 font-bold uppercase tracking-wider">勝率の計算</div>
+            <div className="text-base font-black">{standing.teamName}</div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          {/* 勝率本体 */}
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 text-center">
+            <div className="text-[10px] text-indigo-600 font-bold tracking-wider mb-1">勝率</div>
+            <div className="text-4xl font-black text-indigo-700 tabular-nums">{winRate.toFixed(3)}</div>
+            <div className="mt-2 text-[11px] text-slate-600 font-medium tabular-nums">
+              = 勝利した対戦チーム数 <span className="text-indigo-700 font-black">{standing.wins}</span>
+              <span className="mx-1 text-slate-400">÷</span>
+              総対戦チーム数 <span className="text-indigo-700 font-black">{totalMatches}</span>
+            </div>
+          </div>
+
+          {/* 参考統計 */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-slate-50 rounded-lg p-2">
+              <div className="text-[10px] text-slate-400 font-bold">対戦勝敗</div>
+              <div className="text-base font-black tabular-nums">{standing.wins} - {standing.losses}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-2">
+              <div className="text-[10px] text-slate-400 font-bold">取得ポイント</div>
+              <div className="text-base font-black tabular-nums">{standing.pointsWon} - {standing.pointsLost}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-2">
+              <div className="text-[10px] text-slate-400 font-bold">取得ゲーム</div>
+              <div className="text-base font-black tabular-nums">{standing.gamesWon} - {standing.gamesLost}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-2">
+              <div className="text-[10px] text-slate-400 font-bold">取得ゲーム率</div>
+              <div className="text-base font-black tabular-nums">{gameRatio.toFixed(3)}</div>
+            </div>
+          </div>
+
+          {/* クラブ対抗戦の順位決定方法（明示） */}
+          <div className="border-t border-slate-100 pt-3">
+            <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">クラブ対抗戦 順位決定方法</div>
+            <ol className="space-y-1 text-[11px] text-slate-700 leading-snug">
+              <li><span className="font-black text-indigo-700">①</span> 勝率（勝利した対戦チーム数 ÷ 総対戦チーム数）の高いチームを上位</li>
+              <li><span className="font-black text-indigo-700">②</span> 同率の場合、取得ポイント（対戦内勝利数）の多いチームを上位</li>
+              <li><span className="font-black text-indigo-700">③</span> 同率の場合、取得ゲーム率の高いチームを上位</li>
+              <li><span className="font-black text-indigo-700">④</span> 同率の場合、直接対決の勝者を上位</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStanding; onClose: () => void }) {
   const { tiebreakOrder } = useTeamStore();
   const [detailRule, setDetailRule] = useState<TiebreakRuleId | null>(null);
@@ -353,6 +422,7 @@ export default function TeamLeagueView() {
   const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
+  const [winRateTarget, setWinRateTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   // 試合形式に応じた種目順（クラブ対抗戦は D3,D2,D1,S2,S1。それ以外は MIX,WD,MD）
@@ -536,8 +606,24 @@ export default function TeamLeagueView() {
                             <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                               {rowTeam.teamNumber}
                             </td>
-                            <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20`}>
+                            <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20 relative`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
+                              {complete && standing && (() => {
+                                const promo = getClubPromotionStatus(league.leagueId, standing.rank);
+                                if (!promo) return null;
+                                const cls = promo.kind === 'champion'
+                                  ? 'bg-amber-500 text-white'
+                                  : promo.kind === 'promote'
+                                  ? 'bg-emerald-600 text-white'
+                                  : promo.kind === 'relegate'
+                                  ? 'bg-rose-600 text-white'
+                                  : 'bg-slate-400 text-white';
+                                return (
+                                  <span className={`absolute bottom-0 right-1 inline-flex items-center justify-center px-1 py-0.5 rounded text-[8px] lg:text-[9px] font-black tracking-wider shadow-sm ${cls}`}>
+                                    {promo.label}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className={`px-0.5 py-1 lg:px-1 lg:py-2.5 align-middle border-r ${c.border} ${c.bg}/20`}>
                               <div className="flex flex-col gap-0.5 lg:gap-1 items-center">
@@ -730,6 +816,7 @@ export default function TeamLeagueView() {
                   </th>
                 ))}
                 <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
+                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[60px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>勝率</th>
                 {leagueComplete && (
                   <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>順位</th>
                 )}
@@ -746,8 +833,25 @@ export default function TeamLeagueView() {
                     <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
-                    <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20`}>
+                    <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20 relative`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
+                      {/* 昇降格バッジ（クラブ対抗戦のみ、リーグ確定後に表示） */}
+                      {leagueComplete && standing && (() => {
+                        const promo = getClubPromotionStatus(selectedLeague.leagueId, standing.rank);
+                        if (!promo) return null;
+                        const cls = promo.kind === 'champion'
+                          ? 'bg-amber-500 text-white'
+                          : promo.kind === 'promote'
+                          ? 'bg-emerald-600 text-white'
+                          : promo.kind === 'relegate'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-400 text-white';
+                        return (
+                          <span className={`absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] lg:text-[10px] font-black tracking-wider shadow-sm ${cls}`}>
+                            {promo.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     {/* 種目ラベル列 */}
                     <td className={`px-0.5 py-1.5 lg:px-1 lg:py-2.5 align-middle border-r ${color.border} ${color.bg}/20`}>
@@ -843,6 +947,22 @@ export default function TeamLeagueView() {
                         </div>
                       ) : '-'}
                     </td>
+                    {/* 勝率列：クリックで詳細ポップアップ */}
+                    <td
+                      className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border} cursor-pointer hover:bg-slate-100/60 transition-colors`}
+                      onClick={() => standing && setWinRateTarget(standing)}
+                    >
+                      {standing ? (() => {
+                        const total = standing.wins + standing.losses;
+                        const rate = total === 0 ? 0 : standing.wins / total;
+                        return (
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span className="text-xs lg:text-sm font-black text-slate-800 tabular-nums">{rate.toFixed(3)}</span>
+                            <Info className="w-2.5 h-2.5 text-slate-400" />
+                          </div>
+                        );
+                      })() : '-'}
+                    </td>
                     {leagueComplete && (
                       <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border}`}>
                         {standing && <RankText rank={standing.rank || 0} />}
@@ -874,6 +994,7 @@ export default function TeamLeagueView() {
       })()}
 
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
+      {winRateTarget && <WinRateDetailPopup standing={winRateTarget} onClose={() => setWinRateTarget(null)} />}
 
       {/* 対戦順 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">

@@ -1,5 +1,5 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
-import { getMatchTypeOrder, getDisplayNameParts } from './teamLogic';
+import { getMatchTypeOrder, getDisplayNameParts, getClubPromotionStatus } from './teamLogic';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -478,7 +478,33 @@ export async function generateTeamLeagueResultDataUrl(
     drawLine(tableX + numColW, tableY + colHeaderH, tableX + numColW, tableY + tableH, COL.slate200, 1);
 
     // --- チーム名列 ---
-    drawText(team.teamName, tableX + numColW + 14, rowTop + rowH / 2, 16, 'left', COL.slate900, 'bold', nameColW - 22);
+    drawText(team.teamName, tableX + numColW + 14, rowTop + rowH / 2 - 8, 16, 'left', COL.slate900, 'bold', nameColW - 22);
+
+    // 昇降格バッジ（クラブ対抗戦のみ、確定後に表示。右下に配置）
+    if (standing) {
+      const promo = getClubPromotionStatus(league.leagueId, standing.rank);
+      if (promo) {
+        const badgeColor =
+          promo.kind === 'champion' ? '#f59e0b' :
+          promo.kind === 'promote'  ? '#059669' :
+          promo.kind === 'relegate' ? '#e11d48' : '#64748b';
+        const badgeFont = '800 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+        ctx.save();
+        ctx.font = badgeFont;
+        const txtW = ctx.measureText(promo.label).width;
+        const padX = 8;
+        const bw = txtW + padX * 2;
+        const bh = 18;
+        const bx = tableX + numColW + nameColW - bw - 8;
+        const by = rowTop + rowH - bh - 6;
+        drawRoundRect(bx, by, bw, bh, bh / 2, badgeColor);
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(promo.label, bx + bw / 2, by + bh / 2 + 0.5);
+        ctx.restore();
+      }
+    }
 
     // --- 種目列 ---
     const typeColX = tableX + numColW + nameColW;
