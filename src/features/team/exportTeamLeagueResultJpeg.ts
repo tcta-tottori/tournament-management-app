@@ -321,7 +321,8 @@ export async function generateTeamLeagueResultDataUrl(
   const numberMatch = pillText.match(/^(.*?)(\d+)(.*)$/);
   const pillH = 96;
   const bigFont = '900 64px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  const smallFont = '900 32px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  // 数字（bigFont）は極太のまま、前後の文字（"男子" / "部" 等）は読みやすさのため少し細めに
+  const smallFont = '600 30px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   // 混合サイズ描画時、prefix - number - suffix の間に控えめなギャップを入れる
   const segGap = 8;
   ctx.save();
