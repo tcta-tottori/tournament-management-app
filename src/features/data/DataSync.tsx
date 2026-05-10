@@ -13,6 +13,7 @@ import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
+import { parseClubExcel } from '../team/clubExcelParser';
 import { useTeamStore } from '../team/teamStore';
 import type { TeamTournamentInfo, TeamLeague as ITeamLeague, TeamLeagueMatch as ITeamLeagueMatch } from '../team/types';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
@@ -734,6 +735,31 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       // Excelを解析して確認画面用のデータを構築
       let isMixedOrTeam = false;
       try {
+        // クラブ対抗戦フォーマットを最初に試行（ファイル名に「クラブ対抗」が含まれる場合）
+        const isClubFile = /クラブ対抗/.test(file.name);
+        if (isClubFile) {
+          try {
+            const clubResult = parseClubExcel(arrayBuffer, file.name);
+            if (clubResult.leagues.length > 0) {
+              setWizardTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name, arrayBuffer });
+              setWizardMixedPending(null);
+              setWizardParsedExcel(null);
+              setWizardEditName(clubResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
+              setWizardEditDate(formatJpDate(clubResult.info.date || ''));
+              setWizardEditVenue(clubResult.info.venue || 'ヤマタスポーツパーク');
+              if (clubResult.info.date) setWizardSourceDate(clubResult.info.date);
+              if (clubResult.info.venue) setWizardSourceVenue(clubResult.info.venue);
+              setWizardDateMode('normal');
+              setWizardVenueMode('normal');
+              isMixedOrTeam = true;
+              setWizardIsMixedOrTeam(true);
+              setWizardPhase('confirm-tournament');
+              setWizardLoadingFileId(null);
+              return;
+            }
+          } catch { /* fall through */ }
+        }
+
         // 団体戦フォーマットを最初に試行（ファイル名に「団体」が含まれる場合）
         const isTeamFile = /団体/.test(file.name);
         if (isTeamFile) {
