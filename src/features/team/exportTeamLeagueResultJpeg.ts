@@ -475,7 +475,7 @@ export async function generateTeamLeagueResultDataUrl(
     // 番号列に薄い背景帯を入れて視覚的に独立させる
     ctx.fillStyle = COL.slate50;
     ctx.fillRect(tableX + 0.5, rowTop + 0.5, numColW - 0.5, rowH - 1);
-    drawText(String(team.teamNumber), numColCenterX, rowTop + rowH / 2, 28, 'center', COL.slate700, 'black');
+    drawText(String(team.teamNumber), numColCenterX, rowTop + rowH / 2, 20, 'center', COL.slate500, 'black');
     // 番号列とチーム名列の境界
     drawLine(tableX + numColW, tableY + colHeaderH, tableX + numColW, tableY + tableH, COL.slate200, 1);
 
@@ -515,17 +515,12 @@ export async function generateTeamLeagueResultDataUrl(
     for (let i = 0; i < TYPE_ORDER.length; i++) {
       const mt = TYPE_ORDER[i];
       const tc = TYPE_COLORS[mt];
-      const tagW = 40;
-      const tagH = 22;
-      const tagX = typeColX + (typeColW - tagW) / 2;
-      const tagY = subCenters[i] - tagH / 2;
-      // 背景 + 細い縁取り
-      drawRoundRect(tagX, tagY, tagW, tagH, 6, tc.bg, tc.accent, 1);
+      // シンプルなテキスト表示（バッジなし、種目色を活かす）
       ctx.fillStyle = tc.fg;
-      ctx.font = 'bold 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+      ctx.font = '900 14px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(TYPE_LABEL[mt], tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+      ctx.fillText(TYPE_LABEL[mt], typeColX + typeColW / 2, subCenters[i]);
     }
 
     // 種目列の上部（総合勝敗エリア）に「勝敗」ラベルを表示
@@ -547,9 +542,11 @@ export async function generateTeamLeagueResultDataUrl(
       drawLine(x, tableY + colHeaderH, x, tableY + tableH, COL.slate200, 1);
 
       if (colIdx === rowIdx) {
-        ctx.fillStyle = COL.slate50;
+        // 対戦無しセル（同チーム同士の交点）
+        ctx.fillStyle = COL.slate100;
         ctx.fillRect(x + 0.5, rowTop + 0.5, scoreColW - 1, rowH - 1);
-        drawLine(x + 8, rowTop + 8, x + scoreColW - 8, rowTop + rowH - 8, COL.slate200, 1);
+        // 右肩下がりの斜め線：太く濃く描いて視認性を上げる
+        drawLine(x + 4, rowTop + 4, x + scoreColW - 4, rowTop + rowH - 4, COL.slate400, 3);
         continue;
       }
 
@@ -770,23 +767,23 @@ export async function generateTeamLeagueResultDataUrl(
     const rankCx = rkL + rankColW / 2;
     const rankCy = rowTop + rowH / 2;
     if (rank > 0) {
-      const numFont = '900 36px "Inter", "Helvetica Neue", sans-serif';
-      const labelFont = '700 16px "Hiragino Sans", "Yu Gothic", sans-serif';
+      const numFont = '900 52px "Inter", "Helvetica Neue", sans-serif';
+      const labelFont = '700 18px "Hiragino Sans", "Yu Gothic", sans-serif';
       ctx.font = numFont;
       const wNum = ctx.measureText(String(rank)).width;
       ctx.font = labelFont;
       const wKurai = ctx.measureText('位').width;
-      const total = wNum + wKurai + 2;
+      const total = wNum + wKurai + 4;
       let cx = rankCx - total / 2;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = COL.slate800;
       ctx.font = numFont;
       ctx.fillText(String(rank), cx, rankCy);
-      cx += wNum + 2;
+      cx += wNum + 4;
       ctx.fillStyle = COL.slate500;
       ctx.font = labelFont;
-      ctx.fillText('位', cx, rankCy + 4);
+      ctx.fillText('位', cx, rankCy + 6);
     } else {
       drawText('-', rankCx, rankCy, 16, 'center', COL.slate300, 'normal');
     }
