@@ -551,9 +551,23 @@ export default function TeamScoreInput({
     return init;
   });
 
+  // 選手名はスコア決定を待たずに即時保存（団体戦リーグのみ。トーナメントは決定時に保存）
   const handlePlayerChange = useCallback((mt: MatchType, key: 'p1a'|'p1b'|'p2a'|'p2b', value: string) => {
-    setScores(prev => ({ ...prev, [mt]: { ...(prev[mt] as SubMatchState), [key]: value } }));
-  }, []);
+    setScores(prev => {
+      const current = (prev[mt] as SubMatchState | undefined) ?? {
+        score1: '', score2: '', tiebreakScore: '',
+        p1a: '', p1b: '', p2a: '', p2b: '',
+      };
+      const updated = { ...current, [key]: value };
+      if (!isBracket) {
+        const isSingles = playersPerSubMatch(mt) === 1;
+        const p1 = (isSingles ? [updated.p1a] : [updated.p1a, updated.p1b]).map(x => x.trim()).filter(Boolean);
+        const p2 = (isSingles ? [updated.p2a] : [updated.p2a, updated.p2b]).map(x => x.trim()).filter(Boolean);
+        updateSubMatchPlayers(matchId, mt, p1, p2);
+      }
+      return { ...prev, [mt]: updated };
+    });
+  }, [isBracket, matchId, updateSubMatchPlayers]);
 
   // ピッカー状態管理
   const [picker, setPicker] = useState<{
