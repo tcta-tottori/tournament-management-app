@@ -317,10 +317,25 @@ export async function generateTeamLeagueResultDataUrl(
   // 左: 「Aリーグ」を1つの大きな角丸ピルバッジにまとめる
   // 「男子8部」など既に "部" を含む場合は "リーグ" を重ねない
   const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
+  // 「男子1部」など数字を含むラベルは「数字 大 + 文字 小」で描画する
+  const numberMatch = pillText.match(/^(.*?)(\d+)(.*)$/);
   const pillH = 92;
+  const bigFont = '900 64px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const smallFont = '900 32px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   ctx.save();
-  ctx.font = '900 52px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  const pillTextW = ctx.measureText(pillText).width;
+  let pillTextW: number;
+  if (numberMatch) {
+    const [, prefix, num, suffix] = numberMatch;
+    ctx.font = smallFont;
+    const wPre = ctx.measureText(prefix).width;
+    const wSuf = ctx.measureText(suffix).width;
+    ctx.font = bigFont;
+    const wNum = ctx.measureText(num).width;
+    pillTextW = wPre + wNum + wSuf;
+  } else {
+    ctx.font = bigFont;
+    pillTextW = ctx.measureText(pillText).width;
+  }
   ctx.restore();
   const pillPadX = 34;
   const pillW = pillTextW + pillPadX * 2;
@@ -348,12 +363,29 @@ export async function generateTeamLeagueResultDataUrl(
   // 内側ボーダー
   drawRoundRect(pillX + 1.5, pillY + 1.5, pillW - 3, pillH - 3, pillH / 2 - 1.5, undefined, 'rgba(255,255,255,0.4)', 1);
 
-  // バッジ内テキスト「Aリーグ」（大きく中央）
+  // バッジ内テキスト
   ctx.fillStyle = COL.white;
-  ctx.font = '900 52px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
+  if (numberMatch) {
+    const [, prefix, num, suffix] = numberMatch;
+    let cx = pillX + (pillW - pillTextW) / 2;
+    const cy = pillY + pillH / 2 + 2;
+    ctx.font = smallFont;
+    const wPre = ctx.measureText(prefix).width;
+    ctx.fillText(prefix, cx, cy);
+    cx += wPre;
+    ctx.font = bigFont;
+    const wNum = ctx.measureText(num).width;
+    ctx.fillText(num, cx, cy);
+    cx += wNum;
+    ctx.font = smallFont;
+    ctx.fillText(suffix, cx, cy);
+  } else {
+    ctx.textAlign = 'center';
+    ctx.font = bigFont;
+    ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
+  }
 
   const badgeSize = pillH; // 以降の参照用（ヘッダー配置のため）
 
@@ -515,8 +547,9 @@ export async function generateTeamLeagueResultDataUrl(
     for (let i = 0; i < TYPE_ORDER.length; i++) {
       const mt = TYPE_ORDER[i];
       const tc = TYPE_COLORS[mt];
-      // シンプルなテキスト表示（バッジなし、種目色を活かす）
-      ctx.fillStyle = tc.fg;
+      // シンプルなテキスト表示（バッジなし）
+      // クラブ対抗戦は黒文字、ミックス大会は種目色を維持
+      ctx.fillStyle = matchFormat === 'club' ? COL.slate900 : tc.fg;
       ctx.font = '900 14px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
