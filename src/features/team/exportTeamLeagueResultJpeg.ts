@@ -145,7 +145,11 @@ export async function generateTeamLeagueResultDataUrl(
   const paddingY = 26;
   const headerH = 110; // 角丸バッジ + 大会名 + 会場ロゴ
   const colHeaderH = 44;
-  const rowH = 146;
+  // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて行高を調整
+  const _subCountForRow = TYPE_ORDER.length;
+  const _baseOverallH = 38;
+  const _perSubH = 36;
+  const rowH = _baseOverallH + _perSubH * _subCountForRow;
   const numColW = 60;       // チーム番号専用列
   const nameColW = 168;     // チーム名（番号と分離したのでやや細く）
   const typeColW = 54;
@@ -421,7 +425,8 @@ export async function generateTeamLeagueResultDataUrl(
   // 各行レイアウト: 上部の総合勝敗 + 3サブ行
   const overallAreaH = 38;
   const subAreaH = rowH - overallAreaH;
-  const subH = subAreaH / 3;
+  const subCount = TYPE_ORDER.length;
+  const subH = subAreaH / subCount;
 
   // ---- 各行の描画 ----
   for (let rowIdx = 0; rowIdx < teamCount; rowIdx++) {
@@ -434,7 +439,7 @@ export async function generateTeamLeagueResultDataUrl(
     }
 
     const subAreaTop = rowTop + overallAreaH;
-    const subCenters = [0, 1, 2].map(i => subAreaTop + subH * i + subH / 2);
+    const subCenters = Array.from({ length: subCount }, (_, i) => subAreaTop + subH * i + subH / 2);
 
     // --- 番号列 (バッジなし、専用列に大きな数字) ---
     const numColCenterX = tableX + numColW / 2;
@@ -475,7 +480,7 @@ export async function generateTeamLeagueResultDataUrl(
     // サブ行の境界線
     const subRowRightEdge = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
     drawLine(typeColX, subAreaTop, subRowRightEdge, subAreaTop, COL.slate200, 0.8);
-    for (let i = 1; i < 3; i++) {
+    for (let i = 1; i < subCount; i++) {
       const y = subAreaTop + subH * i;
       drawLine(typeColX, y, subRowRightEdge, y, COL.slate100, 0.6);
     }

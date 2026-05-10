@@ -71,7 +71,11 @@ export async function generateTeamBracketResultDataUrl(
   const paddingY = 26;
   const headerH = 110;
   const matchW = 260;
-  const matchH = 158; // チーム名2段 + サブマッチ3行 + ステータス
+  // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて高さを調整
+  // 158 = チーム名2段 + サブマッチ3行 + ステータス
+  // 5行のときはサブマッチ分だけ拡張
+  const _baseMatchH = 158;
+  const matchH = _baseMatchH + Math.max(0, TYPE_ORDER.length - 3) * 22;
   const roundGap = 44;
   const matchGap = 22;
 
@@ -491,7 +495,7 @@ export async function generateTeamBracketResultDataUrl(
     const subAreaH2 = matchH - (subAreaY - cy) - 10;
     drawLine(cx + 8, subAreaY, cx + matchW - 8, subAreaY, COL.slate200, 1);
 
-    const subRowH = subAreaH2 / 3;
+    const subRowH = subAreaH2 / TYPE_ORDER.length;
     for (let i = 0; i < TYPE_ORDER.length; i++) {
       const mt = TYPE_ORDER[i];
       const sub = match.subMatches.find(s => s.type === mt);
