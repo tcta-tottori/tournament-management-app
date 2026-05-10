@@ -200,6 +200,9 @@ export async function generateTeamLeagueResultDataUrl(
     slate700: '#334155',
     slate800: '#1e293b',
     slate900: '#0f172a',
+    // 勝敗スコア用：勝ち=赤、負け=グレー
+    winRed: '#dc2626',
+    loseGray: '#94a3b8',
     // 上位3チームのメダル風グラデ
     gold:   { c1: '#fde68a', c2: '#f59e0b', c3: '#b45309', text: '#7c2d12' },
     silver: { c1: '#f1f5f9', c2: '#cbd5e1', c3: '#64748b', text: '#334155' },
@@ -287,7 +290,8 @@ export async function generateTeamLeagueResultDataUrl(
   const leagueId = league.leagueId.trim();
 
   // 左: 「Aリーグ」を1つの大きな角丸ピルバッジにまとめる
-  const pillText = `${leagueId}リーグ`;
+  // 「男子8部」など既に "部" を含む場合は "リーグ" を重ねない
+  const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
   const pillH = 92;
   ctx.save();
   ctx.font = '900 52px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
@@ -578,7 +582,8 @@ export async function generateTeamLeagueResultDataUrl(
           : NAME_FONT;
         const oppNameFont = NAME_FONT;
         const nameColor = COL.slate700;
-        const scoreColor = leftIsWinner ? tc.fg : COL.slate500;
+        // 自チームの勝ち試合は赤、負け試合はグレー
+        const scoreColor = leftIsWinner ? COL.winRed : COL.loseGray;
 
         // 【中央揃えレイアウト】
         // スコア（"6 - 4"）をセル中央に配置し、左右の選手名はスコアを挟むように配置する。
