@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Download, ImageIcon, Loader2, X, Pencil, RotateCcw } from 'lucide-react';
 import { generateTeamLeagueResultDataUrl } from './exportTeamLeagueResultJpeg';
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding } from './types';
+import { useTeamStore } from './teamStore';
 
 interface Props {
   league: TeamLeague;
@@ -26,6 +27,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
   const [showEdit, setShowEdit] = useState(false);
   // 選手名の手動上書き: { 元の名前: 表示名 }
   const [playerOverrides, setPlayerOverrides] = useState<Record<string, string>>({});
+  const matchFormat = useTeamStore(s => s.tournamentInfo?.matchFormat);
 
   // リーグ内の全選手名（重複除去）
   const allPlayerNames = useMemo(() => {
@@ -50,7 +52,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
     let isMounted = true;
     setIsLoading(true);
 
-    generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerOverrides)
+    generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -63,7 +65,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, league, standings, matches, allTeams, tournamentName, playerOverrides]);
+  }, [isOpen, league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat]);
 
   const handleDownload = () => {
     if (!dataUrl) return;

@@ -6,7 +6,7 @@ import type {
   TeamPhase, TeamTournamentInfo, ExcelSheetData, SubMatchScore,
   MatchType, BracketSubMatchScore, TeamMember, TiebreakRuleId
 } from './types';
-import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, MATCH_TYPE_ORDER, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
+import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, getMatchTypeOrder, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
 
 /**
  * ブラケット再構築用ヘルパ。slotsArray と byePositions から R1 のマッチを組み、
@@ -20,10 +20,12 @@ function rebuildBracketObject(
   byePositions: Set<number> | undefined,
   allTeams: TeamEntry[],
   excludeTeamIds?: Set<string>,
+  matchFormat?: import('./types').MatchFormat,
 ): TeamPlacementBracket {
   const drawSize = slotsArray.length;
   const totalRounds = Math.log2(drawSize);
   const matches: TeamBracketMatch[] = [];
+  const matchTypeOrder = getMatchTypeOrder(matchFormat);
 
   for (let round = 1; round <= totalRounds; round++) {
     const matchesInRound = drawSize / Math.pow(2, round);
@@ -37,7 +39,7 @@ function rebuildBracketObject(
         matchId, category: bracket.category, round, position: pos,
         team1Id: null, team2Id: null, team1Name: '', team2Name: '',
         team1League: '', team2League: '',
-        subMatches: MATCH_TYPE_ORDER.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
+        subMatches: matchTypeOrder.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
         winsTeam1: 0, winsTeam2: 0,
         winnerId: null, status: 'waiting' as const, isBye: false,
         nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
@@ -349,7 +351,7 @@ export const useTeamStore = create<TeamState>()(
       generateBrackets: () => {
         const { leagues, leagueMatches, allTeams, tournamentInfo, rankOverrides } = get();
         const standings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, get().tiebreakOrder);
-        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders, tournamentInfo?.matchFormat);
         set({ brackets, currentPhase: 'tournament' });
       },
 
@@ -634,6 +636,7 @@ export const useTeamStore = create<TeamState>()(
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
           if (bracketIdx === -1) return state;
           const bracket = state.brackets[bracketIdx];
+          const matchTypeOrder = getMatchTypeOrder(state.tournamentInfo?.matchFormat);
           const reorderedTeams = newOrder.map((teamId, i) => {
             const existing = bracket.teams.find(t => t.teamId === teamId);
             if (existing) return { ...existing, seedPosition: i + 1 };
@@ -658,7 +661,7 @@ export const useTeamStore = create<TeamState>()(
                 matchId, category, round, position: pos,
                 team1Id: null, team2Id: null, team1Name: '', team2Name: '',
                 team1League: '', team2League: '',
-                subMatches: MATCH_TYPE_ORDER.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
+                subMatches: matchTypeOrder.map(type => ({ type, score1: null, score2: null, tiebreakScore: null, winnerId: null })),
                 winsTeam1: 0, winsTeam2: 0,
                 winnerId: null, status: 'waiting', isBye: false,
                 nextMatchId, nextSlot: nextMatchId ? nextSlot : null,
@@ -718,7 +721,7 @@ export const useTeamStore = create<TeamState>()(
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
           if (bracketIdx === -1) return state;
           const bracket = state.brackets[bracketIdx];
-          const newBracket = rebuildBracketObject(bracket, slotsArray, byePositions, state.allTeams);
+          const newBracket = rebuildBracketObject(bracket, slotsArray, byePositions, state.allTeams, undefined, state.tournamentInfo?.matchFormat);
           const newBrackets = [...state.brackets];
           newBrackets[bracketIdx] = newBracket;
           return { brackets: newBrackets };
@@ -749,14 +752,14 @@ export const useTeamStore = create<TeamState>()(
                 srcByes.add(i);
               }
             }
-            newBrackets[idx] = rebuildBracketObject(source, srcSlots, srcByes, state.allTeams, removedIds);
+            newBrackets[idx] = rebuildBracketObject(source, srcSlots, srcByes, state.allTeams, removedIds, state.tournamentInfo?.matchFormat);
           }
 
           // Step 2: ターゲットブラケットを再構築
           const targetIdx = newBrackets.findIndex(b => b.category === targetCategory);
           if (targetIdx !== -1) {
             const target = newBrackets[targetIdx];
-            newBrackets[targetIdx] = rebuildBracketObject(target, targetSlots, targetByes, state.allTeams);
+            newBrackets[targetIdx] = rebuildBracketObject(target, targetSlots, targetByes, state.allTeams, undefined, state.tournamentInfo?.matchFormat);
           }
 
           return { brackets: newBrackets };
@@ -773,7 +776,7 @@ export const useTeamStore = create<TeamState>()(
           const isCompleted = lMatches.length > 0 && lMatches.every(m => m.status === 'finished');
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
-        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders, get().tournamentInfo?.matchFormat);
         set({ brackets, bracketCourtAssignments: {} });
       },
 
@@ -786,7 +789,7 @@ export const useTeamStore = create<TeamState>()(
           const isCompleted = lMatches.length > 0 && lMatches.every(m => m.status === 'finished');
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
-        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders, tournamentInfo?.matchFormat);
         const preservedCategories = new Set<string>();
         for (const oldB of oldBrackets) {
           const hasRealProgress = oldB.matches.some(m => m.status === 'finished' || m.status === 'playing');

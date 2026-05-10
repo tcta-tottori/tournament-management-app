@@ -3,7 +3,7 @@ import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuf
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT, MATCH_TYPE_ORDER, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel } from './teamLogic';
+import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel, playersPerSubMatch } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -322,9 +322,10 @@ export default function TeamBracketView() {
                   m => m.round === round && m.team1Id && m.team2Id && !m.isBye
                 );
                 for (const m of roundMatches) {
-                  for (const mt of MATCH_TYPE_ORDER) {
-                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
-                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                  for (const sm of m.subMatches) {
+                    const players = playersPerSubMatch(sm.type) === 1 ? ['田中'] : ['田中', '山本'];
+                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, sm.type, 6, 4, null);
+                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, sm.type, players, players);
                   }
                   useTeamStore.getState().advanceWinner(m.matchId);
                 }
@@ -348,9 +349,10 @@ export default function TeamBracketView() {
                   m => m.round === round && m.team1Id && m.team2Id && !m.isBye
                 );
                 for (const m of roundMatches) {
-                  for (const mt of MATCH_TYPE_ORDER) {
-                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, mt, 6, 4, null);
-                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, mt, ['田中', '山本'], ['田中', '山本']);
+                  for (const sm of m.subMatches) {
+                    const players = playersPerSubMatch(sm.type) === 1 ? ['田中'] : ['田中', '山本'];
+                    useTeamStore.getState().updateBracketSubMatchScore(m.matchId, sm.type, 6, 4, null);
+                    useTeamStore.getState().updateBracketSubMatchPlayers(m.matchId, sm.type, players, players);
                   }
                   useTeamStore.getState().advanceWinner(m.matchId);
                 }

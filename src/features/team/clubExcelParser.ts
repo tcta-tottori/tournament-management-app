@@ -3,7 +3,7 @@ import type {
   TeamEntry, TeamLeague, TeamLeagueMatch, TeamMember, TeamTournamentInfo,
   MatchOrderEntry,
 } from './types';
-import { MATCH_TYPE_ORDER } from './teamLogic';
+import { MATCH_TYPE_ORDER_CLUB } from './teamLogic';
 
 /** 3チームリーグの対戦順 */
 const MATCH_ORDER_3: MatchOrderEntry[] = [
@@ -106,6 +106,7 @@ function extractTournamentInfo(wb: XLSX.WorkBook, fileName: string): TeamTournam
     date: '',
     venue: 'ヤマタスポーツパーク',
     rules: [],
+    matchFormat: 'club',
   };
 
   let titleText = '';
@@ -435,7 +436,7 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
         matchNumber: mo.matchNumber,
         team1Id: team1.teamId,
         team2Id: team2.teamId,
-        subMatches: MATCH_TYPE_ORDER.map(type => ({
+        subMatches: MATCH_TYPE_ORDER_CLUB.map(type => ({
           type,
           score1: null, score2: null, tiebreakScore: null, winnerId: null,
         })),

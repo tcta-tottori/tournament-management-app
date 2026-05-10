@@ -1,15 +1,21 @@
-import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory } from './types';
-import { resolveBracketLabel } from './teamLogic';
+import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
+import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
 
-/** 種目表示順 */
-const TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
-const TYPE_LABEL: Record<MatchType, string> = { MIX: 'Mix', WD: 'WD', MD: 'MD' };
+const TYPE_LABEL: Record<MatchType, string> = {
+  MIX: 'Mix', WD: 'WD', MD: 'MD',
+  D1: 'D1', D2: 'D2', D3: 'D3', S1: 'S1', S2: 'S2',
+};
 
 /** 種目別カラー（画面側・予選リーグ結果と統一） */
 const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }> = {
   MIX: { bg: '#ede9fe', fg: '#6d28d9', accent: '#8b5cf6' }, // violet
   WD:  { bg: '#fce7f3', fg: '#be185d', accent: '#ec4899' }, // pink
   MD:  { bg: '#e0f2fe', fg: '#0369a1', accent: '#0ea5e9' }, // sky
+  D3:  { bg: '#dbeafe', fg: '#1d4ed8', accent: '#3b82f6' }, // blue
+  D2:  { bg: '#cffafe', fg: '#0e7490', accent: '#06b6d4' }, // cyan
+  D1:  { bg: '#ccfbf1', fg: '#0f766e', accent: '#14b8a6' }, // teal
+  S2:  { bg: '#fef3c7', fg: '#b45309', accent: '#f59e0b' }, // amber
+  S1:  { bg: '#fee2e2', fg: '#b91c1c', accent: '#ef4444' }, // red
 };
 
 /** カテゴリ別カラー（ヘッダーのバッジに使用） */
@@ -37,6 +43,7 @@ export async function generateTeamBracketResultDataUrl(
   _allTeams: TeamEntry[],
   tournamentName: string,
   customLabels?: Partial<Record<PlacementCategory, string>>,
+  matchFormat?: MatchFormat,
 ): Promise<string> {
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
@@ -45,6 +52,8 @@ export async function generateTeamBracketResultDataUrl(
     tryLoadImage(`${base}logo-venue.png`),
   ]);
 
+  // 試合形式に応じた種目順
+  const TYPE_ORDER = getMatchTypeOrder(matchFormat);
   const matches = bracket.matches;
   if (matches.length === 0) throw new Error('No matches');
 
@@ -583,8 +592,9 @@ export async function exportTeamBracketResultJpeg(
   allTeams: TeamEntry[],
   tournamentName: string,
   customLabels?: Partial<Record<PlacementCategory, string>>,
+  matchFormat?: MatchFormat,
 ) {
-  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels);
+  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${resolveBracketLabel(bracket.category, customLabels)}_結果_団体戦.jpg`;

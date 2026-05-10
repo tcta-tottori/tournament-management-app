@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Download, ImageIcon, Loader2, X } from 'lucide-react';
 import { generateTeamBracketResultDataUrl } from './exportTeamBracketResultJpeg';
 import { resolveBracketLabel } from './teamLogic';
+import { useTeamStore } from './teamStore';
 import type { TeamPlacementBracket, TeamEntry, PlacementCategory } from './types';
 
 interface Props {
@@ -16,6 +17,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const matchFormat = useTeamStore(s => s.tournamentInfo?.matchFormat);
 
   // モーダルを開くたびに最新コードで再生成する
   useEffect(() => {
@@ -27,7 +29,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
     let isMounted = true;
     setIsLoading(true);
 
-    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels)
+    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -40,7 +42,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, bracket, allTeams, tournamentName, customLabels]);
+  }, [isOpen, bracket, allTeams, tournamentName, customLabels, matchFormat]);
 
   const label = resolveBracketLabel(bracket.category, customLabels);
 
