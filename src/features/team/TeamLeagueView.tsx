@@ -137,26 +137,26 @@ function truncTeamName(name: string, max = 6): string {
 /**
  * プレイヤー名の表示コンポーネント
  * - 空白区切りで苗字のみ抽出
- * - 2文字以下 → そのまま表示
- * - 3文字 → 先頭2文字 + 1文字（小さめ、同姓補助）
- * - 4文字以上 → 先頭2文字のみ表示（フルネーム対策）
+ * - 3文字以下 → そのまま表示
+ * - 4文字 → 先頭3文字 + 1文字（小さめ、同姓補助）
+ * - 5文字以上 → 先頭3文字のみ表示（フルネーム対策）
  */
 function PlayerDisplay({ name }: { name: string }) {
   if (!name) return null;
   const famName = name.trim().split(/[\s\u3000]+/)[0] || name;
-  if (famName.length <= 2) {
+  if (famName.length <= 3) {
     return <span>{famName}</span>;
   }
-  if (famName.length === 3) {
+  if (famName.length === 4) {
     return (
       <span className="inline-flex items-baseline">
-        <span>{famName.slice(0, 2)}</span>
-        <span className="text-[0.6em] opacity-75 ml-px">{famName.slice(2)}</span>
+        <span>{famName.slice(0, 3)}</span>
+        <span className="text-[0.6em] opacity-75 ml-px">{famName.slice(3)}</span>
       </span>
     );
   }
-  // 4文字以上は苗字＋名前の可能性が高いので先頭2文字のみ
-  return <span>{famName.slice(0, 2)}</span>;
+  // 5文字以上は苗字＋名前の可能性が高いので先頭3文字のみ
+  return <span>{famName.slice(0, 3)}</span>;
 }
 
 /** 複数のプレイヤー名をスラッシュ区切りで表示 */

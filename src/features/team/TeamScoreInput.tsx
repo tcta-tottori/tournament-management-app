@@ -178,15 +178,27 @@ function PlayerPickerPopup({
   /** 表示名更新コールバック */
   onUpdateDisplayName?: (teamId: string, playerName: string, displayName: string | undefined) => void;
 }) {
-  const [manual, setManual] = useState(current || '');
+  // 既存値を「苗字 / 名前」に分解（空白区切りの先頭=苗字、残り=名前）
+  const initParts = (current || '').trim().split(/[\s　]+/);
+  const [manualSurname, setManualSurname] = useState(initParts[0] || '');
+  const [manualGiven, setManualGiven] = useState(initParts.slice(1).join(' ') || '');
   const [manualMode, setManualMode] = useState(false);
   const [showDisplayNameEdit, setShowDisplayNameEdit] = useState(false);
   const reactId = useId();
-  const uniqueName = `player-manual-${reactId.replace(/:/g, '')}`;
-  const manualInputRef = useRef<HTMLInputElement | null>(null);
+  const uniqueNameSurname = `player-manual-sn-${reactId.replace(/:/g, '')}`;
+  const uniqueNameGiven = `player-manual-gn-${reactId.replace(/:/g, '')}`;
+  const manualSurnameRef = useRef<HTMLInputElement | null>(null);
+  const manualGivenRef = useRef<HTMLInputElement | null>(null);
 
   const usedSet = useMemo(() => new Set(usedPlayers), [usedPlayers]);
-  const manualTrim = manual.trim();
+  // 苗字＋名前を結合した手動入力値（保存・重複判定用）
+  const manualCombined = (() => {
+    const sn = manualSurname.trim();
+    const gn = manualGiven.trim();
+    if (!sn && !gn) return '';
+    return gn ? `${sn} ${gn}` : sn;
+  })();
+  const manualTrim = manualCombined;
   const manualIsDuplicate = manualTrim.length > 0 && usedSet.has(manualTrim) && manualTrim !== current;
 
   const commit = (name: string) => {
@@ -199,7 +211,7 @@ function PlayerPickerPopup({
   const openManual = () => {
     setManualMode(true);
     // 次フレームでフォーカス（ユーザー操作起点なのでキーボード表示 OK）
-    setTimeout(() => manualInputRef.current?.focus(), 50);
+    setTimeout(() => manualSurnameRef.current?.focus(), 50);
   };
 
   return createPortal(
@@ -317,29 +329,54 @@ function PlayerPickerPopup({
           {manualMode ? (
             <form
               autoComplete="off"
-              onSubmit={e => { e.preventDefault(); if (manualTrim && !manualIsDuplicate) commit(manual); }}
+              onSubmit={e => { e.preventDefault(); if (manualTrim && !manualIsDuplicate) commit(manualCombined); }}
               className="space-y-1.5"
             >
-              <div className="flex gap-1.5">
-                <input
-                  ref={manualInputRef}
-                  type="text"
-                  value={manual}
-                  onChange={e => setManual(e.target.value)}
-                  placeholder="苗字を入力"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  name={uniqueName}
-                  data-lpignore="true"
-                  data-form-type="other"
-                  data-1p-ignore="true"
-                  enterKeyHint="done"
-                  className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                    manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
-                  }`}
-                />
+              <div className="flex gap-1.5 items-stretch">
+                <div className="flex-1 grid grid-cols-2 gap-1.5">
+                  <input
+                    ref={manualSurnameRef}
+                    type="text"
+                    value={manualSurname}
+                    onChange={e => setManualSurname(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        manualGivenRef.current?.focus();
+                      }
+                    }}
+                    placeholder="苗字"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    name={uniqueNameSurname}
+                    data-lpignore="true"
+                    data-form-type="other"
+                    data-1p-ignore="true"
+                    enterKeyHint="next"
+                    className={`px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
+                      manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
+                    }`}
+                  />
+                  <input
+                    ref={manualGivenRef}
+                    type="text"
+                    value={manualGiven}
+                    onChange={e => setManualGiven(e.target.value)}
+                    placeholder="名前（任意）"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    name={uniqueNameGiven}
+                    data-lpignore="true"
+                    data-form-type="other"
+                    data-1p-ignore="true"
+                    enterKeyHint="done"
+                    className={`px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 border-slate-300 ${theme.ring}`}
+                  />
+                </div>
                 <button
                   type="submit"
                   disabled={!manualTrim || manualIsDuplicate}
@@ -349,7 +386,12 @@ function PlayerPickerPopup({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setManualMode(false); setManual(current || ''); }}
+                  onClick={() => {
+                    setManualMode(false);
+                    const parts = (current || '').trim().split(/[\s　]+/);
+                    setManualSurname(parts[0] || '');
+                    setManualGiven(parts.slice(1).join(' ') || '');
+                  }}
                   className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
                 >
                   <X className="w-4 h-4" />
@@ -388,17 +430,17 @@ function PlayerPickerPopup({
 }
 
 /**
- * 表示名レンダリング: メイン文字 + 同姓補助文字（小さめ・下揃え）
- * nameStr が3文字以上の場合、先頭2文字をメイン、残りを小さいサブ文字として表示
+ * 表示名レンダリング: メイン文字（苗字、最大3文字）+ 同姓補助文字（小さめ・下揃え）
+ * - 3文字以下はそのまま表示
+ * - 4文字以上は先頭3文字をメイン、残りを小さいサブ文字として表示
  */
 function DisplayNameSpan({ name, className }: { name: string; className?: string }) {
   if (!name) return null;
-  // 2文字以下はそのまま
-  if (name.length <= 2) {
+  if (name.length <= 3) {
     return <span className={className}>{name}</span>;
   }
-  const main = name.slice(0, 2);
-  const sub = name.slice(2);
+  const main = name.slice(0, 3);
+  const sub = name.slice(3);
   return (
     <span className={`inline-flex items-baseline ${className || ''}`}>
       <span>{main}</span>
