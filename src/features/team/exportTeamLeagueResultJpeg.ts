@@ -579,10 +579,29 @@ export async function generateTeamLeagueResultDataUrl(
 
       if (colIdx === rowIdx) {
         // 対戦無しセル（同チーム同士の交点）
-        ctx.fillStyle = COL.slate100;
+        // 背景: ごく淡いベタ塗りで他と差別化（slate-50）
+        ctx.fillStyle = COL.slate50;
         ctx.fillRect(x + 0.5, rowTop + 0.5, scoreColW - 1, rowH - 1);
-        // 右肩下がりの斜め線：太く濃く描いて視認性を上げる
-        drawLine(x + 4, rowTop + 4, x + scoreColW - 4, rowTop + rowH - 4, COL.slate400, 3);
+        // 右肩下がりの斜め線：両端透明 → 中央 slate-300 のグラデで控えめにおしゃれに
+        ctx.save();
+        const lx0 = x + 10;
+        const ly0 = rowTop + 10;
+        const lx1 = x + scoreColW - 10;
+        const ly1 = rowTop + rowH - 10;
+        const lineGrad = ctx.createLinearGradient(lx0, ly0, lx1, ly1);
+        lineGrad.addColorStop(0,    'rgba(148, 163, 184, 0)');
+        lineGrad.addColorStop(0.15, 'rgba(148, 163, 184, 0.35)');
+        lineGrad.addColorStop(0.5,  'rgba(100, 116, 139, 0.55)');
+        lineGrad.addColorStop(0.85, 'rgba(148, 163, 184, 0.35)');
+        lineGrad.addColorStop(1,    'rgba(148, 163, 184, 0)');
+        ctx.strokeStyle = lineGrad;
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(lx0, ly0);
+        ctx.lineTo(lx1, ly1);
+        ctx.stroke();
+        ctx.restore();
         continue;
       }
 
