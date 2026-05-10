@@ -607,7 +607,8 @@ export default function TeamScoreInput({
     const s1 = s1Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score1);
     const s2 = s2Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score2);
     if (isNaN(s1) || isNaN(s2)) return;
-    if (s1 < 0 || s2 < 0 || s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) return;
+    // 範囲外（負数）はスキップ。上限は設けず、入力されたスコアをそのまま反映
+    if (s1 < 0 || s2 < 0) return;
     if (!isTerminated && s1 === s2) return;
 
     const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
@@ -801,7 +802,7 @@ export default function TeamScoreInput({
       if (isNaN(s1) || isNaN(s2)) return false;
       if (s1 < 0 || s2 < 0) return false;
       if (s1 === s2) return false;
-      if (s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) return false;
+      // 上限は設けず、入力されたスコアをそのまま反映する
     }
     return true;
   }, [scores, terminated, matchTypeOrder]);
