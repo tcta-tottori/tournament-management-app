@@ -376,9 +376,13 @@ export const useTeamStore = create<TeamState>()(
                 else if (sm.winnerId === m.team2Id) winsTeam2++;
               }
               const allFinished = newSubMatches.every(sm => sm.winnerId !== null || sm.terminated);
+              // 過半数（カウント対象種目の半分超）獲得で勝者確定
+              // 例) 3種目 → 2勝 / 5種目 → 3勝
+              const totalCounted = newSubMatches.filter(sm => !sm.terminated).length;
+              const majorityWins = Math.floor(totalCounted / 2) + 1;
               let winnerId: string | null = null;
-              if (winsTeam1 >= 2) winnerId = m.team1Id;
-              else if (winsTeam2 >= 2) winnerId = m.team2Id;
+              if (winsTeam1 >= majorityWins) winnerId = m.team1Id;
+              else if (winsTeam2 >= majorityWins) winnerId = m.team2Id;
               else if (allFinished && winsTeam1 !== winsTeam2) winnerId = winsTeam1 > winsTeam2 ? m.team1Id : m.team2Id;
               const nextStatus = (winnerId ? 'finished' : m.status) as TeamBracketMatch['status'];
               if (nextStatus === 'finished' && m.status !== 'finished') becameFinished = true;
@@ -870,7 +874,7 @@ export const useTeamStore = create<TeamState>()(
     }),
     {
       name: 'team-tournament-storage',
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
         if (version < 2 && persistedState && typeof persistedState === 'object') {
           const old = persistedState.bracketCourtAssignments || {};
@@ -886,6 +890,35 @@ export const useTeamStore = create<TeamState>()(
             }
           }
           persistedState.bracketCourtAssignments = next;
+        }
+        // v3: 過半数しきい値で勝者を再計算（5試合形式クラブ対抗戦の勝者誤判定を修正）
+        if (version < 3 && persistedState && typeof persistedState === 'object') {
+          const recompute = (m: any) => {
+            if (!m || !Array.isArray(m.subMatches)) return m;
+            let winsTeam1 = 0, winsTeam2 = 0;
+            for (const sm of m.subMatches) {
+              if (sm.terminated) continue;
+              if (sm.winnerId === m.team1Id) winsTeam1++;
+              else if (sm.winnerId === m.team2Id) winsTeam2++;
+            }
+            const totalCounted = m.subMatches.filter((sm: any) => !sm.terminated).length;
+            const majorityWins = Math.floor(totalCounted / 2) + 1;
+            const allFinished = m.subMatches.every((sm: any) => sm.winnerId !== null || sm.terminated);
+            let winnerId: string | null = null;
+            if (winsTeam1 >= majorityWins) winnerId = m.team1Id;
+            else if (winsTeam2 >= majorityWins) winnerId = m.team2Id;
+            else if (allFinished && winsTeam1 !== winsTeam2) winnerId = winsTeam1 > winsTeam2 ? m.team1Id : m.team2Id;
+            return { ...m, winsTeam1, winsTeam2, winnerId };
+          };
+          if (Array.isArray(persistedState.leagueMatches)) {
+            persistedState.leagueMatches = persistedState.leagueMatches.map(recompute);
+          }
+          if (Array.isArray(persistedState.brackets)) {
+            persistedState.brackets = persistedState.brackets.map((b: any) => ({
+              ...b,
+              matches: Array.isArray(b.matches) ? b.matches.map(recompute) : b.matches,
+            }));
+          }
         }
         return persistedState;
       },
