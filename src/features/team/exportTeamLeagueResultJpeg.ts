@@ -319,25 +319,28 @@ export async function generateTeamLeagueResultDataUrl(
   const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
   // 「男子1部」など数字を含むラベルは「数字 大 + 文字 小」で描画する
   const numberMatch = pillText.match(/^(.*?)(\d+)(.*)$/);
-  const pillH = 92;
+  const pillH = 96;
   const bigFont = '900 64px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   const smallFont = '900 32px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  // 混合サイズ描画時、prefix - number - suffix の間に控えめなギャップを入れる
+  const segGap = 8;
   ctx.save();
   let pillTextW: number;
   if (numberMatch) {
     const [, prefix, num, suffix] = numberMatch;
     ctx.font = smallFont;
-    const wPre = ctx.measureText(prefix).width;
-    const wSuf = ctx.measureText(suffix).width;
+    const wPre = prefix ? ctx.measureText(prefix).width : 0;
+    const wSuf = suffix ? ctx.measureText(suffix).width : 0;
     ctx.font = bigFont;
     const wNum = ctx.measureText(num).width;
-    pillTextW = wPre + wNum + wSuf;
+    const gapCount = (prefix ? 1 : 0) + (suffix ? 1 : 0);
+    pillTextW = wPre + wNum + wSuf + segGap * gapCount;
   } else {
     ctx.font = bigFont;
     pillTextW = ctx.measureText(pillText).width;
   }
   ctx.restore();
-  const pillPadX = 34;
+  const pillPadX = 40;
   const pillW = pillTextW + pillPadX * 2;
   const pillX = paddingX;
   const pillY = paddingY + 4;
@@ -373,16 +376,21 @@ export async function generateTeamLeagueResultDataUrl(
     let cx = pillX + (pillW - pillTextW) / 2;
     // 64px の数字を視覚的に中央配置する baseline 位置
     const baselineY = pillY + pillH / 2 + 64 * 0.34;
-    ctx.font = smallFont;
-    const wPre = ctx.measureText(prefix).width;
-    ctx.fillText(prefix, cx, baselineY);
-    cx += wPre;
+    if (prefix) {
+      ctx.font = smallFont;
+      const wPre = ctx.measureText(prefix).width;
+      ctx.fillText(prefix, cx, baselineY);
+      cx += wPre + segGap;
+    }
     ctx.font = bigFont;
     const wNum = ctx.measureText(num).width;
     ctx.fillText(num, cx, baselineY);
     cx += wNum;
-    ctx.font = smallFont;
-    ctx.fillText(suffix, cx, baselineY);
+    if (suffix) {
+      cx += segGap;
+      ctx.font = smallFont;
+      ctx.fillText(suffix, cx, baselineY);
+    }
   } else {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -479,7 +487,7 @@ export async function generateTeamLeagueResultDataUrl(
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];
     const x = tableX + numColW + nameColW + typeColW + scoreColW * i + scoreColW / 2;
-    drawText(team.teamName, x, tableY + colHeaderH / 2, 14, 'center', thColor, 'black', scoreColW - 10);
+    drawText(team.teamName, x, tableY + colHeaderH / 2, 18, 'center', thColor, 'black', scoreColW - 10);
   }
   let colCursor = tableX + numColW + nameColW + typeColW + scoreColW * teamCount;
   drawText('勝敗', colCursor + recordColW / 2, tableY + colHeaderH / 2, 12, 'center', thColor, 'black');
@@ -515,7 +523,7 @@ export async function generateTeamLeagueResultDataUrl(
     drawLine(tableX + numColW, tableY + colHeaderH, tableX + numColW, tableY + tableH, COL.slate200, 1);
 
     // --- チーム名列 ---
-    drawText(team.teamName, tableX + numColW + 14, rowTop + rowH / 2 - 8, 16, 'left', COL.slate900, 'bold', nameColW - 22);
+    drawText(team.teamName, tableX + numColW + 14, rowTop + rowH / 2 - 10, 22, 'left', COL.slate900, 'black', nameColW - 22);
 
     // 昇降格バッジ（クラブ対抗戦のみ、確定後に表示。右下に配置）
     if (standing) {
