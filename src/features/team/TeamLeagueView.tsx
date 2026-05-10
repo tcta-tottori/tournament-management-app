@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
-import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, getClubPromotionStatus } from './teamLogic';
+import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, resolveClubPromotionStatus, listClubPromotionOptions } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -279,6 +279,96 @@ function TiebreakRuleSettings() {
 
 /** 判定詳細ポップアップ */
 /**
+ * 昇降格バッジ手動切替ピッカー。クラブ対抗戦の各チームに対し、
+ * 「自動表示（順位ベース）」「<部別の選択肢>」「非表示」を切替できる。
+ */
+function PromotionPickerPopup({
+  teamName, options, autoLabel, override, onSelect, onClose,
+}: {
+  teamName: string;
+  /** 選択候補ラベル（例: ["総合優勝", "残留", "2部降格"]） */
+  options: string[];
+  /** 自動表示でのラベル（参考表示用、null は自動だと表示なし） */
+  autoLabel: string | null;
+  /** 現在のオーバーライド値（undefined = 自動、空文字 = 非表示、文字列 = 上書き） */
+  override: string | undefined;
+  /** label に null を渡すと自動表示、''を渡すと非表示、文字列で上書き */
+  onSelect: (label: string | null) => void;
+  onClose: () => void;
+}) {
+  const kindOf = (label: string): 'champion' | 'promote' | 'stay' | 'relegate' => {
+    if (label.includes('優勝')) return 'champion';
+    if (label.includes('昇格')) return 'promote';
+    if (label.includes('降格')) return 'relegate';
+    return 'stay';
+  };
+  const colorOf = (k: ReturnType<typeof kindOf>) =>
+    k === 'champion' ? 'bg-amber-500 text-white' :
+    k === 'promote'  ? 'bg-emerald-600 text-white' :
+    k === 'relegate' ? 'bg-rose-600 text-white' :
+                       'bg-slate-500 text-white';
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 px-4 py-3 text-white flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] opacity-80 font-bold uppercase tracking-wider">昇降格バッジ</div>
+            <div className="text-sm font-black truncate">{teamName}</div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-3 space-y-1.5">
+          <button
+            type="button"
+            onClick={() => onSelect(null)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
+              override === undefined
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="inline-flex w-5 h-5 rounded-full bg-slate-100 text-slate-500 items-center justify-center text-[10px] font-black">自</span>
+            <span className="flex-1 text-left">自動（順位から判定）</span>
+            {autoLabel && <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorOf(kindOf(autoLabel))}`}>{autoLabel}</span>}
+          </button>
+          {options.map(opt => {
+            const isActive = override === opt;
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => onSelect(opt)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
+                  isActive
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-black ${colorOf(kindOf(opt))}`}>{opt}</span>
+                <span className="flex-1 text-left text-slate-500">として表示</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => onSelect('')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
+              override === ''
+                ? 'border-slate-500 bg-slate-100 text-slate-700'
+                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <span className="inline-flex w-5 h-5 rounded-full bg-slate-200 text-slate-500 items-center justify-center text-[10px] font-black">×</span>
+            <span className="flex-1 text-left">バッジを非表示</span>
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
  * 勝率詳細ポップアップ：勝率の計算式・分母分子・参考統計（取得ポイント / ゲーム率）を提示。
  * クラブ対抗戦の特別ルール「勝率 → 取得ポイント → ゲーム率 → 直接対決」が分かるように
  * 並べる。
@@ -419,11 +509,12 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
 }
 
 export default function TeamLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo } = useTeamStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo, promotionOverrides, setPromotionOverride } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [winRateTarget, setWinRateTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [promotionTarget, setPromotionTarget] = useState<{ teamId: string; leagueId: string } | null>(null);
 
   // 試合形式に応じた種目順（クラブ対抗戦は D3,D2,D1,S2,S1。それ以外は MIX,WD,MD）
   const matchTypeOrder = useMemo(
@@ -608,20 +699,37 @@ export default function TeamLeagueView() {
                             </td>
                             <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20 relative`}>
                               <div className="truncate max-w-[180px]">{rowTeam.teamName}</div>
-                              {complete && standing && (() => {
-                                const promo = getClubPromotionStatus(league.leagueId, standing.rank);
-                                if (!promo) return null;
+                              {(() => {
+                                const override = promotionOverrides[rowTeam.teamId];
+                                const auto = standing ? resolveClubPromotionStatus(league.leagueId, standing.rank, override) : null;
+                                const promo = (override !== undefined || complete) ? auto : null;
+                                if (!promo) {
+                                  if (!listClubPromotionOptions(league.leagueId).length) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: league.leagueId })}
+                                      title="昇降格バッジを設定"
+                                      className="absolute bottom-0 right-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                                    >＋</button>
+                                  );
+                                }
                                 const cls = promo.kind === 'champion'
-                                  ? 'bg-amber-500 text-white'
+                                  ? 'bg-amber-500 text-white hover:bg-amber-600'
                                   : promo.kind === 'promote'
-                                  ? 'bg-emerald-600 text-white'
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                                   : promo.kind === 'relegate'
-                                  ? 'bg-rose-600 text-white'
-                                  : 'bg-slate-400 text-white';
+                                  ? 'bg-rose-600 text-white hover:bg-rose-700'
+                                  : 'bg-slate-500 text-white hover:bg-slate-600';
                                 return (
-                                  <span className={`absolute bottom-0 right-1 inline-flex items-center justify-center px-1 py-0.5 rounded text-[8px] lg:text-[9px] font-black tracking-wider shadow-sm ${cls}`}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: league.leagueId })}
+                                    title="クリックして表示を切替"
+                                    className={`absolute bottom-0 right-1 inline-flex items-center justify-center px-1 py-0.5 rounded text-[8px] lg:text-[9px] font-black tracking-wider shadow-sm transition-colors ${cls}`}
+                                  >
                                     {promo.label}
-                                  </span>
+                                  </button>
                                 );
                               })()}
                             </td>
@@ -835,21 +943,42 @@ export default function TeamLeagueView() {
                     </td>
                     <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20 relative`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
-                      {/* 昇降格バッジ（クラブ対抗戦のみ、リーグ確定後に表示） */}
-                      {leagueComplete && standing && (() => {
-                        const promo = getClubPromotionStatus(selectedLeague.leagueId, standing.rank);
-                        if (!promo) return null;
+                      {/* 昇降格バッジ（クラブ対抗戦のみ）。クリックで手動切替ピッカーを開く */}
+                      {(() => {
+                        const override = promotionOverrides[rowTeam.teamId];
+                        const auto = standing ? resolveClubPromotionStatus(selectedLeague.leagueId, standing.rank, override) : null;
+                        // 表示判定: 上書きがある or リーグ確定後の自動表示
+                        const promo = (override !== undefined || leagueComplete) ? auto : null;
+                        if (!promo) {
+                          // ピッカーを開く小さな編集ハンドル（クラブ対抗戦のみ）
+                          if (!listClubPromotionOptions(selectedLeague.leagueId).length) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: selectedLeague.leagueId })}
+                              title="昇降格バッジを設定"
+                              className="absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center w-4 h-4 lg:w-5 lg:h-5 rounded-full text-[9px] lg:text-[10px] font-black text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                            >
+                              ＋
+                            </button>
+                          );
+                        }
                         const cls = promo.kind === 'champion'
-                          ? 'bg-amber-500 text-white'
+                          ? 'bg-amber-500 text-white hover:bg-amber-600'
                           : promo.kind === 'promote'
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                           : promo.kind === 'relegate'
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-slate-400 text-white';
+                          ? 'bg-rose-600 text-white hover:bg-rose-700'
+                          : 'bg-slate-500 text-white hover:bg-slate-600';
                         return (
-                          <span className={`absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] lg:text-[10px] font-black tracking-wider shadow-sm ${cls}`}>
+                          <button
+                            type="button"
+                            onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: selectedLeague.leagueId })}
+                            title="クリックして表示を切替"
+                            className={`absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] lg:text-[10px] font-black tracking-wider shadow-sm transition-colors ${cls}`}
+                          >
                             {promo.label}
-                          </span>
+                          </button>
                         );
                       })()}
                     </td>
@@ -995,6 +1124,26 @@ export default function TeamLeagueView() {
 
       {judgementTarget && <TiebreakDetailPopup standing={judgementTarget} onClose={() => setJudgementTarget(null)} />}
       {winRateTarget && <WinRateDetailPopup standing={winRateTarget} onClose={() => setWinRateTarget(null)} />}
+      {promotionTarget && (() => {
+        const teamName = leagues.flatMap(l => l.teams).find(t => t.teamId === promotionTarget.teamId)?.teamName ?? '';
+        const standing = allStandings.get(promotionTarget.leagueId)?.find(s => s.teamId === promotionTarget.teamId);
+        const auto = standing ? resolveClubPromotionStatus(promotionTarget.leagueId, standing.rank, undefined) : null;
+        const options = listClubPromotionOptions(promotionTarget.leagueId);
+        const current = promotionOverrides[promotionTarget.teamId];
+        return (
+          <PromotionPickerPopup
+            teamName={teamName}
+            options={options}
+            autoLabel={auto?.label || null}
+            override={current}
+            onSelect={(label) => {
+              setPromotionOverride(promotionTarget.teamId, label);
+              setPromotionTarget(null);
+            }}
+            onClose={() => setPromotionTarget(null)}
+          />
+        );
+      })()}
 
       {/* 対戦順 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">

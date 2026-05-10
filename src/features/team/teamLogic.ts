@@ -81,6 +81,48 @@ export interface PromotionStatus {
   kind: 'champion' | 'promote' | 'stay' | 'relegate';
 }
 
+/**
+ * クラブ対抗戦の昇降格バッジを解決する。手動オーバーライド優先、なければ
+ * 自動算出（rank と leagueId）にフォールバック。
+ *
+ * - override に空文字を入れると "非表示" として扱う（null を返す）。
+ * - override にラベル文字列が入っていれば、その文字列を表示。kind は
+ *   既知ラベルから推定（不明なら 'stay'）。
+ */
+export function resolveClubPromotionStatus(
+  leagueId: string,
+  rank: number,
+  override: string | undefined,
+): PromotionStatus | null {
+  if (override !== undefined) {
+    if (override === '') return null; // 明示的に非表示
+    return { label: override, kind: inferPromotionKind(override) };
+  }
+  return getClubPromotionStatus(leagueId, rank);
+}
+
+function inferPromotionKind(label: string): PromotionStatus['kind'] {
+  if (label.includes('総合優勝') || label.includes('優勝')) return 'champion';
+  if (label.includes('昇格')) return 'promote';
+  if (label.includes('降格')) return 'relegate';
+  return 'stay';
+}
+
+/**
+ * 指定されたリーグ ID（"男子N部"等）に対して、表示候補として提示可能な
+ * ラベルの一覧を返す。手動切替UIのドロップダウン用。
+ */
+export function listClubPromotionOptions(leagueId: string): string[] {
+  const m = leagueId.match(/(\d+)\s*部/);
+  if (!m) return [];
+  const div = parseInt(m[1], 10);
+  if (div === 1) return ['総合優勝', '残留', '2部降格'];
+  if (div === 2) return ['1部昇格', '残留', '3部降格'];
+  if (div >= 3 && div <= 7) return [`${div - 1}部昇格`, '残留', `${div + 1}部降格`];
+  if (div === 8) return ['7部昇格', '残留', '降格'];
+  return [];
+}
+
 export function getClubPromotionStatus(
   leagueId: string,
   rank: number,
