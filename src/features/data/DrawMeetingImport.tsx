@@ -11,6 +11,7 @@ import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
 import { parseTeamExcel } from '../team/teamExcelParser';
+import { parseClubExcel } from '../team/clubExcelParser';
 import type { TeamTournamentInfo, TeamLeague, TeamLeagueMatch } from '../team/types';
 import { useTeamStore } from '../team/teamStore';
 import { useNavigate } from 'react-router-dom';
@@ -589,6 +590,20 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   // --- 外部から渡されたExcelデータ（GDriveからDL済み）を処理 ---
   const processExcelArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
     try {
+      // クラブ対抗戦は団体戦形式で扱う
+      if (/クラブ対抗/.test(fileName)) {
+        try {
+          const clubResult = parseClubExcel(arrayBuffer, fileName);
+          if (clubResult.leagues.length > 0) {
+            setTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName });
+            setTeamEditName(clubResult.info.name);
+            setTeamEditDate(clubResult.info.date);
+            setTeamEditVenue(clubResult.info.venue);
+            return;
+          }
+        } catch { /* fall through */ }
+      }
+
       const result = parseDrawExcel(arrayBuffer, fileName);
       if (!result.events || result.events.length === 0) {
         // ミックス大会フォーマットを試行
@@ -726,6 +741,19 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     reader.onload = (e) => {
       try {
         const arrayBuffer = e.target?.result as ArrayBuffer;
+        // クラブ対抗戦は団体戦形式で扱う
+        if (/クラブ対抗/.test(file.name)) {
+          try {
+            const clubResult = parseClubExcel(arrayBuffer, file.name);
+            if (clubResult.leagues.length > 0) {
+              setTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name });
+              setTeamEditName(clubResult.info.name);
+              setTeamEditDate(clubResult.info.date);
+              setTeamEditVenue(clubResult.info.venue);
+              return;
+            }
+          } catch { /* fall through */ }
+        }
         const result = parseDrawExcel(arrayBuffer, file.name);
         if (!result.events || result.events.length === 0) {
           // ドロー検出失敗 → ミックス大会フォーマットを試行
