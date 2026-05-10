@@ -491,6 +491,8 @@ interface Props {
   team1Members?: TeamMember[];
   /** team2のメンバー（表示名生成用） */
   team2Members?: TeamMember[];
+  /** 1セット獲得に必要なゲーム数（6 or 8）。タイブレークは N+1 になる。 */
+  winGames?: number;
 }
 
 interface SubMatchState {
@@ -503,14 +505,17 @@ interface SubMatchState {
   p2b: string;
 }
 
-/** Default winning game count for team matches */
-const WIN_GAMES = 6;
+/** Default winning game count for team matches（リーグ規定によって6 or 8） */
+const DEFAULT_WIN_GAMES = 6;
 
 export default function TeamScoreInput({
   matchId, team1Id, team2Id, team1Name, team2Name, subMatches, onClose, isBracket = false,
   team1Roster = [], team2Roster = [],
   team1Members = [], team2Members = [],
+  winGames = DEFAULT_WIN_GAMES,
 }: Props) {
+  // ローカルでは WIN_GAMES として扱う（後方互換のため変数名を維持）
+  const WIN_GAMES = winGames;
   const {
     updateSubMatchScore, clearSubMatchScore, updateSubMatchPlayers,
     updateBracketSubMatchScore, clearBracketSubMatchScore,
@@ -608,7 +613,7 @@ export default function TeamScoreInput({
     const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
     const tb = isTb && s.tiebreakScore ? parseInt(s.tiebreakScore) : null;
     updateFn(matchId, mt, s1, s2, tb, isTerminated);
-  }, [isBracket, matchId, subMatches,
+  }, [isBracket, matchId, subMatches, WIN_GAMES,
       updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore]);
 
   // 自動保存：scores / terminated 変更時に保留 onChange と整合をとる念のためのバックアップ
@@ -752,7 +757,7 @@ export default function TeamScoreInput({
         }
       }
     }
-  }, [scores, matchTypeOrder, terminated, persistSubMatch]);
+  }, [scores, matchTypeOrder, terminated, persistSubMatch, WIN_GAMES]);
 
   const handleTiebreakChange = useCallback((matchType: MatchType, value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
@@ -775,7 +780,7 @@ export default function TeamScoreInput({
         }, 100);
       }
     }
-  }, [scores, matchTypeOrder, terminated, persistSubMatch]);
+  }, [scores, matchTypeOrder, terminated, persistSubMatch, WIN_GAMES]);
 
   // Validate all sub-matches that have been filled
   const validate = useCallback((): boolean => {

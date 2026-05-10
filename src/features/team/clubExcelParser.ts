@@ -448,9 +448,9 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
     }
   }
 
-  // ゲームルールのデフォルト
+  // ゲームルールのデフォルト（3チームリーグは8ゲーム、4・5チームリーグは6ゲーム）
   info.gameRules = info.gameRules || {};
-  if (!info.gameRules[3]) info.gameRules[3] = '6ゲームマッチ（6-6タイブレーク・ノーアド）';
+  if (!info.gameRules[3]) info.gameRules[3] = '8ゲームマッチ（8-8タイブレーク・ノーアド）';
   if (!info.gameRules[4]) info.gameRules[4] = '6ゲーム先取（ノーアド）';
   if (!info.gameRules[5]) info.gameRules[5] = '6ゲーム先取（ノーアド）';
   info.bracketGameRule = info.bracketGameRule || '6ゲームマッチ（6-6タイブレーク・ノーアド）';

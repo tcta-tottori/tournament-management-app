@@ -961,6 +961,15 @@ export default function TeamLeagueView() {
         const t2Members = team2?.members || [];
         const t1Roster = Array.from(new Set(t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean)));
         const t2Roster = Array.from(new Set(t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean)));
+        // 試合形式から1セット獲得に必要なゲーム数を解決（gameRules を team 数で参照）
+        const editingLeague = leagues.find(l => l.leagueId === editingMatch.leagueId);
+        const teamCount = editingLeague?.teams.length ?? 4;
+        const ruleStr = tournamentInfo?.gameRules?.[teamCount] ?? '';
+        const winGames = (() => {
+          const m = ruleStr.match(/(\d+)\s*ゲーム/);
+          const n = m ? parseInt(m[1], 10) : NaN;
+          return Number.isFinite(n) && n > 0 ? n : 6;
+        })();
         return (
           <TeamScoreInput
             matchId={editingMatch.matchId}
@@ -973,6 +982,7 @@ export default function TeamLeagueView() {
             team1Members={t1Members}
             team2Members={t2Members}
             team2Roster={t2Roster}
+            winGames={winGames}
             onClose={() => setEditingMatch(null)}
           />
         );
