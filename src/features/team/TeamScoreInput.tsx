@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil, OctagonX } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { SubMatchScore, MatchType, BracketSubMatchScore } from './types';
-import { MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
+import { MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts, playersPerSubMatch } from './teamLogic';
 import type { TeamMember } from './types';
 
 /** Full-width to half-width number conversion */
@@ -752,13 +752,14 @@ export default function TeamScoreInput({
       updateFn(matchId, mt, s1, s2, tb, isTerminated);
     }
 
-    // 選手名は団体戦リーグのみ保存
+    // 選手名は団体戦リーグのみ保存（シングルスは1名のみ）
     if (!isBracket) {
       for (const mt of matchTypeOrder) {
         const s = scores[mt];
         if (!s) continue;
-        const p1 = [s.p1a, s.p1b].map(x => x.trim()).filter(Boolean);
-        const p2 = [s.p2a, s.p2b].map(x => x.trim()).filter(Boolean);
+        const isSingles = playersPerSubMatch(mt) === 1;
+        const p1 = (isSingles ? [s.p1a] : [s.p1a, s.p1b]).map(x => x.trim()).filter(Boolean);
+        const p2 = (isSingles ? [s.p2a] : [s.p2a, s.p2b]).map(x => x.trim()).filter(Boolean);
         updateSubMatchPlayers(matchId, mt, p1, p2);
       }
     }
@@ -1041,43 +1042,54 @@ export default function TeamScoreInput({
                     )}
                   </div>
 
-                  {/* 選手名選択（対戦チーム別カラー: 左=オレンジ, 右=グリーン） */}
-                  <div className="mt-3 pt-2.5 border-t border-white/60 grid grid-cols-2 gap-2">
-                    <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[1].bg}`}>
-                      <div className={`text-[9px] font-black truncate ${TEAM_THEME[1].textStrong} uppercase tracking-wider`}>{team1Name}</div>
-                      <div className="grid grid-cols-2 gap-1">
-                        <PlayerPickerButton
-                          value={s.p1a}
-                          placeholder="選手1"
-                          teamTheme={TEAM_THEME[1]}
-                          onClick={() => setPicker({ mt, key: 'p1a', side: 1 })}
-                        />
-                        <PlayerPickerButton
-                          value={s.p1b}
-                          placeholder="選手2"
-                          teamTheme={TEAM_THEME[1]}
-                          onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
-                        />
+                  {/* 選手名選択（対戦チーム別カラー: 左=オレンジ, 右=グリーン）。
+                      シングルス（S1/S2）は各チーム1名のみ選択。 */}
+                  {(() => {
+                    const isSingles = playersPerSubMatch(mt) === 1;
+                    const slotsClass = isSingles ? 'grid-cols-1' : 'grid-cols-2';
+                    return (
+                      <div className="mt-3 pt-2.5 border-t border-white/60 grid grid-cols-2 gap-2">
+                        <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[1].bg}`}>
+                          <div className={`text-[9px] font-black truncate ${TEAM_THEME[1].textStrong} uppercase tracking-wider`}>{team1Name}</div>
+                          <div className={`grid ${slotsClass} gap-1`}>
+                            <PlayerPickerButton
+                              value={s.p1a}
+                              placeholder={isSingles ? '選手' : '選手1'}
+                              teamTheme={TEAM_THEME[1]}
+                              onClick={() => setPicker({ mt, key: 'p1a', side: 1 })}
+                            />
+                            {!isSingles && (
+                              <PlayerPickerButton
+                                value={s.p1b}
+                                placeholder="選手2"
+                                teamTheme={TEAM_THEME[1]}
+                                onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[2].bg}`}>
+                          <div className={`text-[9px] font-black truncate ${TEAM_THEME[2].textStrong} uppercase tracking-wider`}>{team2Name}</div>
+                          <div className={`grid ${slotsClass} gap-1`}>
+                            <PlayerPickerButton
+                              value={s.p2a}
+                              placeholder={isSingles ? '選手' : '選手1'}
+                              teamTheme={TEAM_THEME[2]}
+                              onClick={() => setPicker({ mt, key: 'p2a', side: 2 })}
+                            />
+                            {!isSingles && (
+                              <PlayerPickerButton
+                                value={s.p2b}
+                                placeholder="選手2"
+                                teamTheme={TEAM_THEME[2]}
+                                onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className={`space-y-1 rounded-lg p-1.5 ${TEAM_THEME[2].bg}`}>
-                      <div className={`text-[9px] font-black truncate ${TEAM_THEME[2].textStrong} uppercase tracking-wider`}>{team2Name}</div>
-                      <div className="grid grid-cols-2 gap-1">
-                        <PlayerPickerButton
-                          value={s.p2a}
-                          placeholder="選手1"
-                          teamTheme={TEAM_THEME[2]}
-                          onClick={() => setPicker({ mt, key: 'p2a', side: 2 })}
-                        />
-                        <PlayerPickerButton
-                          value={s.p2b}
-                          placeholder="選手2"
-                          teamTheme={TEAM_THEME[2]}
-                          onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -1095,7 +1107,7 @@ export default function TeamScoreInput({
             }`}
           >
             <Save size={14} />
-            決定 {filledCount > 0 && `(${filledCount}/3)`}
+            決定 {filledCount > 0 && `(${filledCount}/${matchTypeOrder.length})`}
           </button>
 
           {/* Clear / Cancel + 時刻 */}
