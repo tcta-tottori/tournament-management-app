@@ -65,6 +65,54 @@ export function getDisplayName(
   return getDisplayNameParts(player, allMembers).full;
 }
 
+/**
+ * クラブ対抗戦の昇降格ステータス
+ * - 1部: 1位=総合優勝、2位=残留、3-4位=2部降格
+ * - 2部: 1-2位=1部昇格、3位=残留、4位=3部降格
+ * - 3〜7部: 1位=（N-1）部昇格、2-3位=残留、4位=（N+1）部降格
+ * - 8部: 1位=7部昇格、2位=残留、3位=降格
+ *
+ * leagueId は "男子N部" / "女子N部" 等を想定。N が取れない leagueId は null を返す。
+ */
+export interface PromotionStatus {
+  /** 表示用ラベル（例：「総合優勝」「1部昇格」「2部降格」「残留」） */
+  label: string;
+  /** 種別（バッジカラー切り替え用） */
+  kind: 'champion' | 'promote' | 'stay' | 'relegate';
+}
+
+export function getClubPromotionStatus(
+  leagueId: string,
+  rank: number,
+): PromotionStatus | null {
+  const m = leagueId.match(/(\d+)\s*部/);
+  if (!m) return null;
+  const div = parseInt(m[1], 10);
+  if (!Number.isFinite(div) || div < 1) return null;
+
+  if (div === 1) {
+    if (rank === 1) return { label: '総合優勝', kind: 'champion' };
+    if (rank === 2) return { label: '残留', kind: 'stay' };
+    return { label: '2部降格', kind: 'relegate' };
+  }
+  if (div === 2) {
+    if (rank <= 2) return { label: '1部昇格', kind: 'promote' };
+    if (rank === 3) return { label: '残留', kind: 'stay' };
+    return { label: '3部降格', kind: 'relegate' };
+  }
+  if (div >= 3 && div <= 7) {
+    if (rank === 1) return { label: `${div - 1}部昇格`, kind: 'promote' };
+    if (rank <= 3) return { label: '残留', kind: 'stay' };
+    return { label: `${div + 1}部降格`, kind: 'relegate' };
+  }
+  if (div === 8) {
+    if (rank === 1) return { label: '7部昇格', kind: 'promote' };
+    if (rank === 2) return { label: '残留', kind: 'stay' };
+    return { label: '降格', kind: 'relegate' };
+  }
+  return null;
+}
+
 /** タイブレークルール定義 */
 export const TIEBREAK_RULE_LABELS: Record<TiebreakRuleId, string> = {
   points: '取得ポイント（種目勝利数）',
