@@ -1,5 +1,5 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
-import { getMatchTypeOrder } from './teamLogic';
+import { getMatchTypeOrder, getDisplayNameParts } from './teamLogic';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -93,6 +93,26 @@ export async function generateTeamLeagueResultDataUrl(
   // リーグカラー（A=青, B=緑, C=紫, D=ローズ, E=アンバー, ...）
   const lc = LEAGUE_COLORS[getLeagueColorIndex(league.leagueId)];
   const shortName = (name: string) => shortenPlayerName(name, playerNameOverrides);
+  // チームごとの「表示名 → 構造（main/sub）」マップ。同姓ディスアンビグの sub を
+  // 小文字描画するために使う。手動入力（メンバーに無い名前）は plain として扱う。
+  const partsLookupByTeam = new Map<string, Map<string, { main: string; sub: string }>>();
+  for (const t of league.teams) {
+    const m = new Map<string, { main: string; sub: string }>();
+    for (const member of t.members) {
+      const parts = getDisplayNameParts(member.player, t.members);
+      // 上書き名がある場合はそれをキーにも登録
+      m.set(parts.full, { main: parts.main, sub: parts.sub });
+      const overridden = playerNameOverrides[member.player.name];
+      if (overridden) m.set(overridden, { main: overridden, sub: '' });
+    }
+    partsLookupByTeam.set(t.teamId, m);
+  }
+  const getParts = (teamId: string, name: string): { main: string; sub: string } => {
+    const map = partsLookupByTeam.get(teamId);
+    const hit = map?.get(name);
+    if (hit) return hit;
+    return { main: name, sub: '' };
+  };
   // 試合形式に応じた種目順
   const TYPE_ORDER = getMatchTypeOrder(matchFormat);
   // 公式ロゴ・会場ロゴを事前に読み込む
@@ -107,7 +127,10 @@ export async function generateTeamLeagueResultDataUrl(
   const teamCount = teams.length;
 
   // ---- フォント定義 ----
-  const NAME_FONT = '500 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const NAME_FONT = '600 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const NAME_FONT_BOLD = '700 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const NAME_SUB_FONT = '500 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+  const NAME_SUB_FONT_BOLD = '700 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
   const SCORE_FONT = 'bold 18px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
 
   // ---- 対戦テキストの最大幅を事前計測して scoreColW を最適化 ----
@@ -569,25 +592,17 @@ export async function generateTeamLeagueResultDataUrl(
         const subWon = sub.winnerId === team.teamId;
         const myPlayers = (isTeam1 ? sub.players1 : sub.players2) || [];
         const oppPlayers = (isTeam1 ? sub.players2 : sub.players1) || [];
-        // 苗字2文字に短縮（手動上書きがあれば優先）
-        const myP = myPlayers.map(shortName).join('/') || '　';
-        const oppP = oppPlayers.map(shortName).join('/') || '　';
         const displayScoreText = `${myScore} - ${oppScore}`;
 
         // 左 = 行チーム（自分）、右 = 対戦相手。
         // 「左側が勝者のセル（subWon）」では左の選手名のみ太字にして強調する。
         const leftIsWinner = subWon;
-        const myNameFont = leftIsWinner
-          ? 'bold 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif'
-          : NAME_FONT;
-        const oppNameFont = NAME_FONT;
         const nameColor = COL.slate700;
         // 自チームの勝ち試合は赤、負け試合はグレー
         const scoreColor = leftIsWinner ? COL.winRed : COL.loseGray;
 
         // 【中央揃えレイアウト】
         // スコア（"6 - 4"）をセル中央に配置し、左右の選手名はスコアを挟むように配置する。
-        // これによりどの行のスコアも必ずセル中央で揃う。
         const cellCx = x + scoreColW / 2;
         const gap = CELL_GAP;
 
@@ -599,19 +614,65 @@ export async function generateTeamLeagueResultDataUrl(
         ctx.fillText(displayScoreText, cellCx, subY);
         const scoreW = ctx.measureText(displayScoreText).width;
 
-        // 左選手名 — スコア左側に右揃えで描画
-        ctx.font = myNameFont;
-        ctx.fillStyle = nameColor;
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(myP, cellCx - scoreW / 2 - gap, subY);
+        // 同姓ディスアンビグの1文字名は小文字（小さめ）で描画する
+        const drawPlayerList = (
+          players: string[],
+          tid: string,
+          edgeX: number,
+          y: number,
+          align: 'left' | 'right',
+          bold: boolean,
+        ) => {
+          const items = players.map(p => {
+            const short = shortName(p);
+            return getParts(tid, short);
+          });
+          const mainFont = bold ? NAME_FONT_BOLD : NAME_FONT;
+          const subFont = bold ? NAME_SUB_FONT_BOLD : NAME_SUB_FONT;
+          if (items.length === 0) {
+            ctx.font = mainFont;
+            ctx.fillStyle = nameColor;
+            ctx.textAlign = align;
+            ctx.textBaseline = 'middle';
+            ctx.fillText('　', edgeX, y);
+            return;
+          }
+          // 幅を測定
+          ctx.font = mainFont;
+          const sepW = ctx.measureText('/').width;
+          const widths = items.map(it => {
+            ctx.font = mainFont;
+            const mw = ctx.measureText(it.main).width;
+            ctx.font = subFont;
+            const sw = it.sub ? ctx.measureText(it.sub).width : 0;
+            return { mw, sw };
+          });
+          let totalW = 0;
+          widths.forEach((w, i) => { totalW += w.mw + w.sw; if (i > 0) totalW += sepW; });
+          let cx = align === 'right' ? edgeX - totalW : edgeX;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = nameColor;
+          for (let idx = 0; idx < items.length; idx++) {
+            ctx.font = mainFont;
+            ctx.fillText(items[idx].main, cx, y);
+            cx += widths[idx].mw;
+            if (items[idx].sub) {
+              ctx.font = subFont;
+              // ベースライン微調整：小文字はわずかに下げて視認性UP
+              ctx.fillText(items[idx].sub, cx, y + 1);
+              cx += widths[idx].sw;
+            }
+            if (idx < items.length - 1) {
+              ctx.font = mainFont;
+              ctx.fillText('/', cx, y);
+              cx += sepW;
+            }
+          }
+        };
 
-        // 右選手名 — スコア右側に左揃えで描画
-        ctx.font = oppNameFont;
-        ctx.fillStyle = nameColor;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(oppP, cellCx + scoreW / 2 + gap, subY);
+        drawPlayerList(myPlayers, team.teamId, cellCx - scoreW / 2 - gap, subY, 'right', leftIsWinner);
+        drawPlayerList(oppPlayers, oppTeam.teamId, cellCx + scoreW / 2 + gap, subY, 'left', false);
       }
     }
 
