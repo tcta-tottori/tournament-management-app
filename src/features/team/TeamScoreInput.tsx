@@ -1199,19 +1199,14 @@ export default function TeamScoreInput({
             })}
           </div>
 
-          {/* Save button */}
+          {/* 閉じるボタン（入力内容は常に自動保存されている） */}
           <button
             type="button"
-            onClick={handleSave}
-            disabled={filledCount === 0 || !validate()}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98] ${
-              filledCount > 0 && validate()
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+            onClick={onClose}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98] bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700"
           >
-            <Save size={14} />
-            決定 {filledCount > 0 && `(${filledCount}/${matchTypeOrder.length})`}
+            <Check size={14} />
+            閉じる {filledCount > 0 && `(${filledCount}/${matchTypeOrder.length} 自動保存済み)`}
           </button>
 
           {/* Clear / Cancel + 時刻 */}
