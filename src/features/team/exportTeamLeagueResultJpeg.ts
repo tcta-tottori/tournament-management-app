@@ -59,13 +59,14 @@ function getLeagueColorIndex(leagueId: string): number {
   return code;
 }
 
-/** 表示用選手名の短縮（苗字2文字） + 手動上書き */
+/** 表示用選手名の短縮（苗字最大3文字） + 手動上書き */
 function shortenPlayerName(name: string, overrides: Record<string, string>): string {
   if (overrides[name] !== undefined) return overrides[name];
   const trimmed = name.trim();
-  // 既に2文字以下ならそのまま、3文字以上なら先頭2文字
-  if (trimmed.length <= 2) return trimmed;
-  return trimmed.substring(0, 2);
+  // 苗字部分（空白前）を取り出して最大3文字
+  const famName = trimmed.split(/[\s　]+/)[0] || trimmed;
+  if (famName.length <= 3) return famName;
+  return famName.substring(0, 3);
 }
 
 /** 画像を読み込むヘルパー（失敗時は null） */

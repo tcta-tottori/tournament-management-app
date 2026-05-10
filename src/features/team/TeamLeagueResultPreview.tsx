@@ -13,11 +13,12 @@ interface Props {
   tournamentName: string;
 }
 
-/** 自動短縮（苗字2文字） */
+/** 自動短縮（苗字最大3文字） */
 function autoShortName(name: string): string {
   const trimmed = name.trim();
-  if (trimmed.length <= 2) return trimmed;
-  return trimmed.substring(0, 2);
+  const famName = trimmed.split(/[\s　]+/)[0] || trimmed;
+  if (famName.length <= 3) return famName;
+  return famName.substring(0, 3);
 }
 
 export function TeamLeagueResultPreview({ league, standings, matches, allTeams, tournamentName }: Props) {
@@ -162,7 +163,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
               <div className="border-b border-amber-200 bg-amber-50/50 shrink-0">
                 <div className="px-4 py-3 flex items-center justify-between">
                   <div className="text-xs font-bold text-amber-800">
-                    表示名を編集（空欄またはデフォルトで自動短縮: 苗字2文字）
+                    表示名を編集（空欄またはデフォルトで自動短縮: 苗字最大3文字）
                   </div>
                   <button
                     onClick={resetOverrides}
