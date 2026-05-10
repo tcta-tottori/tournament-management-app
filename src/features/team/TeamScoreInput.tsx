@@ -583,53 +583,42 @@ export default function TeamScoreInput({
     inputRefs.current[key] = el;
   }, []);
 
-  // 自動保存：スコア・打ち切りフラグの変更を即時 store に反映（リーグ・トーナメント共通）。
-  // 不完全（片側のみ・同点）な状態はスキップし、完全に空＆打ち切りなしならクリアする。
-  useEffect(() => {
+  // 自動保存ヘルパ：指定した種目のスコア・打ち切りフラグを store に書き込む
+  // （入力途中＝片側NaNや同点はスキップ。両側空＆打ち切りなしならクリア）
+  const persistSubMatch = useCallback((mt: MatchType, s: SubMatchState, isTerminated: boolean) => {
     const updateFn = isBracket ? updateBracketSubMatchScore : updateSubMatchScore;
     const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
+    const s1Empty = s.score1 === '';
+    const s2Empty = s.score2 === '';
+
+    if (s1Empty && s2Empty && !isTerminated) {
+      const existing = subMatches.find(sm => sm.type === mt);
+      if (existing && (existing.score1 !== null || existing.score2 !== null || existing.terminated)) {
+        clearFn(matchId, mt);
+      }
+      return;
+    }
+
+    const s1 = s1Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score1);
+    const s2 = s2Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score2);
+    if (isNaN(s1) || isNaN(s2)) return;
+    if (s1 < 0 || s2 < 0 || s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) return;
+    if (!isTerminated && s1 === s2) return;
+
+    const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
+    const tb = isTb && s.tiebreakScore ? parseInt(s.tiebreakScore) : null;
+    updateFn(matchId, mt, s1, s2, tb, isTerminated);
+  }, [isBracket, matchId, subMatches,
+      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore]);
+
+  // 自動保存：scores / terminated 変更時に保留 onChange と整合をとる念のためのバックアップ
+  useEffect(() => {
     for (const mt of matchTypeOrder) {
       const s = scores[mt];
       if (!s) continue;
-      const existing = subMatches.find(sm => sm.type === mt);
-      if (!existing) continue;
-      const isTerminated = !!terminated[mt];
-      const s1Empty = s.score1 === '';
-      const s2Empty = s.score2 === '';
-
-      // 完全に空 + 打ち切りなし → 既に保存済みならクリア
-      if (s1Empty && s2Empty && !isTerminated) {
-        if (existing.score1 !== null || existing.score2 !== null || existing.terminated) {
-          clearFn(matchId, mt);
-        }
-        continue;
-      }
-
-      const s1 = s1Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score1);
-      const s2 = s2Empty ? (isTerminated ? 0 : NaN) : parseInt(s.score2);
-      // 入力途中（NaN）はスキップ
-      if (isNaN(s1) || isNaN(s2)) continue;
-      // 範囲外もスキップ
-      if (s1 < 0 || s2 < 0 || s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) continue;
-      // 同点（打ち切り以外）はスキップ
-      if (!isTerminated && s1 === s2) continue;
-
-      const isTb = !isTerminated && ((s1 === WIN_GAMES + 1 && s2 === WIN_GAMES) || (s1 === WIN_GAMES && s2 === WIN_GAMES + 1));
-      const tb = isTb && s.tiebreakScore ? parseInt(s.tiebreakScore) : null;
-
-      // 既存値と同じなら何もしない（無駄な書き込み回避）
-      if (
-        existing.score1 === s1 &&
-        existing.score2 === s2 &&
-        (existing.tiebreakScore ?? null) === tb &&
-        (existing.terminated ?? false) === isTerminated
-      ) {
-        continue;
-      }
-      updateFn(matchId, mt, s1, s2, tb, isTerminated);
+      persistSubMatch(mt, s, !!terminated[mt]);
     }
-  }, [scores, terminated, isBracket, matchTypeOrder, subMatches, matchId,
-      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore]);
+  }, [scores, terminated, matchTypeOrder, persistSubMatch]);
 
   // Auto-focus first input
   useEffect(() => {
@@ -715,49 +704,45 @@ export default function TeamScoreInput({
   // Input handlers
   const handleScoreChange = useCallback((matchType: MatchType, field: 'score1' | 'score2', value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
-    setScores(prev => ({
-      ...prev,
-      [matchType]: { ...(prev[matchType] as SubMatchState), [field]: raw },
-    }));
+    // 次状態を計算してから setScores と persist を行う（× 早押しでも保存されるように同期保存）
+    setScores(prev => {
+      const currentBase = (prev[matchType] as SubMatchState | undefined) ?? {
+        score1: '', score2: '', tiebreakScore: '',
+        p1a: '', p1b: '', p2a: '', p2b: '',
+      };
+      let next: SubMatchState = { ...currentBase, [field]: raw };
+      // Auto-fill 仕様：1桁を入力した瞬間、相手側が空ならゲーム取得本数 (=WIN_GAMES) で埋める
+      if (raw.length === 1 && /^[0-9]$/.test(raw)) {
+        const num = parseInt(raw);
+        if (field === 'score1' && num < WIN_GAMES && next.score2 === '') {
+          next = { ...next, score2: WIN_GAMES.toString() };
+        } else if (field === 'score2' && num < WIN_GAMES && next.score1 === '') {
+          next = { ...next, score1: WIN_GAMES.toString() };
+        }
+      }
+      // 即時保存（× 早押し対策で同期実行）
+      persistSubMatch(matchType, next, !!terminated[matchType]);
+      return { ...prev, [matchType]: next };
+    });
 
-    // Auto-advance focus
+    // フォーカス遷移
     if (raw.length === 1 && /^[0-9]$/.test(raw)) {
       const num = parseInt(raw);
       if (field === 'score1') {
-        // Auto-fill opponent score if lower score entered
-        if (num < WIN_GAMES) {
-          setScores(prev => {
-            const current = prev[matchType] as SubMatchState;
-            if (current.score2 === '') {
-              return { ...prev, [matchType]: { ...current, score1: raw, score2: WIN_GAMES.toString() } };
-            }
-            return { ...prev, [matchType]: { ...current, score1: raw } };
-          });
-        }
         setTimeout(() => {
           inputRefs.current[`${matchType}-score2`]?.focus();
           inputRefs.current[`${matchType}-score2`]?.select();
         }, 50);
       } else {
-        // score2 changed
-        // Auto-fill score1 if needed
-        setScores(prev => {
-          const current = prev[matchType] as SubMatchState;
-          if (num < WIN_GAMES && current.score1 === '') {
-            return { ...prev, [matchType]: { ...current, score2: raw, score1: WIN_GAMES.toString() } };
-          }
-          return { ...prev, [matchType]: { ...current, score2: raw } };
-        });
-
         const s1 = parseInt((scores[matchType] as SubMatchState | undefined)?.score1 ?? '');
-        // Check if tiebreak
+        // タイブレーク時は TB 入力にフォーカス
         if ((s1 === WIN_GAMES + 1 && num === WIN_GAMES) || (s1 === WIN_GAMES && num === WIN_GAMES + 1)) {
           setTimeout(() => {
             inputRefs.current[`${matchType}-tiebreak`]?.focus();
             inputRefs.current[`${matchType}-tiebreak`]?.select();
           }, 50);
         } else {
-          // Advance to next match type's score1
+          // 次の種目の score1 へ
           const idx = matchTypeOrder.indexOf(matchType);
           if (idx >= 0 && idx < matchTypeOrder.length - 1) {
             const nextType = matchTypeOrder[idx + 1];
@@ -769,14 +754,19 @@ export default function TeamScoreInput({
         }
       }
     }
-  }, [scores, matchTypeOrder]);
+  }, [scores, matchTypeOrder, terminated, persistSubMatch]);
 
   const handleTiebreakChange = useCallback((matchType: MatchType, value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
-    setScores(prev => ({
-      ...prev,
-      [matchType]: { ...(prev[matchType] as SubMatchState), tiebreakScore: raw },
-    }));
+    setScores(prev => {
+      const currentBase = (prev[matchType] as SubMatchState | undefined) ?? {
+        score1: '', score2: '', tiebreakScore: '',
+        p1a: '', p1b: '', p2a: '', p2b: '',
+      };
+      const next: SubMatchState = { ...currentBase, tiebreakScore: raw };
+      persistSubMatch(matchType, next, !!terminated[matchType]);
+      return { ...prev, [matchType]: next };
+    });
 
     // Auto-advance to next match type on tiebreak entry
     if (raw.length >= 1) {
@@ -1010,7 +1000,13 @@ export default function TeamScoreInput({
                       )}
                       <button
                         type="button"
-                        onClick={() => setTerminated(prev => ({ ...prev, [mt]: !prev[mt] }))}
+                        onClick={() => {
+                          const nextTerminated = !terminated[mt];
+                          setTerminated(prev => ({ ...prev, [mt]: nextTerminated }));
+                          // 即時保存（×早押しでも反映）
+                          const s = scores[mt];
+                          if (s) persistSubMatch(mt, s, nextTerminated);
+                        }}
                         className={`flex items-center gap-1 px-2 h-6 rounded-md text-[10px] font-bold border transition-colors ${
                           terminated[mt]
                             ? 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600'
