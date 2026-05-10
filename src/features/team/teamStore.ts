@@ -559,6 +559,24 @@ export const useTeamStore = create<TeamState>()(
 
       updatePlayerDisplayName: (teamId, playerName, displayName) => {
         set(state => {
+          // 旧表示名（更新前）を計算しておき、既存の subMatch.players に同名が
+          // 含まれていたら新表示名にリネームする（追加・修正の反映）
+          const team = state.allTeams.find(t => t.teamId === teamId);
+          const oldDisplay = (() => {
+            const m = team?.members.find(x => x.player.name === playerName);
+            if (!m) return null;
+            // 旧 displayName が設定されていればそれ、未設定なら苗字3文字
+            if (m.player.displayName) return m.player.displayName;
+            const surname = (playerName || '').trim().split(/[\s　]+/)[0] || playerName;
+            return surname.slice(0, 3);
+          })();
+          const newDisplay = (displayName && displayName.trim())
+            ? displayName.trim()
+            : (() => {
+                const surname = (playerName || '').trim().split(/[\s　]+/)[0] || playerName;
+                return surname.slice(0, 3);
+              })();
+
           const updateMember = (t: TeamEntry): TeamEntry => {
             if (t.teamId !== teamId) return t;
             return {
@@ -570,9 +588,53 @@ export const useTeamStore = create<TeamState>()(
               ),
             };
           };
+
+          // 既存の subMatch.players1 / players2 の oldDisplay を newDisplay に置換
+          const renameInPlayers = (arr: string[] | undefined): string[] | undefined => {
+            if (!arr || !oldDisplay || oldDisplay === newDisplay) return arr;
+            let changed = false;
+            const next = arr.map(n => {
+              if ((n || '').trim() === oldDisplay) {
+                changed = true;
+                return newDisplay;
+              }
+              return n;
+            });
+            return changed ? next : arr;
+          };
+
+          const renamedLeagueMatches = state.leagueMatches.map(m => {
+            if (m.team1Id !== teamId && m.team2Id !== teamId) return m;
+            const isT1 = m.team1Id === teamId;
+            const subs = m.subMatches.map(sm => {
+              const next = isT1
+                ? { ...sm, players1: renameInPlayers(sm.players1) }
+                : { ...sm, players2: renameInPlayers(sm.players2) };
+              return next;
+            });
+            return { ...m, subMatches: subs };
+          });
+
+          const renamedBrackets = state.brackets.map(b => ({
+            ...b,
+            matches: b.matches.map(m => {
+              if (m.team1Id !== teamId && m.team2Id !== teamId) return m;
+              const isT1 = m.team1Id === teamId;
+              const subs = m.subMatches.map(sm => {
+                const next = isT1
+                  ? { ...sm, players1: renameInPlayers(sm.players1) }
+                  : { ...sm, players2: renameInPlayers(sm.players2) };
+                return next;
+              });
+              return { ...m, subMatches: subs };
+            }),
+          }));
+
           return {
             leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(updateMember) })),
             allTeams: state.allTeams.map(updateMember),
+            leagueMatches: renamedLeagueMatches,
+            brackets: renamedBrackets,
           };
         });
       },
