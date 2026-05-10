@@ -704,26 +704,24 @@ export default function TeamScoreInput({
   // Input handlers
   const handleScoreChange = useCallback((matchType: MatchType, field: 'score1' | 'score2', value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
-    // 次状態を計算してから setScores と persist を行う（× 早押しでも保存されるように同期保存）
-    setScores(prev => {
-      const currentBase = (prev[matchType] as SubMatchState | undefined) ?? {
-        score1: '', score2: '', tiebreakScore: '',
-        p1a: '', p1b: '', p2a: '', p2b: '',
-      };
-      let next: SubMatchState = { ...currentBase, [field]: raw };
-      // Auto-fill 仕様：1桁を入力した瞬間、相手側が空ならゲーム取得本数 (=WIN_GAMES) で埋める
-      if (raw.length === 1 && /^[0-9]$/.test(raw)) {
-        const num = parseInt(raw);
-        if (field === 'score1' && num < WIN_GAMES && next.score2 === '') {
-          next = { ...next, score2: WIN_GAMES.toString() };
-        } else if (field === 'score2' && num < WIN_GAMES && next.score1 === '') {
-          next = { ...next, score1: WIN_GAMES.toString() };
-        }
+    const currentBase = (scores[matchType] as SubMatchState | undefined) ?? {
+      score1: '', score2: '', tiebreakScore: '',
+      p1a: '', p1b: '', p2a: '', p2b: '',
+    };
+    let next: SubMatchState = { ...currentBase, [field]: raw };
+    // Auto-fill 仕様：1桁を入力した瞬間、相手側が空ならゲーム取得本数 (=WIN_GAMES) で埋める
+    if (raw.length === 1 && /^[0-9]$/.test(raw)) {
+      const num = parseInt(raw);
+      if (field === 'score1' && num < WIN_GAMES && next.score2 === '') {
+        next = { ...next, score2: WIN_GAMES.toString() };
+      } else if (field === 'score2' && num < WIN_GAMES && next.score1 === '') {
+        next = { ...next, score1: WIN_GAMES.toString() };
       }
-      // 即時保存（× 早押し対策で同期実行）
-      persistSubMatch(matchType, next, !!terminated[matchType]);
-      return { ...prev, [matchType]: next };
-    });
+    }
+    // local state を更新（updater は純粋）
+    setScores(prev => ({ ...prev, [matchType]: next }));
+    // store へ即時保存（× 早押しでもイベント終了時点で書き込み済み）
+    persistSubMatch(matchType, next, !!terminated[matchType]);
 
     // フォーカス遷移
     if (raw.length === 1 && /^[0-9]$/.test(raw)) {
@@ -734,7 +732,7 @@ export default function TeamScoreInput({
           inputRefs.current[`${matchType}-score2`]?.select();
         }, 50);
       } else {
-        const s1 = parseInt((scores[matchType] as SubMatchState | undefined)?.score1 ?? '');
+        const s1 = parseInt(next.score1);
         // タイブレーク時は TB 入力にフォーカス
         if ((s1 === WIN_GAMES + 1 && num === WIN_GAMES) || (s1 === WIN_GAMES && num === WIN_GAMES + 1)) {
           setTimeout(() => {
@@ -758,15 +756,13 @@ export default function TeamScoreInput({
 
   const handleTiebreakChange = useCallback((matchType: MatchType, value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
-    setScores(prev => {
-      const currentBase = (prev[matchType] as SubMatchState | undefined) ?? {
-        score1: '', score2: '', tiebreakScore: '',
-        p1a: '', p1b: '', p2a: '', p2b: '',
-      };
-      const next: SubMatchState = { ...currentBase, tiebreakScore: raw };
-      persistSubMatch(matchType, next, !!terminated[matchType]);
-      return { ...prev, [matchType]: next };
-    });
+    const currentBase = (scores[matchType] as SubMatchState | undefined) ?? {
+      score1: '', score2: '', tiebreakScore: '',
+      p1a: '', p1b: '', p2a: '', p2b: '',
+    };
+    const next: SubMatchState = { ...currentBase, tiebreakScore: raw };
+    setScores(prev => ({ ...prev, [matchType]: next }));
+    persistSubMatch(matchType, next, !!terminated[matchType]);
 
     // Auto-advance to next match type on tiebreak entry
     if (raw.length >= 1) {
@@ -779,7 +775,7 @@ export default function TeamScoreInput({
         }, 100);
       }
     }
-  }, [matchTypeOrder]);
+  }, [scores, matchTypeOrder, terminated, persistSubMatch]);
 
   // Validate all sub-matches that have been filled
   const validate = useCallback((): boolean => {
