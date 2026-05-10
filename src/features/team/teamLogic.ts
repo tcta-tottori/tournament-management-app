@@ -1,7 +1,7 @@
 import type {
   TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding,
   TeamPlacementBracket, PlacementCategory, TeamBracketMatch,
-  MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType,
+  MatchOrderEntry, TeamTournamentInfo, SubMatchScore, BracketSubMatchScore, MatchType, MatchFormat,
   TiebreakRuleId, TeamPlayer, TeamMember
 } from './types';
 
@@ -75,14 +75,30 @@ export const TIEBREAK_RULE_LABELS: Record<TiebreakRuleId, string> = {
 /** デフォルト判定順序 */
 export const DEFAULT_TIEBREAK_ORDER: TiebreakRuleId[] = ['points', 'gameRatio', 'headToHead'];
 
-/** 種目の対戦順（固定） */
-export const MATCH_TYPE_ORDER: MatchType[] = ['MIX', 'WD', 'MD'];
+/** 種目の対戦順（ミックス大会形式 = MIX/WD/MD の3種目） */
+export const MATCH_TYPE_ORDER_MIX: MatchType[] = ['MIX', 'WD', 'MD'];
+
+/** 種目の対戦順（クラブ対抗戦形式 = ダブルス3 → 2 → 1 → シングルス2 → 1） */
+export const MATCH_TYPE_ORDER_CLUB: MatchType[] = ['D3', 'D2', 'D1', 'S2', 'S1'];
+
+/** 互換用：既存のミックス大会と同じ並び（後方互換のため "MIX/WD/MD" のまま） */
+export const MATCH_TYPE_ORDER: MatchType[] = MATCH_TYPE_ORDER_MIX;
+
+/** 試合形式に応じた種目順を返す */
+export function getMatchTypeOrder(format?: MatchFormat | null): MatchType[] {
+  return format === 'club' ? MATCH_TYPE_ORDER_CLUB : MATCH_TYPE_ORDER_MIX;
+}
 
 /** 種目ラベル */
 export const MATCH_TYPE_LABELS: Record<MatchType, string> = {
   MIX: 'ミックスダブルス',
   WD: '女子ダブルス',
   MD: '男子ダブルス',
+  D1: 'ダブルス1',
+  D2: 'ダブルス2',
+  D3: 'ダブルス3',
+  S1: 'シングルス1',
+  S2: 'シングルス2',
 };
 
 /** 種目短縮ラベル */
@@ -90,7 +106,17 @@ export const MATCH_TYPE_SHORT: Record<MatchType, string> = {
   MIX: 'Mix',
   WD: 'WD',
   MD: 'MD',
+  D1: 'D1',
+  D2: 'D2',
+  D3: 'D3',
+  S1: 'S1',
+  S2: 'S2',
 };
+
+/** 種目あたりの選手数（シングルス=1名、ダブルス系=2名） */
+export function playersPerSubMatch(type: MatchType): 1 | 2 {
+  return type === 'S1' || type === 'S2' ? 1 : 2;
+}
 
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
@@ -130,9 +156,9 @@ function generateMatchOrder(n: number): MatchOrderEntry[] {
   return order;
 }
 
-/** 空のサブマッチ配列を生成 */
-function createEmptySubMatches(): SubMatchScore[] {
-  return MATCH_TYPE_ORDER.map(type => ({
+/** 空のサブマッチ配列を生成（試合形式を渡せばその種目順で生成） */
+function createEmptySubMatches(format?: MatchFormat): SubMatchScore[] {
+  return getMatchTypeOrder(format).map(type => ({
     type,
     score1: null,
     score2: null,
@@ -142,7 +168,7 @@ function createEmptySubMatches(): SubMatchScore[] {
 }
 
 /** リーグの試合データを再生成 */
-export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
+export function regenerateLeagueMatches(league: TeamLeague, format?: MatchFormat): TeamLeagueMatch[] {
   const matchOrder = generateMatchOrder(league.teams.length);
   const matches: TeamLeagueMatch[] = [];
   for (const mo of matchOrder) {
@@ -155,7 +181,7 @@ export function regenerateLeagueMatches(league: TeamLeague): TeamLeagueMatch[] {
       matchNumber: mo.matchNumber,
       team1Id: team1.teamId,
       team2Id: team2.teamId,
-      subMatches: createEmptySubMatches(),
+      subMatches: createEmptySubMatches(format),
       winnerId: null,
       winsTeam1: 0,
       winsTeam2: 0,
@@ -387,8 +413,8 @@ function bracketOrdersToSlots(entries: string[], drawSizeIn: number): (string | 
 }
 
 /** 空のブラケットサブマッチを生成 */
-function createEmptyBracketSubMatches(): BracketSubMatchScore[] {
-  return MATCH_TYPE_ORDER.map(type => ({
+function createEmptyBracketSubMatches(format?: MatchFormat): BracketSubMatchScore[] {
+  return getMatchTypeOrder(format).map(type => ({
     type,
     score1: null,
     score2: null,
@@ -404,7 +430,8 @@ export function generateAllBrackets(
   standings: Map<string, TeamLeagueStanding[]>,
   _allTeams: TeamEntry[],
   leagues: TeamLeague[],
-  bracketOrders?: TeamTournamentInfo['bracketOrders']
+  bracketOrders?: TeamTournamentInfo['bracketOrders'],
+  matchFormat?: MatchFormat,
 ): TeamPlacementBracket[] {
   // 3位と4位を分けるかどうかをbracketOrdersから判定
   const has3rd = bracketOrders?.['3rd'] && bracketOrders['3rd'].length > 0;
@@ -714,7 +741,7 @@ function generateBracketMatchesWithSlots(
         matchId, category, round, position: pos,
         team1Id: null, team2Id: null, team1Name: '', team2Name: '',
         team1League: '', team2League: '',
-        subMatches: createEmptyBracketSubMatches(),
+        subMatches: createEmptyBracketSubMatches(matchFormat),
         winsTeam1: 0, winsTeam2: 0,
         winnerId: null,
         status: 'waiting', isBye: false,

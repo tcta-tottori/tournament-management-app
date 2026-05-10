@@ -26,7 +26,10 @@ export interface TeamEntry {
 }
 
 /** 対戦種目 */
-export type MatchType = 'MIX' | 'WD' | 'MD';
+export type MatchType = 'MIX' | 'WD' | 'MD' | 'D1' | 'D2' | 'D3' | 'S1' | 'S2';
+
+/** 試合形式（ミックス大会=3種目 / クラブ対抗戦=ダブルス3+シングルス2 の5試合） */
+export type MatchFormat = 'mix' | 'club';
 
 /** 対戦順定義 */
 export interface MatchOrderEntry {
@@ -149,6 +152,8 @@ export interface TeamTournamentInfo {
   rules: string[];
   gameRules?: Record<number, string>;
   bracketGameRule?: string;
+  /** 試合形式（省略時は 'mix' = MIX/WD/MD の3種目） */
+  matchFormat?: MatchFormat;
   bracketOrders?: {
     '2nd'?: string[];
     '3rd'?: string[];

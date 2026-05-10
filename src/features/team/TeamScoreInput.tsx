@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Save, Trash2, Trophy, ChevronDown, Check, Users, Pencil, OctagonX } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { SubMatchScore, MatchType, BracketSubMatchScore } from './types';
-import { MATCH_TYPE_ORDER, MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
+import { MATCH_TYPE_LABELS, MATCH_TYPE_SHORT, getDisplayNameParts } from './teamLogic';
 import type { TeamMember } from './types';
 
 /** Full-width to half-width number conversion */
@@ -57,6 +57,61 @@ const MATCH_TYPE_THEME: Record<MatchType, MatchTheme> = {
     accentBorder: 'border-sky-300',
     softBg: 'bg-sky-100/60',
     btn: 'bg-white hover:bg-sky-50 border-sky-200 text-sky-700',
+  },
+  D3: {
+    grad: 'from-blue-500 to-indigo-500',
+    bg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
+    border: 'border-blue-200',
+    text: 'text-blue-700',
+    badge: 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white',
+    ring: 'focus:ring-blue-400 focus:border-blue-500',
+    accentBorder: 'border-blue-300',
+    softBg: 'bg-blue-100/60',
+    btn: 'bg-white hover:bg-blue-50 border-blue-200 text-blue-700',
+  },
+  D2: {
+    grad: 'from-cyan-500 to-blue-500',
+    bg: 'bg-gradient-to-br from-cyan-50 to-blue-50',
+    border: 'border-cyan-200',
+    text: 'text-cyan-700',
+    badge: 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white',
+    ring: 'focus:ring-cyan-400 focus:border-cyan-500',
+    accentBorder: 'border-cyan-300',
+    softBg: 'bg-cyan-100/60',
+    btn: 'bg-white hover:bg-cyan-50 border-cyan-200 text-cyan-700',
+  },
+  D1: {
+    grad: 'from-teal-500 to-cyan-500',
+    bg: 'bg-gradient-to-br from-teal-50 to-cyan-50',
+    border: 'border-teal-200',
+    text: 'text-teal-700',
+    badge: 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white',
+    ring: 'focus:ring-teal-400 focus:border-teal-500',
+    accentBorder: 'border-teal-300',
+    softBg: 'bg-teal-100/60',
+    btn: 'bg-white hover:bg-teal-50 border-teal-200 text-teal-700',
+  },
+  S2: {
+    grad: 'from-amber-500 to-orange-500',
+    bg: 'bg-gradient-to-br from-amber-50 to-orange-50',
+    border: 'border-amber-200',
+    text: 'text-amber-700',
+    badge: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white',
+    ring: 'focus:ring-amber-400 focus:border-amber-500',
+    accentBorder: 'border-amber-300',
+    softBg: 'bg-amber-100/60',
+    btn: 'bg-white hover:bg-amber-50 border-amber-200 text-amber-700',
+  },
+  S1: {
+    grad: 'from-red-500 to-rose-500',
+    bg: 'bg-gradient-to-br from-red-50 to-rose-50',
+    border: 'border-red-200',
+    text: 'text-red-700',
+    badge: 'bg-gradient-to-br from-red-500 to-rose-500 text-white',
+    ring: 'focus:ring-red-400 focus:border-red-500',
+    accentBorder: 'border-red-300',
+    softBg: 'bg-red-100/60',
+    btn: 'bg-white hover:bg-red-50 border-red-200 text-red-700',
   },
 };
 
@@ -420,10 +475,16 @@ export default function TeamScoreInput({
     updatePlayerDisplayName,
   } = useTeamStore();
 
-  // Local state for each sub-match (MIX, WD, MD)
-  const [scores, setScores] = useState<Record<MatchType, SubMatchState>>(() => {
-    const init: Record<MatchType, SubMatchState> = {} as any;
-    for (const mt of MATCH_TYPE_ORDER) {
+  // 試合に含まれる種目順（クラブ対抗戦は D3,D2,D1,S2,S1。ミックス大会は MIX,WD,MD）
+  const matchTypeOrder = useMemo(
+    () => subMatches.map(sm => sm.type),
+    [subMatches],
+  );
+
+  // 種目ごとのローカル state
+  const [scores, setScores] = useState<Partial<Record<MatchType, SubMatchState>>>(() => {
+    const init: Partial<Record<MatchType, SubMatchState>> = {};
+    for (const mt of matchTypeOrder) {
       const sm = subMatches.find(s => s.type === mt);
       init[mt] = {
         score1: sm?.score1 !== null && sm?.score1 !== undefined && sm.score1 >= 0 ? sm.score1.toString() : '',
@@ -439,9 +500,9 @@ export default function TeamScoreInput({
   });
 
   // 種目ごとの「打ち切り」フラグ（途中終了し勝利数にカウントしない）
-  const [terminated, setTerminated] = useState<Record<MatchType, boolean>>(() => {
-    const init: Record<MatchType, boolean> = {} as any;
-    for (const mt of MATCH_TYPE_ORDER) {
+  const [terminated, setTerminated] = useState<Partial<Record<MatchType, boolean>>>(() => {
+    const init: Partial<Record<MatchType, boolean>> = {};
+    for (const mt of matchTypeOrder) {
       const sm = subMatches.find(s => s.type === mt);
       init[mt] = !!sm?.terminated;
     }
@@ -449,7 +510,7 @@ export default function TeamScoreInput({
   });
 
   const handlePlayerChange = useCallback((mt: MatchType, key: 'p1a'|'p1b'|'p2a'|'p2b', value: string) => {
-    setScores(prev => ({ ...prev, [mt]: { ...prev[mt], [key]: value } }));
+    setScores(prev => ({ ...prev, [mt]: { ...(prev[mt] as SubMatchState), [key]: value } }));
   }, []);
 
   // ピッカー状態管理
@@ -469,14 +530,14 @@ export default function TeamScoreInput({
   // Auto-focus first input
   useEffect(() => {
     const timer = setTimeout(() => {
-      const firstInput = inputRefs.current[`${MATCH_TYPE_ORDER[0]}-score1`];
+      const firstInput = inputRefs.current[`${matchTypeOrder[0]}-score1`];
       if (firstInput) {
         firstInput.focus({ preventScroll: true });
         firstInput.select();
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, []);
+  }, [matchTypeOrder]);
 
   // Current time (HH:MM)
   const [nowTime, setNowTime] = useState(() => {
@@ -500,9 +561,10 @@ export default function TeamScoreInput({
 
   // Determine winner for each sub-match
   const subMatchWinners = useMemo(() => {
-    const result: Record<MatchType, { winner: 0 | 1 | 2; isTiebreak: boolean; loserSide: 0 | 1 | 2 }> = {} as any;
-    for (const mt of MATCH_TYPE_ORDER) {
+    const result: Partial<Record<MatchType, { winner: 0 | 1 | 2; isTiebreak: boolean; loserSide: 0 | 1 | 2 }>> = {};
+    for (const mt of matchTypeOrder) {
       const s = scores[mt];
+      if (!s) continue;
       const s1 = parseInt(s.score1);
       const s2 = parseInt(s.score2);
       let winner: 0 | 1 | 2 = 0;
@@ -524,31 +586,34 @@ export default function TeamScoreInput({
     return result;
   }, [scores]);
 
+  // 過半数（チーム勝利に必要な勝ち数）= 種目数の半分超
+  const majorityWins = Math.floor(matchTypeOrder.length / 2) + 1;
+
   // Win tally（打ち切り種目はカウントしない）
   const winTally = useMemo(() => {
     let t1 = 0, t2 = 0;
-    for (const mt of MATCH_TYPE_ORDER) {
+    for (const mt of matchTypeOrder) {
       if (terminated[mt]) continue;
-      const w = subMatchWinners[mt].winner;
+      const w = subMatchWinners[mt]?.winner ?? 0;
       if (w === 1) t1++;
       if (w === 2) t2++;
     }
     return { t1, t2 };
-  }, [subMatchWinners, terminated]);
+  }, [subMatchWinners, terminated, matchTypeOrder]);
 
-  // Overall winner detection (2+ wins)
+  // Overall winner detection（過半数獲得で確定）
   const overallWinner = useMemo(() => {
-    if (winTally.t1 >= 2) return 1;
-    if (winTally.t2 >= 2) return 2;
+    if (winTally.t1 >= majorityWins) return 1;
+    if (winTally.t2 >= majorityWins) return 2;
     return 0;
-  }, [winTally]);
+  }, [winTally, majorityWins]);
 
   // Input handlers
   const handleScoreChange = useCallback((matchType: MatchType, field: 'score1' | 'score2', value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
     setScores(prev => ({
       ...prev,
-      [matchType]: { ...prev[matchType], [field]: raw },
+      [matchType]: { ...(prev[matchType] as SubMatchState), [field]: raw },
     }));
 
     // Auto-advance focus
@@ -558,7 +623,7 @@ export default function TeamScoreInput({
         // Auto-fill opponent score if lower score entered
         if (num < WIN_GAMES) {
           setScores(prev => {
-            const current = prev[matchType];
+            const current = prev[matchType] as SubMatchState;
             if (current.score2 === '') {
               return { ...prev, [matchType]: { ...current, score1: raw, score2: WIN_GAMES.toString() } };
             }
@@ -573,14 +638,14 @@ export default function TeamScoreInput({
         // score2 changed
         // Auto-fill score1 if needed
         setScores(prev => {
-          const current = prev[matchType];
+          const current = prev[matchType] as SubMatchState;
           if (num < WIN_GAMES && current.score1 === '') {
             return { ...prev, [matchType]: { ...current, score2: raw, score1: WIN_GAMES.toString() } };
           }
           return { ...prev, [matchType]: { ...current, score2: raw } };
         });
 
-        const s1 = parseInt(scores[matchType].score1);
+        const s1 = parseInt((scores[matchType] as SubMatchState | undefined)?.score1 ?? '');
         // Check if tiebreak
         if ((s1 === WIN_GAMES + 1 && num === WIN_GAMES) || (s1 === WIN_GAMES && num === WIN_GAMES + 1)) {
           setTimeout(() => {
@@ -589,9 +654,9 @@ export default function TeamScoreInput({
           }, 50);
         } else {
           // Advance to next match type's score1
-          const idx = MATCH_TYPE_ORDER.indexOf(matchType);
-          if (idx < MATCH_TYPE_ORDER.length - 1) {
-            const nextType = MATCH_TYPE_ORDER[idx + 1];
+          const idx = matchTypeOrder.indexOf(matchType);
+          if (idx >= 0 && idx < matchTypeOrder.length - 1) {
+            const nextType = matchTypeOrder[idx + 1];
             setTimeout(() => {
               inputRefs.current[`${nextType}-score1`]?.focus();
               inputRefs.current[`${nextType}-score1`]?.select();
@@ -600,32 +665,33 @@ export default function TeamScoreInput({
         }
       }
     }
-  }, [scores]);
+  }, [scores, matchTypeOrder]);
 
   const handleTiebreakChange = useCallback((matchType: MatchType, value: string) => {
     const raw = toHalfWidth(value).replace(/[^0-9]/g, '');
     setScores(prev => ({
       ...prev,
-      [matchType]: { ...prev[matchType], tiebreakScore: raw },
+      [matchType]: { ...(prev[matchType] as SubMatchState), tiebreakScore: raw },
     }));
 
     // Auto-advance to next match type on tiebreak entry
     if (raw.length >= 1) {
-      const idx = MATCH_TYPE_ORDER.indexOf(matchType);
-      if (idx < MATCH_TYPE_ORDER.length - 1) {
-        const nextType = MATCH_TYPE_ORDER[idx + 1];
+      const idx = matchTypeOrder.indexOf(matchType);
+      if (idx >= 0 && idx < matchTypeOrder.length - 1) {
+        const nextType = matchTypeOrder[idx + 1];
         setTimeout(() => {
           inputRefs.current[`${nextType}-score1`]?.focus();
           inputRefs.current[`${nextType}-score1`]?.select();
         }, 100);
       }
     }
-  }, []);
+  }, [matchTypeOrder]);
 
   // Validate all sub-matches that have been filled
   const validate = useCallback((): boolean => {
-    for (const mt of MATCH_TYPE_ORDER) {
+    for (const mt of matchTypeOrder) {
       const s = scores[mt];
+      if (!s) continue;
       const isTerminated = terminated[mt];
       const s1 = parseInt(s.score1);
       const s2 = parseInt(s.score2);
@@ -643,16 +709,16 @@ export default function TeamScoreInput({
       if (s1 > WIN_GAMES + 1 || s2 > WIN_GAMES + 1) return false;
     }
     return true;
-  }, [scores, terminated]);
+  }, [scores, terminated, matchTypeOrder]);
 
   // Count how many sub-matches have been filled (打ち切りも件数に含む)
   const filledCount = useMemo(() => {
-    return MATCH_TYPE_ORDER.filter(mt => {
+    return matchTypeOrder.filter(mt => {
       if (terminated[mt]) return true;
       const s = scores[mt];
-      return s.score1 !== '' && s.score2 !== '';
+      return s ? s.score1 !== '' && s.score2 !== '' : false;
     }).length;
-  }, [scores, terminated]);
+  }, [scores, terminated, matchTypeOrder]);
 
   const handleSave = useCallback(() => {
     if (!validate()) return;
@@ -660,9 +726,10 @@ export default function TeamScoreInput({
     const updateFn = isBracket ? updateBracketSubMatchScore : updateSubMatchScore;
     const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
 
-    for (const mt of MATCH_TYPE_ORDER) {
+    for (const mt of matchTypeOrder) {
       const s = scores[mt];
-      const isTerminated = terminated[mt];
+      if (!s) continue;
+      const isTerminated = !!terminated[mt];
       const s1raw = parseInt(s.score1);
       const s2raw = parseInt(s.score2);
       // 打ち切り時はスコア未入力を 0 として保存（カウントには影響しない）
@@ -687,8 +754,9 @@ export default function TeamScoreInput({
 
     // 選手名は団体戦リーグのみ保存
     if (!isBracket) {
-      for (const mt of MATCH_TYPE_ORDER) {
+      for (const mt of matchTypeOrder) {
         const s = scores[mt];
+        if (!s) continue;
         const p1 = [s.p1a, s.p1b].map(x => x.trim()).filter(Boolean);
         const p2 = [s.p2a, s.p2b].map(x => x.trim()).filter(Boolean);
         updateSubMatchPlayers(matchId, mt, p1, p2);
@@ -696,16 +764,16 @@ export default function TeamScoreInput({
     }
 
     onClose();
-  }, [scores, terminated, matchId, isBracket, subMatches, onClose, validate,
+  }, [scores, terminated, matchId, isBracket, subMatches, onClose, validate, matchTypeOrder,
       updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore, updateSubMatchPlayers]);
 
   const handleClearAll = useCallback(() => {
     const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
-    for (const mt of MATCH_TYPE_ORDER) {
+    for (const mt of matchTypeOrder) {
       clearFn(matchId, mt);
     }
     onClose();
-  }, [matchId, isBracket, onClose, clearSubMatchScore, clearBracketSubMatchScore]);
+  }, [matchId, isBracket, onClose, clearSubMatchScore, clearBracketSubMatchScore, matchTypeOrder]);
 
   // Check if any sub-match has existing scores
   const hasExistingScores = subMatches.some(sm => sm.score1 !== null);
@@ -799,9 +867,10 @@ export default function TeamScoreInput({
 
           {/* Sub-match score rows */}
           <div className="space-y-3 mb-4">
-            {MATCH_TYPE_ORDER.map((mt) => {
+            {matchTypeOrder.map((mt) => {
               const s = scores[mt];
-              const info = subMatchWinners[mt];
+              if (!s) return null;
+              const info = subMatchWinners[mt] || { winner: 0 as 0 | 1 | 2, isTiebreak: false, loserSide: 0 as 0 | 1 | 2 };
               const hasScores = s.score1 !== '' && s.score2 !== '';
               const theme = MATCH_TYPE_THEME[mt];
 
@@ -911,13 +980,13 @@ export default function TeamScoreInput({
                       onChange={e => handleScoreChange(mt, 'score2', e.target.value)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
-                          const idx = MATCH_TYPE_ORDER.indexOf(mt);
-                          if (idx < MATCH_TYPE_ORDER.length - 1 && !info.isTiebreak) {
+                          const idx = matchTypeOrder.indexOf(mt);
+                          if (idx < matchTypeOrder.length - 1 && !info.isTiebreak) {
                             // Move to next row
-                            const nextType = MATCH_TYPE_ORDER[idx + 1];
+                            const nextType = matchTypeOrder[idx + 1];
                             inputRefs.current[`${nextType}-score1`]?.focus();
                             inputRefs.current[`${nextType}-score1`]?.select();
-                          } else if (idx === MATCH_TYPE_ORDER.length - 1 && !info.isTiebreak) {
+                          } else if (idx === matchTypeOrder.length - 1 && !info.isTiebreak) {
                             handleSave();
                           }
                         }
@@ -948,9 +1017,9 @@ export default function TeamScoreInput({
                           onChange={e => handleTiebreakChange(mt, e.target.value)}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
-                              const idx = MATCH_TYPE_ORDER.indexOf(mt);
-                              if (idx < MATCH_TYPE_ORDER.length - 1) {
-                                const nextType = MATCH_TYPE_ORDER[idx + 1];
+                              const idx = matchTypeOrder.indexOf(mt);
+                              if (idx < matchTypeOrder.length - 1) {
+                                const nextType = matchTypeOrder[idx + 1];
                                 inputRefs.current[`${nextType}-score1`]?.focus();
                               } else {
                                 handleSave();
@@ -1068,10 +1137,10 @@ export default function TeamScoreInput({
         // （現在編集中のスロット自体は除外することで、再選択・クリアが自然に動く）
         const usedPlayers: string[] = [];
         const sameSideKeys: Array<'p1a'|'p1b'|'p2a'|'p2b'> = isTeam1 ? ['p1a', 'p1b'] : ['p2a', 'p2b'];
-        for (const mt of MATCH_TYPE_ORDER) {
+        for (const mt of matchTypeOrder) {
           for (const k of sameSideKeys) {
             if (mt === pickerState.mt && k === pickerState.key) continue;
-            const val = scores[mt][k].trim();
+            const val = (scores[mt]?.[k] || '').trim();
             if (val) usedPlayers.push(val);
           }
         }

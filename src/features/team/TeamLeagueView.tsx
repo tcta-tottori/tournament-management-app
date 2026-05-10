@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
-import { calculateTeamStandings, MATCH_TYPE_ORDER, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
+import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -175,29 +175,31 @@ function PlayerListDisplay({ players }: { players: string[] }) {
 }
 
 /**
- * テスト入力用：チームのメンバーを上から順に取り出し、
- * 各種目（MIX / WD / MD）に2名ずつ割り当てた配列を返す。
- * メンバーが足りない場合は先頭に戻って巡回する。
+ * テスト入力用：チームのメンバーを上から順に取り出し、各種目に割り当てる。
+ * - ダブルス系種目（MIX/WD/MD/D1/D2/D3）は2名、シングルス（S1/S2）は1名
+ * - メンバーが足りない場合は先頭に戻って巡回する
  */
-function getTestPlayersForTeam(team: TeamEntry | undefined): Record<string, string[]> {
+function getTestPlayersForTeam(
+  team: TeamEntry | undefined,
+  matchTypeOrder: readonly string[],
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
   const fallback = ['田中', '山本'];
-  if (!team || team.members.length === 0) {
-    return { MIX: fallback, WD: fallback, MD: fallback };
+  const names = team && team.members.length > 0
+    ? team.members.map(m => familyName(m.player.name || '').trim() || '名無し')
+    : fallback;
+
+  let cursor = 0;
+  for (const mt of matchTypeOrder) {
+    const playerCount = (mt === 'S1' || mt === 'S2') ? 1 : 2;
+    const slots: string[] = [];
+    for (let i = 0; i < playerCount; i++) {
+      slots.push(names[(cursor + i) % names.length]);
+    }
+    result[mt] = slots;
+    cursor += playerCount;
   }
-  const names = team.members.map(m => {
-    const n = familyName(m.player.name || '').trim();
-    return n || '名無し';
-  });
-  const pick = (startIdx: number): string[] => {
-    const a = names[startIdx % names.length];
-    const b = names[(startIdx + 1) % names.length];
-    return [a, b];
-  };
-  return {
-    MIX: pick(0),
-    WD: pick(2),
-    MD: pick(4),
-  };
+  return result;
 }
 
 /** 種目カラー */
@@ -205,6 +207,11 @@ const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   MIX: { bg: 'bg-violet-100', text: 'text-violet-700' },
   WD:  { bg: 'bg-pink-100',   text: 'text-pink-700' },
   MD:  { bg: 'bg-sky-100',    text: 'text-sky-700' },
+  D3:  { bg: 'bg-blue-100',   text: 'text-blue-700' },
+  D2:  { bg: 'bg-cyan-100',   text: 'text-cyan-700' },
+  D1:  { bg: 'bg-teal-100',   text: 'text-teal-700' },
+  S2:  { bg: 'bg-amber-100',  text: 'text-amber-700' },
+  S1:  { bg: 'bg-red-100',    text: 'text-red-700' },
 };
 
 /** 順位（プレーンテキスト） */
@@ -347,6 +354,12 @@ export default function TeamLeagueView() {
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
+
+  // 試合形式に応じた種目順（クラブ対抗戦は D3,D2,D1,S2,S1。それ以外は MIX,WD,MD）
+  const matchTypeOrder = useMemo(
+    () => getMatchTypeOrder(tournamentInfo?.matchFormat),
+    [tournamentInfo?.matchFormat],
+  );
 
   const { rankOverrides } = useTeamStore();
   const allStandings = calculateTeamStandings(leagues, leagueMatches, rankOverrides, tiebreakOrder);
@@ -528,7 +541,7 @@ export default function TeamLeagueView() {
                             </td>
                             <td className={`px-0.5 py-1 lg:px-1 lg:py-2.5 align-middle border-r ${c.border} ${c.bg}/20`}>
                               <div className="flex flex-col gap-0.5 lg:gap-1 items-center">
-                                {MATCH_TYPE_ORDER.map(mt => {
+                                {matchTypeOrder.map(mt => {
                                   const tag = MATCH_TYPE_COLORS[mt];
                                   return (
                                     <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 lg:w-8 lg:h-4 rounded text-[8px] lg:text-[9px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
@@ -566,7 +579,7 @@ export default function TeamLeagueView() {
                                         {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                                       </div>
                                     )}
-                                    {MATCH_TYPE_ORDER.map(matchType => {
+                                    {matchTypeOrder.map(matchType => {
                                       const sub = match.subMatches.find(s => s.type === matchType);
                                       const myScore = isTeam1 ? sub?.score1 : sub?.score2;
                                       const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
@@ -641,9 +654,9 @@ export default function TeamLeagueView() {
             for (const m of leagueMatchList) {
               const t1 = allTeams.find(t => t.teamId === m.team1Id);
               const t2 = allTeams.find(t => t.teamId === m.team2Id);
-              const p1 = getTestPlayersForTeam(t1);
-              const p2 = getTestPlayersForTeam(t2);
-              for (const mt of MATCH_TYPE_ORDER) {
+              const p1 = getTestPlayersForTeam(t1, matchTypeOrder);
+              const p2 = getTestPlayersForTeam(t2, matchTypeOrder);
+              for (const mt of matchTypeOrder) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
                 updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
@@ -659,9 +672,9 @@ export default function TeamLeagueView() {
             for (const m of leagueMatches) {
               const t1 = allTeams.find(t => t.teamId === m.team1Id);
               const t2 = allTeams.find(t => t.teamId === m.team2Id);
-              const p1 = getTestPlayersForTeam(t1);
-              const p2 = getTestPlayersForTeam(t2);
-              for (const mt of MATCH_TYPE_ORDER) {
+              const p1 = getTestPlayersForTeam(t1, matchTypeOrder);
+              const p2 = getTestPlayersForTeam(t2, matchTypeOrder);
+              for (const mt of matchTypeOrder) {
                 updateSubMatchScore(m.matchId, mt, 6, 4, null);
                 updateSubMatchPlayers(m.matchId, mt, p1[mt], p2[mt]);
               }
@@ -739,7 +752,7 @@ export default function TeamLeagueView() {
                     {/* 種目ラベル列 */}
                     <td className={`px-0.5 py-1.5 lg:px-1 lg:py-2.5 align-middle border-r ${color.border} ${color.bg}/20`}>
                       <div className="flex flex-col gap-0.5 lg:gap-1 items-center">
-                        {MATCH_TYPE_ORDER.map(mt => {
+                        {matchTypeOrder.map(mt => {
                           const tag = MATCH_TYPE_COLORS[mt];
                           return (
                             <span key={mt} className={`inline-flex items-center justify-center w-7 h-3.5 lg:w-8 lg:h-4 rounded text-[8px] lg:text-[9px] font-black tracking-wider ${tag.bg} ${tag.text}`}>
@@ -790,7 +803,7 @@ export default function TeamLeagueView() {
                               </div>
                             )}
                             {/* 種目別スコア + PC:選手名 */}
-                            {MATCH_TYPE_ORDER.map(matchType => {
+                            {matchTypeOrder.map(matchType => {
                               const sub = match.subMatches.find(sm => sm.type === matchType);
                               const myScore = isTeam1 ? sub?.score1 : sub?.score2;
                               const oppScore = isTeam1 ? sub?.score2 : sub?.score1;
