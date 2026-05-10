@@ -116,10 +116,9 @@ export function listClubPromotionOptions(leagueId: string): string[] {
   const m = leagueId.match(/(\d+)\s*部/);
   if (!m) return [];
   const div = parseInt(m[1], 10);
-  if (div === 1) return ['総合優勝', '残留', '2部降格'];
-  if (div === 2) return ['1部昇格', '残留', '3部降格'];
-  if (div >= 3 && div <= 7) return [`${div - 1}部昇格`, '残留', `${div + 1}部降格`];
-  if (div === 8) return ['7部昇格', '残留', '降格'];
+  if (div === 1) return ['総合優勝', '残留', '降格'];
+  if (div >= 2 && div <= 7) return ['昇格', '残留', '降格'];
+  if (div === 8) return ['昇格', '残留', '降格'];
   return [];
 }
 
@@ -135,20 +134,20 @@ export function getClubPromotionStatus(
   if (div === 1) {
     if (rank === 1) return { label: '総合優勝', kind: 'champion' };
     if (rank === 2) return { label: '残留', kind: 'stay' };
-    return { label: '2部降格', kind: 'relegate' };
+    return { label: '降格', kind: 'relegate' };
   }
   if (div === 2) {
-    if (rank <= 2) return { label: '1部昇格', kind: 'promote' };
+    if (rank <= 2) return { label: '昇格', kind: 'promote' };
     if (rank === 3) return { label: '残留', kind: 'stay' };
-    return { label: '3部降格', kind: 'relegate' };
+    return { label: '降格', kind: 'relegate' };
   }
   if (div >= 3 && div <= 7) {
-    if (rank === 1) return { label: `${div - 1}部昇格`, kind: 'promote' };
+    if (rank === 1) return { label: '昇格', kind: 'promote' };
     if (rank <= 3) return { label: '残留', kind: 'stay' };
-    return { label: `${div + 1}部降格`, kind: 'relegate' };
+    return { label: '降格', kind: 'relegate' };
   }
   if (div === 8) {
-    if (rank === 1) return { label: '7部昇格', kind: 'promote' };
+    if (rank === 1) return { label: '昇格', kind: 'promote' };
     if (rank === 2) return { label: '残留', kind: 'stay' };
     return { label: '降格', kind: 'relegate' };
   }
