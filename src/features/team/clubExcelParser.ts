@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type {
-  TeamEntry, TeamLeague, TeamLeagueMatch, TeamTournamentInfo,
+  TeamEntry, TeamLeague, TeamLeagueMatch, TeamMember, TeamTournamentInfo,
   MatchOrderEntry,
 } from './types';
 import { MATCH_TYPE_ORDER } from './teamLogic';
@@ -193,6 +193,93 @@ function extractTeamsInRegion(
   return teams;
 }
 
+/** チーム名を比較用に正規化（全角→半角、括弧統一、空白除去、小文字化） */
+function normalizeTeamName(s: string): string {
+  return toHalf(s)
+    .replace(/[（]/g, '(')
+    .replace(/[）]/g, ')')
+    .replace(/[～〜]/g, '~')
+    .replace(/[\s　]+/g, '')
+    .toLowerCase();
+}
+
+/** 選手名簿シートからチーム→メンバーのマップを構築 */
+function parseRoster(wb: XLSX.WorkBook): Map<string, TeamMember[]> {
+  // Key: `${gender}:${rank}:${normalizedTeamName}` → TeamMember[]
+  const result = new Map<string, TeamMember[]>();
+
+  // 名簿シートを検索
+  let rosterSheet: string | null = null;
+  for (const name of wb.SheetNames) {
+    if (/名簿|メンバー/.test(name)) {
+      rosterSheet = name;
+      break;
+    }
+  }
+  if (!rosterSheet) return result;
+
+  const ws = wb.Sheets[rosterSheet];
+  const ref = ws['!ref'];
+  if (!ref) return result;
+  const range = XLSX.utils.decode_range(ref);
+
+  // 列0に部見出しがある行を集める（前年度参考列の見出しは別列に出るので除外される）
+  type DivBlock = { row: number; gender: 'M' | 'F'; rank: number };
+  const divRows: DivBlock[] = [];
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const v = cellStr(ws, 'A' + (r + 1));
+    if (!v) continue;
+    const div = divisionFromText(v);
+    if (div) divRows.push({ row: r, gender: div.gender, rank: div.rank });
+  }
+
+  // 前年度比較セクションの開始列を検出（列0に "令和N年度...メンバー" があり、
+  // 別列にも同様の見出しが出る。当年度セクションはおおむね列0〜10を使う）
+  const PLAYER_COL_LIMIT = 10;
+
+  for (let i = 0; i < divRows.length; i++) {
+    const block = divRows[i];
+    const nextRow = i + 1 < divRows.length ? divRows[i + 1].row : range.e.r + 1;
+
+    // 部見出しの行から、当年度範囲のチーム名セルを拾う
+    const teams: Array<{ col: number; name: string }> = [];
+    for (let c = 1; c <= Math.min(range.e.c, PLAYER_COL_LIMIT); c++) {
+      const cell = cellStr(ws, colLetter(c) + (block.row + 1));
+      if (!cell) continue;
+      const cleaned = cell.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!cleaned) continue;
+      if (divisionFromText(cleaned)) continue;
+      if (!looksLikeTeamName(cleaned)) continue;
+      teams.push({ col: c, name: cleaned });
+    }
+    if (teams.length === 0) continue;
+
+    // 各チームの選手名を取得（チーム名列の右隣がプレイヤー名列）
+    for (const team of teams) {
+      const members: TeamMember[] = [];
+      for (let r = block.row + 1; r < nextRow; r++) {
+        const nameCell = cellStr(ws, colLetter(team.col + 1) + (r + 1));
+        if (!nameCell) continue;
+        const playerName = nameCell.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!playerName) continue;
+        // 番号セル・空白を除外
+        if (/^[\d０-９]+$/.test(playerName)) continue;
+        if (!looksLikeTeamName(playerName)) continue;
+        members.push({
+          player: { name: playerName, affiliation: team.name },
+          gender: block.gender,
+        });
+      }
+      if (members.length > 0) {
+        const key = `${block.gender}:${block.rank}:${normalizeTeamName(team.name)}`;
+        result.set(key, members);
+      }
+    }
+  }
+
+  return result;
+}
+
 /**
  * クラブ対抗戦Excelパーサー
  *
@@ -210,6 +297,9 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
   const wb = XLSX.read(buffer, { type: 'array' });
 
   const info = extractTournamentInfo(wb, fileName);
+
+  // 選手名簿（あれば）からチーム名→メンバーのマップを作成
+  const rosterMap = parseRoster(wb);
 
   // 編成表シートを優先（"編成" を含み "規定"/"名簿"/"練習" を含まない）
   let bestSheet: string | null = null;
@@ -308,15 +398,19 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
     // リーグID: 連番のアルファベットだと混乱するので "男子1部" などの部名をそのまま使用
     const leagueId = h.label;
 
-    const teams: TeamEntry[] = teamNames.slice(0, 5).map((name, idx) => ({
-      teamId: `${leagueId}-${idx + 1}`,
-      leagueId,
-      numberInLeague: idx + 1,
-      teamNumber: idx + 1,
-      teamName: name,
-      members: [],
-      status: 'none',
-    }));
+    const teams: TeamEntry[] = teamNames.slice(0, 5).map((name, idx) => {
+      const rosterKey = `${h.gender}:${h.rank}:${normalizeTeamName(name)}`;
+      const members = rosterMap.get(rosterKey) || [];
+      return {
+        teamId: `${leagueId}-${idx + 1}`,
+        leagueId,
+        numberInLeague: idx + 1,
+        teamNumber: idx + 1,
+        teamName: name,
+        members,
+        status: 'none',
+      };
+    });
 
     const matchOrder = teams.length <= 3
       ? MATCH_ORDER_3
