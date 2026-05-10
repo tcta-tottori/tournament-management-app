@@ -927,7 +927,12 @@ export default function TeamBracketView() {
       )}
 
       {/* スコア入力ダイアログ */}
-      {editingMatch && (
+      {editingMatch && (() => {
+        const ruleStr = tournamentInfo?.bracketGameRule ?? '';
+        const m = ruleStr.match(/(\d+)\s*ゲーム/);
+        const n = m ? parseInt(m[1], 10) : NaN;
+        const winGames = Number.isFinite(n) && n > 0 ? n : 6;
+        return (
         <TeamScoreInput
           matchId={editingMatch.matchId}
           team1Id={editingMatch.team1Id || ''}
@@ -935,10 +940,12 @@ export default function TeamBracketView() {
           team1Name={editingMatch.team1Name}
           team2Name={editingMatch.team2Name}
           subMatches={editingMatch.subMatches}
+          winGames={winGames}
           onClose={() => setEditingMatch(null)}
           isBracket
         />
-      )}
+        );
+      })()}
     </div>
   );
 }
