@@ -1,5 +1,5 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
-import { getMatchTypeOrder, getDisplayNameParts, getClubPromotionStatus } from './teamLogic';
+import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -89,6 +89,7 @@ export async function generateTeamLeagueResultDataUrl(
   tournamentName: string,
   playerNameOverrides: Record<string, string> = {},
   matchFormat?: import('./types').MatchFormat,
+  promotionOverrides: Record<string, string> = {},
 ): Promise<string> {
   // リーグカラー（A=青, B=緑, C=紫, D=ローズ, E=アンバー, ...）
   const lc = LEAGUE_COLORS[getLeagueColorIndex(league.leagueId)];
@@ -482,7 +483,7 @@ export async function generateTeamLeagueResultDataUrl(
 
     // 昇降格バッジ（クラブ対抗戦のみ、確定後に表示。右下に配置）
     if (standing) {
-      const promo = getClubPromotionStatus(league.leagueId, standing.rank);
+      const promo = resolveClubPromotionStatus(league.leagueId, standing.rank, promotionOverrides[team.teamId]);
       if (promo) {
         const badgeColor =
           promo.kind === 'champion' ? '#f59e0b' :
@@ -757,8 +758,9 @@ export async function exportTeamLeagueResultJpeg(
   tournamentName: string,
   playerNameOverrides: Record<string, string> = {},
   matchFormat?: import('./types').MatchFormat,
+  promotionOverrides: Record<string, string> = {},
 ) {
-  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat);
+  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat, promotionOverrides);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${league.leagueId.trim()}リーグ結果_団体戦.jpg`;

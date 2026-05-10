@@ -144,6 +144,8 @@ interface TeamState {
   importFileName: string;
   isImported: boolean;
   rankOverrides: Record<string, Record<string, number>>;
+  /** クラブ対抗戦の昇降格バッジ上書き。teamId → 表示ラベル文字列（空文字は非表示） */
+  promotionOverrides: Record<string, string>;
   bracketCourtAssignments: Record<string, { courtNames: string[]; startedAt: number }>;
   lastStandingsHash: string;
   tiebreakOrder: TiebreakRuleId[];
@@ -182,6 +184,8 @@ interface TeamState {
   // Navigation
   setCurrentPhase: (phase: TeamPhase) => void;
   setRankOverride: (leagueId: string, teamId: string, rank: number) => void;
+  /** 昇降格バッジを上書き。label が null/undefined のときは上書き解除（自動表示に戻す）、''は非表示 */
+  setPromotionOverride: (teamId: string, label: string | null) => void;
   assignBracketMatchToCourt: (matchId: string, courtNames: string[]) => void;
   removeBracketMatchFromCourt: (matchId: string) => void;
   setSelectedLeagueId: (id: string | null) => void;
@@ -227,6 +231,7 @@ export const useTeamStore = create<TeamState>()(
       importFileName: '',
       isImported: false,
       rankOverrides: {},
+      promotionOverrides: {},
       bracketCourtAssignments: {},
       lastStandingsHash: '',
       tiebreakOrder: DEFAULT_TIEBREAK_ORDER,
@@ -260,6 +265,7 @@ export const useTeamStore = create<TeamState>()(
           selectedLeagueId: leagues[0]?.leagueId || null,
           brackets: [],
           rankOverrides: {},
+          promotionOverrides: {},
           bracketCourtAssignments: {},
           lastStandingsHash: '',
         });
@@ -282,6 +288,7 @@ export const useTeamStore = create<TeamState>()(
           importFileName: '',
           isImported: false,
           rankOverrides: {},
+          promotionOverrides: {},
           bracketCourtAssignments: {},
           lastStandingsHash: '',
         });
@@ -647,6 +654,15 @@ export const useTeamStore = create<TeamState>()(
       setRankOverride: (leagueId, teamId, rank) => set(state => ({
         rankOverrides: { ...state.rankOverrides, [leagueId]: { ...state.rankOverrides[leagueId], [teamId]: rank } },
       })),
+      setPromotionOverride: (teamId, label) => set(state => {
+        const next = { ...state.promotionOverrides };
+        if (label === null || label === undefined) {
+          delete next[teamId];
+        } else {
+          next[teamId] = label;
+        }
+        return { promotionOverrides: next };
+      }),
       assignBracketMatchToCourt: (matchId, courtNames) => set(state => {
         const brackets = state.brackets.map(b => ({
           ...b,

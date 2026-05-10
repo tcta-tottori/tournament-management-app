@@ -29,6 +29,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
   // 選手名の手動上書き: { 元の名前: 表示名 }
   const [playerOverrides, setPlayerOverrides] = useState<Record<string, string>>({});
   const matchFormat = useTeamStore(s => s.tournamentInfo?.matchFormat);
+  const promotionOverrides = useTeamStore(s => s.promotionOverrides);
 
   // リーグ内の全選手名（重複除去）
   const allPlayerNames = useMemo(() => {
@@ -53,7 +54,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
     let isMounted = true;
     setIsLoading(true);
 
-    generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat)
+    generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat, promotionOverrides)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -66,7 +67,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat]);
+  }, [isOpen, league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat, promotionOverrides]);
 
   const handleDownload = () => {
     if (!dataUrl) return;
