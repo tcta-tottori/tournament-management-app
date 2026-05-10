@@ -959,8 +959,31 @@ export default function TeamLeagueView() {
         const team2 = allLeagueTeams.find(t => t.teamId === editingMatch.team2Id);
         const t1Members = team1?.members || [];
         const t2Members = team2?.members || [];
-        const t1Roster = Array.from(new Set(t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean)));
-        const t2Roster = Array.from(new Set(t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean)));
+        // 既存メンバー由来の roster
+        const t1FromMembers = t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean);
+        const t2FromMembers = t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean);
+        // 同チームが過去に出場した試合の選手名を収集（手動入力した名前も含む）
+        const collectPastNames = (teamId: string): string[] => {
+          const set = new Set<string>();
+          for (const m of leagueMatches) {
+            if (m.team1Id !== teamId && m.team2Id !== teamId) continue;
+            const isT1 = m.team1Id === teamId;
+            for (const sm of m.subMatches) {
+              const ps = isT1 ? sm.players1 : sm.players2;
+              if (!ps) continue;
+              for (const p of ps) {
+                const v = (p || '').trim();
+                if (v) set.add(v);
+              }
+            }
+          }
+          return Array.from(set);
+        };
+        const t1Past = collectPastNames(editingMatch.team1Id);
+        const t2Past = collectPastNames(editingMatch.team2Id);
+        // メンバー名と過去使用名をマージ（重複除去・登録順を優先）
+        const t1Roster = Array.from(new Set([...t1FromMembers, ...t1Past]));
+        const t2Roster = Array.from(new Set([...t2FromMembers, ...t2Past]));
         // 試合形式から1セット獲得に必要なゲーム数を解決（gameRules を team 数で参照）
         const editingLeague = leagues.find(l => l.leagueId === editingMatch.leagueId);
         const teamCount = editingLeague?.teams.length ?? 4;
