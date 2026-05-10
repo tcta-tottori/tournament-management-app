@@ -208,6 +208,20 @@ function PlayerPickerPopup({
     onClose();
   };
 
+  // メンバーから「保存名 → 構造（main 文字数 / sub）」マップを作る。
+  // 同姓ディスアンビグの1文字名を小文字スタイルで描画するために使う。
+  const partsByName = useMemo(() => {
+    const m = new Map<string, { mainLen: number }>();
+    if (members) {
+      for (const member of members) {
+        const parts = getDisplayNameParts(member.player, members);
+        if (parts.sub) m.set(parts.full, { mainLen: parts.main.length });
+      }
+    }
+    return m;
+  }, [members]);
+  const partsFor = (n: string) => partsByName.get(n);
+
   const openManual = () => {
     setManualMode(true);
     // 次フレームでフォーカス（ユーザー操作起点なのでキーボード表示 OK）
@@ -260,7 +274,7 @@ function PlayerPickerPopup({
                       <div className="flex items-center gap-1.5">
                         {isSelected && <Check className="w-4 h-4 shrink-0" />}
                         <span className={`truncate ${isUsed ? 'line-through' : ''}`}>
-                          <DisplayNameSpan name={name} />
+                          <DisplayNameSpan name={name} mainLen={partsFor(name)?.mainLen} />
                         </span>
                         {isUsed && (
                           <span className="ml-auto text-[9px] font-bold text-slate-400 shrink-0">出場済み</span>
@@ -430,12 +444,31 @@ function PlayerPickerPopup({
 }
 
 /**
- * 表示名レンダリング: メイン文字（苗字、最大3文字）+ 同姓補助文字（小さめ・下揃え）
- * - 3文字以下はそのまま表示
- * - 4文字以上は先頭3文字をメイン、残りを小さいサブ文字として表示
+ * 表示名レンダリング: メイン文字（苗字）+ 同姓補助文字（小さめ・下揃え）
+ * - 構造が判明している場合は mainLen で main / sub を分割（同姓ディスアンビグの
+ *   1文字名は小文字スタイル）
+ * - 構造が不明（手動入力など）の場合は、3文字以下はそのまま、4文字以上は先頭3文字を
+ *   メイン・残りをサブとして表示するフォールバック
  */
-function DisplayNameSpan({ name, className }: { name: string; className?: string }) {
+function DisplayNameSpan({
+  name, mainLen, className,
+}: {
+  name: string;
+  mainLen?: number;
+  className?: string;
+}) {
   if (!name) return null;
+  // 構造が判明している場合は明示的に分割
+  if (typeof mainLen === 'number' && mainLen > 0 && mainLen < name.length) {
+    const main = name.slice(0, mainLen);
+    const sub = name.slice(mainLen);
+    return (
+      <span className={`inline-flex items-baseline ${className || ''}`}>
+        <span>{main}</span>
+        <span className="text-[0.75em] ml-[1px] opacity-80">{sub}</span>
+      </span>
+    );
+  }
   if (name.length <= 3) {
     return <span className={className}>{name}</span>;
   }
@@ -451,24 +484,25 @@ function DisplayNameSpan({ name, className }: { name: string; className?: string
 
 /** 選手名ボタン（タップでピッカー表示） */
 function PlayerPickerButton({
-  value, placeholder, teamTheme, onClick,
+  value, placeholder, teamTheme, onClick, mainLen,
 }: {
   value: string;
   placeholder: string;
   teamTheme: TeamTheme;
   onClick: () => void;
+  mainLen?: number;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-1 text-[11px] border-2 rounded-md px-2 py-1.5 transition-all active:scale-[0.97] ${
+      className={`w-full flex items-center justify-between gap-1 text-[13px] border-2 rounded-md px-2 py-1.5 transition-all active:scale-[0.97] ${
         value
           ? `bg-white ${teamTheme.border} ${teamTheme.text} font-bold`
           : `bg-white ${teamTheme.border} text-slate-400`
       }`}
     >
-      {value ? <DisplayNameSpan name={value} className="truncate" /> : <span className="truncate">{placeholder}</span>}
+      {value ? <DisplayNameSpan name={value} mainLen={mainLen} className="truncate" /> : <span className="truncate">{placeholder}</span>}
       <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
     </button>
   );
@@ -527,6 +561,24 @@ export default function TeamScoreInput({
     () => subMatches.map(sm => sm.type),
     [subMatches],
   );
+
+  // 各チームメンバーから「保存名 → main 文字数」マップを作成（同姓ディスアンビグ用）
+  const team1PartsMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const member of team1Members) {
+      const parts = getDisplayNameParts(member.player, team1Members);
+      if (parts.sub) m.set(parts.full, parts.main.length);
+    }
+    return m;
+  }, [team1Members]);
+  const team2PartsMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const member of team2Members) {
+      const parts = getDisplayNameParts(member.player, team2Members);
+      if (parts.sub) m.set(parts.full, parts.main.length);
+    }
+    return m;
+  }, [team2Members]);
 
   // 種目ごとのローカル state
   const [scores, setScores] = useState<Partial<Record<MatchType, SubMatchState>>>(() => {
@@ -1156,6 +1208,7 @@ export default function TeamScoreInput({
                           <div className={`grid ${slotsClass} gap-1`}>
                             <PlayerPickerButton
                               value={s.p1a}
+                              mainLen={team1PartsMap.get(s.p1a)}
                               placeholder={isSingles ? '選手' : '選手1'}
                               teamTheme={TEAM_THEME[1]}
                               onClick={() => setPicker({ mt, key: 'p1a', side: 1 })}
@@ -1163,6 +1216,7 @@ export default function TeamScoreInput({
                             {!isSingles && (
                               <PlayerPickerButton
                                 value={s.p1b}
+                                mainLen={team1PartsMap.get(s.p1b)}
                                 placeholder="選手2"
                                 teamTheme={TEAM_THEME[1]}
                                 onClick={() => setPicker({ mt, key: 'p1b', side: 1 })}
@@ -1175,6 +1229,7 @@ export default function TeamScoreInput({
                           <div className={`grid ${slotsClass} gap-1`}>
                             <PlayerPickerButton
                               value={s.p2a}
+                              mainLen={team2PartsMap.get(s.p2a)}
                               placeholder={isSingles ? '選手' : '選手1'}
                               teamTheme={TEAM_THEME[2]}
                               onClick={() => setPicker({ mt, key: 'p2a', side: 2 })}
@@ -1182,6 +1237,7 @@ export default function TeamScoreInput({
                             {!isSingles && (
                               <PlayerPickerButton
                                 value={s.p2b}
+                                mainLen={team2PartsMap.get(s.p2b)}
                                 placeholder="選手2"
                                 teamTheme={TEAM_THEME[2]}
                                 onClick={() => setPicker({ mt, key: 'p2b', side: 2 })}
