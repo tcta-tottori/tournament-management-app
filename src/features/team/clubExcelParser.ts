@@ -90,8 +90,10 @@ function looksLikeTeamName(raw: string): boolean {
   if (/^\d{1,2}[:：]\d{2}/.test(toHalf(s))) return false;
   // 既知のラベル
   if (/^(コート|対戦|順位|勝|敗|引分|総当り|総当たり|備考|開催日|会場|大会|代表者|電話|ＴＥＬ|TEL|住所|男子|女子|[1-9１-９]部|得失|勝率|順位決定|シード|BYE|bye)$/i.test(s)) return false;
-  // 日付ラベルや日時表記
-  if (/(令和|平成|年度|予備日)/.test(s)) return false;
+  // 区切り文字単独
+  if (/^[・･、。\.,:;!?\-―ー\s]+$/.test(s)) return false;
+  // 日付ラベルや日時表記・大会説明文に頻出する語
+  if (/(令和|平成|年度|予備日|日程|開催|練習)/.test(s)) return false;
   // テニス用語
   if (/(タイブレーク|ノーアド|ゲーム先取|ゲームマッチ|ダブルス|シングルス|MIX|WD|MD)/i.test(s)) return false;
   return true;
@@ -120,13 +122,16 @@ function extractTournamentInfo(wb: XLSX.WorkBook, fileName: string): TeamTournam
         if (!v) continue;
         const clean = v.replace(/\s+/g, ' ').trim();
 
-        // 年度
-        if (/令和\s*[\d０-９]+\s*年度/.test(clean)) {
-          if (!yearText || clean.length < yearText.length) yearText = clean;
+        // 年度（"令和8年度" の部分のみ抽出。大会名と重複しないよう）
+        const yearMatch = clean.match(/令和\s*[\d０-９]+\s*年度/);
+        if (yearMatch) {
+          const y = yearMatch[0];
+          if (!yearText || y.length < yearText.length) yearText = y;
         }
-        // タイトル候補（"クラブ対抗" を含む短めの文字列）
+        // タイトル候補（"クラブ対抗" を含む短めの文字列）。年度部分は除外して比較
         if (/クラブ対抗/.test(clean) && clean.length <= 40 && !/方法|ルール|タイブレーク|ノーアド/.test(clean)) {
-          if (!titleText || clean.length < titleText.length) titleText = clean;
+          const stripped = clean.replace(/令和\s*[\d０-９]+\s*年度\s*/, '').trim();
+          if (stripped && (!titleText || stripped.length < titleText.length)) titleText = stripped;
         }
 
         // 日付
@@ -136,13 +141,10 @@ function extractTournamentInfo(wb: XLSX.WorkBook, fileName: string): TeamTournam
           if (d && !/(方法|ルール|ゲームマッチ)/.test(clean)) info.date = d[0];
         }
 
+        // 会場（"スポーツパーク" 等を含む明確な施設名のみ採用）
         if (!info.venue || info.venue === 'ヤマタスポーツパーク') {
-          if (/(会\s*場|コート|テニスパーク|スポーツパーク)/.test(clean) && /[（(]?[ぁ-んァ-ヶー一-龥a-zA-Z]/.test(clean) && clean.length <= 40 && !/会場$/.test(clean.trim())) {
-            // 会場名らしき行をピックアップ（簡易）
-            if (/(コート|スポーツパーク|テニスパーク|体育館)/.test(clean)) {
-              info.venue = clean.replace(/^会\s*場\s*[:：]?\s*/, '').split(/[（(]予備日/)[0].trim();
-            }
-          }
+          const venueMatch = clean.match(/[ぁ-んァ-ヶー一-龥a-zA-Zａ-ｚＡ-Ｚ]+(?:スポーツパーク|テニスパーク|体育館)(?:[・･][ぁ-んァ-ヶー一-龥a-zA-Zａ-ｚＡ-Ｚ]+(?:コート|テニスコート)?)?/);
+          if (venueMatch) info.venue = venueMatch[0].replace(/･/g, '・');
         }
       }
     }
@@ -173,6 +175,9 @@ function extractTeamsInRegion(
       if (!v) continue;
       const cleaned = v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
       if (!cleaned) continue;
+
+      // 部見出しセル（"男子１部 ５･６ コート" 等）はスキップ
+      if (divisionFromText(cleaned)) continue;
 
       // 丸数字付きセル: "① プラセール" → 丸数字を除去して判定
       const stripped = cleaned.replace(new RegExp(`[${CIRCLED_NUMBERS}]`, 'g'), '').trim();
@@ -206,25 +211,35 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
 
   const info = extractTournamentInfo(wb, fileName);
 
-  // 最もデータが多いシートを選ぶ
-  let bestSheet = wb.SheetNames[0];
-  let bestCells = 0;
+  // 編成表シートを優先（"編成" を含み "規定"/"名簿"/"練習" を含まない）
+  let bestSheet: string | null = null;
   for (const name of wb.SheetNames) {
-    const ws = wb.Sheets[name];
-    const ref = ws['!ref'];
-    if (!ref) continue;
-    const range = XLSX.utils.decode_range(ref);
-    const cells = (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
-    if (cells > bestCells) {
-      bestCells = cells;
+    if (/編成/.test(name) && !/規定|名簿|練習/.test(name)) {
       bestSheet = name;
+      break;
+    }
+  }
+  // 見つからない場合は、最もデータが多いシートにフォールバック
+  if (!bestSheet) {
+    let bestCells = 0;
+    bestSheet = wb.SheetNames[0];
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      const ref = ws['!ref'];
+      if (!ref) continue;
+      const range = XLSX.utils.decode_range(ref);
+      const cells = (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
+      if (cells > bestCells) {
+        bestCells = cells;
+        bestSheet = name;
+      }
     }
   }
   const ws = wb.Sheets[bestSheet];
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:CZ100');
 
   // 部見出しの位置を全て収集
-  type Header = { row: number; col: number; gender: 'M' | 'F'; rank: number; label: string };
+  type Header = { row: number; col: number; gender: 'M' | 'F'; rank: number; label: string; courtName: string };
   const headers: Header[] = [];
   for (let r = range.s.r; r <= range.e.r; r++) {
     for (let c = range.s.c; c <= range.e.c; c++) {
@@ -232,7 +247,11 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
       if (!v) continue;
       const div = divisionFromText(v);
       if (div) {
-        headers.push({ row: r, col: c, ...div });
+        // ヘッダーセル内に併記されたコート情報（例: "５･６ コート"）を拾う
+        const halfV = toHalf(v).replace(/\s+/g, ' ');
+        const courtMatch = halfV.match(/(\d+(?:[\s･・,、][\s]*\d+)?)\s*コート/);
+        const courtName = courtMatch ? courtMatch[0].replace(/\s+/g, '').replace(/･/g, '・') : '';
+        headers.push({ row: r, col: c, ...div, courtName });
       }
     }
   }
@@ -257,20 +276,23 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
   });
 
   // 各部の領域（行・列範囲）を決定。次の見出しの直前までを領域とする
-  // 同じ列内に複数見出しがある（縦並び）想定をベースに、行範囲を区切る
-  const sortedByRow = [...uniqHeaders].sort((a, b) => a.row - b.row || a.col - b.col);
+  // dedupする前の全見出しを使い、Day1→Day2 等で同じ部名が複数登場する場合でも
+  // 領域がDay2範囲まで漏れ広がらないようにする
+  const allHeadersByRow = [...headers].sort((a, b) => a.row - b.row || a.col - b.col);
 
   const leagues: TeamLeague[] = [];
   const matches: TeamLeagueMatch[] = [];
 
   for (let i = 0; i < uniqHeaders.length; i++) {
     const h = uniqHeaders[i];
-    const idxInRow = sortedByRow.findIndex(x => x.row === h.row && x.col === h.col && x.label === h.label);
-    const next = sortedByRow[idxInRow + 1];
+    const idxInAll = allHeadersByRow.findIndex(x => x.row === h.row && x.col === h.col && x.label === h.label);
+    const nextAll = allHeadersByRow[idxInAll + 1];
 
-    // 行範囲: ヘッダー行〜次ヘッダーの直前（同列または近い列）
+    // 行範囲: ヘッダー行から、次の見出し（label違いも含む）の直前まで。
+    // ただし最大でも2行先まで（チーム名は通常ヘッダーと同じ行か直下にある）
     const rowStart = h.row;
-    const rowEnd = next ? next.row - 1 : Math.min(range.e.r, h.row + 25);
+    const rowCap = Math.min(range.e.r, h.row + 2);
+    const rowEnd = nextAll ? Math.min(nextAll.row - 1, rowCap) : rowCap;
 
     // 列範囲: 同じ行に他の見出しがあれば、その直前まで。なければ列全体
     const sameRowOthers = uniqHeaders.filter(x => x.row === h.row && x.col !== h.col).sort((a, b) => a.col - b.col);
@@ -278,7 +300,8 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
     const colStart = h.col;
     const colEnd = rightSibling ? rightSibling.col - 1 : range.e.c;
 
-    const teamNames = extractTeamsInRegion(ws, rowStart + 1, rowEnd, colStart, colEnd);
+    // Day1 はヘッダー行に直接チーム名が並ぶケースがあるため、ヘッダー行も走査
+    const teamNames = extractTeamsInRegion(ws, rowStart, rowEnd, colStart, colEnd);
 
     if (teamNames.length < 2) continue; // 最低2チーム必要
 
@@ -303,7 +326,7 @@ export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResu
 
     leagues.push({
       leagueId,
-      courtName: '',
+      courtName: h.courtName || '',
       teams,
       matchOrder,
     });
