@@ -739,7 +739,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       let isMixedOrTeam = false;
       try {
         // クラブ対抗戦フォーマットを最初に試行（ファイル名に「クラブ対抗」が含まれる場合）
-        const isClubFile = /クラブ対抗/.test(file.name);
+        const isClubFile = /クラブ対抗/.test(file.name.normalize('NFC'));
         if (isClubFile) {
           try {
             const clubResult = parseClubExcel(arrayBuffer, file.name);
@@ -846,7 +846,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
             /ミックス|団体|mixed|team|クラブ対抗/i.test(e.eventName)
           );
           // クラブ対抗戦は種目名に出ない場合があるので大会名・ファイル名でも判定
-          const isClubTournament = /クラブ対抗/.test(result.tournamentName || '') || /クラブ対抗/.test(file.name);
+          const isClubTournament = /クラブ対抗/.test(result.tournamentName || '') || /クラブ対抗/.test(file.name.normalize('NFC'));
           if (hasSpecialEvent || isClubTournament) isMixedOrTeam = true;
         }
       } catch {

@@ -594,7 +594,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const processExcelArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
     try {
       // クラブ対抗戦は団体戦形式で扱う
-      if (/クラブ対抗/.test(fileName)) {
+      if (/クラブ対抗/.test(fileName.normalize('NFC'))) {
         try {
           const clubResult = parseClubExcel(arrayBuffer, fileName);
           if (clubResult.leagues.length > 0) {
@@ -748,7 +748,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       try {
         const arrayBuffer = e.target?.result as ArrayBuffer;
         // クラブ対抗戦は団体戦形式で扱う
-        if (/クラブ対抗/.test(file.name)) {
+        if (/クラブ対抗/.test(file.name.normalize('NFC'))) {
           try {
             const clubResult = parseClubExcel(arrayBuffer, file.name);
             if (clubResult.leagues.length > 0) {

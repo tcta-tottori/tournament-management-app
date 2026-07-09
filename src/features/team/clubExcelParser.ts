@@ -811,7 +811,9 @@ function tryParseMultiVenue(wb: XLSX.WorkBook, fileName: string): ClubVenueSecti
  * 2. 各部見出しの近隣セル領域からチーム名候補を抽出
  * 3. 抽出チーム数に応じて 3/4/5 チームリーグの対戦順を自動生成
  */
-export function parseClubExcel(buffer: ArrayBuffer, fileName: string): ParseResult {
+export function parseClubExcel(buffer: ArrayBuffer, fileNameRaw: string): ParseResult {
+  // macOS等でファイル名がNFD正規化されている場合に「後期」「クラブ対抗」等の判定が外れないようNFCへ統一
+  const fileName = fileNameRaw.normalize('NFC');
   const wb = XLSX.read(buffer, { type: 'array' });
 
   // 男女別会場（大会規定シートが複数）の形式を優先的に試す
