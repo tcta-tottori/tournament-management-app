@@ -113,6 +113,7 @@ function inferPromotionKind(label: string): PromotionStatus['kind'] {
  * ラベルの一覧を返す。手動切替UIのドロップダウン用。
  */
 export function listClubPromotionOptions(leagueId: string): string[] {
+  if (/予選会/.test(leagueId)) return ['昇格', '残留'];
   const m = leagueId.match(/(\d+)\s*部/);
   if (!m) return [];
   const div = parseInt(m[1], 10);
@@ -126,6 +127,13 @@ export function getClubPromotionStatus(
   leagueId: string,
   rank: number,
 ): PromotionStatus | null {
+  // 男子予選会: 上位2チームが次期大会8部に昇格（規定10）
+  if (/男子予選会/.test(leagueId)) {
+    if (rank <= 2) return { label: '昇格', kind: 'promote' };
+    return null;
+  }
+  // 女子予選会: 昇格は順位決定戦の結果で決まるため自動表示なし（手動切替のみ）
+  if (/予選会/.test(leagueId)) return null;
   const m = leagueId.match(/(\d+)\s*部/);
   if (!m) return null;
   const div = parseInt(m[1], 10);
@@ -170,12 +178,22 @@ export const MATCH_TYPE_ORDER_MIX: MatchType[] = ['MIX', 'WD', 'MD'];
 /** 種目の対戦順（クラブ対抗戦形式 = ダブルス3 → 2 → 1 → シングルス2 → 1） */
 export const MATCH_TYPE_ORDER_CLUB: MatchType[] = ['D3', 'D2', 'D1', 'S2', 'S1'];
 
+/** 種目の対戦順（クラブ対抗戦3試合制 = ダブルス2 → シングルス → ダブルス1） */
+export const MATCH_TYPE_ORDER_CLUB3: MatchType[] = ['D2', 'S1', 'D1'];
+
 /** 互換用：既存のミックス大会と同じ並び（後方互換のため "MIX/WD/MD" のまま） */
 export const MATCH_TYPE_ORDER: MatchType[] = MATCH_TYPE_ORDER_MIX;
 
 /** 試合形式に応じた種目順を返す */
 export function getMatchTypeOrder(format?: MatchFormat | null): MatchType[] {
-  return format === 'club' ? MATCH_TYPE_ORDER_CLUB : MATCH_TYPE_ORDER_MIX;
+  if (format === 'club') return MATCH_TYPE_ORDER_CLUB;
+  if (format === 'club3') return MATCH_TYPE_ORDER_CLUB3;
+  return MATCH_TYPE_ORDER_MIX;
+}
+
+/** クラブ対抗戦系の形式か（昇降格バッジ・結果出力の配色などで使用） */
+export function isClubFormat(format?: MatchFormat | null): boolean {
+  return format === 'club' || format === 'club3';
 }
 
 /** 種目ラベル */
@@ -549,7 +567,7 @@ export function generateAllBrackets(
 
   for (const { cat, label, rank } of categories) {
     // bracketOrders からスロット配列を取得
-    const orderEntries = bracketOrders?.[cat === '4th' ? '4th' : cat === '3rd' ? '3rd' : cat === '2nd' ? '2nd' : undefined as never];
+    const orderEntries = bracketOrders?.[cat];
 
     // standings からチーム情報を収集
     const teamByLeague = new Map<string, { teamId: string; teamName: string; leagueId: string }[]>();
@@ -584,8 +602,8 @@ export function generateAllBrackets(
         if (code === null) {
           slots.push(null);
         } else {
-          // "A2" → league=A, rank=2
-          const m = code.match(/^([A-Z])(\d)$/);
+          // "A2" → league=A, rank=2（"女子予選会A1" のようにリーグIDが複数文字でも可）
+          const m = code.match(/^(.+?)(\d)$/);
           if (m) {
             const leagueKey = m[1];
             const rankNum = parseInt(m[2]);
@@ -610,7 +628,7 @@ export function generateAllBrackets(
 
       const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
         .map((t, i) => ({ ...t, seedPosition: i + 1 }));
-      const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
+      const matches = generateBracketMatchesWithSlots(cat, drawSize, slots, matchFormat);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
     } else if (cat !== '1st') {
       // デフォルトのスロットマップを使用
@@ -654,7 +672,7 @@ export function generateAllBrackets(
         }
         const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
           .map((t, i) => ({ ...t, seedPosition: i + 1 }));
-        const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
+        const matches = generateBracketMatchesWithSlots(cat, drawSize, slots, matchFormat);
         brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
       }
     } else {
@@ -668,7 +686,7 @@ export function generateAllBrackets(
       }
       const drawSize = 8;
       const emptySlots: (null)[] = Array(drawSize).fill(null);
-      const matches = generateBracketMatchesWithSlots(cat, drawSize, emptySlots);
+      const matches = generateBracketMatchesWithSlots(cat, drawSize, emptySlots, matchFormat);
       brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
     }
   }
@@ -817,7 +835,8 @@ export function buildTeamBracketCallText(args: {
 function generateBracketMatchesWithSlots(
   category: PlacementCategory,
   drawSize: number,
-  slots: ({ teamId: string; teamName: string; leagueId: string } | null)[]
+  slots: ({ teamId: string; teamName: string; leagueId: string } | null)[],
+  matchFormat?: MatchFormat,
 ): TeamBracketMatch[] {
   const matches: TeamBracketMatch[] = [];
   const totalRounds = Math.log2(drawSize);

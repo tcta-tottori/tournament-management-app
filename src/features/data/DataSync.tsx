@@ -13,7 +13,7 @@ import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
-import { parseClubExcel } from '../team/clubExcelParser';
+import { parseClubExcel, type ClubVenueSection } from '../team/clubExcelParser';
 import { useTeamStore } from '../team/teamStore';
 import type { TeamTournamentInfo, TeamLeague as ITeamLeague, TeamLeagueMatch as ITeamLeagueMatch } from '../team/types';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
@@ -331,6 +331,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     matches: ITeamLeagueMatch[];
     fileName: string;
     arrayBuffer: ArrayBuffer;
+    /** 男女別会場など複数セクション構成の場合の選択肢 */
+    sections?: ClubVenueSection[];
+    selectedSectionKey?: string;
   } | null>(null);
   const [wizardTournamentArrayBuffer, setWizardTournamentArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [wizardTournamentFileName, setWizardTournamentFileName] = useState('');
@@ -741,7 +744,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           try {
             const clubResult = parseClubExcel(arrayBuffer, file.name);
             if (clubResult.leagues.length > 0) {
-              setWizardTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name, arrayBuffer });
+              setWizardTeamPending({
+                info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name, arrayBuffer,
+                sections: clubResult.sections, selectedSectionKey: clubResult.sections?.[0]?.key,
+              });
               setWizardMixedPending(null);
               setWizardParsedExcel(null);
               setWizardEditName(clubResult.info.name || cleanTournamentName(file.name.replace(/\.(xlsx?|xls)$/i, '')));
@@ -1463,6 +1469,49 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
 
                   {/* フォーム */}
                   <div className="px-5 py-4 space-y-3">
+                    {/* 会場（セクション）選択：男女で会場が分かれる場合 */}
+                    {wizardTeamPending?.sections && wizardTeamPending.sections.length > 1 && (
+                      <div>
+                        <label className="text-[11px] font-medium text-gray-500 block mb-1">運営する会場を選択</label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {wizardTeamPending.sections.map(sec => {
+                            const isActive = sec.key === wizardTeamPending.selectedSectionKey;
+                            return (
+                              <button
+                                key={sec.key}
+                                type="button"
+                                onClick={() => {
+                                  setWizardTeamPending(prev => prev ? {
+                                    ...prev,
+                                    info: sec.info,
+                                    leagues: sec.leagues,
+                                    matches: sec.matches,
+                                    selectedSectionKey: sec.key,
+                                  } : prev);
+                                  setWizardEditName(sec.info.name);
+                                  setWizardEditDate(formatJpDate(sec.info.date || ''));
+                                  setWizardEditVenue(sec.info.venue);
+                                  if (sec.info.date) setWizardSourceDate(sec.info.date);
+                                  if (sec.info.venue) setWizardSourceVenue(sec.info.venue);
+                                }}
+                                className={`text-left px-3 py-2.5 rounded-xl border transition-colors ${
+                                  isActive
+                                    ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300'
+                                    : 'border-gray-200 bg-white hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className={`text-sm font-bold ${isActive ? 'text-emerald-700' : 'text-gray-700'}`}>{sec.label}</div>
+                                <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                  <MapPin className="w-3 h-3" />{sec.info.venue}
+                                  <span className="ml-1">{sec.leagues.length}リーグ・{sec.leagues.reduce((s, l) => s + l.teams.length, 0)}チーム</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">※ 会場ごとに端末を分けて運営できます。この端末で運営する会場を選んでください。</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[11px] font-medium text-gray-500 block mb-1">大会名</label>
                       <div className="flex gap-2">
@@ -1506,6 +1555,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             <option value="">会場を選択</option>
                             <option value="ヤマタスポーツパーク">ヤマタスポーツパーク</option>
                             <option value="千代テニス場">千代テニス場</option>
+                            {wizardEditVenue && !wizardEditVenue.includes('ヤマタ') && !wizardEditVenue.includes('千代') && (
+                              <option value={wizardEditVenue}>{wizardEditVenue}</option>
+                            )}
                           </select>
                         </div>
                       </div>

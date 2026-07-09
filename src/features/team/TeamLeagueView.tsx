@@ -752,7 +752,12 @@ export default function TeamLeagueView() {
                               );
                               }
                               const match = sm.get(`${rowTeam.teamId}-${colTeam.teamId}`);
-                              if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
+                              if (!match) {
+                                // 変則リーグ等で対戦の無い組み合わせ
+                                return (
+                                  <td key={colTeam.teamId} className="border-r border-slate-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e2e8f0 49.6%, #e2e8f0 50.4%, #fcfcfd 50.4%)' }} />
+                                );
+                              }
                               const isTeam1 = match.team1Id === rowTeam.teamId;
                               const isFinished = match.status === 'finished';
                               const cellWonAll = isFinished && match.winnerId === rowTeam.teamId;
@@ -1002,7 +1007,12 @@ export default function TeamLeagueView() {
                               );
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
-                      if (!match) return <td key={colTeam.teamId} className="border-r border-slate-100" />;
+                      if (!match) {
+                        // 変則リーグ等で対戦の無い組み合わせ
+                        return (
+                          <td key={colTeam.teamId} className="border-r border-slate-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e2e8f0 49.6%, #e2e8f0 50.4%, #fcfcfd 50.4%)' }} />
+                        );
+                      }
                       const isTeam1 = match.team1Id === rowTeam.teamId;
                       const isCurrent = currentMatchNumber && match.matchNumber === currentMatchNumber;
                       const isFinished = match.status === 'finished';
@@ -1175,6 +1185,14 @@ export default function TeamLeagueView() {
               >
                 {/* # */}
                 <span className="text-[10px] lg:text-[11px] font-black text-slate-400 w-5 lg:w-6 text-center shrink-0">#{mo.matchNumber}</span>
+
+                {/* OP由来のラウンド・コート */}
+                {(mo.round || (mo.courts && mo.courts.length > 0)) && (
+                  <span className="shrink-0 text-[9px] lg:text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5 whitespace-nowrap tabular-nums">
+                    {mo.round ? `${mo.round}R` : ''}
+                    {mo.courts && mo.courts.length > 0 ? `${mo.round ? ' ' : ''}№${mo.courts.join('・')}` : ''}
+                  </span>
+                )}
 
                 {/* チーム1 */}
                 <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate ${match.winnerId === team1.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
