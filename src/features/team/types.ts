@@ -28,14 +28,18 @@ export interface TeamEntry {
 /** 対戦種目 */
 export type MatchType = 'MIX' | 'WD' | 'MD' | 'D1' | 'D2' | 'D3' | 'S1' | 'S2';
 
-/** 試合形式（ミックス大会=3種目 / クラブ対抗戦=ダブルス3+シングルス2 の5試合） */
-export type MatchFormat = 'mix' | 'club';
+/** 試合形式（ミックス大会=3種目 / クラブ対抗戦=ダブルス3+シングルス2 の5試合 / クラブ対抗戦女子=ダブルス2+シングルス1 の3試合） */
+export type MatchFormat = 'mix' | 'club' | 'club3';
 
 /** 対戦順定義 */
 export interface MatchOrderEntry {
   matchNumber: number;
   team1Index: number;       // 1-based (①=1, ②=2...)
   team2Index: number;
+  /** OP（オーダー・オブ・プレー）由来のラウンド番号（1R=1） */
+  round?: number;
+  /** OP由来の使用コート（例: ["1", "2"]） */
+  courts?: string[];
 }
 
 /** リーグ */
@@ -155,6 +159,7 @@ export interface TeamTournamentInfo {
   /** 試合形式（省略時は 'mix' = MIX/WD/MD の3種目） */
   matchFormat?: MatchFormat;
   bracketOrders?: {
+    '1st'?: string[];
     '2nd'?: string[];
     '3rd'?: string[];
     '4th'?: string[];

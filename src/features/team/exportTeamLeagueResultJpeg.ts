@@ -561,7 +561,7 @@ export async function generateTeamLeagueResultDataUrl(
       const tc = TYPE_COLORS[mt];
       // シンプルなテキスト表示（バッジなし）
       // クラブ対抗戦は黒文字、ミックス大会は種目色を維持
-      ctx.fillStyle = matchFormat === 'club' ? COL.slate900 : tc.fg;
+      ctx.fillStyle = matchFormat === 'club' || matchFormat === 'club3' ? COL.slate900 : tc.fg;
       ctx.font = '900 14px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -586,8 +586,15 @@ export async function generateTeamLeagueResultDataUrl(
 
       drawLine(x, tableY + colHeaderH, x, tableY + tableH, COL.slate200, 1);
 
-      if (colIdx === rowIdx) {
-        // 対戦無しセル（同チーム同士の交点）
+      const oppTeam = teams[colIdx];
+      const match = colIdx === rowIdx ? undefined : matches.find(m =>
+        m.leagueId === league.leagueId &&
+        ((m.team1Id === team.teamId && m.team2Id === oppTeam.teamId) ||
+          (m.team1Id === oppTeam.teamId && m.team2Id === team.teamId))
+      );
+
+      if (colIdx === rowIdx || !match) {
+        // 対戦無しセル（同チーム同士の交点、または変則リーグで対戦の無い組み合わせ）
         // 背景: ごく淡いベタ塗りで他と差別化（slate-50）
         ctx.fillStyle = COL.slate50;
         ctx.fillRect(x + 0.5, rowTop + 0.5, scoreColW - 1, rowH - 1);
@@ -614,14 +621,7 @@ export async function generateTeamLeagueResultDataUrl(
         continue;
       }
 
-      const oppTeam = teams[colIdx];
-      const match = matches.find(m =>
-        m.leagueId === league.leagueId &&
-        ((m.team1Id === team.teamId && m.team2Id === oppTeam.teamId) ||
-          (m.team1Id === oppTeam.teamId && m.team2Id === team.teamId))
-      );
-
-      if (!match || match.status !== 'finished') continue;
+      if (match.status !== 'finished') continue;
 
       const isTeam1 = match.team1Id === team.teamId;
       const won = match.winnerId === team.teamId;

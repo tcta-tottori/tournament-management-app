@@ -11,7 +11,7 @@ import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
 import { parseTeamExcel } from '../team/teamExcelParser';
-import { parseClubExcel } from '../team/clubExcelParser';
+import { parseClubExcel, type ClubVenueSection } from '../team/clubExcelParser';
 import type { TeamTournamentInfo, TeamLeague, TeamLeagueMatch } from '../team/types';
 import { useTeamStore } from '../team/teamStore';
 import { useNavigate } from 'react-router-dom';
@@ -547,6 +547,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     leagues: TeamLeague[];
     matches: TeamLeagueMatch[];
     fileName: string;
+    /** 男女別会場など複数セクション構成の場合の選択肢 */
+    sections?: ClubVenueSection[];
+    selectedSectionKey?: string;
   } | null>(null);
   const [teamEditName, setTeamEditName] = useState('');
   const [teamEditDate, setTeamEditDate] = useState('');
@@ -591,11 +594,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const processExcelArrayBuffer = useCallback((arrayBuffer: ArrayBuffer, fileName: string) => {
     try {
       // クラブ対抗戦は団体戦形式で扱う
-      if (/クラブ対抗/.test(fileName)) {
+      if (/クラブ対抗/.test(fileName.normalize('NFC'))) {
         try {
           const clubResult = parseClubExcel(arrayBuffer, fileName);
           if (clubResult.leagues.length > 0) {
-            setTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName });
+            setTeamPending({
+              info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName,
+              sections: clubResult.sections, selectedSectionKey: clubResult.sections?.[0]?.key,
+            });
             setTeamEditName(clubResult.info.name);
             setTeamEditDate(clubResult.info.date);
             setTeamEditVenue(clubResult.info.venue);
@@ -742,11 +748,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       try {
         const arrayBuffer = e.target?.result as ArrayBuffer;
         // クラブ対抗戦は団体戦形式で扱う
-        if (/クラブ対抗/.test(file.name)) {
+        if (/クラブ対抗/.test(file.name.normalize('NFC'))) {
           try {
             const clubResult = parseClubExcel(arrayBuffer, file.name);
             if (clubResult.leagues.length > 0) {
-              setTeamPending({ info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name });
+              setTeamPending({
+                info: clubResult.info, leagues: clubResult.leagues, matches: clubResult.matches, fileName: file.name,
+                sections: clubResult.sections, selectedSectionKey: clubResult.sections?.[0]?.key,
+              });
               setTeamEditName(clubResult.info.name);
               setTeamEditDate(clubResult.info.date);
               setTeamEditVenue(clubResult.info.venue);
@@ -1544,6 +1553,48 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           </div>
           <div className="p-5 space-y-4">
             <p className="text-xs text-gray-500">大会情報を確認・修正してから確定してください。</p>
+
+            {/* 会場（セクション）選択：男女で会場が分かれる場合 */}
+            {teamPending.sections && teamPending.sections.length > 1 && (
+              <div>
+                <label className="text-[11px] font-medium text-gray-500 mb-1 block">運営する会場を選択</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {teamPending.sections.map(sec => {
+                    const isActive = sec.key === teamPending.selectedSectionKey;
+                    return (
+                      <button
+                        key={sec.key}
+                        type="button"
+                        onClick={() => {
+                          setTeamPending(prev => prev ? {
+                            ...prev,
+                            info: sec.info,
+                            leagues: sec.leagues,
+                            matches: sec.matches,
+                            selectedSectionKey: sec.key,
+                          } : prev);
+                          setTeamEditName(sec.info.name);
+                          setTeamEditDate(sec.info.date);
+                          setTeamEditVenue(sec.info.venue);
+                        }}
+                        className={`text-left px-3 py-2.5 rounded-xl border transition-colors ${
+                          isActive
+                            ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-300'
+                            : 'border-gray-200 bg-white hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`text-sm font-bold ${isActive ? 'text-blue-700' : 'text-gray-700'}`}>{sec.label}</div>
+                        <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3" />{sec.info.venue}
+                          <span className="ml-1">{sec.leagues.length}リーグ・{sec.leagues.reduce((s, l) => s + l.teams.length, 0)}チーム</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">※ 会場ごとに端末を分けて運営できます。この端末で運営する会場を選んでください。</p>
+              </div>
+            )}
 
             {/* 大会名 */}
             <div>
