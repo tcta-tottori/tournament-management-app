@@ -31,6 +31,45 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
 /** @type {Map<string, Set<import('ws').WebSocket>>} */
 const rooms = new Map();
 
+// ---------- ルームごとの最新スナップショットキャッシュ ----------
+// 運営端末が離線していても、後から参加した観戦端末へ
+// 直近の大会データを即座に配信できるようにする。
+/** @type {Map<string, { message: any, updatedAt: number }>} */
+const roomSnapshots = new Map();
+
+/** キャッシュ保持の上限（メモリ保護） */
+const MAX_CACHED_ROOMS = 200;
+/** キャッシュの有効期間（この時間更新が無ければ破棄）: 24時間 */
+const SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** ルームの最新スナップショットを保存 */
+function storeSnapshot(roomCode, message) {
+  if (!roomCode || !message) return;
+  roomSnapshots.set(roomCode, { message, updatedAt: Date.now() });
+  // 上限を超えたら最も古いものから破棄
+  if (roomSnapshots.size > MAX_CACHED_ROOMS) {
+    let oldestKey = null;
+    let oldestAt = Infinity;
+    for (const [code, snap] of roomSnapshots) {
+      if (snap.updatedAt < oldestAt) {
+        oldestAt = snap.updatedAt;
+        oldestKey = code;
+      }
+    }
+    if (oldestKey) roomSnapshots.delete(oldestKey);
+  }
+}
+
+/** 期限切れのスナップショットを掃除 */
+function pruneSnapshots() {
+  const now = Date.now();
+  for (const [code, snap] of roomSnapshots) {
+    if (now - snap.updatedAt > SNAPSHOT_TTL_MS) {
+      roomSnapshots.delete(code);
+    }
+  }
+}
+
 // ---------- HTTP サーバー（CORS 付き）----------
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -211,6 +250,7 @@ wss.on('connection', (ws) => {
 
     // ルーム参加
     if (action === 'join' && roomCode) {
+      const isViewer = data.viewer === true;
       // 既存ルームから離脱
       if (currentRoom) {
         const room = rooms.get(currentRoom);
@@ -223,6 +263,26 @@ wss.on('connection', (ws) => {
       if (!rooms.has(roomCode)) rooms.set(roomCode, new Set());
       rooms.get(roomCode).add(ws);
       console.log(`[${roomCode}] 端末参加 (${rooms.get(roomCode).size}台)`);
+
+      // 直近のスナップショットが保持されていれば、観戦端末へ即配信する。
+      // これにより運営端末が接続していなくても観戦端末はデータを閲覧できる。
+      // 運営端末には配信しない（ローカルの編集を上書きしないため）。
+      if (isViewer) {
+        const snap = roomSnapshots.get(roomCode);
+        if (snap) {
+          try {
+            ws.send(JSON.stringify(snap.message));
+            console.log(`[${roomCode}] 観戦端末へキャッシュ済みスナップショットを配信`);
+          } catch { /* */ }
+        }
+      }
+      return;
+    }
+
+    // スナップショットのキャッシュ登録（他端末へは中継しない）
+    // 運営端末が定期的に最新の完全スナップショットを送ってくる。
+    if (action === 'cache' && roomCode && payload) {
+      storeSnapshot(roomCode, payload);
       return;
     }
 
@@ -242,6 +302,11 @@ wss.on('connection', (ws) => {
 
     // ブロードキャスト
     if (action === 'broadcast' && roomCode && payload) {
+      // 運営端末→観戦端末の完全スナップショット応答が流れてきたら、
+      // 後続の参加者向けにキャッシュしておく。
+      if (payload.type === 'snapshot-response') {
+        storeSnapshot(roomCode, payload);
+      }
       const room = rooms.get(roomCode);
       if (!room) return;
       const msg = JSON.stringify(payload);
@@ -265,12 +330,13 @@ wss.on('connection', (ws) => {
   });
 });
 
-// 定期的にルーム情報をログ出力
+// 定期的にルーム情報をログ出力＋期限切れキャッシュの掃除
 setInterval(() => {
+  pruneSnapshots();
   if (rooms.size > 0) {
     const info = [...rooms.entries()]
       .map(([code, clients]) => `${code}(${clients.size}台)`)
       .join(', ');
-    console.log(`[状態] アクティブルーム: ${info}`);
+    console.log(`[状態] アクティブルーム: ${info} / キャッシュ保持: ${roomSnapshots.size}件`);
   }
 }, 60000);

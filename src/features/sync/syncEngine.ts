@@ -37,6 +37,8 @@ class SyncEngine {
   /** Zustand スナップショット送信のデバウンスタイマー */
   private mixedDebounce: ReturnType<typeof setTimeout> | null = null;
   private teamDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** サーバーキャッシュへの完全スナップショット送信デバウンスタイマー */
+  private cachePushDebounce: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.broadcastTransport = new BroadcastTransport();
@@ -51,6 +53,11 @@ class SyncEngine {
     // WebSocket の接続状態をストアに反映
     this.wsTransport.onStateChange((state) => {
       this.updateConnectionState(state);
+      // 運営端末が（再）接続したら、最新スナップショットをサーバーへ登録し直す。
+      // サーバー再起動などでキャッシュが失われても復旧できる。
+      if (state === 'connected' && this.active && !this.viewerMode) {
+        this.schedulePushSnapshotToCache(1500);
+      }
     });
     this.broadcastTransport.onStateChange(() => {
       this.updateConnectionState();
@@ -84,6 +91,7 @@ class SyncEngine {
     const wsUrl = serverUrl || store.serverUrl;
     if (wsUrl) {
       this.wsTransport.setServerUrl(wsUrl);
+      this.wsTransport.setViewer(viewerMode);
       this.wsTransport.connect(roomCode);
     }
 
@@ -91,6 +99,9 @@ class SyncEngine {
     if (!viewerMode) {
       this.setupDexieHooks();
       this.setupZustandSubscriptions();
+      // 接続直後に、保有している大会データをサーバーキャッシュへ登録する。
+      // これで運営端末が離線した後でも観戦端末がデータを閲覧できる。
+      this.schedulePushSnapshotToCache(2000);
     }
 
     // 自分の参加を通知
@@ -152,6 +163,7 @@ class SyncEngine {
 
     if (this.mixedDebounce) clearTimeout(this.mixedDebounce);
     if (this.teamDebounce) clearTimeout(this.teamDebounce);
+    if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
 
     store.setSyncEnabled(false);
     store.setConnectionState('disconnected');
@@ -188,6 +200,8 @@ class SyncEngine {
       timestamp: Date.now(),
       payload,
     });
+    // 変更後の最新状態をサーバーキャッシュへ反映（後発の観戦端末向け）
+    this.schedulePushSnapshotToCache();
   }
 
   /** Zustand のスナップショットをブロードキャスト */
@@ -202,6 +216,8 @@ class SyncEngine {
       timestamp: Date.now(),
       payload: { store: storeName, state } as ZustandSnapshotPayload,
     });
+    // 変更後の最新状態をサーバーキャッシュへ反映（後発の観戦端末向け）
+    this.schedulePushSnapshotToCache();
   }
 
   // ===========================
@@ -247,6 +263,18 @@ class SyncEngine {
           joinedAt: Date.now(),
           lastSeen: Date.now(),
         });
+        // 観戦端末が先に接続し、後から運営端末が現れた場合に備えて
+        // 新しい端末を検知したらスナップショットを再要求する。
+        if (this.viewerMode) {
+          this.broadcast({
+            type: 'request-snapshot',
+            deviceId: store.deviceId,
+            deviceName: store.deviceName,
+            roomCode: this.roomCode,
+            timestamp: Date.now(),
+            payload: null,
+          });
+        }
         break;
 
       case 'device-bye':
@@ -460,24 +488,57 @@ class SyncEngine {
   // フルスナップショット（初回同期）
   // ===========================
 
+  /** 現在の全データからスナップショット応答メッセージを構築 */
+  private async buildSnapshotMessage(): Promise<SyncMessage> {
+    const dexieData = await this.exportDexieData();
+    const zustandData = this.exportZustandData();
+    const store = useSyncStore.getState();
+    return {
+      type: 'snapshot-response',
+      deviceId: store.deviceId,
+      deviceName: store.deviceName,
+      roomCode: this.roomCode,
+      timestamp: Date.now(),
+      payload: {
+        dexie: dexieData,
+        zustand: zustandData,
+      } as SnapshotResponsePayload,
+    };
+  }
+
   private async sendFullSnapshot(_targetDeviceId: string): Promise<void> {
     try {
-      const dexieData = await this.exportDexieData();
-      const zustandData = this.exportZustandData();
-      const store = useSyncStore.getState();
-      this.broadcast({
-        type: 'snapshot-response',
-        deviceId: store.deviceId,
-        deviceName: store.deviceName,
-        roomCode: this.roomCode,
-        timestamp: Date.now(),
-        payload: {
-          dexie: dexieData,
-          zustand: zustandData,
-        } as SnapshotResponsePayload,
-      });
+      this.broadcast(await this.buildSnapshotMessage());
     } catch (err) {
       console.warn('[Sync] スナップショット送信エラー:', err);
+    }
+  }
+
+  /** 最新の完全スナップショットをサーバーキャッシュへ登録（デバウンス） */
+  private schedulePushSnapshotToCache(delayMs = 3000): void {
+    if (this.viewerMode || !this.active) return;
+    if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
+    this.cachePushDebounce = setTimeout(() => {
+      void this.pushSnapshotToCache();
+    }, delayMs);
+  }
+
+  /**
+   * 中継サーバーに最新スナップショットをキャッシュ登録する。
+   * 他端末へは中継されないため、常時ブロードキャストするより軽量で、
+   * 運営端末が離線した後でも観戦端末が最新データを閲覧できるようになる。
+   */
+  private async pushSnapshotToCache(): Promise<void> {
+    if (this.viewerMode || !this.active) return;
+    if (!this.wsTransport.isOpen()) return; // 中継サーバー未接続なら送らない
+    // 共有すべきデータが無ければ送らない
+    const hasData =
+      useMixedStore.getState().isImported || useTeamStore.getState().isImported;
+    if (!hasData) return;
+    try {
+      this.wsTransport.sendCache(await this.buildSnapshotMessage());
+    } catch (err) {
+      console.warn('[Sync] スナップショットキャッシュ登録エラー:', err);
     }
   }
 

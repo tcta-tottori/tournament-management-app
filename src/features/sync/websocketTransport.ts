@@ -12,15 +12,18 @@ const RECONNECT_MAX_ATTEMPTS = 20;
 
 /** WebSocket 中継サーバー宛のメッセージラッパー */
 interface WsEnvelope {
-  action: 'join' | 'leave' | 'broadcast';
+  action: 'join' | 'leave' | 'broadcast' | 'cache';
   roomCode: string;
   payload?: SyncMessage;
+  /** join 時のみ: 観戦（読み取り専用）端末かどうか */
+  viewer?: boolean;
 }
 
 export class WebSocketTransport implements SyncTransport {
   private ws: WebSocket | null = null;
   private serverUrl = '';
   private roomCode = '';
+  private viewer = false;
   private messageHandlers: ((msg: SyncMessage) => void)[] = [];
   private stateHandlers: ((state: SyncConnectionState) => void)[] = [];
   private state: SyncConnectionState = 'disconnected';
@@ -35,6 +38,11 @@ export class WebSocketTransport implements SyncTransport {
 
   setServerUrl(url: string): void {
     this.serverUrl = url;
+  }
+
+  /** 観戦（読み取り専用）端末として接続するかを設定 */
+  setViewer(viewer: boolean): void {
+    this.viewer = viewer;
   }
 
   connect(roomCode: string): void {
@@ -65,6 +73,25 @@ export class WebSocketTransport implements SyncTransport {
         payload: message,
       });
     }
+  }
+
+  /**
+   * 中継サーバーに最新スナップショットをキャッシュ登録する。
+   * 他端末へは中継されず、後から参加する観戦端末への初期配信に使われる。
+   */
+  sendCache(message: SyncMessage): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.sendEnvelope({
+        action: 'cache',
+        roomCode: this.roomCode,
+        payload: message,
+      });
+    }
+  }
+
+  /** WebSocket が接続済みか */
+  isOpen(): boolean {
+    return !!this.ws && this.ws.readyState === WebSocket.OPEN;
   }
 
   onMessage(handler: (message: SyncMessage) => void): void {
@@ -99,7 +126,7 @@ export class WebSocketTransport implements SyncTransport {
       this.reconnectAttempt = 0;
       this.setState('connected');
       // ルームに参加
-      this.sendEnvelope({ action: 'join', roomCode: this.roomCode });
+      this.sendEnvelope({ action: 'join', roomCode: this.roomCode, viewer: this.viewer });
       // 定期 ping
       this.startPing();
     };
