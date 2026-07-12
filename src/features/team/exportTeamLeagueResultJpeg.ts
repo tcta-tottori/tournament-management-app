@@ -1,5 +1,6 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
+import { drawVenueBadge } from './venueBadge';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -90,6 +91,7 @@ export async function generateTeamLeagueResultDataUrl(
   playerNameOverrides: Record<string, string> = {},
   matchFormat?: import('./types').MatchFormat,
   promotionOverrides: Record<string, string> = {},
+  venue?: string,
 ): Promise<string> {
   // リーグカラー（A=青, B=緑, C=紫, D=ローズ, E=アンバー, ...）
   const lc = LEAGUE_COLORS[getLeagueColorIndex(league.leagueId)];
@@ -118,9 +120,10 @@ export async function generateTeamLeagueResultDataUrl(
   const TYPE_ORDER = getMatchTypeOrder(matchFormat);
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
-  const [tctaLogo, venueLogo] = await Promise.all([
+  const [tctaLogo, venueLogo, tottoriLogo] = await Promise.all([
     tryLoadImage(`${base}logo-tcta.png`),
     tryLoadImage(`${base}logo-venue.png`),
+    tryLoadImage(`${base}logo-tottori-univ.png`),
   ]);
 
   // チーム番号順
@@ -406,21 +409,14 @@ export async function generateTeamLeagueResultDataUrl(
   if (tournamentName) {
     drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeSize - 160);
   }
-  // 会場ロゴ（添付 logo-venue.png）
-  if (venueLogo) {
-    const venueMaxH = 48;
-    const venueMaxW = 230;
-    const vRatio = venueLogo.width / venueLogo.height;
-    let vH = venueMaxH;
-    let vW = vH * vRatio;
-    if (vW > venueMaxW) {
-      vW = venueMaxW;
-      vH = vW / vRatio;
-    }
-    const vX = headerRightX - vW;
-    const vY = paddingY + 54;
-    ctx.drawImage(venueLogo, vX, vY, vW, vH);
-  }
+  // 会場表示（鳥取大学の場合は専用ロゴ＋テキスト、それ以外は会場ロゴ）
+  drawVenueBadge(ctx, {
+    venue,
+    rightX: headerRightX,
+    topY: paddingY + 54,
+    venueLogo,
+    tottoriLogo,
+  });
 
   // ---- ヘッダーと表の間の装飾アクセントライン ----
   const accentY = paddingY + headerH - 4;
@@ -894,8 +890,9 @@ export async function exportTeamLeagueResultJpeg(
   playerNameOverrides: Record<string, string> = {},
   matchFormat?: import('./types').MatchFormat,
   promotionOverrides: Record<string, string> = {},
+  venue?: string,
 ) {
-  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat, promotionOverrides);
+  const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat, promotionOverrides, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${league.leagueId.trim()}リーグ結果_団体戦.jpg`;

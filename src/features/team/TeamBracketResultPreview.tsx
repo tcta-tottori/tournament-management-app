@@ -18,6 +18,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const matchFormat = useTeamStore(s => s.tournamentInfo?.matchFormat);
+  const venue = useTeamStore(s => s.tournamentInfo?.venue);
 
   // モーダルを開くたびに最新コードで再生成する
   useEffect(() => {
@@ -29,7 +30,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
     let isMounted = true;
     setIsLoading(true);
 
-    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat)
+    generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat, venue)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -42,7 +43,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, bracket, allTeams, tournamentName, customLabels, matchFormat]);
+  }, [isOpen, bracket, allTeams, tournamentName, customLabels, matchFormat, venue]);
 
   const label = resolveBracketLabel(bracket.category, customLabels);
 
