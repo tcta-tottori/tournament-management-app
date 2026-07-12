@@ -33,6 +33,10 @@ interface MixedState {
   importData: (info: TournamentInfo, leagues: MixedLeague[], matches: LeagueMatchScore[]) => void;
   setRawExcelSheets: (sheets: ExcelSheetData[]) => void;
   resetAll: () => void;
+  /** 決勝トーナメントのデータのみクリア */
+  clearBrackets: () => void;
+  /** 予選リーグの結果（スコア）のみクリア（対戦表・チーム構成は保持） */
+  clearLeagueResults: () => void;
 
   // Actions: League
   updateLeagueScore: (matchId: string, score1: number, score2: number, tiebreakScore?: number | null, overrideWinnerId?: string | null) => void;
@@ -146,6 +150,26 @@ export const useMixedStore = create<MixedState>()(
           lastStandingsHash: '',
         });
       },
+
+      clearBrackets: () =>
+        set({
+          brackets: [],
+          bracketCourtAssignments: {},
+          currentPhase: 'league',
+          selectedBracketCategory: '1st',
+        }),
+
+      clearLeagueResults: () =>
+        set(state => ({
+          leagueMatches: state.leagueMatches.map(m => ({
+            ...m,
+            score1: null,
+            score2: null,
+            tiebreakScore: null,
+            winnerId: null,
+            status: 'waiting' as const,
+          })),
+        })),
 
       updateLeagueScore: (matchId, score1, score2, tiebreakScore, overrideWinnerId) => {
         set(state => {

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users, Eraser } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -352,6 +353,70 @@ export default function DataManagement() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetDone, setResetDone] = useState(false);
 
+  // シート別クリア用
+  const [pendingClear, setPendingClear] = useState<null | { title: string; message: string; run: () => void | Promise<void> }>(null);
+  const [clearDoneLabel, setClearDoneLabel] = useState<string | null>(null);
+  const drawCount = useLiveQuery(() => db.draws.count(), [], 0);
+  const matchCount = useLiveQuery(() => db.matches.count(), [], 0);
+  const hasDrawData = (drawCount ?? 0) > 0 || (matchCount ?? 0) > 0;
+
+  const runPendingClear = useCallback(async () => {
+    if (!pendingClear) return;
+    const label = pendingClear.title;
+    try {
+      await pendingClear.run();
+      setClearDoneLabel(label);
+      setTimeout(() => setClearDoneLabel(null), 3000);
+    } catch (err) {
+      console.error('Sheet clear failed:', err);
+    }
+    setPendingClear(null);
+  }, [pendingClear]);
+
+  // クリア対象（読み込まれているデータに応じて表示）
+  const clearItems = [
+    isTeamImported && {
+      key: 'team-bracket',
+      label: '団体戦：決勝トーナメント',
+      desc: '順位トーナメントの試合・結果を削除（予選リーグ・チームは保持）',
+      message: '団体戦の決勝トーナメント（順位トーナメント）のデータを削除します。\n\n予選リーグの結果・チーム構成は保持されます。\nこの操作は取り消せません。',
+      run: () => useTeamStore.getState().clearBrackets(),
+    },
+    isTeamImported && {
+      key: 'team-league',
+      label: '団体戦：予選リーグ結果',
+      desc: '予選リーグのスコアをすべて消去（対戦表・チームは保持）',
+      message: '団体戦の予選リーグの結果（スコア）をすべて削除します。\n\n対戦表・チーム構成は保持されます。\nこの操作は取り消せません。',
+      run: () => useTeamStore.getState().clearLeagueResults(),
+    },
+    isMixedImported && {
+      key: 'mixed-bracket',
+      label: 'ミックス：決勝トーナメント',
+      desc: '決勝トーナメントの試合・結果を削除（予選リーグは保持）',
+      message: 'ミックスの決勝トーナメントのデータを削除します。\n\n予選リーグの結果は保持されます。\nこの操作は取り消せません。',
+      run: () => useMixedStore.getState().clearBrackets(),
+    },
+    isMixedImported && {
+      key: 'mixed-league',
+      label: 'ミックス：予選リーグ結果',
+      desc: '予選リーグのスコアをすべて消去（対戦表は保持）',
+      message: 'ミックスの予選リーグの結果（スコア）をすべて削除します。\n\n対戦表は保持されます。\nこの操作は取り消せません。',
+      run: () => useMixedStore.getState().clearLeagueResults(),
+    },
+    hasDrawData && {
+      key: 'draws',
+      label: 'シングルス/ダブルス：対戦表・試合結果',
+      desc: 'ドロー（対戦表）と試合結果を削除（エントリー・選手は保持）',
+      message: 'シングルス/ダブルスの対戦表（ドロー）と試合結果を削除します。\n\nエントリー・選手データは保持されます。\nこの操作は取り消せません。',
+      run: async () => {
+        await db.transaction('rw', [db.draws, db.matches], async () => {
+          await db.draws.clear();
+          await db.matches.clear();
+        });
+      },
+    },
+  ].filter(Boolean) as { key: string; label: string; desc: string; message: string; run: () => void | Promise<void> }[];
+
   // DataSync の接続/切断時に再評価をトリガー
   const handleConnectionChange = useCallback(() => {
     setGdriveVersion(v => v + 1);
@@ -494,6 +559,46 @@ export default function DataManagement() {
         )}
       </section>
 
+      {/* シート別データクリア */}
+      {clearItems.length > 0 && (
+        <section className="rounded-xl overflow-hidden border border-amber-200/70 bg-gradient-to-r from-amber-50/70 to-orange-50/40">
+          <div className="px-5 py-3.5 border-b border-amber-200/60 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-white border border-amber-200 shadow-sm flex items-center justify-center shrink-0">
+              <Eraser className="w-4.5 h-4.5 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">シート別データクリア</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5">決勝トーナメントなど、区分ごとにデータを個別に削除できます</p>
+            </div>
+          </div>
+          <div className="p-4 grid gap-2.5 sm:grid-cols-2">
+            {clearItems.map(item => (
+              <div key={item.key} className="flex items-center gap-3 px-3.5 py-3 bg-white rounded-xl border border-amber-100">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-800">{item.label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                </div>
+                <button
+                  onClick={() => setPendingClear({ title: item.label, message: item.message, run: item.run })}
+                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-all shrink-0"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  クリア
+                </button>
+              </div>
+            ))}
+          </div>
+          {clearDoneLabel && (
+            <div className="px-5 pb-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                <p className="text-xs text-green-700 font-medium">「{clearDoneLabel}」をクリアしました</p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* 全データリセット */}
       <section className="rounded-xl overflow-hidden border border-red-200/60 bg-gradient-to-r from-red-50/80 to-orange-50/50">
         <div className="px-5 py-4 flex items-center gap-4">
@@ -531,6 +636,17 @@ export default function DataManagement() {
         confirmLabel="リセット実行"
         onConfirm={handleResetAll}
         onCancel={() => setShowResetConfirm(false)}
+      />
+
+      {/* シート別クリア確認ダイアログ */}
+      <ConfirmDialog
+        open={pendingClear !== null}
+        title={pendingClear ? `${pendingClear.title} をクリア` : ''}
+        message={pendingClear?.message ?? ''}
+        danger
+        confirmLabel="クリア実行"
+        onConfirm={runPendingClear}
+        onCancel={() => setPendingClear(null)}
       />
     </div>
   );

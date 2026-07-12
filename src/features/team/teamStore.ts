@@ -154,6 +154,10 @@ interface TeamState {
   importData: (info: TeamTournamentInfo, leagues: TeamLeague[], matches: TeamLeagueMatch[]) => void;
   setRawExcelSheets: (sheets: ExcelSheetData[]) => void;
   resetAll: () => void;
+  /** 決勝トーナメント（順位トーナメント）のデータのみクリア */
+  clearBrackets: () => void;
+  /** 予選リーグの結果（スコア）のみクリア（対戦表・チーム構成は保持） */
+  clearLeagueResults: () => void;
 
   // Actions: League
   updateSubMatchScore: (matchId: string, matchType: MatchType, score1: number, score2: number, tiebreakScore?: number | null, terminated?: boolean) => void;
@@ -293,6 +297,33 @@ export const useTeamStore = create<TeamState>()(
           lastStandingsHash: '',
         });
       },
+
+      clearBrackets: () =>
+        set({
+          brackets: [],
+          bracketCourtAssignments: {},
+          currentPhase: 'league',
+          selectedBracketCategory: '1st',
+        }),
+
+      clearLeagueResults: () =>
+        set(state => ({
+          leagueMatches: state.leagueMatches.map(m => ({
+            ...m,
+            subMatches: m.subMatches.map(sm => ({
+              ...sm,
+              score1: null,
+              score2: null,
+              tiebreakScore: null,
+              winnerId: null,
+              terminated: false,
+            })),
+            winnerId: null,
+            winsTeam1: 0,
+            winsTeam2: 0,
+            status: 'waiting' as const,
+          })),
+        })),
 
       updateSubMatchScore: (matchId, matchType, score1, score2, tiebreakScore, terminated) => {
         set(state => {
