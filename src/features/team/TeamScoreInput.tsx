@@ -520,7 +520,7 @@ export default function TeamScoreInput({
   const WIN_GAMES = winGames;
   const {
     updateSubMatchScore, clearSubMatchScore, updateSubMatchPlayers,
-    updateBracketSubMatchScore, clearBracketSubMatchScore,
+    updateBracketSubMatchScore, clearBracketSubMatchScore, updateBracketSubMatchPlayers,
     updatePlayerDisplayName,
   } = useTeamStore();
 
@@ -586,15 +586,18 @@ export default function TeamScoreInput({
         p1a: '', p1b: '', p2a: '', p2b: '',
       };
       const updated = { ...current, [key]: value };
-      if (!isBracket) {
-        const isSingles = playersPerSubMatch(mt) === 1;
-        const p1 = (isSingles ? [updated.p1a] : [updated.p1a, updated.p1b]).map(x => x.trim()).filter(Boolean);
-        const p2 = (isSingles ? [updated.p2a] : [updated.p2a, updated.p2b]).map(x => x.trim()).filter(Boolean);
+      // 選手名を即時保存（リーグ・決勝トーナメント両方）。結果画像に選手名を表示するため。
+      const isSingles = playersPerSubMatch(mt) === 1;
+      const p1 = (isSingles ? [updated.p1a] : [updated.p1a, updated.p1b]).map(x => x.trim()).filter(Boolean);
+      const p2 = (isSingles ? [updated.p2a] : [updated.p2a, updated.p2b]).map(x => x.trim()).filter(Boolean);
+      if (isBracket) {
+        updateBracketSubMatchPlayers(matchId, mt, p1, p2);
+      } else {
         updateSubMatchPlayers(matchId, mt, p1, p2);
       }
       return { ...prev, [mt]: updated };
     });
-  }, [isBracket, matchId, updateSubMatchPlayers]);
+  }, [isBracket, matchId, updateSubMatchPlayers, updateBracketSubMatchPlayers]);
 
   // ピッカー状態管理
   const [picker, setPicker] = useState<{
@@ -870,21 +873,24 @@ export default function TeamScoreInput({
       updateFn(matchId, mt, s1, s2, tb, isTerminated);
     }
 
-    // 選手名は団体戦リーグのみ保存（シングルスは1名のみ）
-    if (!isBracket) {
-      for (const mt of matchTypeOrder) {
-        const s = scores[mt];
-        if (!s) continue;
-        const isSingles = playersPerSubMatch(mt) === 1;
-        const p1 = (isSingles ? [s.p1a] : [s.p1a, s.p1b]).map(x => x.trim()).filter(Boolean);
-        const p2 = (isSingles ? [s.p2a] : [s.p2a, s.p2b]).map(x => x.trim()).filter(Boolean);
+    // 選手名を保存（リーグ・決勝トーナメント両方。シングルスは1名のみ）
+    for (const mt of matchTypeOrder) {
+      const s = scores[mt];
+      if (!s) continue;
+      const isSingles = playersPerSubMatch(mt) === 1;
+      const p1 = (isSingles ? [s.p1a] : [s.p1a, s.p1b]).map(x => x.trim()).filter(Boolean);
+      const p2 = (isSingles ? [s.p2a] : [s.p2a, s.p2b]).map(x => x.trim()).filter(Boolean);
+      if (isBracket) {
+        updateBracketSubMatchPlayers(matchId, mt, p1, p2);
+      } else {
         updateSubMatchPlayers(matchId, mt, p1, p2);
       }
     }
 
     onClose();
   }, [scores, terminated, matchId, isBracket, subMatches, onClose, validate, matchTypeOrder,
-      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore, updateSubMatchPlayers]);
+      updateSubMatchScore, clearSubMatchScore, updateBracketSubMatchScore, clearBracketSubMatchScore,
+      updateSubMatchPlayers, updateBracketSubMatchPlayers]);
 
   const handleClearAll = useCallback(() => {
     const clearFn = isBracket ? clearBracketSubMatchScore : clearSubMatchScore;
