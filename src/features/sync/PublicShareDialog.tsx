@@ -7,6 +7,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Copy, Check, Share2, Info, ExternalLink } from 'lucide-react';
+import { DEFAULT_SERVER_URL, PUBLIC_ROOM } from './syncStore';
 
 interface Props {
   open: boolean;
@@ -15,14 +16,19 @@ interface Props {
   serverUrl: string;
 }
 
-/** 現在のオリジン + アプリのベースパス + /view?room=... を組み立てる */
+/**
+ * 現在のオリジン + アプリのベースパス + /view/league を組み立てる。
+ * ルーム/サーバーがビルド埋め込みの既定値と同じ場合はクエリを省略し、
+ * HP に貼りっぱなしにできる短い固定URLを返す。
+ */
 function buildPublicUrl(roomCode: string, serverUrl: string): string {
   const origin = window.location.origin;
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const qs = new URLSearchParams();
-  qs.set('room', roomCode);
-  if (serverUrl) qs.set('server', serverUrl);
-  return `${origin}${base}/view/league?${qs.toString()}`;
+  if (roomCode && roomCode !== PUBLIC_ROOM) qs.set('room', roomCode);
+  if (serverUrl && serverUrl !== DEFAULT_SERVER_URL) qs.set('server', serverUrl);
+  const q = qs.toString();
+  return `${origin}${base}/view/league${q ? `?${q}` : ''}`;
 }
 
 export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }: Props) {
@@ -63,7 +69,10 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
     }
   };
 
-  const noServerWarning = !serverUrl;
+  const effectiveServer = serverUrl || DEFAULT_SERVER_URL;
+  const noServerWarning = !effectiveServer;
+  // 既定サーバー & 固定公開ルームでの配信なら、URL は貼りっぱなしにできる固定URL
+  const isFixedUrl = !!effectiveServer && (!PUBLIC_ROOM || roomCode === PUBLIC_ROOM);
 
   return createPortal(
     <div
@@ -117,9 +126,16 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
           </div>
 
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              観戦用URL
-            </p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                観戦用URL
+              </p>
+              {isFixedUrl && (
+                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5">
+                  固定URL・HP貼りっぱなしOK
+                </span>
+              )}
+            </div>
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
               <p className="text-xs font-mono text-slate-800 break-all leading-relaxed">
                 {url}

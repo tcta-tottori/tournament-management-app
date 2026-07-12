@@ -23,7 +23,8 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { networkInterfaces } from 'os';
 
-const PORT = parseInt(process.argv[2] || '8787', 10);
+// ポート: コマンド引数 > 環境変数 PORT（Render等が自動注入）> 既定8787
+const PORT = parseInt(process.argv[2] || process.env.PORT || '8787', 10);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-preview-tts';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';

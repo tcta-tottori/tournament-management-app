@@ -2,6 +2,26 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SyncConnectionState, SyncPeer } from './types';
 
+// =============================================
+// ビルド時に埋め込まれるインターネット公開用の既定設定
+// GitHub Actions のシークレット/変数から注入される。
+//   VITE_SYNC_SERVER_URL … 公開中継サーバー(wss://xxx.onrender.com)
+//   VITE_PUBLIC_ROOM      … HP掲載用の固定ルームコード(例: TCTA01)
+// これらが設定されていれば、各端末は個別設定なしで
+// インターネット越しに観戦データを閲覧・配信できる。
+// =============================================
+
+/** 既定の中継サーバーURL（未設定なら空文字） */
+export const DEFAULT_SERVER_URL: string =
+  ((import.meta.env.VITE_SYNC_SERVER_URL as string | undefined) || '').trim();
+
+/** HP掲載用の固定公開ルームコード（未設定なら空文字） */
+export const PUBLIC_ROOM: string =
+  ((import.meta.env.VITE_PUBLIC_ROOM as string | undefined) || '').trim().toUpperCase();
+
+/** インターネット公開が有効か（サーバーURLが埋め込まれているか） */
+export const PUBLIC_PUBLISH_ENABLED = !!DEFAULT_SERVER_URL;
+
 // デバイスIDの生成・保持
 function getOrCreateDeviceId(): string {
   const key = 'sync-device-id';
@@ -68,7 +88,7 @@ export const useSyncStore = create<SyncState>()(
       // 永続化設定
       deviceId: getOrCreateDeviceId(),
       deviceName: getDefaultDeviceName(),
-      serverUrl: '',
+      serverUrl: DEFAULT_SERVER_URL,
       autoConnect: false,
       lastRoomCode: '',
 
@@ -123,6 +143,16 @@ export const useSyncStore = create<SyncState>()(
         autoConnect: state.autoConnect,
         lastRoomCode: state.lastRoomCode,
       }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<SyncState>;
+        return {
+          ...current,
+          ...p,
+          // 保存済みのURLが空なら、ビルドに埋め込まれた既定サーバーを使う。
+          // これで既存ユーザーでも設定不要でインターネット公開に追随できる。
+          serverUrl: p.serverUrl && p.serverUrl.trim() ? p.serverUrl : DEFAULT_SERVER_URL,
+        };
+      },
     }
   )
 );

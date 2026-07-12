@@ -8,9 +8,12 @@ import { createPortal } from 'react-dom';
 import {
   X, Wifi, WifiOff, Monitor, Smartphone,
   Copy, Check, Play, Square, Settings2,
-  Users, RefreshCw, AlertCircle, Info, Share2,
+  Users, RefreshCw, AlertCircle, Info, Share2, Globe,
 } from 'lucide-react';
-import { useSyncStore, generateRoomCode } from './syncStore';
+import {
+  useSyncStore, generateRoomCode,
+  DEFAULT_SERVER_URL, PUBLIC_ROOM, PUBLIC_PUBLISH_ENABLED,
+} from './syncStore';
 import { syncEngine } from './syncEngine';
 import PublicShareDialog from './PublicShareDialog';
 
@@ -33,6 +36,14 @@ export default function SyncPanel({ open, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+
+  // インターネット公開を開始（固定の公開ルーム＋既定サーバーでワンタップ配信）
+  const handlePublish = useCallback(() => {
+    setDeviceName(editingDeviceName);
+    setServerUrl(DEFAULT_SERVER_URL);
+    const code = PUBLIC_ROOM || generateRoomCode();
+    syncEngine.start(code, DEFAULT_SERVER_URL, false);
+  }, [editingDeviceName, setDeviceName, setServerUrl]);
 
   // ルーム作成
   const handleCreateRoom = useCallback(() => {
@@ -221,6 +232,29 @@ export default function SyncPanel({ open, onClose }: Props) {
           ) : (
             <>
               {/* 未接続の場合 */}
+
+              {/* インターネット公開（HP掲載向け・ワンタップ） */}
+              {PUBLIC_PUBLISH_ENABLED && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Globe className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold text-emerald-800">インターネット公開</h3>
+                  </div>
+                  <p className="text-[10px] text-emerald-700 mb-3 leading-relaxed">
+                    ボタンひとつで、現在の大会データをインターネットに公開します。
+                    観戦者は{PUBLIC_ROOM ? '固定の観戦用URL' : '発行された観戦用URL'}を開くだけで、
+                    どこからでもリアルタイムに閲覧できます。
+                  </p>
+                  <button
+                    onClick={handlePublish}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md transition-all active:scale-[0.98]"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>インターネット公開を開始</span>
+                  </button>
+                </div>
+              )}
+
               {/* 端末名 */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">

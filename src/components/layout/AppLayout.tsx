@@ -11,7 +11,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../../features/mixed/mixedStore';
 import { useTeamStore } from '../../features/team/teamStore';
-import { useSyncStore } from '../../features/sync/syncStore';
+import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../../features/sync/syncStore';
 import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
@@ -557,10 +557,12 @@ function PublicViewHeaderLink() {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   let href = `${base}/view/league`;
   if (syncEnabled && roomCode) {
+    // 既定サーバー/固定公開ルームと同じ値ならクエリを省略し、固定URLにする
     const qs = new URLSearchParams();
-    qs.set('room', roomCode);
-    if (serverUrl) qs.set('server', serverUrl);
-    href = `${base}/view/league?${qs.toString()}`;
+    if (roomCode && roomCode !== PUBLIC_ROOM) qs.set('room', roomCode);
+    if (serverUrl && serverUrl !== DEFAULT_SERVER_URL) qs.set('server', serverUrl);
+    const q = qs.toString();
+    href = `${base}/view/league${q ? `?${q}` : ''}`;
   }
 
   return (

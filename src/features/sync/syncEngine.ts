@@ -5,7 +5,7 @@
 // =============================================
 
 import { db } from '../../db/database';
-import { useSyncStore } from './syncStore';
+import { useSyncStore, DEFAULT_SERVER_URL } from './syncStore';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
 import { BroadcastTransport } from './broadcastTransport';
@@ -88,7 +88,8 @@ class SyncEngine {
     this.broadcastTransport.connect(roomCode);
 
     // WebSocket 接続（サーバーURLが設定されている場合）
-    const wsUrl = serverUrl || store.serverUrl;
+    // 引数 > ストア設定 > ビルド埋め込みの既定 の順に採用する。
+    const wsUrl = serverUrl || store.serverUrl || DEFAULT_SERVER_URL;
     if (wsUrl) {
       this.wsTransport.setServerUrl(wsUrl);
       this.wsTransport.setViewer(viewerMode);

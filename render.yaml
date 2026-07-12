@@ -1,0 +1,32 @@
+# =============================================
+# Render.com デプロイ設定（Blueprint）
+#
+# 観戦用の WebSocket 中継サーバーを Render 無料プランで公開する。
+# デプロイすると https://<name>.onrender.com が発行され、
+# WebSocket は wss://<name>.onrender.com で利用できる（TLS自動）。
+#
+# 使い方:
+#   1. https://dashboard.render.com/ → New → Blueprint
+#   2. このリポジトリを選択（render.yaml が自動検出される）
+#   3. Apply でデプロイ
+#   4. 発行された wss://<name>.onrender.com を
+#      GitHub リポジトリの Secrets/Variables `SYNC_SERVER_URL` に登録
+#
+# ※無料プランは15分アクセスが無いとスリープし、次アクセスで
+#   自動復帰（初回のみ数十秒）。大会中は稼働し続けるため実害は小さい。
+# =============================================
+services:
+  - type: web
+    name: tournament-sync-server
+    runtime: node
+    plan: free
+    rootDir: sync-server
+    buildCommand: npm install
+    startCommand: node server.mjs
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Gemini TTS プロキシを使う場合のみ設定（任意）。
+      # 観戦データ配信だけなら未設定で問題ない。
+      - key: GEMINI_API_KEY
+        sync: false

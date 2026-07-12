@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { syncEngine } from '../sync/syncEngine';
-import { useSyncStore } from '../sync/syncStore';
+import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../sync/syncStore';
 
 export interface PublicSyncStatus {
   /** URL にルーム指定があるか */
@@ -35,8 +35,10 @@ export function usePublicSync(): PublicSyncStatus {
   const error = useSyncStore(s => s.error);
   const roomCode = useSyncStore(s => s.roomCode);
 
-  const room = params.get('room') || '';
-  const server = params.get('server') || '';
+  // URL に指定が無ければ、ビルドに埋め込まれた固定の公開ルーム/サーバーを使う。
+  // これにより HP には ...  /view/league （クエリ無し）を貼るだけでよい。
+  const room = params.get('room') || PUBLIC_ROOM;
+  const server = params.get('server') || DEFAULT_SERVER_URL;
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
