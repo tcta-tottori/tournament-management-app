@@ -264,7 +264,9 @@ export async function generateTeamBracketResultDataUrl(
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;
   if (tournamentName) {
-    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeW - 40);
+    // バッジの右側だけに収める（重なり防止）。最低幅は確保。
+    const nameMaxW = Math.max(200, tableW - badgeW - 48);
+    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', nameMaxW);
   }
   // 会場表示（鳥取大学の場合は専用ロゴ＋テキスト、それ以外は会場ロゴ）
   drawVenueBadge(ctx, {

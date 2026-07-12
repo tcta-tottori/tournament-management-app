@@ -324,31 +324,47 @@ export async function generateTeamLeagueResultDataUrl(
   // 「男子1部」など数字を含むラベルは「数字 大 + 文字 小」で描画する
   const numberMatch = pillText.match(/^(.*?)(\d+)(.*)$/);
   const pillH = 96;
-  const bigFont = '900 64px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  // 数字（bigFont）は極太のまま、前後の文字（"男子" / "部" 等）は読みやすさのため少し細めに
-  const smallFont = '600 30px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-  // 混合サイズ描画時、prefix - number - suffix の間に控えめなギャップを入れる
-  const segGap = 8;
-  ctx.save();
-  let pillTextW: number;
-  if (numberMatch) {
-    const [, prefix, num, suffix] = numberMatch;
-    ctx.font = smallFont;
-    const wPre = prefix ? ctx.measureText(prefix).width : 0;
-    const wSuf = suffix ? ctx.measureText(suffix).width : 0;
-    ctx.font = bigFont;
-    const wNum = ctx.measureText(num).width;
-    const gapCount = (prefix ? 1 : 0) + (suffix ? 1 : 0);
-    pillTextW = wPre + wNum + wSuf + segGap * gapCount;
-  } else {
-    ctx.font = bigFont;
-    pillTextW = ctx.measureText(pillText).width;
-  }
-  ctx.restore();
   const pillPadX = 40;
-  const pillW = pillTextW + pillPadX * 2;
   const pillX = paddingX;
   const pillY = paddingY + 4;
+  // 混合サイズ描画時、prefix - number - suffix の間に控えめなギャップを入れる
+  const segGap = 8;
+  // フォントサイズは長いラベル時に自動縮小する（右側の大会名と重ならないように）
+  let bigPx = 64;
+  let smallPx = 30;
+  const bigFontOf = (px: number) => `900 ${px}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
+  const smallFontOf = (px: number) => `600 ${px}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
+
+  const measurePillTextW = (): number => {
+    ctx.save();
+    let w: number;
+    if (numberMatch) {
+      const [, prefix, num, suffix] = numberMatch;
+      ctx.font = smallFontOf(smallPx);
+      const wPre = prefix ? ctx.measureText(prefix).width : 0;
+      const wSuf = suffix ? ctx.measureText(suffix).width : 0;
+      ctx.font = bigFontOf(bigPx);
+      const wNum = ctx.measureText(num).width;
+      const gapCount = (prefix ? 1 : 0) + (suffix ? 1 : 0);
+      w = wPre + wNum + wSuf + segGap * gapCount;
+    } else {
+      ctx.font = bigFontOf(bigPx);
+      w = ctx.measureText(pillText).width;
+    }
+    ctx.restore();
+    return w;
+  };
+
+  // ピルは横幅の約半分までに制限。超える場合はフォントを縮小して収める。
+  const maxPillW = Math.min(tableW * 0.5, 560);
+  let pillTextW = measurePillTextW();
+  if (pillTextW + pillPadX * 2 > maxPillW) {
+    const scale = Math.max(0.4, (maxPillW - pillPadX * 2) / pillTextW);
+    bigPx = Math.round(bigPx * scale);
+    smallPx = Math.round(smallPx * scale);
+    pillTextW = measurePillTextW();
+  }
+  const pillW = pillTextW + pillPadX * 2;
 
   // 外側影
   ctx.save();
@@ -379,36 +395,36 @@ export async function generateTeamLeagueResultDataUrl(
   if (numberMatch) {
     const [, prefix, num, suffix] = numberMatch;
     let cx = pillX + (pillW - pillTextW) / 2;
-    // 64px の数字を視覚的に中央配置する baseline 位置
-    const baselineY = pillY + pillH / 2 + 64 * 0.34;
+    // 数字（bigPx）を視覚的に中央配置する baseline 位置
+    const baselineY = pillY + pillH / 2 + bigPx * 0.34;
     if (prefix) {
-      ctx.font = smallFont;
+      ctx.font = smallFontOf(smallPx);
       const wPre = ctx.measureText(prefix).width;
       ctx.fillText(prefix, cx, baselineY);
       cx += wPre + segGap;
     }
-    ctx.font = bigFont;
+    ctx.font = bigFontOf(bigPx);
     const wNum = ctx.measureText(num).width;
     ctx.fillText(num, cx, baselineY);
     cx += wNum;
     if (suffix) {
       cx += segGap;
-      ctx.font = smallFont;
+      ctx.font = smallFontOf(smallPx);
       ctx.fillText(suffix, cx, baselineY);
     }
   } else {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = bigFont;
+    ctx.font = bigFontOf(bigPx);
     ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
   }
-
-  const badgeSize = pillH; // 以降の参照用（ヘッダー配置のため）
 
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;
   if (tournamentName) {
-    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeSize - 160);
+    // ピルの右端より右側だけに収める（重なり防止）。最低幅は確保。
+    const nameMaxW = Math.max(200, tableW - pillW - 48);
+    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', nameMaxW);
   }
   // 会場表示（鳥取大学の場合は専用ロゴ＋テキスト、それ以外は会場ロゴ）
   drawVenueBadge(ctx, {
