@@ -1,5 +1,6 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
+import { drawVenueBadge } from './venueBadge';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -44,12 +45,14 @@ export async function generateTeamBracketResultDataUrl(
   tournamentName: string,
   customLabels?: Partial<Record<PlacementCategory, string>>,
   matchFormat?: MatchFormat,
+  venue?: string,
 ): Promise<string> {
   // 公式ロゴ・会場ロゴを事前に読み込む
   const base = import.meta.env.BASE_URL;
-  const [tctaLogo, venueLogo] = await Promise.all([
+  const [tctaLogo, venueLogo, tottoriLogo] = await Promise.all([
     tryLoadImage(`${base}logo-tcta.png`),
     tryLoadImage(`${base}logo-venue.png`),
+    tryLoadImage(`${base}logo-tottori-univ.png`),
   ]);
 
   // 試合形式に応じた種目順
@@ -262,20 +265,14 @@ export async function generateTeamBracketResultDataUrl(
   if (tournamentName) {
     drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', tableW - badgeW - 40);
   }
-  if (venueLogo) {
-    const venueMaxH = 48;
-    const venueMaxW = 230;
-    const vRatio = venueLogo.width / venueLogo.height;
-    let vH = venueMaxH;
-    let vW = vH * vRatio;
-    if (vW > venueMaxW) {
-      vW = venueMaxW;
-      vH = vW / vRatio;
-    }
-    const vX = headerRightX - vW;
-    const vY = paddingY + 54;
-    ctx.drawImage(venueLogo, vX, vY, vW, vH);
-  }
+  // 会場表示（鳥取大学の場合は専用ロゴ＋テキスト、それ以外は会場ロゴ）
+  drawVenueBadge(ctx, {
+    venue,
+    rightX: headerRightX,
+    topY: paddingY + 54,
+    venueLogo,
+    tottoriLogo,
+  });
 
   // ---- ヘッダーと表の間のアクセントライン ----
   const accentY = paddingY + headerH - 4;
@@ -597,8 +594,9 @@ export async function exportTeamBracketResultJpeg(
   tournamentName: string,
   customLabels?: Partial<Record<PlacementCategory, string>>,
   matchFormat?: MatchFormat,
+  venue?: string,
 ) {
-  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat);
+  const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${resolveBracketLabel(bracket.category, customLabels)}_結果_団体戦.jpg`;
