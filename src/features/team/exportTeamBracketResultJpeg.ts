@@ -8,6 +8,23 @@ const TYPE_LABEL: Record<MatchType, string> = {
   D1: 'D1', D2: 'D2', D3: 'D3', S1: 'S1', S2: 'S2',
 };
 
+/**
+ * リーグバッジ用の短縮ラベル。長いリーグ名（例:「女子予選会A」）が
+ * チーム名と重ならないよう、コンパクトな表記にする。
+ *   「女子予選会A」→「予A」 / 「男子1部」→「1部」 / 「A」→「A」
+ */
+function shortLeagueBadge(league: string): string {
+  const s = (league || '').trim();
+  if (!s) return '-';
+  const bu = s.match(/(\d+)\s*部/);
+  if (bu) return `${bu[1]}部`;
+  const yo = s.match(/予選会\s*([0-9A-Za-z]+)/);
+  if (yo) return `予${yo[1]}`;
+  const tail = s.match(/([0-9A-Za-z]+)\s*$/);
+  if (tail && tail[1].length <= 3) return tail[1];
+  return s.slice(0, 3);
+}
+
 /** 種目別カラー（画面側・予選リーグ結果と統一） */
 const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }> = {
   MIX: { bg: '#ede9fe', fg: '#6d28d9', accent: '#8b5cf6' }, // violet
@@ -395,13 +412,15 @@ export async function generateTeamBracketResultDataUrl(
       ctx.restore();
       drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.sky200, 1.5);
 
-      // リーグ色バッジ（通常のチーム行と統一）
+      // リーグ色バッジ（短縮ラベル＋自動幅で重なり防止）
       const bgBadgeX = cx + 10;
-      const bgBadgeW = 22;
+      const bgBadgeLabel = shortLeagueBadge(byeLeague || '');
+      ctx.font = '900 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+      const bgBadgeW = Math.max(22, ctx.measureText(bgBadgeLabel).width + 12);
       const bgBadgeH = 20;
       const bgBadgeY = byeY + (byeH - bgBadgeH) / 2;
       drawRoundRect(bgBadgeX, bgBadgeY, bgBadgeW, bgBadgeH, 5, COL.sky100, COL.sky200, 1);
-      drawText(byeLeague || '-', bgBadgeX + bgBadgeW / 2, bgBadgeY + bgBadgeH / 2 + 0.5, 11, 'center', COL.sky700, 'black');
+      drawText(bgBadgeLabel, bgBadgeX + bgBadgeW / 2, bgBadgeY + bgBadgeH / 2 + 0.5, 11, 'center', COL.sky700, 'black', bgBadgeW - 6);
 
       // チーム名（中央寄せ風、badgeの右から右端まで）
       const nameX = bgBadgeX + bgBadgeW + 8;
@@ -449,15 +468,17 @@ export async function generateTeamBracketResultDataUrl(
         ctx.fillRect(cx + 6, rowY + 2, matchW - 12, teamRowH - 2);
       }
 
-      // リーグバッジ
+      // リーグバッジ（短縮ラベル＋テキスト幅に合わせた自動幅で重なり防止）
       const badgeX2 = cx + 10;
       const badgeY2 = rowY + (teamRowH - 20) / 2;
-      const bgW = 22;
+      const badgeLabel = shortLeagueBadge(teamLeague || '');
+      ctx.font = '900 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+      const bgW = Math.max(22, ctx.measureText(badgeLabel).width + 12);
       const bgH = 20;
       drawRoundRect(badgeX2, badgeY2, bgW, bgH, 5, COL.sky100, COL.sky200, 1);
-      drawText(teamLeague || '-', badgeX2 + bgW / 2, badgeY2 + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'black');
+      drawText(badgeLabel, badgeX2 + bgW / 2, badgeY2 + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'black', bgW - 6);
 
-      // チーム名
+      // チーム名（バッジの右端から開始）
       const nameX = badgeX2 + bgW + 8;
       const scoreBoxW = 30;
       const nameMaxW = matchW - (nameX - cx) - scoreBoxW - 14;
