@@ -2,6 +2,7 @@ import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, Plac
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
 import { buildResultFileName } from './resultFileName';
+import { splitBigSmall, measureMixed, drawMixed } from './mixedSizeText';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -241,11 +242,12 @@ export async function generateTeamBracketResultDataUrl(
   const catColor = CATEGORY_COLORS[bracket.category];
   const catText = resolveBracketLabel(bracket.category, customLabels);
 
-  // バッジサイズをテキスト幅に合わせて決定
-  const badgeFontSize = 30;
+  // 数字・英字は大きく、その他（日本語など）は小さく描画する（例:「1位・2位決定戦」の 1,2 のみ大）
+  const catRuns = splitBigSmall(catText);
+  const badgeBigPx = 34;
+  const badgeSmallPx = 23;
   const badgeH = 62;
-  ctx.font = `900 ${badgeFontSize}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-  const badgeTextW = ctx.measureText(catText).width;
+  const badgeTextW = measureMixed(ctx, catRuns, badgeBigPx, badgeSmallPx, '900', '800');
   const badgePadX = 28;
   const badgeW = badgeTextW + badgePadX * 2;
   const badgeX = paddingX;
@@ -271,12 +273,10 @@ export async function generateTeamBracketResultDataUrl(
   // 内側ボーダー
   drawRoundRect(badgeX + 1.5, badgeY + 1.5, badgeW - 3, badgeH - 3, badgeH / 2 - 1.5, undefined, 'rgba(255,255,255,0.45)', 1);
 
-  // バッジ内テキスト
+  // バッジ内テキスト（数字/英字=大, その他=小。alphabetic ベースラインで下端そろえ）
   ctx.fillStyle = COL.white;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = `900 ${badgeFontSize}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-  ctx.fillText(catText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
+  const badgeBaselineY = badgeY + badgeH / 2 + badgeBigPx * 0.34;
+  drawMixed(ctx, catRuns, badgeX + (badgeW - badgeTextW) / 2, badgeBaselineY, badgeBigPx, badgeSmallPx, '900', '800');
 
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;

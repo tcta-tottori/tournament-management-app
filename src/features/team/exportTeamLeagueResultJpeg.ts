@@ -2,6 +2,7 @@ import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchT
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
 import { buildResultFileName } from './resultFileName';
+import { splitBigSmall, measureMixed, drawMixed } from './mixedSizeText';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -321,48 +322,24 @@ export async function generateTeamLeagueResultDataUrl(
   // 左: 「Aリーグ」を1つの大きな角丸ピルバッジにまとめる
   // 「男子8部」など既に "部" を含む場合は "リーグ" を重ねない
   const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
-  // 「男子1部」など数字を含むラベルは「数字 大 + 文字 小」で描画する
-  const numberMatch = pillText.match(/^(.*?)(\d+)(.*)$/);
+  // 数字・英字は大きく、それ以外（日本語など）は小さく描画する（例:「女子1部」の 部）
+  const pillRuns = splitBigSmall(pillText);
   const pillH = 96;
   const pillPadX = 40;
   const pillX = paddingX;
   const pillY = paddingY + 4;
-  // 混合サイズ描画時、prefix - number - suffix の間に控えめなギャップを入れる
-  const segGap = 8;
   // フォントサイズは長いラベル時に自動縮小する（右側の大会名と重ならないように）
   let bigPx = 64;
   let smallPx = 30;
-  const bigFontOf = (px: number) => `900 ${px}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-  const smallFontOf = (px: number) => `600 ${px}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-
-  const measurePillTextW = (): number => {
-    ctx.save();
-    let w: number;
-    if (numberMatch) {
-      const [, prefix, num, suffix] = numberMatch;
-      ctx.font = smallFontOf(smallPx);
-      const wPre = prefix ? ctx.measureText(prefix).width : 0;
-      const wSuf = suffix ? ctx.measureText(suffix).width : 0;
-      ctx.font = bigFontOf(bigPx);
-      const wNum = ctx.measureText(num).width;
-      const gapCount = (prefix ? 1 : 0) + (suffix ? 1 : 0);
-      w = wPre + wNum + wSuf + segGap * gapCount;
-    } else {
-      ctx.font = bigFontOf(bigPx);
-      w = ctx.measureText(pillText).width;
-    }
-    ctx.restore();
-    return w;
-  };
 
   // ピルは横幅の約半分までに制限。超える場合はフォントを縮小して収める。
   const maxPillW = Math.min(tableW * 0.5, 560);
-  let pillTextW = measurePillTextW();
+  let pillTextW = measureMixed(ctx, pillRuns, bigPx, smallPx, '900', '600');
   if (pillTextW + pillPadX * 2 > maxPillW) {
     const scale = Math.max(0.4, (maxPillW - pillPadX * 2) / pillTextW);
     bigPx = Math.round(bigPx * scale);
     smallPx = Math.round(smallPx * scale);
-    pillTextW = measurePillTextW();
+    pillTextW = measureMixed(ctx, pillRuns, bigPx, smallPx, '900', '600');
   }
   const pillW = pillTextW + pillPadX * 2;
 
@@ -387,37 +364,10 @@ export async function generateTeamLeagueResultDataUrl(
   // 内側ボーダー
   drawRoundRect(pillX + 1.5, pillY + 1.5, pillW - 3, pillH - 3, pillH / 2 - 1.5, undefined, 'rgba(255,255,255,0.4)', 1);
 
-  // バッジ内テキスト
+  // バッジ内テキスト（数字/英字=大, その他=小。alphabetic ベースラインで下端そろえ）
   ctx.fillStyle = COL.white;
-  ctx.textAlign = 'left';
-  // 数字と文字でサイズが異なる場合は alphabetic ベースラインで揃え（＝下揃え）
-  ctx.textBaseline = 'alphabetic';
-  if (numberMatch) {
-    const [, prefix, num, suffix] = numberMatch;
-    let cx = pillX + (pillW - pillTextW) / 2;
-    // 数字（bigPx）を視覚的に中央配置する baseline 位置
-    const baselineY = pillY + pillH / 2 + bigPx * 0.34;
-    if (prefix) {
-      ctx.font = smallFontOf(smallPx);
-      const wPre = ctx.measureText(prefix).width;
-      ctx.fillText(prefix, cx, baselineY);
-      cx += wPre + segGap;
-    }
-    ctx.font = bigFontOf(bigPx);
-    const wNum = ctx.measureText(num).width;
-    ctx.fillText(num, cx, baselineY);
-    cx += wNum;
-    if (suffix) {
-      cx += segGap;
-      ctx.font = smallFontOf(smallPx);
-      ctx.fillText(suffix, cx, baselineY);
-    }
-  } else {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = bigFontOf(bigPx);
-    ctx.fillText(pillText, pillX + pillW / 2, pillY + pillH / 2 + 2);
-  }
+  const pillBaselineY = pillY + pillH / 2 + bigPx * 0.34;
+  drawMixed(ctx, pillRuns, pillX + (pillW - pillTextW) / 2, pillBaselineY, bigPx, smallPx, '900', '600');
 
   // 右: 大会名 + 会場ロゴ
   const headerRightX = paddingX + tableW;
