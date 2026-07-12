@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import AppLayout from './components/layout/AppLayout'
+import ErrorBoundary from './components/ErrorBoundary'
 import DataManagement from './features/data/DataManagement'
 import { loadSeedDataIfNeeded } from './db/database'
 
@@ -53,6 +54,7 @@ import PublicLiveView from './features/view/PublicLiveView';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ErrorBoundary>
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/live" element={<LiveDashboard />} />
@@ -88,5 +90,6 @@ createRoot(document.getElementById('root')!).render(
       {/* 団体戦コール中の右下ステータスバブル（全ルート共通） */}
       <TeamCallStatusBubble />
     </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

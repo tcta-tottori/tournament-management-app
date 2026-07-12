@@ -935,8 +935,8 @@ export default function TeamBracketView() {
         // 選手選択用のチームメンバー・候補名（予選リーグと同様に解決）
         const t1Members = allTeams.find(t => t.teamId === editingMatch.team1Id)?.members || [];
         const t2Members = allTeams.find(t => t.teamId === editingMatch.team2Id)?.members || [];
-        const t1FromMembers = t1Members.map(mem => getDisplayName(mem.player, t1Members)).filter(Boolean);
-        const t2FromMembers = t2Members.map(mem => getDisplayName(mem.player, t2Members)).filter(Boolean);
+        const t1FromMembers = t1Members.filter(mem => mem?.player).map(mem => getDisplayName(mem.player, t1Members)).filter(Boolean);
+        const t2FromMembers = t2Members.filter(mem => mem?.player).map(mem => getDisplayName(mem.player, t2Members)).filter(Boolean);
         // 同チームが決勝トーナメントで既に使った選手名（手動入力名も含む）を収集
         const collectPastNames = (teamId: string | null): string[] => {
           if (!teamId) return [];

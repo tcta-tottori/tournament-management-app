@@ -207,6 +207,7 @@ function PlayerPickerPopup({
     const m = new Map<string, { mainLen: number }>();
     if (members) {
       for (const member of members) {
+        if (!member?.player) continue;
         const parts = getDisplayNameParts(member.player, members);
         if (parts.sub) m.set(parts.full, { mainLen: parts.main.length });
       }
@@ -533,6 +534,7 @@ export default function TeamScoreInput({
   const team1PartsMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const member of team1Members) {
+      if (!member?.player) continue;
       const parts = getDisplayNameParts(member.player, team1Members);
       if (parts.sub) m.set(parts.full, parts.main.length);
     }
@@ -541,6 +543,7 @@ export default function TeamScoreInput({
   const team2PartsMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const member of team2Members) {
+      if (!member?.player) continue;
       const parts = getDisplayNameParts(member.player, team2Members);
       if (parts.sub) m.set(parts.full, parts.main.length);
     }
