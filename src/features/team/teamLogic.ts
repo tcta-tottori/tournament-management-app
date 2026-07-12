@@ -7,12 +7,13 @@ import type {
 
 /** 苗字のみ抽出 */
 export function familyName(name: string): string {
-  return name.trim().split(/[\s\u3000]+/)[0] || name;
+  const n = (name || '').trim();
+  return n.split(/[\s\u3000]+/)[0] || n;
 }
 
 /** 名前（下の名前）の先頭1文字を取得 */
 function givenNameInitial(name: string): string {
-  const parts = name.trim().split(/[\s\u3000]+/);
+  const parts = (name || '').trim().split(/[\s\u3000]+/);
   return parts.length > 1 ? parts[1][0] || '' : '';
 }
 
@@ -33,6 +34,10 @@ export function getDisplayNameParts(
   player: TeamPlayer,
   allMembers: TeamMember[],
 ): DisplayNameParts {
+  // 不正なメンバーデータでも落ちないよう防御
+  if (!player) {
+    return { main: '', sub: '', full: '' };
+  }
   // displayName が設定済みならそのまま返す
   if (player.displayName) {
     return { main: player.displayName, sub: '', full: player.displayName };
@@ -43,8 +48,10 @@ export function getDisplayNameParts(
 
   // 同チーム内で同姓（先頭3文字一致）がいるかチェック
   const sameNameMembers = allMembers.filter(m => {
-    const otherSurname = familyName(m.player.name);
-    return otherSurname.slice(0, 3) === main && m.player.name !== player.name;
+    const otherName = m?.player?.name;
+    if (!otherName) return false;
+    const otherSurname = familyName(otherName);
+    return otherSurname.slice(0, 3) === main && otherName !== player.name;
   });
 
   if (sameNameMembers.length > 0) {

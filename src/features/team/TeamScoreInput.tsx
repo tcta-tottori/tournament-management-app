@@ -178,26 +178,19 @@ function PlayerPickerPopup({
   /** 表示名更新コールバック */
   onUpdateDisplayName?: (teamId: string, playerName: string, displayName: string | undefined) => void;
 }) {
-  // 既存値を「苗字 / 名前」に分解（空白区切りの先頭=苗字、残り=名前）
-  const initParts = (current || '').trim().split(/[\s　]+/);
-  const [manualSurname, setManualSurname] = useState(initParts[0] || '');
-  const [manualGiven, setManualGiven] = useState(initParts.slice(1).join(' ') || '');
+  // 手動入力は1つの「選手名」フィールドに統一（苗字＋名前を2欄に分けると
+  // ブラウザ/OSの自動補完が名前欄を苗字と同じ文字で埋めてしまうため）。
+  // 同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力する。
+  const [manualName, setManualName] = useState((current || '').trim());
   const [manualMode, setManualMode] = useState(false);
   const [showDisplayNameEdit, setShowDisplayNameEdit] = useState(false);
   const reactId = useId();
-  const uniqueNameSurname = `player-manual-sn-${reactId.replace(/:/g, '')}`;
-  const uniqueNameGiven = `player-manual-gn-${reactId.replace(/:/g, '')}`;
-  const manualSurnameRef = useRef<HTMLInputElement | null>(null);
-  const manualGivenRef = useRef<HTMLInputElement | null>(null);
+  const uniqueNameField = `player-manual-${reactId.replace(/:/g, '')}`;
+  const manualNameRef = useRef<HTMLInputElement | null>(null);
 
   const usedSet = useMemo(() => new Set(usedPlayers), [usedPlayers]);
-  // 苗字＋名前を結合した手動入力値（保存・重複判定用）
-  const manualCombined = (() => {
-    const sn = manualSurname.trim();
-    const gn = manualGiven.trim();
-    if (!sn && !gn) return '';
-    return gn ? `${sn} ${gn}` : sn;
-  })();
+  // 手動入力値（保存・重複判定用）
+  const manualCombined = manualName.trim();
   const manualTrim = manualCombined;
   const manualIsDuplicate = manualTrim.length > 0 && usedSet.has(manualTrim) && manualTrim !== current;
 
@@ -225,7 +218,7 @@ function PlayerPickerPopup({
   const openManual = () => {
     setManualMode(true);
     // 次フレームでフォーカス（ユーザー操作起点なのでキーボード表示 OK）
-    setTimeout(() => manualSurnameRef.current?.focus(), 50);
+    setTimeout(() => manualNameRef.current?.focus(), 50);
   };
 
   return createPortal(
@@ -347,50 +340,25 @@ function PlayerPickerPopup({
               className="space-y-1.5"
             >
               <div className="flex gap-1.5 items-stretch">
-                <div className="flex-1 grid grid-cols-2 gap-1.5">
-                  <input
-                    ref={manualSurnameRef}
-                    type="text"
-                    value={manualSurname}
-                    onChange={e => setManualSurname(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        manualGivenRef.current?.focus();
-                      }
-                    }}
-                    placeholder="苗字"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    name={uniqueNameSurname}
-                    data-lpignore="true"
-                    data-form-type="other"
-                    data-1p-ignore="true"
-                    enterKeyHint="next"
-                    className={`px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                      manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
-                    }`}
-                  />
-                  <input
-                    ref={manualGivenRef}
-                    type="text"
-                    value={manualGiven}
-                    onChange={e => setManualGiven(e.target.value)}
-                    placeholder="名前（任意）"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    name={uniqueNameGiven}
-                    data-lpignore="true"
-                    data-form-type="other"
-                    data-1p-ignore="true"
-                    enterKeyHint="done"
-                    className={`px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 border-slate-300 ${theme.ring}`}
-                  />
-                </div>
+                <input
+                  ref={manualNameRef}
+                  type="text"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  placeholder="選手名（例: 山田 太郎）"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  name={uniqueNameField}
+                  data-lpignore="true"
+                  data-form-type="other"
+                  data-1p-ignore="true"
+                  enterKeyHint="done"
+                  className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
+                    manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
+                  }`}
+                />
                 <button
                   type="submit"
                   disabled={!manualTrim || manualIsDuplicate}
@@ -402,15 +370,14 @@ function PlayerPickerPopup({
                   type="button"
                   onClick={() => {
                     setManualMode(false);
-                    const parts = (current || '').trim().split(/[\s　]+/);
-                    setManualSurname(parts[0] || '');
-                    setManualGiven(parts.slice(1).join(' ') || '');
+                    setManualName((current || '').trim());
                   }}
                   className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
+              <p className="text-[10px] text-slate-400 px-1">同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力してください。</p>
               {manualIsDuplicate && (
                 <div className="text-[10px] font-bold text-rose-500 px-1">
                   「{manualTrim}」は既にこの対戦で出場済みです。
