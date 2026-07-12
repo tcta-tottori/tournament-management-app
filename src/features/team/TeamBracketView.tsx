@@ -3,7 +3,7 @@ import { Trophy, ChevronRight, MapPin, Play, Check, Medal, Award, Sparkles, Shuf
 import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
-import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel, playersPerSubMatch } from './teamLogic';
+import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel, playersPerSubMatch, getDisplayName } from './teamLogic';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -932,6 +932,33 @@ export default function TeamBracketView() {
         const m = ruleStr.match(/(\d+)\s*ゲーム/);
         const n = m ? parseInt(m[1], 10) : NaN;
         const winGames = Number.isFinite(n) && n > 0 ? n : 6;
+        // 選手選択用のチームメンバー・候補名（予選リーグと同様に解決）
+        const t1Members = allTeams.find(t => t.teamId === editingMatch.team1Id)?.members || [];
+        const t2Members = allTeams.find(t => t.teamId === editingMatch.team2Id)?.members || [];
+        const t1FromMembers = t1Members.map(mem => getDisplayName(mem.player, t1Members)).filter(Boolean);
+        const t2FromMembers = t2Members.map(mem => getDisplayName(mem.player, t2Members)).filter(Boolean);
+        // 同チームが決勝トーナメントで既に使った選手名（手動入力名も含む）を収集
+        const collectPastNames = (teamId: string | null): string[] => {
+          if (!teamId) return [];
+          const set = new Set<string>();
+          for (const b of brackets) {
+            for (const bm of b.matches) {
+              if (bm.team1Id !== teamId && bm.team2Id !== teamId) continue;
+              const isT1 = bm.team1Id === teamId;
+              for (const sm of bm.subMatches) {
+                const ps = isT1 ? sm.players1 : sm.players2;
+                if (!ps) continue;
+                for (const p of ps) {
+                  const v = (p || '').trim();
+                  if (v) set.add(v);
+                }
+              }
+            }
+          }
+          return Array.from(set);
+        };
+        const t1Roster = Array.from(new Set([...t1FromMembers, ...collectPastNames(editingMatch.team1Id)]));
+        const t2Roster = Array.from(new Set([...t2FromMembers, ...collectPastNames(editingMatch.team2Id)]));
         return (
         <TeamScoreInput
           matchId={editingMatch.matchId}
@@ -940,6 +967,10 @@ export default function TeamBracketView() {
           team1Name={editingMatch.team1Name}
           team2Name={editingMatch.team2Name}
           subMatches={editingMatch.subMatches}
+          team1Roster={t1Roster}
+          team2Roster={t2Roster}
+          team1Members={t1Members}
+          team2Members={t2Members}
           winGames={winGames}
           onClose={() => setEditingMatch(null)}
           isBracket
