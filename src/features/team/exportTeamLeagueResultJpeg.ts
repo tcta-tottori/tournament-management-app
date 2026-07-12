@@ -1,6 +1,7 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
+import { buildResultFileName } from './resultFileName';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -895,6 +896,6 @@ export async function exportTeamLeagueResultJpeg(
   const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat, promotionOverrides, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = `${league.leagueId.trim()}リーグ結果_団体戦.jpg`;
+  a.download = buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
   a.click();
 }

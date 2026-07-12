@@ -4,6 +4,7 @@ import { Download, ImageIcon, Loader2, X } from 'lucide-react';
 import { generateTeamBracketResultDataUrl } from './exportTeamBracketResultJpeg';
 import { resolveBracketLabel } from './teamLogic';
 import { useTeamStore } from './teamStore';
+import { buildResultFileName } from './resultFileName';
 import type { TeamPlacementBracket, TeamEntry, PlacementCategory } from './types';
 
 interface Props {
@@ -51,7 +52,7 @@ export function TeamBracketResultPreview({ bracket, allTeams, tournamentName, cu
     if (!dataUrl) return;
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `${label}_結果_団体戦.jpg`;
+    a.download = buildResultFileName(tournamentName, `${label}_結果_団体戦`);
     a.click();
   };
 

@@ -1,6 +1,7 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
+import { buildResultFileName } from './resultFileName';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -599,6 +600,6 @@ export async function exportTeamBracketResultJpeg(
   const dataUrl = await generateTeamBracketResultDataUrl(bracket, allTeams, tournamentName, customLabels, matchFormat, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = `${resolveBracketLabel(bracket.category, customLabels)}_結果_団体戦.jpg`;
+  a.download = buildResultFileName(tournamentName, `${resolveBracketLabel(bracket.category, customLabels)}_結果_団体戦`);
   a.click();
 }

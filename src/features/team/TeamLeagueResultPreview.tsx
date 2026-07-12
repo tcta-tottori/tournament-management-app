@@ -4,6 +4,7 @@ import { Download, ImageIcon, Loader2, X, Pencil, RotateCcw } from 'lucide-react
 import { generateTeamLeagueResultDataUrl } from './exportTeamLeagueResultJpeg';
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding } from './types';
 import { useTeamStore } from './teamStore';
+import { buildResultFileName } from './resultFileName';
 
 interface Props {
   league: TeamLeague;
@@ -74,7 +75,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
     if (!dataUrl) return;
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `${league.leagueId.trim()}リーグ結果_団体戦.jpg`;
+    a.download = buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
     a.click();
   };
 
