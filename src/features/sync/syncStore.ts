@@ -78,6 +78,7 @@ interface SyncState {
   incrementPending: () => void;
   decrementPending: () => void;
   resetPending: () => void;
+  setPendingChanges: (n: number) => void;
   setError: (error: string | null) => void;
   setPanelOpen: (open: boolean) => void;
 }
@@ -131,6 +132,7 @@ export const useSyncStore = create<SyncState>()(
       incrementPending: () => set((s) => ({ pendingChanges: s.pendingChanges + 1 })),
       decrementPending: () => set((s) => ({ pendingChanges: Math.max(0, s.pendingChanges - 1) })),
       resetPending: () => set({ pendingChanges: 0 }),
+      setPendingChanges: (n) => set({ pendingChanges: Math.max(0, n) }),
       setError: (error) => set({ error }),
       setPanelOpen: (open) => set({ panelOpen: open }),
     }),

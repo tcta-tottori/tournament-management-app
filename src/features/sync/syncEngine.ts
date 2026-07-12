@@ -62,6 +62,11 @@ class SyncEngine {
     this.broadcastTransport.onStateChange(() => {
       this.updateConnectionState();
     });
+
+    // 未送信キューの件数をストアへ反映（切断中の警告表示に使う）
+    this.wsTransport.onQueueChange((count) => {
+      useSyncStore.getState().setPendingChanges(count);
+    });
   }
 
   // ===========================
@@ -176,6 +181,40 @@ class SyncEngine {
   /** アクティブかどうか */
   isActive(): boolean {
     return this.active;
+  }
+
+  // ===========================
+  // 手動再同期（切断復帰後の整合用）
+  // ===========================
+
+  /**
+   * この端末の全データを他端末へ強制的に反映する。
+   * 切断中に本端末で編集した内容を、復帰後に確実に全員へ配信したいときに使う。
+   * （相手端末は本端末のデータで上書きされる）
+   */
+  async forcePushToPeers(): Promise<void> {
+    if (!this.active) return;
+    await this.sendFullSnapshot('');
+    // サーバーキャッシュ（観戦用）も最新化
+    await this.pushSnapshotToCache();
+  }
+
+  /**
+   * 他端末の最新データを取り込む。
+   * オンラインの運営端末へスナップショットを要求し、その内容で本端末を上書きする。
+   * （本端末のデータは他端末の内容で上書きされる）
+   */
+  requestLatestFromPeers(): void {
+    if (!this.active) return;
+    const store = useSyncStore.getState();
+    this.broadcast({
+      type: 'request-snapshot',
+      deviceId: store.deviceId,
+      deviceName: store.deviceName,
+      roomCode: this.roomCode,
+      timestamp: Date.now(),
+      payload: null,
+    });
   }
 
   // ===========================

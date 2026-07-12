@@ -19,6 +19,9 @@ interface WsEnvelope {
   viewer?: boolean;
 }
 
+/** オフライン中に保持する送信キューの上限 */
+const MAX_QUEUE = 1000;
+
 export class WebSocketTransport implements SyncTransport {
   private ws: WebSocket | null = null;
   private serverUrl = '';
@@ -26,6 +29,9 @@ export class WebSocketTransport implements SyncTransport {
   private viewer = false;
   private messageHandlers: ((msg: SyncMessage) => void)[] = [];
   private stateHandlers: ((state: SyncConnectionState) => void)[] = [];
+  /** 切断中に送れなかった変更を保持し、再接続時に送信するキュー */
+  private outboundQueue: SyncMessage[] = [];
+  private queueHandlers: ((count: number) => void)[] = [];
   private state: SyncConnectionState = 'disconnected';
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -62,6 +68,11 @@ export class WebSocketTransport implements SyncTransport {
       this.ws.close();
       this.ws = null;
     }
+    // 意図的な切断（同期停止）ではキューを破棄する
+    if (this.outboundQueue.length > 0) {
+      this.outboundQueue = [];
+      this.notifyQueue();
+    }
     this.setState('disconnected');
   }
 
@@ -72,7 +83,58 @@ export class WebSocketTransport implements SyncTransport {
         roomCode: this.roomCode,
         payload: message,
       });
+    } else {
+      // 切断中はデータ変更をキューに退避し、再接続時に送信する
+      this.enqueue(message);
     }
+  }
+
+  /** キュー件数の変化を購読 */
+  onQueueChange(handler: (count: number) => void): void {
+    this.queueHandlers.push(handler);
+  }
+
+  /** 現在の未送信件数 */
+  getQueueLength(): number {
+    return this.outboundQueue.length;
+  }
+
+  private notifyQueue(): void {
+    for (const h of this.queueHandlers) h(this.outboundQueue.length);
+  }
+
+  /** 切断中の変更をキューに積む（データ変更のみ対象） */
+  private enqueue(message: SyncMessage): void {
+    // 送信対象は実データの変更のみ。制御メッセージ(hello/bye/request等)は捨てる
+    if (message.type !== 'dexie-change' && message.type !== 'zustand-snapshot') {
+      return;
+    }
+    // Zustand スナップショットは全体状態なので、同一ストアの古いものは破棄し最新のみ保持
+    if (message.type === 'zustand-snapshot') {
+      const store = (message.payload as { store?: string } | null)?.store;
+      if (store) {
+        this.outboundQueue = this.outboundQueue.filter(
+          (m) => !(m.type === 'zustand-snapshot' && (m.payload as { store?: string } | null)?.store === store)
+        );
+      }
+    }
+    this.outboundQueue.push(message);
+    // 上限超過時は最も古い変更から破棄（メモリ保護）
+    while (this.outboundQueue.length > MAX_QUEUE) {
+      this.outboundQueue.shift();
+    }
+    this.notifyQueue();
+  }
+
+  /** キューに溜まった変更をまとめて送信 */
+  private flushQueue(): void {
+    if (this.outboundQueue.length === 0) return;
+    const pending = this.outboundQueue;
+    this.outboundQueue = [];
+    for (const msg of pending) {
+      this.sendEnvelope({ action: 'broadcast', roomCode: this.roomCode, payload: msg });
+    }
+    this.notifyQueue();
   }
 
   /**
@@ -127,6 +189,8 @@ export class WebSocketTransport implements SyncTransport {
       this.setState('connected');
       // ルームに参加
       this.sendEnvelope({ action: 'join', roomCode: this.roomCode, viewer: this.viewer });
+      // 切断中に溜まった変更を送信
+      this.flushQueue();
       // 定期 ping
       this.startPing();
     };

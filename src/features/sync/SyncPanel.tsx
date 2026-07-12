@@ -9,6 +9,7 @@ import {
   X, Wifi, WifiOff, Monitor, Smartphone,
   Copy, Check, Play, Square, Settings2,
   Users, RefreshCw, AlertCircle, Info, Share2, Globe,
+  AlertTriangle, UploadCloud, DownloadCloud,
 } from 'lucide-react';
 import {
   useSyncStore, generateRoomCode,
@@ -16,6 +17,7 @@ import {
 } from './syncStore';
 import { syncEngine } from './syncEngine';
 import PublicShareDialog from './PublicShareDialog';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Props {
   open: boolean;
@@ -26,7 +28,7 @@ export default function SyncPanel({ open, onClose }: Props) {
   const {
     deviceName, serverUrl, connectionState, roomCode,
     peers, syncEnabled, lastSyncAt, error, lastRoomCode,
-    deviceId,
+    deviceId, pendingChanges,
     setDeviceName, setServerUrl,
   } = useSyncStore();
 
@@ -36,6 +38,8 @@ export default function SyncPanel({ open, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // 手動再同期の確認ダイアログ（'push' = この端末を反映 / 'pull' = 他端末を取込）
+  const [resyncConfirm, setResyncConfirm] = useState<null | 'push' | 'pull'>(null);
 
   // インターネット公開を開始（固定の公開ルーム＋既定サーバーでワンタップ配信）
   const handlePublish = useCallback(() => {
@@ -75,6 +79,16 @@ export default function SyncPanel({ open, onClose }: Props) {
     syncEngine.stop();
   }, []);
 
+  // 手動再同期の実行
+  const runResync = useCallback(() => {
+    if (resyncConfirm === 'push') {
+      void syncEngine.forcePushToPeers();
+    } else if (resyncConfirm === 'pull') {
+      syncEngine.requestLatestFromPeers();
+    }
+    setResyncConfirm(null);
+  }, [resyncConfirm]);
+
   // ルームコードをコピー
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode).then(() => {
@@ -87,6 +101,9 @@ export default function SyncPanel({ open, onClose }: Props) {
 
   const isConnected = syncEnabled && connectionState === 'connected';
   const isConnecting = connectionState === 'connecting' || connectionState === 'reconnecting';
+  // 同期が有効なのに未接続 = 編集が他端末へ届いていない可能性
+  const isUnsynced = syncEnabled && connectionState !== 'connected';
+  const hasPending = pendingChanges > 0;
 
   return createPortal(
     <div
@@ -142,6 +159,31 @@ export default function SyncPanel({ open, onClose }: Props) {
                   )}
                 </div>
               </div>
+
+              {/* 切断/未送信の警告バナー */}
+              {(isUnsynced || hasPending) && (
+                <div className={`flex items-start gap-2 px-4 py-3 rounded-xl border ${
+                  isUnsynced ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${isUnsynced ? 'text-red-500' : 'text-amber-500'}`} />
+                  <div className={`text-[11px] leading-relaxed ${isUnsynced ? 'text-red-700' : 'text-amber-700'}`}>
+                    {isUnsynced ? (
+                      <>
+                        <p className="font-bold mb-0.5">同期が切断されています</p>
+                        <p>この端末の編集は、まだ他の端末に反映されていません。電波が戻ると自動で再接続し、未送信の変更を送信します。</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-bold mb-0.5">未送信の変更があります</p>
+                        <p>接続の回復を待って自動送信します。</p>
+                      </>
+                    )}
+                    {hasPending && (
+                      <p className="mt-1 font-bold">未送信の変更: {pendingChanges} 件</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* ルームコード */}
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
@@ -210,6 +252,31 @@ export default function SyncPanel({ open, onClose }: Props) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 手動再同期（切断復帰後などの整合用） */}
+              <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-[11px] font-bold text-slate-600">手動で同期をそろえる</span>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  切断から復帰した後などにデータがズレている場合、どちらを正とするか選んで同期できます。
+                </p>
+                <button
+                  onClick={() => setResyncConfirm('push')}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-all"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>この端末を最新として全員に反映</span>
+                </button>
+                <button
+                  onClick={() => setResyncConfirm('pull')}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 transition-all"
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" />
+                  <span>他端末の最新を取り込む</span>
+                </button>
               </div>
 
               {/* エラー表示 */}
@@ -364,6 +431,20 @@ export default function SyncPanel({ open, onClose }: Props) {
           onClose={() => setShareOpen(false)}
           roomCode={roomCode}
           serverUrl={serverUrl}
+        />
+
+        <ConfirmDialog
+          open={resyncConfirm !== null}
+          danger
+          title={resyncConfirm === 'push' ? 'この端末を全員に反映' : '他端末の最新を取り込む'}
+          message={
+            resyncConfirm === 'push'
+              ? 'この端末のデータを、接続中の全端末へ反映します。\n他端末のデータは、この端末の内容で上書きされます。よろしいですか？'
+              : '接続中の他端末から最新データを取り込みます。\nこの端末のデータは、取り込んだ内容で上書きされます。よろしいですか？'
+          }
+          confirmLabel={resyncConfirm === 'push' ? '全員に反映' : '取り込む'}
+          onConfirm={runResync}
+          onCancel={() => setResyncConfirm(null)}
         />
       </div>
     </div>,
