@@ -66,7 +66,16 @@ const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string; border: stri
   MIX: { bg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-200' },
   WD:  { bg: 'bg-pink-100',   text: 'text-pink-700',   border: 'border-pink-200' },
   MD:  { bg: 'bg-sky-100',    text: 'text-sky-700',    border: 'border-sky-200' },
+  // 団体戦（クラブ対抗）の種目。未定義だと配色参照でクラッシュするため必須。
+  D3:  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-200' },
+  D2:  { bg: 'bg-cyan-100',   text: 'text-cyan-700',   border: 'border-cyan-200' },
+  D1:  { bg: 'bg-teal-100',   text: 'text-teal-700',   border: 'border-teal-200' },
+  S2:  { bg: 'bg-amber-100',  text: 'text-amber-700',  border: 'border-amber-200' },
+  S1:  { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-200' },
 };
+
+/** 未知の種目でも落ちないためのフォールバック配色 */
+const FALLBACK_TYPE_COLOR = { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
 
 /** "9コート" や "5番コート" から数字のみを抽出 */
 function extractCourtNumberShort(courtName: string): string {
@@ -753,7 +762,7 @@ export default function TeamBracketView() {
                                       {isFinished && match.subMatches.length > 0 && (
                                         <div className="flex gap-1 overflow-hidden items-center">
                                           {match.subMatches.map(sm => {
-                                            const tag = MATCH_TYPE_COLORS[sm.type];
+                                            const tag = MATCH_TYPE_COLORS[sm.type] || FALLBACK_TYPE_COLOR;
                                             const isTerminated = !!sm.terminated;
                                             return (
                                               <span key={sm.type} className="inline-flex items-center gap-0.5 whitespace-nowrap">
