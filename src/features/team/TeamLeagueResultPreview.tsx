@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, ImageIcon, Loader2, X, Pencil, RotateCcw } from 'lucide-react';
+import { Download, ImageIcon, Loader2, X, Pencil, RotateCcw, ListOrdered, LayoutGrid } from 'lucide-react';
 import { generateTeamLeagueResultDataUrl } from './exportTeamLeagueResultJpeg';
+import { generateTeamLeagueSummaryDataUrl, summaryResultFileName } from './exportTeamLeagueSummaryJpeg';
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding } from './types';
 import { useTeamStore } from './teamStore';
 import { buildResultFileName } from './resultFileName';
+
+type ResultView = 'summary' | 'detail';
 
 interface Props {
   league: TeamLeague;
@@ -23,7 +26,10 @@ function autoShortName(name: string): string {
 }
 
 export function TeamLeagueResultPreview({ league, standings, matches, allTeams, tournamentName }: Props) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  // 2種類の画像: サマリー（順位表）と詳細（総当たり表）
+  const [summaryUrl, setSummaryUrl] = useState<string | null>(null);
+  const [detailUrl, setDetailUrl] = useState<string | null>(null);
+  const [view, setView] = useState<ResultView>('summary');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -46,37 +52,49 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [matches, league.leagueId]);
 
-  // モーダルを開くたびに最新コードで再生成する（閉じたらキャッシュを破棄）
+  // サマリー画像（順位表）— 選手名の上書きには依存しない
   useEffect(() => {
-    if (!isOpen) {
-      setDataUrl(null);
-      return;
-    }
+    if (!isOpen) { setSummaryUrl(null); return; }
+    let isMounted = true;
+    generateTeamLeagueSummaryDataUrl(league, standings, tournamentName, matchFormat, promotionOverrides, venue)
+      .then(url => { if (isMounted) setSummaryUrl(url); })
+      .catch(err => { console.error(err); });
+    return () => { isMounted = false; };
+  }, [isOpen, league, standings, tournamentName, matchFormat, promotionOverrides, venue]);
 
+  // 詳細画像（総当たり表）— 選手名の上書きに依存
+  useEffect(() => {
+    if (!isOpen) { setDetailUrl(null); return; }
     let isMounted = true;
     setIsLoading(true);
-
     generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat, promotionOverrides, venue)
-      .then(url => {
-        if (isMounted) {
-          setDataUrl(url);
-          setIsLoading(false);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        if (isMounted) setIsLoading(false);
-      });
-
+      .then(url => { if (isMounted) { setDetailUrl(url); setIsLoading(false); } })
+      .catch(err => { console.error(err); if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
   }, [isOpen, league, standings, matches, allTeams, tournamentName, playerOverrides, matchFormat, promotionOverrides, venue]);
 
-  const handleDownload = () => {
-    if (!dataUrl) return;
+  const currentUrl = view === 'summary' ? summaryUrl : detailUrl;
+  // 表示中の画像がまだ生成できていない場合のみローディング表示
+  const showLoading = !currentUrl && (view === 'detail' ? isLoading : true);
+
+  const downloadUrl = (url: string, view: ResultView) => {
     const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
+    a.href = url;
+    a.download = view === 'summary'
+      ? summaryResultFileName(tournamentName, league.leagueId)
+      : buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
     a.click();
+  };
+
+  const handleDownload = () => {
+    if (currentUrl) downloadUrl(currentUrl, view);
+  };
+
+  // サマリー・詳細の両方を保存
+  const handleDownloadBoth = () => {
+    if (summaryUrl) downloadUrl(summaryUrl, 'summary');
+    // 連続ダウンロードがブラウザにブロックされないよう少し遅らせる
+    if (detailUrl) setTimeout(() => downloadUrl(detailUrl, 'detail'), 400);
   };
 
   const resetOverrides = () => setPlayerOverrides({});
@@ -123,31 +141,43 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 {league.leagueId.trim()}リーグ 予選結果プレビュー
               </h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowEdit(v => !v)}
-                  className={`relative flex items-center justify-center w-9 h-9 rounded-lg shadow transition-colors active:scale-95 border ${
-                    showEdit
-                      ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-                      : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
-                  }`}
-                  title="選手名を手動編集"
-                  aria-label="選手名を手動編集"
-                >
-                  <Pencil size={15} />
-                  {Object.keys(playerOverrides).length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">
-                      {Object.keys(playerOverrides).length}
-                    </span>
-                  )}
-                </button>
-                {dataUrl && (
+                {/* 選手名編集は詳細（総当たり表）のみ有効 */}
+                {view === 'detail' && (
+                  <button
+                    onClick={() => setShowEdit(v => !v)}
+                    className={`relative flex items-center justify-center w-9 h-9 rounded-lg shadow transition-colors active:scale-95 border ${
+                      showEdit
+                        ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                        : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
+                    }`}
+                    title="選手名を手動編集"
+                    aria-label="選手名を手動編集"
+                  >
+                    <Pencil size={15} />
+                    {Object.keys(playerOverrides).length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">
+                        {Object.keys(playerOverrides).length}
+                      </span>
+                    )}
+                  </button>
+                )}
+                {currentUrl && (
                   <button
                     onClick={handleDownload}
                     className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg shadow hover:from-sky-600 hover:to-sky-700 transition-colors active:scale-95"
-                    title="ダウンロード"
-                    aria-label="ダウンロード"
+                    title={view === 'summary' ? '順位表を保存' : '総当たり表を保存'}
+                    aria-label="表示中の画像を保存"
                   >
                     <Download size={15} />
+                  </button>
+                )}
+                {summaryUrl && detailUrl && (
+                  <button
+                    onClick={handleDownloadBoth}
+                    className="hidden sm:flex items-center gap-1 px-3 h-9 bg-white text-sky-700 border border-sky-200 rounded-lg shadow-sm hover:bg-sky-50 transition-colors active:scale-95 text-xs font-bold"
+                    title="順位表と総当たり表の両方を保存"
+                  >
+                    <Download size={14} />2枚保存
                   </button>
                 )}
                 <button
@@ -161,8 +191,33 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
               </div>
             </div>
 
-            {/* 選手名編集パネル（トグル表示） */}
-            {showEdit && (
+            {/* 表示切替タブ: サマリー（順位表） / 詳細（総当たり表） */}
+            <div className="px-4 py-2 bg-white border-b border-sky-100 shrink-0 flex items-center gap-2">
+              <div className="inline-flex p-0.5 bg-sky-50 border border-sky-200 rounded-lg">
+                <button
+                  onClick={() => { setView('summary'); setShowEdit(false); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    view === 'summary' ? 'bg-white text-sky-700 shadow-sm' : 'text-sky-500 hover:text-sky-700'
+                  }`}
+                >
+                  <ListOrdered size={14} />順位表
+                </button>
+                <button
+                  onClick={() => setView('detail')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    view === 'detail' ? 'bg-white text-sky-700 shadow-sm' : 'text-sky-500 hover:text-sky-700'
+                  }`}
+                >
+                  <LayoutGrid size={14} />総当たり表
+                </button>
+              </div>
+              <span className="text-[10px] text-sky-500/80 hidden sm:inline">
+                {view === 'summary' ? '見やすい順位一覧（共有向き）' : '対戦ごとの詳細スコア'}
+              </span>
+            </div>
+
+            {/* 選手名編集パネル（詳細表示時のみ・トグル） */}
+            {showEdit && view === 'detail' && (
               <div className="border-b border-amber-200 bg-amber-50/50 shrink-0">
                 <div className="px-4 py-3 flex items-center justify-between">
                   <div className="text-xs font-bold text-amber-800">
@@ -211,16 +266,16 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
 
             {/* プレビュー画像本体 (白背景) */}
             <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
-              {isLoading && (
+              {showLoading && (
                 <div className="flex flex-col items-center gap-2 text-sky-400">
                   <Loader2 size={32} className="animate-spin" />
                   <span className="text-sm font-medium">画像を生成中...</span>
                 </div>
               )}
-              {dataUrl && !isLoading && (
+              {currentUrl && !showLoading && (
                 <img
-                  src={dataUrl}
-                  alt={`${league.leagueId}リーグ結果`}
+                  src={currentUrl}
+                  alt={`${league.leagueId}リーグ${view === 'summary' ? '順位表' : '結果'}`}
                   className="max-w-full h-auto object-contain shadow-sm border border-sky-100 bg-white rounded"
                   style={{ maxHeight: '100%' }}
                 />
