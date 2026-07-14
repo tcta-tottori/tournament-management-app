@@ -585,9 +585,22 @@ function generateBipartiteOrder(teamCount: number): MatchOrderEntry[] {
   return order;
 }
 
+/** 2つの文字列の先頭一致文字数 */
+function commonPrefixLen(a: string, b: string): number {
+  let i = 0;
+  const n = Math.min(a.length, b.length);
+  while (i < n && a[i] === b[i]) i++;
+  return i;
+}
+
 /**
  * 名簿シートからチーム名→メンバーを抽出する（セクション用）。
- * 既知のチーム名セルを起点に、直下の連番セルの右隣を選手名として読む。
+ * 直下に連番（1始まり）が続くチーム名セルを「見出しブロック」として全て収集し、
+ * コート割由来のチーム名へ割り当てる。
+ * - まず正規化名の完全一致で割り当て
+ * - 一致しなかったチームは、共通接頭辞が十分長く一意なブロックへフォールバック割当。
+ *   コート割と名簿でチーム名の表記が食い違う場合（例: "湖山池ＴＣ２" ↔ "湖山池東"、
+ *   "鳥取市立病院⅖" ↔ "鳥取市立病院⅗"）でも選手名簿を取りこぼさないための救済。
  * 前年度参考列（K列以降）は対象外。
  */
 function parseSectionRoster(
@@ -602,28 +615,71 @@ function parseSectionRoster(
   const range = XLSX.utils.decode_range(ref);
   const PLAYER_COL_LIMIT = 9; // A〜J列（0-9）を当年度分とみなす
 
-  const nameByNorm = new Map<string, string>();
-  for (const n of teamNames) nameByNorm.set(normalizeTeamName(n), n);
-
+  // 1) 名簿シート内のチーム見出しブロックを全収集
+  //    （見出し = チーム名らしいセルで、直下の同列セルが連番になっているもの）
+  interface RosterBlock { norm: string; members: { name: string }[]; }
+  const blocks: RosterBlock[] = [];
   for (let r = range.s.r; r <= range.e.r; r++) {
     for (let c = range.s.c; c <= Math.min(range.e.c, PLAYER_COL_LIMIT); c++) {
       const v = cellAt(ws, r, c);
-      if (!v) continue;
+      if (!v || !looksLikeTeamName(v)) continue;
+      // 直下セルが連番でなければチーム見出しとみなさない
+      if (!/^\d+$/.test(toHalf(cellAt(ws, r + 1, c)).trim())) continue;
       const norm = normalizeTeamName(stripAllSpaces(v));
-      const teamName = nameByNorm.get(norm);
-      if (!teamName || result.has(norm)) continue;
+      if (!norm) continue;
 
-      const members: TeamMember[] = [];
+      const members: { name: string }[] = [];
       for (let row = r + 1; row <= range.e.r; row++) {
         const numCell = toHalf(cellAt(ws, row, c)).trim();
         if (!/^\d+$/.test(numCell)) break;
         const nameCell = normalizePlayerName(cellAt(ws, row, c + 1));
         if (!nameCell || /^\d+$/.test(toHalf(nameCell))) continue;
-        members.push({ player: { name: nameCell, affiliation: teamName }, gender });
+        members.push({ name: nameCell });
       }
-      if (members.length > 0) result.set(norm, members);
+      if (members.length > 0) blocks.push({ norm, members });
     }
   }
+  if (blocks.length === 0) return result;
+
+  const used = new Array(blocks.length).fill(false);
+  const reqNorms = teamNames.map(n => normalizeTeamName(n));
+  const assign = (reqNorm: string, teamName: string, blockIdx: number) => {
+    if (result.has(reqNorm)) return;
+    result.set(
+      reqNorm,
+      blocks[blockIdx].members.map(m => ({
+        player: { name: m.name, affiliation: teamName },
+        gender,
+      })),
+    );
+    used[blockIdx] = true;
+  };
+
+  // 2) 完全一致（正規化）を優先
+  reqNorms.forEach((rn, i) => {
+    if (!rn || result.has(rn)) return;
+    const idx = blocks.findIndex((b, bi) => !used[bi] && b.norm === rn);
+    if (idx >= 0) assign(rn, teamNames[i], idx);
+  });
+
+  // 3) フォールバック: 未一致チームを共通接頭辞が十分長く一意なブロックへ割当
+  const MIN_PREFIX = 3;
+  reqNorms.forEach((rn, i) => {
+    if (!rn || result.has(rn)) return;
+    let best = -1, bestLen = 0, tie = false;
+    blocks.forEach((b, bi) => {
+      if (used[bi]) return;
+      const cpl = commonPrefixLen(rn, b.norm);
+      // 短い方の半分以上、かつ最低3文字の一致を要求
+      const need = Math.max(MIN_PREFIX, Math.ceil(Math.min(rn.length, b.norm.length) / 2));
+      if (cpl >= need) {
+        if (cpl > bestLen) { bestLen = cpl; best = bi; tie = false; }
+        else if (cpl === bestLen) { tie = true; }
+      }
+    });
+    if (best >= 0 && !tie) assign(rn, teamNames[i], best);
+  });
+
   return result;
 }
 
