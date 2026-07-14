@@ -37,24 +37,33 @@ export function drawVenueBadge(ctx: CanvasRenderingContext2D, opts: VenueBadgeOp
 
   ctx.save();
   if (isTottoriUniv(venue)) {
-    // 鳥取大学ロゴ（用意されていれば描画）＋「鳥取大学テニスコート」
-    let logoBottom = topY;
+    // 鳥取大学ロゴ（マーク）を「鳥取大学テニスコート」テキストの左側に横並びで配置。
+    // ［ロゴ］ 鳥取大学テニスコート  の並びで、全体を rightX に右揃えする。
+    const label = '鳥取大学テニスコート';
+    const fontPx = 16;
+    ctx.font = `700 ${fontPx}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const textW = ctx.measureText(label).width;
+
+    // ロゴ寸法（テキストより少し高め）
+    let logoW = 0;
+    let logoH = 0;
     if (tottoriLogo) {
-      const maxH = 32;
-      const maxW = 230;
-      const ratio = tottoriLogo.width / tottoriLogo.height;
-      let h = maxH;
-      let w = h * ratio;
-      if (w > maxW) { w = maxW; h = w / ratio; }
-      const startY = topY - 6;
-      ctx.drawImage(tottoriLogo, rightX - w, startY, w, h);
-      logoBottom = startY + h;
+      logoH = 30;
+      logoW = logoH * (tottoriLogo.width / tottoriLogo.height);
     }
-    ctx.font = '700 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
+    const gap = tottoriLogo ? 8 : 0;
+    const totalW = logoW + gap + textW;
+    const startX = rightX - totalW;
+    // ロゴ／テキストの縦中心。従来テキスト位置（topY 付近）に合わせて中央寄せ。
+    const centerY = topY + logoH / 2;
+
+    if (tottoriLogo) {
+      ctx.drawImage(tottoriLogo, startX, centerY - logoH / 2, logoW, logoH);
+    }
     ctx.fillStyle = '#334155'; // slate-700
-    ctx.fillText('鳥取大学テニスコート', rightX, tottoriLogo ? logoBottom + 4 : topY + 8);
+    ctx.fillText(label, startX + logoW + gap, centerY);
   } else if (venueLogo) {
     // 従来の会場ロゴ
     const venueMaxH = 48;
