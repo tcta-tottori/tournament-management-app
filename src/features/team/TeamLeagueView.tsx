@@ -913,28 +913,28 @@ export default function TeamLeagueView() {
             {leagueComplete && <Check className="w-3 h-3" />}
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[70vh] lg:max-h-[76vh]">
           <table className="w-full text-xs border-collapse lg:text-sm">
             <thead>
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
-                <th className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold ${color.text} border-b ${color.border} text-[10px] lg:text-[11px]`}>No.</th>
-                <th className={`px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold ${color.text} border-b ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
-                <th className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs tracking-wide`}>種目</th>
+                <th className={`sticky top-0 left-0 z-30 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold ${color.text} border-b ${color.border} text-[10px] lg:text-[11px]`}>No.</th>
+                <th className={`sticky top-0 left-[28px] lg:left-[36px] z-30 ${color.bg} px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold ${color.text} border-b border-r ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
+                <th className={`sticky top-0 z-20 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
-                  <th key={t.teamId} className={`px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b ${color.border}`}>
+                  <th key={t.teamId} className={`sticky top-0 z-20 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b ${color.border}`}>
                     <span className={`inline-block w-full px-1 py-0.5 lg:px-2 lg:py-1 rounded-full text-[10px] lg:text-[11px] font-black ${color.soft} ${color.text} truncate`} title={t.teamName}>
                       <span className="lg:hidden">{truncTeamName(t.teamName)}</span>
                       <span className="hidden lg:inline">{truncTeamName(t.teamName, 12)}</span>
                     </span>
                   </th>
                 ))}
-                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
-                <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[60px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>勝率</th>
+                <th className={`sticky top-0 z-20 ${color.bg} px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[58px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>成績</th>
+                <th className={`sticky top-0 z-20 ${color.bg} px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[60px] font-bold ${color.text} border-b border-l ${color.border} whitespace-nowrap text-[11px] lg:text-xs`}>勝率</th>
                 {leagueComplete && (
-                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>順位</th>
+                  <th className={`sticky top-0 z-20 ${color.bg} px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[52px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>順位</th>
                 )}
                 {hasTiebreak && (
-                  <th className={`px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[80px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>判定</th>
+                  <th className={`sticky top-0 z-20 ${color.bg} px-2 py-2.5 lg:px-3 lg:py-3 text-center min-w-[80px] font-bold ${color.text} border-b border-l ${color.border} text-[11px] lg:text-xs`}>判定</th>
                 )}
               </tr>
             </thead>
@@ -943,10 +943,10 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${color.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
+                    <td className={`sticky left-0 z-10 px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
-                    <td className={`px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${color.bg}/20 relative`}>
+                    <td className={`sticky left-[28px] lg:left-[36px] z-10 px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} relative`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                       {/* 昇降格バッジ（クラブ対抗戦のみ）。クリックで手動切替ピッカーを開く */}
                       {(() => {
