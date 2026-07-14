@@ -3,6 +3,7 @@ import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, Arrow
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
 import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, resolveClubPromotionStatus, listClubPromotionOptions } from './teamLogic';
+import { findMembersByTeamName } from './clubExcelParser';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -1245,8 +1246,17 @@ export default function TeamLeagueView() {
         const allLeagueTeams = leagues.flatMap(l => l.teams);
         const team1 = allLeagueTeams.find(t => t.teamId === editingMatch.team1Id);
         const team2 = allLeagueTeams.find(t => t.teamId === editingMatch.team2Id);
-        const t1Members = team1?.members || [];
-        const t2Members = team2?.members || [];
+        // メンバー解決: teamId直取得を優先し、空ならチーム名で名簿を復元。
+        // インポート後にチーム名を変更した場合でも登録選手を選べるようにする。
+        const memberPool = allTeams.length ? allTeams : allLeagueTeams;
+        const resolveMembers = (team: typeof team1, teamId: string) => {
+          if (team?.members?.length) return team.members;
+          const byId = memberPool.find(t => t.teamId === teamId);
+          if (byId?.members?.length) return byId.members;
+          return findMembersByTeamName(team?.teamName || '', memberPool);
+        };
+        const t1Members = resolveMembers(team1, editingMatch.team1Id);
+        const t2Members = resolveMembers(team2, editingMatch.team2Id);
         // 既存メンバー由来の roster
         const t1FromMembers = t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean);
         const t2FromMembers = t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean);

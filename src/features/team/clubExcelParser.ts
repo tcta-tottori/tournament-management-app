@@ -594,6 +594,47 @@ function commonPrefixLen(a: string, b: string): number {
 }
 
 /**
+ * チーム名から選手名簿（メンバー）を実行時に復元するフォールバック。
+ * インポート後にチーム名を変更したり、コート割と名簿でチーム名の表記が
+ * 食い違っていて取り込み時に紐付かなかった場合でも、正規化名の
+ * 「完全一致 → 共通接頭辞が十分長く一意な候補」の順でメンバーを引き当てる。
+ *
+ * @param teamName 対象チーム名（変更後の表示名でも可）
+ * @param candidates メンバーを持つ可能性のあるチーム一覧
+ * @returns 引き当てたメンバー配列（見つからなければ空配列）
+ */
+export function findMembersByTeamName<T extends { teamName: string; members?: { player: unknown }[] }>(
+  teamName: string,
+  candidates: T[],
+): NonNullable<T['members']> {
+  const empty = [] as unknown as NonNullable<T['members']>;
+  const target = normalizeTeamName(teamName);
+  if (!target) return empty;
+  const withMembers = candidates.filter(c => (c.members?.length ?? 0) > 0);
+  if (withMembers.length === 0) return empty;
+
+  // 1) 正規化名の完全一致
+  const exact = withMembers.find(c => normalizeTeamName(c.teamName) === target);
+  if (exact) return exact.members as NonNullable<T['members']>;
+
+  // 2) 共通接頭辞が十分長く、かつ一意な候補へフォールバック
+  const MIN_PREFIX = 3;
+  let best: T | null = null;
+  let bestLen = 0;
+  let tie = false;
+  for (const c of withMembers) {
+    const norm = normalizeTeamName(c.teamName);
+    const cpl = commonPrefixLen(target, norm);
+    const need = Math.max(MIN_PREFIX, Math.ceil(Math.min(target.length, norm.length) / 2));
+    if (cpl >= need) {
+      if (cpl > bestLen) { bestLen = cpl; best = c; tie = false; }
+      else if (cpl === bestLen) { tie = true; }
+    }
+  }
+  return (best && !tie) ? best.members as NonNullable<T['members']> : empty;
+}
+
+/**
  * 名簿シートからチーム名→メンバーを抽出する（セクション用）。
  * 直下に連番（1始まり）が続くチーム名セルを「見出しブロック」として全て収集し、
  * コート割由来のチーム名へ割り当てる。
