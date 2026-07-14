@@ -196,7 +196,8 @@ function PlayerPickerPopup({
 
   const commit = (name: string) => {
     const trimmed = name.trim();
-    if (trimmed && usedSet.has(trimmed) && trimmed !== current) return;
+    // 重複名でもブロックしない。手動入力では注意表示のうえで確定を許可する
+    // （同姓別人など、あえて同じ表示名を使いたいケースに対応）。
     onSelect(trimmed);
     onClose();
   };
@@ -337,7 +338,7 @@ function PlayerPickerPopup({
           {manualMode ? (
             <form
               autoComplete="off"
-              onSubmit={e => { e.preventDefault(); if (manualTrim && !manualIsDuplicate) commit(manualCombined); }}
+              onSubmit={e => { e.preventDefault(); if (manualTrim) commit(manualCombined); }}
               className="space-y-1.5"
             >
               <div className="flex gap-1.5 items-stretch">
@@ -357,13 +358,14 @@ function PlayerPickerPopup({
                   data-1p-ignore="true"
                   enterKeyHint="done"
                   className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                    manualIsDuplicate ? 'border-rose-300 focus:ring-rose-300' : `border-slate-300 ${theme.ring}`
+                    manualIsDuplicate ? 'border-amber-300 focus:ring-amber-300' : `border-slate-300 ${theme.ring}`
                   }`}
                 />
                 <button
                   type="submit"
-                  disabled={!manualTrim || manualIsDuplicate}
-                  className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${teamTheme.grad} disabled:opacity-30 active:scale-95`}
+                  disabled={!manualTrim}
+                  title={manualIsDuplicate ? 'この名前はこの対戦で出場済みですが、そのまま追加できます' : undefined}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${manualIsDuplicate ? 'from-amber-500 to-orange-600' : teamTheme.grad} disabled:opacity-30 active:scale-95`}
                 >
                   <Check className="w-4 h-4" />
                 </button>
@@ -380,8 +382,8 @@ function PlayerPickerPopup({
               </div>
               <p className="text-[10px] text-slate-400 px-1">同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力してください。</p>
               {manualIsDuplicate && (
-                <div className="text-[10px] font-bold text-rose-500 px-1">
-                  「{manualTrim}」は既にこの対戦で出場済みです。
+                <div className="text-[10px] font-bold text-amber-600 px-1">
+                  「{manualTrim}」は既にこの対戦で出場済みです。同姓別人などの場合はこのまま追加できます。
                 </div>
               )}
             </form>
