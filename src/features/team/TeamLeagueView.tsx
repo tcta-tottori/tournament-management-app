@@ -3,6 +3,7 @@ import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, Arrow
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
 import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, resolveClubPromotionStatus, listClubPromotionOptions } from './teamLogic';
+import { findMembersByTeamName } from './clubExcelParser';
 import TeamScoreInput from './TeamScoreInput';
 import { TeamLeagueResultPreview } from './TeamLeagueResultPreview';
 import { createPortal } from 'react-dom';
@@ -889,7 +890,7 @@ export default function TeamLeagueView() {
       {(() => {
         const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
         return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
         {/* コンパクトヘッダー */}
         <div className={`flex items-center justify-between gap-2 px-3 py-1.5 lg:px-4 lg:py-2 bg-gradient-to-r ${color.grad} text-white`}>
           <div className="flex items-center gap-2">
@@ -917,8 +918,8 @@ export default function TeamLeagueView() {
           <table className="w-full text-xs border-collapse lg:text-sm">
             <thead>
               <tr className={`bg-gradient-to-b ${color.bg} to-white`}>
-                <th className={`sticky top-0 left-0 z-30 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold ${color.text} border-b ${color.border} text-[10px] lg:text-[11px]`}>No.</th>
-                <th className={`sticky top-0 left-[28px] lg:left-[36px] z-30 ${color.bg} px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold ${color.text} border-b border-r ${color.border} whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
+                <th className={`sticky top-0 left-0 z-30 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[28px] lg:w-[36px] font-bold ${color.text} shadow-[inset_0_-1px_0_0_rgb(226_232_240)] text-[10px] lg:text-[11px]`}>No.</th>
+                <th className={`sticky top-0 left-[28px] lg:left-[36px] z-30 ${color.bg} px-2 py-2.5 lg:px-4 lg:py-3 text-left min-w-[100px] font-bold ${color.text} shadow-[inset_-1px_-1px_0_0_rgb(226_232_240)] whitespace-nowrap text-[11px] lg:text-xs tracking-wide`}>チーム</th>
                 <th className={`sticky top-0 z-20 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[34px] lg:w-[42px] font-bold ${color.text} border-b ${color.border} text-[11px] lg:text-xs tracking-wide`}>種目</th>
                 {selectedLeague.teams.map(t => (
                   <th key={t.teamId} className={`sticky top-0 z-20 ${color.bg} px-1 py-2.5 lg:px-2 lg:py-3 text-center w-[76px] min-w-[76px] max-w-[76px] lg:w-auto lg:min-w-[140px] border-b ${color.border}`}>
@@ -943,10 +944,10 @@ export default function TeamLeagueView() {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
                   <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`sticky left-0 z-10 px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle border-r ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
+                    <td className={`sticky left-0 z-10 px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle shadow-[inset_-1px_0_0_0_rgb(226_232_240)] ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
-                    <td className={`sticky left-[28px] lg:left-[36px] z-10 px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${color.border} whitespace-nowrap ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} relative`}>
+                    <td className={`sticky left-[28px] lg:left-[36px] z-10 px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle shadow-[inset_-1px_0_0_0_rgb(226_232_240)] whitespace-nowrap ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} relative`}>
                       <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                       {/* 昇降格バッジ（クラブ対抗戦のみ）。クリックで手動切替ピッカーを開く */}
                       {(() => {
@@ -1156,7 +1157,7 @@ export default function TeamLeagueView() {
       })()}
 
       {/* 対戦順 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden lg:max-w-5xl lg:mx-auto">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
         <div className={`px-4 py-2.5 lg:py-3 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
           <ListOrdered className="w-4 h-4 text-white/80" />
           <span className="text-sm font-bold tracking-wide">対戦順</span>
@@ -1245,8 +1246,17 @@ export default function TeamLeagueView() {
         const allLeagueTeams = leagues.flatMap(l => l.teams);
         const team1 = allLeagueTeams.find(t => t.teamId === editingMatch.team1Id);
         const team2 = allLeagueTeams.find(t => t.teamId === editingMatch.team2Id);
-        const t1Members = team1?.members || [];
-        const t2Members = team2?.members || [];
+        // メンバー解決: teamId直取得を優先し、空ならチーム名で名簿を復元。
+        // インポート後にチーム名を変更した場合でも登録選手を選べるようにする。
+        const memberPool = allTeams.length ? allTeams : allLeagueTeams;
+        const resolveMembers = (team: typeof team1, teamId: string) => {
+          if (team?.members?.length) return team.members;
+          const byId = memberPool.find(t => t.teamId === teamId);
+          if (byId?.members?.length) return byId.members;
+          return findMembersByTeamName(team?.teamName || '', memberPool);
+        };
+        const t1Members = resolveMembers(team1, editingMatch.team1Id);
+        const t2Members = resolveMembers(team2, editingMatch.team2Id);
         // 既存メンバー由来の roster
         const t1FromMembers = t1Members.map(m => getDisplayName(m.player, t1Members)).filter(Boolean);
         const t2FromMembers = t2Members.map(m => getDisplayName(m.player, t2Members)).filter(Boolean);

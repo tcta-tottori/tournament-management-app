@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useTeamStore } from './teamStore';
 import type { TeamBracketMatch, PlacementCategory, TeamPlacementBracket } from './types';
 import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel, resolveBracketLabel, resolveBracketShortLabel, playersPerSubMatch, getDisplayName } from './teamLogic';
+import { findMembersByTeamName } from './clubExcelParser';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -942,8 +943,15 @@ export default function TeamBracketView() {
         const n = m ? parseInt(m[1], 10) : NaN;
         const winGames = Number.isFinite(n) && n > 0 ? n : 6;
         // 選手選択用のチームメンバー・候補名（予選リーグと同様に解決）
-        const t1Members = allTeams.find(t => t.teamId === editingMatch.team1Id)?.members || [];
-        const t2Members = allTeams.find(t => t.teamId === editingMatch.team2Id)?.members || [];
+        // メンバー解決: teamId直取得を優先し、空ならチーム名で名簿を復元。
+        // インポート後にチーム名を変更した場合でも登録選手を選べるようにする。
+        const resolveBracketMembers = (teamId: string | null, teamName: string) => {
+          const byId = teamId ? allTeams.find(t => t.teamId === teamId) : undefined;
+          if (byId?.members?.length) return byId.members;
+          return findMembersByTeamName(teamName || '', allTeams);
+        };
+        const t1Members = resolveBracketMembers(editingMatch.team1Id, editingMatch.team1Name);
+        const t2Members = resolveBracketMembers(editingMatch.team2Id, editingMatch.team2Name);
         const t1FromMembers = t1Members.filter(mem => mem?.player).map(mem => getDisplayName(mem.player, t1Members)).filter(Boolean);
         const t2FromMembers = t2Members.filter(mem => mem?.player).map(mem => getDisplayName(mem.player, t2Members)).filter(Boolean);
         // 同チームが決勝トーナメントで既に使った選手名（手動入力名も含む）を収集
