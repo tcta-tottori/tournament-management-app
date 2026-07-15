@@ -1,9 +1,53 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers } from 'lucide-react';
+import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers, Upload } from 'lucide-react';
 import { useTeamStore } from './teamStore';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
 import { getDisplayName } from './teamLogic';
+import { parseClubExcel, normalizeTeamName } from './clubExcelParser';
+import { parseTeamExcel } from './teamExcelParser';
+
+type RosterCandidate = { teamName: string; members: TeamMember[] };
+
+/**
+ * 取込結果からメンバー候補を「会場セクション単位のグループ」で収集する。
+ * 男女別会場ファイルでは同名系チーム（例: 男子「湖山池ＴＣ２」/ 女子「湖山池ＴＣ」）が
+ * 混在し、名前一致が曖昧になるため、セクション別に分けて後段で最適な1グループを選ぶ。
+ */
+function collectRosterGroups(res: { leagues?: { teams: TeamEntry[] }[]; sections?: { leagues: { teams: TeamEntry[] }[] }[] }): RosterCandidate[][] {
+  const groups: RosterCandidate[][] = [];
+  const fromLeagues = (leagues?: { teams: TeamEntry[] }[]): RosterCandidate[] => {
+    const out: RosterCandidate[] = [];
+    for (const l of leagues || []) {
+      for (const t of l.teams) {
+        if (t.members && t.members.length > 0) out.push({ teamName: t.teamName, members: t.members });
+      }
+    }
+    return out;
+  };
+  if (res.sections && res.sections.length > 0) {
+    for (const s of res.sections) { const g = fromLeagues(s.leagues); if (g.length) groups.push(g); }
+  } else {
+    const g = fromLeagues(res.leagues); if (g.length) groups.push(g);
+  }
+  return groups;
+}
+
+/**
+ * 取込済みチーム名の集合と最も重なるグループ（=同じ会場/性別）を選ぶ。
+ * これにより別会場の同名系チームを取り違えない。
+ */
+function pickBestRosterGroup(groups: RosterCandidate[][], storeTeamNames: string[]): RosterCandidate[] {
+  if (groups.length <= 1) return groups[0] || [];
+  const storeNorms = new Set(storeTeamNames.map(normalizeTeamName).filter(Boolean));
+  let best: RosterCandidate[] = [];
+  let bestScore = -1;
+  for (const g of groups) {
+    const score = g.filter(c => storeNorms.has(normalizeTeamName(c.teamName))).length;
+    if (score > bestScore) { bestScore = score; best = g; }
+  }
+  return best;
+}
 
 /** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
@@ -329,9 +373,35 @@ const LEAGUE_SOLID_COLORS = [
 
 /** メインコンポーネント */
 export default function TeamEntryView() {
-  const { leagues, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus } = useTeamStore();
+  const { leagues, setTeamStatus, setLeagueAllStatus, setAllTeamsStatus, relinkMembersByName } = useTeamStore();
   const [editingTeam, setEditingTeam] = useState<{ team: TeamEntry; colorIndex: number } | null>(null);
   const [selectedTab, setSelectedTab] = useState<string>('all');
+  const relinkInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 名簿を再取込（スコアを保持したまま、メンバー未登録チームだけ選手名簿を復元）
+  const handleRelinkFile = async (file: File) => {
+    try {
+      const buffer = await file.arrayBuffer();
+      let groups: RosterCandidate[][] = [];
+      // クラブ対抗（後期など）→ 通常団体戦 の順で解析を試す
+      try { groups = collectRosterGroups(parseClubExcel(buffer, file.name)); } catch { /* try next */ }
+      if (groups.length === 0) {
+        try { groups = collectRosterGroups(parseTeamExcel(buffer)); } catch { /* ignore */ }
+      }
+      const storeTeamNames = leagues.flatMap(l => l.teams.map(t => t.teamName));
+      const candidates = pickBestRosterGroup(groups, storeTeamNames);
+      if (candidates.length === 0) {
+        alert('このファイルから選手名簿を読み取れませんでした。名簿シートを含むExcelを選択してください。');
+        return;
+      }
+      const updated = relinkMembersByName(candidates);
+      alert(updated > 0
+        ? `${updated}チームの選手名簿を復元しました（スコアはそのまま保持）。`
+        : '未登録のチームはありませんでした（既に全チームに名簿があります）。');
+    } catch (e) {
+      alert(`名簿の再取込に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   if (leagues.length === 0) {
     return (
@@ -348,6 +418,7 @@ export default function TeamEntryView() {
   const totalTeams = leagues.reduce((sum, l) => sum + l.teams.length, 0);
   const totalEntered = leagues.reduce((sum, l) => sum + l.teams.filter(t => t.status === 'entry').length, 0);
   const allEntered = totalEntered === totalTeams && totalTeams > 0;
+  const teamsMissingMembers = leagues.reduce((sum, l) => sum + l.teams.filter(t => !t.members || t.members.length === 0).length, 0);
 
   const visibleLeagues = selectedTab === 'all'
     ? leagues
@@ -418,7 +489,25 @@ export default function TeamEntryView() {
         <div className="flex-1 text-xs text-slate-500">
           <span className="font-bold tabular-nums text-slate-700">{totalEntered}</span>
           <span className="text-slate-400"> / {totalTeams} チーム Entry</span>
+          {teamsMissingMembers > 0 && (
+            <span className="ml-2 text-amber-600 font-bold">選手名簿なし {teamsMissingMembers}チーム</span>
+          )}
         </div>
+        <input
+          ref={relinkInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleRelinkFile(f); e.target.value = ''; }}
+        />
+        <button
+          onClick={() => relinkInputRef.current?.click()}
+          title="Excelを選び直して、選手が空のチームだけ名簿を復元します（スコアは保持）"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          名簿を再取込
+        </button>
         <button
           onClick={() => setAllTeamsStatus(allEntered ? 'none' : 'entry')}
           className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 ${

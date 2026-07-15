@@ -7,6 +7,7 @@ import type {
   MatchType, BracketSubMatchScore, TeamMember, TiebreakRuleId
 } from './types';
 import { calculateTeamStandings, generateAllBrackets, regenerateLeagueMatches, determineTeamWinner, getMatchTypeOrder, DEFAULT_TIEBREAK_ORDER } from './teamLogic';
+import { findMembersByTeamName } from './clubExcelParser';
 
 /**
  * ブラケット再構築用ヘルパ。slotsArray と byePositions から R1 のマッチを組み、
@@ -182,6 +183,8 @@ interface TeamState {
   setLeagueAllStatus: (leagueId: string, status: 'none' | 'entry' | 'def') => void;
   setAllTeamsStatus: (status: 'none' | 'entry' | 'def') => void;
   setTeamMembers: (teamId: string, members: TeamMember[]) => void;
+  /** 名簿（チーム名→メンバー）を、メンバー未登録のチームにのみ名前一致で再割当。スコア等は保持。戻り値は更新チーム数 */
+  relinkMembersByName: (candidates: { teamName: string; members: TeamMember[] }[]) => number;
   updateTeamName: (teamId: string, name: string) => void;
   updatePlayerDisplayName: (teamId: string, playerName: string, displayName: string | undefined) => void;
 
@@ -587,6 +590,29 @@ export const useTeamStore = create<TeamState>()(
             allTeams: state.allTeams.map(update),
           };
         });
+      },
+
+      relinkMembersByName: (candidates) => {
+        const validCandidates = (candidates || []).filter(c => c.teamName && (c.members?.length ?? 0) > 0);
+        if (validCandidates.length === 0) return 0;
+        const updatedIds = new Set<string>();
+        set(state => {
+          const apply = (t: TeamEntry): TeamEntry => {
+            // 既にメンバーがいるチームは触らない（誤上書き防止）
+            if (t.members && t.members.length > 0) return t;
+            const found = findMembersByTeamName(t.teamName, validCandidates);
+            if (found.length > 0) {
+              updatedIds.add(t.teamId);
+              return { ...t, members: found };
+            }
+            return t;
+          };
+          return {
+            leagues: state.leagues.map(l => ({ ...l, teams: l.teams.map(apply) })),
+            allTeams: state.allTeams.map(apply),
+          };
+        });
+        return updatedIds.size;
       },
 
       updateTeamName: (teamId, name) => {

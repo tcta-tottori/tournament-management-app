@@ -216,7 +216,7 @@ function extractTeamsInRegion(
 }
 
 /** チーム名を比較用に正規化（全角→半角、括弧統一、空白除去、小文字化） */
-function normalizeTeamName(s: string): string {
+export function normalizeTeamName(s: string): string {
   return toHalf(s)
     .replace(/[（]/g, '(')
     .replace(/[）]/g, ')')
