@@ -1,7 +1,7 @@
 import type { TeamLeague, TeamLeagueStanding, MatchFormat } from './types';
 import { resolveClubPromotionStatus } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
-import { buildResultFileName } from './resultFileName';
+import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
 import { splitBigSmall, measureMixed, drawMixed } from './mixedSizeText';
 
 // =============================================
@@ -204,14 +204,18 @@ export async function generateTeamLeagueSummaryDataUrl(
 
   // ---- ヘッダー（詳細表と統一）----
   const leagueId = league.leagueId.trim();
-  const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
+  // それ自体で完結する名称（「男子予選会」「◯部」「◯リーグ」など）には "リーグ" を付けない
+  const pillText = leagueDivisionLabel(leagueId);
   const pillRuns = splitBigSmall(pillText);
+  // 数字/英字の「大」アンカーが無い日本語のみの名称は、全体を大きめに描いて
+  // ピル内で間延びしないようにする（レイアウトのバランス調整）。
+  const hasBig = pillRuns.some(r => r.big);
   const pillH = 96;
-  const pillPadX = 40;
+  const pillPadX = hasBig ? 40 : 34;
   const pillX = paddingX;
   const pillY = paddingY + 4;
   let bigPx = 64;
-  let smallPx = 30;
+  let smallPx = hasBig ? 30 : 46;
   const maxPillW = Math.min(tableW * 0.5, 560);
   let pillTextW = measureMixed(ctx, pillRuns, bigPx, smallPx, '900', '600');
   if (pillTextW + pillPadX * 2 > maxPillW) {
@@ -407,5 +411,5 @@ export async function generateTeamLeagueSummaryDataUrl(
 
 /** リーグ順位表サマリーの推奨ダウンロードファイル名 */
 export function summaryResultFileName(tournamentName: string, leagueId: string): string {
-  return buildResultFileName(tournamentName, `${leagueId.trim()}リーグ順位表`);
+  return buildResultFileName(tournamentName, `${leagueDivisionLabel(leagueId)}順位表`);
 }
