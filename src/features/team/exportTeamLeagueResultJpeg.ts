@@ -1,7 +1,7 @@
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchType } from './types';
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 import { drawVenueBadge } from './venueBadge';
-import { buildResultFileName } from './resultFileName';
+import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
 import { splitBigSmall, measureMixed, drawMixed } from './mixedSizeText';
 
 const TYPE_LABEL: Record<MatchType, string> = {
@@ -320,17 +320,19 @@ export async function generateTeamLeagueResultDataUrl(
   const leagueId = league.leagueId.trim();
 
   // 左: 「Aリーグ」を1つの大きな角丸ピルバッジにまとめる
-  // 「男子8部」など既に "部" を含む場合は "リーグ" を重ねない
-  const pillText = /部|リーグ/.test(leagueId) ? leagueId : `${leagueId}リーグ`;
+  // 「男子8部」「男子予選会」など、それ自体で完結する名称には "リーグ" を重ねない
+  const pillText = leagueDivisionLabel(leagueId);
   // 数字・英字は大きく、それ以外（日本語など）は小さく描画する（例:「女子1部」の 部）
   const pillRuns = splitBigSmall(pillText);
+  // 数字/英字の「大」アンカーが無い日本語のみの名称は全体を大きめに描き、間延びを防ぐ
+  const hasBig = pillRuns.some(r => r.big);
   const pillH = 96;
-  const pillPadX = 40;
+  const pillPadX = hasBig ? 40 : 34;
   const pillX = paddingX;
   const pillY = paddingY + 4;
   // フォントサイズは長いラベル時に自動縮小する（右側の大会名と重ならないように）
   let bigPx = 64;
-  let smallPx = 30;
+  let smallPx = hasBig ? 30 : 46;
 
   // ピルは横幅の約半分までに制限。超える場合はフォントを縮小して収める。
   const maxPillW = Math.min(tableW * 0.5, 560);
@@ -862,6 +864,6 @@ export async function exportTeamLeagueResultJpeg(
   const dataUrl = await generateTeamLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, playerNameOverrides, matchFormat, promotionOverrides, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
+  a.download = buildResultFileName(tournamentName, `${leagueDivisionLabel(league.leagueId)}結果_団体戦`);
   a.click();
 }

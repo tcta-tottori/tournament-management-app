@@ -5,7 +5,7 @@ import { generateTeamLeagueResultDataUrl } from './exportTeamLeagueResultJpeg';
 import { generateTeamLeagueSummaryDataUrl, summaryResultFileName } from './exportTeamLeagueSummaryJpeg';
 import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding } from './types';
 import { useTeamStore } from './teamStore';
-import { buildResultFileName } from './resultFileName';
+import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
 
 type ResultView = 'summary' | 'detail';
 
@@ -82,7 +82,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
     a.href = url;
     a.download = view === 'summary'
       ? summaryResultFileName(tournamentName, league.leagueId)
-      : buildResultFileName(tournamentName, `${league.leagueId.trim()}リーグ結果_団体戦`);
+      : buildResultFileName(tournamentName, `${leagueDivisionLabel(league.leagueId)}結果_団体戦`);
     a.click();
   };
 
@@ -138,7 +138,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-sky-400 to-sky-600 text-white shadow-sm">
                   <ImageIcon size={13} />
                 </span>
-                {league.leagueId.trim()}リーグ 予選結果プレビュー
+                {leagueDivisionLabel(league.leagueId)} 予選結果プレビュー
               </h3>
               <div className="flex items-center gap-2">
                 {/* 選手名編集は詳細（総当たり表）のみ有効 */}

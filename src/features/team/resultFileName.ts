@@ -6,6 +6,16 @@
 // 一意化する。
 // =============================================
 
+/**
+ * リーグ区分の表示ラベル。「男子予選会」「◯部」など、それ自体で完結する名称には
+ * "リーグ" を重ねず、単純な区分名（A, B…）にのみ "リーグ" を付ける。
+ * 結果画像のピルバッジ表記と統一する。
+ */
+export function leagueDivisionLabel(leagueId: string): string {
+  const id = (leagueId || '').trim();
+  return /部|リーグ|予選|会/.test(id) ? id : `${id}リーグ`;
+}
+
 /** ファイル名に使えない文字を除去し、空白を整える */
 function sanitize(s: string): string {
   return s
