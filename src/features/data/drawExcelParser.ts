@@ -48,6 +48,10 @@ export interface ParsedDrawFile {
   venue: string;
   reserveDate: string;
   reserveVenue: string;
+  /** ドロー表に記載された最早の試合開始時刻（'HH:MM'）。無ければ空文字。 */
+  earliestStartTime: string;
+  /** 最早時刻に開始する試合数（＝同時進行できるコート数の目安）。 */
+  suggestedCourtCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +124,78 @@ function isTimeValue(v: unknown): boolean {
   // Check for time-like string "H:MM" or "HH:MM"
   if (typeof v === 'string' && /^\d{1,2}:\d{2}$/.test(v.trim())) return true;
   return false;
+}
+
+/** 時刻セルを 'HH:MM' 文字列に変換（時刻でなければ null） */
+function timeValueToHM(v: unknown): string | null {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    // cellDates:true の時刻セルはUTC基準で格納される
+    return `${String(v.getUTCHours()).padStart(2, '0')}:${String(v.getUTCMinutes()).padStart(2, '0')}`;
+  }
+  if (typeof v === 'number' && v > 0 && v < 1) {
+    const total = Math.round(v * 24 * 60);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+  if (typeof v === 'string') {
+    const m = v.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (m) return `${m[1].padStart(2, '0')}:${m[2]}`;
+  }
+  return null;
+}
+
+/**
+ * ドロー表の試合開始時刻から、最早時刻と「同時進行できる試合数」を求める。
+ *
+ * 最早時刻（例: 9:00）に開始する試合数がコート数の目安になる。ただし複数種目が
+ * 別々のコート帯で同時進行するため単純合計は過大になりやすい。実運用では最大の
+ * 種目の同時試合数がコート帯サイズを決めるため、「単一種目内で最早時刻に開始する
+ * 試合数の最大値」を採用する（例: A級が9:00に12試合 → 12面）。
+ *
+ * @param rows シート全行
+ * @param sectionBoundaries 各種目ヘッダーの行インデックス（区間分割用）
+ */
+function analyzeStartTimes(
+  rows: unknown[][],
+  sectionBoundaries: number[],
+): { earliestStartTime: string; suggestedCourtCount: number } {
+  const times: { r: number; hm: string }[] = [];
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (const cell of row) {
+      const hm = timeValueToHM(cell);
+      if (hm) times.push({ r, hm });
+    }
+  }
+  if (times.length === 0) return { earliestStartTime: '', suggestedCourtCount: 0 };
+
+  // 最早時刻（文字列昇順＝時刻昇順）
+  let earliest = '';
+  for (const t of times) {
+    if (earliest === '' || t.hm < earliest) earliest = t.hm;
+  }
+
+  // 種目区間ごとに最早時刻の試合数を数え、その最大値を採用
+  const bounds = [...sectionBoundaries].sort((a, b) => a - b);
+  let maxCount = 0;
+  if (bounds.length > 0) {
+    for (let i = 0; i < bounds.length; i++) {
+      const start = bounds[i];
+      const end = i + 1 < bounds.length ? bounds[i + 1] : rows.length;
+      let c = 0;
+      for (const t of times) {
+        if (t.hm === earliest && t.r >= start && t.r < end) c++;
+      }
+      if (c > maxCount) maxCount = c;
+    }
+  }
+  // フォールバック: 区間情報が無い/取れない場合は全体カウント
+  if (maxCount === 0) {
+    for (const t of times) if (t.hm === earliest) maxCount++;
+  }
+
+  return { earliestStartTime: earliest, suggestedCourtCount: maxCount };
 }
 
 /**
@@ -980,6 +1056,12 @@ export function parseDrawExcel(
     }
   }
 
+  // ドロー表の開始時刻から、最早時刻と同時進行試合数（＝コート数の目安）を算出
+  const { earliestStartTime, suggestedCourtCount } = analyzeStartTimes(
+    rows,
+    sections.map((s) => s.headerRow),
+  );
+
   return {
     fileName,
     sheetName: bestSheet,
@@ -989,5 +1071,7 @@ export function parseDrawExcel(
     venue,
     reserveDate,
     reserveVenue,
+    earliestStartTime,
+    suggestedCourtCount,
   };
 }

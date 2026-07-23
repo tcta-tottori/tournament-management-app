@@ -89,6 +89,31 @@ interface R1Result {
 }
 
 // =========================================================================
+//  assignVenueCourtNames - コート数からコート番号を割り当てる
+// =========================================================================
+
+/**
+ * 使用コート数から、会場のコート番号（文字列配列）を割り当てる。
+ *
+ * 会場は最大 maxCourt 面（既定16面）で、照明が良く優先度の高い高番号側から使う。
+ * すなわち N 面使う場合は末尾側の N 面 = (maxCourt-N+1)〜maxCourt 番。
+ *   例) 12面 → 5〜16番, 8面 → 9〜16番, 16面 → 1〜16番。
+ * N が maxCourt を超える場合は 1〜N 番を返す。
+ *
+ * @param count 使用コート数
+ * @param maxCourt 会場の総コート数（既定16）
+ * @returns コート名（番号文字列）の配列（昇順）
+ */
+export function assignVenueCourtNames(count: number, maxCourt = 16): string[] {
+  if (count <= 0) return [];
+  if (count >= maxCourt) {
+    return Array.from({ length: count }, (_, i) => String(i + 1));
+  }
+  const start = maxCourt - count + 1;
+  return Array.from({ length: count }, (_, i) => String(start + i));
+}
+
+// =========================================================================
 //  getRoundLabel - ラウンド表記を返す
 // =========================================================================
 

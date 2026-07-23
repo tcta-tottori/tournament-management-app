@@ -1249,6 +1249,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         reserveDate: editReserveDate,
         reserveVenue: parsedExcel.reserveVenue || '',
         createdAt: now,
+        // ドロー表から検出した開始時刻・同時進行試合数（時間割自動生成の既定値）
+        drawStartTime: parsedExcel.earliestStartTime || undefined,
+        suggestedCourtCount: parsedExcel.suggestedCourtCount || undefined,
       });
 
       // --- 2. 選手マスタ収集 ---

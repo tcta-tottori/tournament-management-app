@@ -3,13 +3,15 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Match } from '../../db/database';
 import { useAppStore, type ImportedScheduleItem } from '../../stores/appStore';
-import { CalendarClock, Download, FileSpreadsheet, FolderOpen, X, Loader2, Edit3, Save } from 'lucide-react';
+import { CalendarClock, Download, FileSpreadsheet, FolderOpen, X, Loader2, Edit3, Save, Zap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   getSavedToken as gdriveGetSavedToken,
   downloadScheduleExcel,
   type GoogleDriveFile,
 } from '../backup/googleDriveApi';
+import { assignVenueCourtNames } from './scheduleEngine';
+import { generateScheduleFromDraws } from './generateSchedule';
 
 const EVENT_COLORS = [
   { bg: 'bg-blue-100', text: 'text-blue-800' },
@@ -121,6 +123,15 @@ export default function ScheduleSheet() {
   const setImportedSchedule = useAppStore(state => state.setImportedSchedule);
 
   const [statusMessage, setStatusMessage] = useState('');
+  const setScheduleFileName = useAppStore(state => state.setScheduleFileName);
+
+  // --------------- 時間割 自動生成（時間割Excel未取込時） ---------------
+  const [genCourtNames, setGenCourtNames] = useState('');
+  const [genStartTime, setGenStartTime] = useState('09:00');
+  const [genDuration, setGenDuration] = useState(40);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genInitialized, setGenInitialized] = useState(false);
+  const [detectedCourtCount, setDetectedCourtCount] = useState<number | null>(null);
 
   // Excel import
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -174,6 +185,55 @@ export default function ScheduleSheet() {
     if (eventIds.length === 0) return [];
     return db.draws.where('eventId').anyOf(eventIds).toArray();
   }, [tid]) || [];
+
+  // --------------- 時間割 自動生成: 大会のドロー検出値で初期値をプリフィル ---------------
+  useEffect(() => {
+    if (genInitialized || !tid) return;
+    db.tournaments.where('tournamentId').equals(tid).first().then((t) => {
+      if (!t) return;
+      const count = t.suggestedCourtCount && t.suggestedCourtCount > 0 ? t.suggestedCourtCount : 0;
+      setDetectedCourtCount(count > 0 ? count : null);
+      setGenCourtNames(assignVenueCourtNames(count > 0 ? count : 6).join(','));
+      if (t.drawStartTime) setGenStartTime(t.drawStartTime);
+      setGenInitialized(true);
+    });
+  }, [tid, genInitialized]);
+
+  const handleAutoGenerate = useCallback(async () => {
+    if (!tid) return;
+    setIsGenerating(true);
+    setStatusMessage('');
+    try {
+      const courtNames = genCourtNames
+        .split(/[,、\s]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (courtNames.length === 0) {
+        setStatusMessage('コート名を入力してください。');
+        setIsGenerating(false);
+        return;
+      }
+      const res = await generateScheduleFromDraws(tid, {
+        courtNames,
+        matchDuration: genDuration,
+        startTime: genStartTime,
+      });
+      if (res.items.length === 0) {
+        setStatusMessage('自動生成対象の試合がありません。先にドローを確定してください。');
+        setIsGenerating(false);
+        return;
+      }
+      setImportedSchedule(res.items);
+      setScheduleFileName('自動生成');
+      setStatusMessage(
+        `時間割を自動生成しました: ${res.matchCount}試合を${res.usedCourtCount}コート（${courtNames.join('・')}番）に配置しました。`,
+      );
+    } catch (err) {
+      setStatusMessage(`自動生成に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [tid, genCourtNames, genDuration, genStartTime, setImportedSchedule, setScheduleFileName]);
 
   // --------------- Derived: grid structure from importedSchedule ---------------
 
@@ -944,9 +1004,68 @@ export default function ScheduleSheet() {
           <h3 className="text-lg font-bold text-gray-900 mb-2">
             タイムテーブルデータがありません
           </h3>
-          <p className="text-gray-500 max-w-md">
-            Excel読込ボタンまたはGoogle Drive時間割フォルダからスケジュールデータをインポートしてください。
+          <p className="text-gray-500 max-w-md mb-6">
+            Excel読込ボタンまたはGoogle Drive時間割フォルダからスケジュールデータをインポートするか、
+            下記からドローをもとに時間割を自動生成できます。
           </p>
+
+          {/* --- ドローから時間割を自動生成 --- */}
+          <div className="w-full max-w-xl text-left bg-gradient-to-br from-primary-50 to-white border border-primary-200 rounded-xl p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="w-4 h-4 text-primary-600" />
+              <h4 className="text-sm font-bold text-gray-900">ドローから時間割を自動生成</h4>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              ドロー表に書かれた開始時刻から同時進行の試合数（＝コート数）を判定し、対戦順・コート割を自動作成します。
+              {detectedCourtCount != null && (
+                <span className="block mt-1 text-primary-700 font-medium">
+                  検出: {genStartTime}開始の試合が{detectedCourtCount}件 → {detectedCourtCount}面（{assignVenueCourtNames(detectedCourtCount).join('・')}番コート）
+                </span>
+              )}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="sm:col-span-3">
+                <label className="block text-xs font-medium text-gray-500 mb-1">使用コート（カンマ区切り）</label>
+                <input
+                  type="text"
+                  value={genCourtNames}
+                  onChange={(e) => setGenCourtNames(e.target.value)}
+                  placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
+                  className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">開始時刻</label>
+                <input
+                  type="time"
+                  value={genStartTime}
+                  onChange={(e) => setGenStartTime(e.target.value)}
+                  className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">1試合の所要時間（分）</label>
+                <input
+                  type="number"
+                  min={20}
+                  max={120}
+                  value={genDuration}
+                  onChange={(e) => setGenDuration(parseInt(e.target.value) || 40)}
+                  className="w-full border border-border-main rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleAutoGenerate}
+              disabled={isGenerating || !currentTournamentId}
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              {isGenerating ? '生成中...' : '時間割を自動生成'}
+            </button>
+          </div>
         </div>
       )}
 

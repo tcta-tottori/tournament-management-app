@@ -12,6 +12,10 @@ export interface Tournament {
   reserveDate: string;
   reserveVenue: string;
   createdAt: number;
+  /** ドロー表から検出した最早試合開始時刻（'HH:MM'）。時間割自動生成の既定値。 */
+  drawStartTime?: string;
+  /** ドロー表から検出した同時進行試合数（＝使用コート数の目安）。 */
+  suggestedCourtCount?: number;
 }
 
 // ---------------------------
