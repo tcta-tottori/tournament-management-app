@@ -246,7 +246,12 @@ function isEventHeader(text: string): boolean {
   if (!text) return false;
   // Must contain at least one event keyword and not be a seed line
   if (text.startsWith('シード')) return false;
-  return EVENT_KEYWORDS.some((kw) => text.includes(kw));
+  if (!EVENT_KEYWORDS.some((kw) => text.includes(kw))) return false;
+  // 大会タイトル（例: 「気高カップ･サマーシングルス大会」）は種目ヘッダーではない。
+  // 種目名に「大会/カップ/選手権/オープン」等は含まれないため除外する。
+  // これを弾かないと空の種目が作られ、日付・会場の抽出領域も潰れてしまう。
+  if (/大会|カップ|選手権|オープン|ｵｰﾌﾟﾝ/.test(text)) return false;
+  return true;
 }
 
 function detectType(eventName: string): 'Singles' | 'Doubles' {
@@ -440,6 +445,103 @@ const DOUBLES_RIGHT: ColumnLayout = {
 };
 
 // ---------------------------------------------------------------------------
+// 列レイアウトの動的検出
+// ---------------------------------------------------------------------------
+// 大会・種目によってドロー番号や氏名・所属の列位置が変わる（右山が17列始まり
+// だったり19列始まりだったり、ダブルスで1列ずれたり）。固定列だと右山が丸ごと
+// 読めない等の不具合が起きるため、実データからドロー番号の入った列を検出する。
+
+/** セル値が1〜256の整数（ドロー番号らしき値）なら返す */
+function asDrawNumber(v: unknown): number | null {
+  let n: number | null = null;
+  if (typeof v === 'number' && Number.isInteger(v)) n = v;
+  else if (typeof v === 'string' && /^\d{1,3}$/.test(v.trim())) n = parseInt(v.trim(), 10);
+  if (n != null && n >= 1 && n <= 256) return n;
+  return null;
+}
+
+/** 氏名列の次以降から所属列を検出（括弧のみのセルは除外して実テキストが最多の列） */
+function detectAffiliationCol(
+  rows: unknown[][],
+  startRow: number,
+  endRow: number,
+  numCol: number,
+): number {
+  let best = numCol + 3;
+  let bestScore = -1;
+  for (const c of [numCol + 2, numCol + 3, numCol + 4]) {
+    let score = 0;
+    for (let r = startRow; r < endRow; r++) {
+      const v = cellStr(rows[r], c);
+      if (!v) continue;
+      if (/^[（）()]$/.test(v)) continue; // 括弧のみのセルは所属ではない
+      score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/**
+ * イベント区間からドロー番号の入った列（左山・右山）を検出してレイアウトを組む。
+ * ドロー番号列 = 整数が多く入っている列。上位2列を左右の番号列とみなす。
+ * 氏名は番号列+1、所属は括弧を避けて検出する。
+ */
+function detectDrawColumns(
+  rows: unknown[][],
+  startRow: number,
+  endRow: number,
+): { left: ColumnLayout | null; right: ColumnLayout | null } {
+  const MAX_COL = 40;
+  const intCounts: number[] = new Array(MAX_COL).fill(0);
+  for (let r = startRow; r < endRow; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < MAX_COL; c++) {
+      if (asDrawNumber(row[c]) != null) intCounts[c]++;
+    }
+  }
+
+  // 整数が3個以上入っている列を候補とする
+  const candidates: number[] = [];
+  for (let c = 0; c < MAX_COL; c++) {
+    if (intCounts[c] >= 3) candidates.push(c);
+  }
+  if (candidates.length === 0) return { left: null, right: null };
+
+  // 整数の多い上位2列を左右のドロー番号列とみなす（列インデックス昇順で左→右）
+  candidates.sort((a, b) => intCounts[b] - intCounts[a]);
+  const top = candidates.slice(0, 2).sort((a, b) => a - b);
+  const leftNumCol = top[0];
+  const rightNumCol = top.length > 1 ? top[1] : null;
+
+  const makeLayout = (numCol: number): ColumnLayout => ({
+    numCol,
+    nameCol: numCol + 1,
+    openParenCol: numCol + 2,
+    affiliationCol: detectAffiliationCol(rows, startRow, endRow, numCol),
+    closeParenCol: numCol + 4,
+  });
+
+  return {
+    left: makeLayout(leftNumCol),
+    right: rightNumCol != null ? makeLayout(rightNumCol) : null,
+  };
+}
+
+/** 選手を検出しない空レイアウト（右山が存在しない種目用） */
+const EMPTY_LAYOUT: ColumnLayout = {
+  numCol: -1,
+  nameCol: -1,
+  openParenCol: -1,
+  affiliationCol: -1,
+  closeParenCol: -1,
+};
+
+// ---------------------------------------------------------------------------
 // Player extraction
 // ---------------------------------------------------------------------------
 
@@ -597,8 +699,18 @@ export function parseDrawExcel(
       if (isRoundRobin) break;
     }
 
-    const leftLayout = isDoubles ? DOUBLES_LEFT : SINGLES_LEFT;
-    const rightLayout = isDoubles ? DOUBLES_RIGHT : SINGLES_RIGHT;
+    // 実データからドロー番号の入った列を検出（大会ごとの列ずれに対応）。
+    // 検出できない場合のみ従来の固定レイアウトにフォールバックする。
+    const detected = detectDrawColumns(rows, startRow, endRow);
+    let leftLayout: ColumnLayout;
+    let rightLayout: ColumnLayout;
+    if (detected.left) {
+      leftLayout = detected.left;
+      rightLayout = detected.right ?? EMPTY_LAYOUT;
+    } else {
+      leftLayout = isDoubles ? DOUBLES_LEFT : SINGLES_LEFT;
+      rightLayout = isDoubles ? DOUBLES_RIGHT : SINGLES_RIGHT;
+    }
 
     // Extract players from left half
     const leftResult = extractPlayersFromHalf(
@@ -741,6 +853,9 @@ export function parseDrawExcel(
 
     // ゲームルール解析
     const roundGameRules = parseGameRules(rows, section.headerRow, endRow, section.matchFormat);
+
+    // 実選手が1人もいない種目（誤検出したタイトル行など）は取り込まない
+    if (!allPlayers.some((p) => !p.isBye)) continue;
 
     events.push({
       eventName: section.eventName,
