@@ -70,8 +70,23 @@ export async function generateScheduleFromDraws(
     name: p.name,
   }));
 
+  // 開始時刻('HH:MM')をスロットindexに変換する
+  const startMinutes = (() => {
+    const [h, m] = startTime.split(':').map((s) => parseInt(s, 10));
+    return h * 60 + m;
+  })();
+  const timeToSlot = (hm: string): number | null => {
+    const mt = hm.match(/^(\d{1,2}):(\d{2})$/);
+    if (!mt) return null;
+    const mins = parseInt(mt[1], 10) * 60 + parseInt(mt[2], 10);
+    const slot = Math.round((mins - startMinutes) / matchDuration);
+    return slot >= 0 ? slot : 0;
+  };
+
   // 各種目のドローから試合を抽出
   let allScheduleMatches: ScheduleMatch[] = [];
+  // ドロー表の記載時刻から算出した、試合ごとの目標スロット
+  const targetSlotByMatchId = new Map<string, number>();
   for (let idx = 0; idx < allEvents.length; idx++) {
     const evt = allEvents[idx];
     const draw = await db.draws.where('eventId').equals(evt.eventId).first();
@@ -98,6 +113,21 @@ export async function generateScheduleFromDraws(
     }));
 
     const extracted = extractMatchesFromDraw(drawData, entryList, playersList, eventInfo);
+
+    // ドロー表に記載された1回戦の開始時刻を、各試合の目標スロットに変換
+    const matchTimes = draw.matchTimes;
+    if (matchTimes) {
+      for (const m of extracted) {
+        if (m.round !== 1) continue;
+        // 1回戦の試合のペア上側位置 = 2*matchNumInRound - 1
+        const topPos = 2 * m.matchNumInRound - 1;
+        const hm = matchTimes[topPos];
+        if (!hm) continue;
+        const slot = timeToSlot(hm);
+        if (slot != null) targetSlotByMatchId.set(m.matchId, slot);
+      }
+    }
+
     allScheduleMatches = allScheduleMatches.concat(extracted);
   }
 
@@ -105,12 +135,13 @@ export async function generateScheduleFromDraws(
     return { items: [], courtNames, matchCount: 0, usedCourtCount: 0 };
   }
 
-  // 自動スケジューリング
+  // 自動スケジューリング（ドロー表の記載時刻を優先）
   const config: ScheduleConfig = {
     courtCount: courtNames.length,
     courtNames,
     matchDuration,
     startTime,
+    targetSlotByMatchId: targetSlotByMatchId.size > 0 ? targetSlotByMatchId : undefined,
   };
   const slots = autoSchedule(allScheduleMatches, config);
 

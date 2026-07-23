@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy, Swords,
-  ClipboardList, CalendarClock, MonitorPlay, BarChart2,
+  ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X, Volume2
 } from 'lucide-react';
@@ -151,8 +151,9 @@ export default function AppLayout() {
     if (allMatches.length === 0 && courts.length === 0) return items;
 
     const playing = allMatches.filter(m => m.status === 'playing');
-    const finished = allMatches.filter(m => m.status === 'finished' || m.status === 'walkover');
-    const total = allMatches.length;
+    // 不戦勝(BYE)は実際に行う試合ではないので進捗の分母・完了数から除外する
+    const finished = allMatches.filter(m => m.status === 'finished');
+    const total = allMatches.filter(m => m.status !== 'walkover').length;
 
     // 進捗
     if (total > 0) {

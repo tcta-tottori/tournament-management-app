@@ -58,6 +58,12 @@ export interface ScheduleConfig {
   courtNames: string[];
   matchDuration: number;
   startTime: string; // 'HH:MM'
+  /**
+   * 試合ごとの目標タイムスロット（matchId → スロットindex）。
+   * ドロー表に記載された開始時刻から算出した値。指定された試合はその時刻以降に
+   * 配置し、並び順もこの時刻を優先する。コートが埋まっていれば後ろの枠にずれる。
+   */
+  targetSlotByMatchId?: Map<string, number>;
 }
 
 /** autoSchedule が生成するスロット */
@@ -415,14 +421,23 @@ export function autoSchedule(
   matches: ScheduleMatch[],
   config: ScheduleConfig,
 ): ScheduleSlot[] {
-  const { courtCount, courtNames, matchDuration, startTime } = config;
+  const { courtCount, courtNames, matchDuration, startTime, targetSlotByMatchId } = config;
+  const targetOf = (m: ScheduleMatch): number | undefined => targetSlotByMatchId?.get(m.matchId);
 
-  // ソート: ラウンド昇順 → 種目順(eventOrder) → ドローサイズ降順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
-  // 種目順を優先することで、ドロー表の記載順（＝A級を先に9:00開始 等）と同じ順に
-  // コートを埋める。ドローサイズ降順を先にすると大きな種目(例:B級64)が先に配置され、
-  // 先頭種目(A級32)が後ろの時間帯に押し出されてしまうため種目順を優先する。
+  // ソート: ラウンド昇順 → 記載時刻(目標スロット)昇順 → 種目順(eventOrder)
+  //        → ドローサイズ降順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
+  // ドロー表に記載された開始時刻がある試合は、その時刻が早い順に先にコートを埋める。
+  // 記載時刻が無い試合（2回戦以降）は同ラウンド内で種目順に配置する。
   const sorted = [...matches].sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
+    const ta = targetOf(a);
+    const tb = targetOf(b);
+    if (ta != null && tb != null) {
+      if (ta !== tb) return ta - tb;
+    } else if (ta != null || tb != null) {
+      // 記載時刻がある試合を先に
+      return ta != null ? -1 : 1;
+    }
     if (a.eventOrder !== b.eventOrder) return a.eventOrder - b.eventOrder;
     if (a.drawSize !== b.drawSize) return b.drawSize - a.drawSize;
     // 左山(L) → 右山(R) → 決勝(F) の順
@@ -492,11 +507,17 @@ export function autoSchedule(
   // 試合配置ループ
   for (const match of sorted) {
     let minSlot = 0;
+    // 依存（前ラウンド）の完了後にしか始められない
     for (const depId of match.dependsOn) {
       const depSlot = completionSlot.get(depId);
       if (depSlot !== undefined) {
         minSlot = Math.max(minSlot, depSlot + 1);
       }
+    }
+    // ドロー表に記載された開始時刻がある場合はその時刻以降に配置する
+    const target = targetOf(match);
+    if (target != null) {
+      minSlot = Math.max(minSlot, target);
     }
 
     let assigned = false;

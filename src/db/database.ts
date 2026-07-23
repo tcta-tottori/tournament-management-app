@@ -107,6 +107,11 @@ export interface Draw {
     seed: number;
     isBye: boolean;
   }[];
+  /**
+   * 1回戦の各試合の開始時刻（'HH:MM'）。キーはペアの上側ブラケット位置。
+   * ドロー表(Excel)に記載された時刻。時間割自動生成でそのまま配置に使う。
+   */
+  matchTimes?: Record<number, string>;
   updatedAt: number;
 }
 
