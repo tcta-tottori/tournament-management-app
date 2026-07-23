@@ -565,7 +565,7 @@ export default function ScheduleSheet() {
     setDriveLoading(true);
     setDriveError('');
     try {
-      const buffer = await downloadScheduleExcel(token, file.id);
+      const buffer = await downloadScheduleExcel(token, file.id, file.mimeType);
       const wb = XLSX.read(buffer);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: (string | number | null)[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });

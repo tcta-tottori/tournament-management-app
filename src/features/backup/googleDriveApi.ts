@@ -10,6 +10,21 @@ const ROOT_FOLDER_NAME = '鳥取テニス協会バックアップ';
 const SUB_FOLDER_NAME = '大会運営システム';
 const SCOPES = 'https://www.googleapis.com/auth/drive';
 
+// MIME タイプ
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const GOOGLE_SHEETS_MIME = 'application/vnd.google-apps.spreadsheet';
+
+/**
+ * Excel系ファイルを検索するための共通クエリ条件。
+ * xlsx / xls に加え、Google ネイティブのスプレッドシート
+ * （xlsx をアップロード時に自動変換されると拡張子なし・この MIME になる）も対象にする。
+ */
+const EXCEL_LIKE_QUERY =
+  `(mimeType='${XLSX_MIME}'` +
+  ` or mimeType='application/vnd.ms-excel'` +
+  ` or mimeType='${GOOGLE_SHEETS_MIME}'` +
+  ` or name contains '.xlsx' or name contains '.xls')`;
+
 /** デフォルト OAuth2 Client ID（全ユーザー共通） */
 export const DEFAULT_CLIENT_ID = '316429350105-v1tpv97kkq6jkg9gmu57aqt7btic6qod.apps.googleusercontent.com';
 
@@ -312,9 +327,8 @@ async function getLatestXlsx(
   token: string,
   folderId: string,
 ): Promise<GoogleDriveFile | null> {
-  // xlsx の MIME: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-  // Google Sheets の場合もあるので拡張対応
-  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  // xlsx / xls / Google ネイティブスプレッドシートを対象
+  const q = `'${folderId}' in parents and trashed=false and ${EXCEL_LIKE_QUERY}`;
   const params = new URLSearchParams({
     q,
     fields: 'files(id,name,size,modifiedTime,mimeType)',
@@ -329,9 +343,17 @@ async function getLatestXlsx(
   return { id: file.id, name: file.name, size: file.size || '0', modifiedTime: file.modifiedTime, mimeType: file.mimeType };
 }
 
-/** ファイルのバイナリをダウンロード */
-async function downloadFileBlob(token: string, fileId: string): Promise<ArrayBuffer> {
-  const res = await fetchWithTimeout(`${DRIVE_API}/files/${fileId}?alt=media`, {
+/**
+ * ファイルのバイナリをダウンロード。
+ * Google ネイティブ形式（スプレッドシート）は alt=media でダウンロードできないため、
+ * xlsx へエクスポートして取得する。
+ */
+async function downloadFileBlob(token: string, fileId: string, mimeType?: string): Promise<ArrayBuffer> {
+  const url =
+    mimeType === GOOGLE_SHEETS_MIME
+      ? `${DRIVE_API}/files/${fileId}/export?mimeType=${encodeURIComponent(XLSX_MIME)}`
+      : `${DRIVE_API}/files/${fileId}?alt=media`;
+  const res = await fetchWithTimeout(url, {
     headers: headers(token),
   });
   if (!res.ok) throw new Error(`ダウンロード失敗 (${res.status})`);
@@ -344,7 +366,7 @@ export async function downloadFuriganaExcel(token: string): Promise<{ data: Arra
   if (!folderId) return null;
   const file = await getLatestXlsx(token, folderId);
   if (!file) return null;
-  const data = await downloadFileBlob(token, file.id);
+  const data = await downloadFileBlob(token, file.id, file.mimeType);
   return { data, fileName: file.name };
 }
 
@@ -354,7 +376,7 @@ export async function downloadAffiliationExcel(token: string): Promise<{ data: A
   if (!folderId) return null;
   const file = await getLatestXlsx(token, folderId);
   if (!file) return null;
-  const data = await downloadFileBlob(token, file.id);
+  const data = await downloadFileBlob(token, file.id, file.mimeType);
   return { data, fileName: file.name };
 }
 
@@ -434,7 +456,7 @@ const SCHEDULE_FOLDER_NAME = '時間割';
 export async function listScheduleExcelFiles(token: string): Promise<GoogleDriveFile[]> {
   const folderId = await findSubFolderId(token, SCHEDULE_FOLDER_NAME);
   if (!folderId) return [];
-  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  const q = `'${folderId}' in parents and trashed=false and ${EXCEL_LIKE_QUERY}`;
   const params = new URLSearchParams({
     q,
     fields: 'files(id,name,size,modifiedTime,mimeType)',
@@ -457,8 +479,8 @@ export async function listScheduleExcelFiles(token: string): Promise<GoogleDrive
 }
 
 /** 時間割フォルダからExcelファイルをダウンロード */
-export async function downloadScheduleExcel(token: string, fileId: string): Promise<ArrayBuffer> {
-  return downloadFileBlob(token, fileId);
+export async function downloadScheduleExcel(token: string, fileId: string, mimeType?: string): Promise<ArrayBuffer> {
+  return downloadFileBlob(token, fileId, mimeType);
 }
 
 /** 時間割フォルダにExcelをアップロード */
@@ -479,7 +501,7 @@ export async function listTournamentExcelFiles(token: string): Promise<GoogleDri
   if (!folderId) {
     throw new Error(`「${SUB_FOLDER_NAME}/${TOURNAMENT_LIST_FOLDER_NAME}」フォルダが見つかりません。Google Drive の接続を切断し、再接続してください。`);
   }
-  const q = `'${folderId}' in parents and trashed=false and (mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType='application/vnd.ms-excel' or name contains '.xlsx' or name contains '.xls')`;
+  const q = `'${folderId}' in parents and trashed=false and ${EXCEL_LIKE_QUERY}`;
   const params = new URLSearchParams({
     q,
     fields: 'files(id,name,size,modifiedTime,mimeType)',
@@ -502,8 +524,8 @@ export async function listTournamentExcelFiles(token: string): Promise<GoogleDri
 }
 
 /** 大会一覧フォルダからExcelファイルをダウンロード */
-export async function downloadTournamentExcel(token: string, fileId: string): Promise<ArrayBuffer> {
-  return downloadFileBlob(token, fileId);
+export async function downloadTournamentExcel(token: string, fileId: string, mimeType?: string): Promise<ArrayBuffer> {
+  return downloadFileBlob(token, fileId, mimeType);
 }
 
 /** デフォルトClient IDでOAuth接続を開始 */

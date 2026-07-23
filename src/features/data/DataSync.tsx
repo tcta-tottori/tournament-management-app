@@ -501,7 +501,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setLoadingFileId(file.id);
     try {
       modal.setModalProgress(30);
-      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      const arrayBuffer = await downloadTournamentExcel(token, file.id, file.mimeType);
       modal.setModalProgress(100);
       steps[0] = { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` };
       modal.setModalSteps([...steps]);
@@ -538,7 +538,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setLoadingScheduleFileId(file.id);
     try {
       modal.setModalProgress(30);
-      const arrayBuffer = await downloadScheduleExcel(token, file.id);
+      const arrayBuffer = await downloadScheduleExcel(token, file.id, file.mimeType);
       modal.setModalProgress(100);
       steps[0] = { ...steps[0], status: 'done', label: `「${file.name}」をダウンロード完了` };
       modal.setModalSteps([...steps]);
@@ -731,7 +731,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     if (!token) return;
     setWizardLoadingFileId(file.id);
     try {
-      const arrayBuffer = await downloadTournamentExcel(token, file.id);
+      const arrayBuffer = await downloadTournamentExcel(token, file.id, file.mimeType);
       setWizardTournamentArrayBuffer(arrayBuffer);
       setWizardTournamentFileName(file.name);
 
@@ -938,7 +938,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     if (!token) return;
     setWizardLoadingFileId(file.id);
     try {
-      const arrayBuffer = await downloadScheduleExcel(token, file.id);
+      const arrayBuffer = await downloadScheduleExcel(token, file.id, file.mimeType);
       onScheduleExcelLoaded?.(arrayBuffer, file.name);
       setWizardResult({ success: true, message: '一括読込が完了しました' });
       setWizardPhase('done');
