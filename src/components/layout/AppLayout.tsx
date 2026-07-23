@@ -12,7 +12,6 @@ import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../../features/mixed/mixedStore';
 import { useTeamStore } from '../../features/team/teamStore';
 import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../../features/sync/syncStore';
-import logoUrl from '/logo.png?url';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
 import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
@@ -365,74 +364,43 @@ export default function AppLayout() {
           ))}
         </div>
 
-        {/* ロゴ */}
-        <img
-          src={logoUrl}
-          alt="鳥取市テニス協会"
-          className="header-logo"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-        />
+        {/* 左: ハンバーガーボタン + 現在ページ名 */}
+        <button
+          className="header-hamburger-btn"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="メニューを開く"
+        >
+          <Menu style={{ width: 24, height: 24 }} />
+        </button>
+        {currentPageLabel && (
+          <div className="header-page-name min-w-0">
+            {CurrentPageIcon && (
+              <CurrentPageIcon style={{ width: 16, height: 16 }} className="shrink-0" />
+            )}
+            <span className="truncate">{currentPageLabel}</span>
+          </div>
+        )}
 
-        {/* タイトル */}
-        <div className="min-w-0 flex-1">
+        {/* スペーサー */}
+        <div className="flex-1" />
+
+        {/* 右: 協会名 + 大会名（右揃え） */}
+        <div className="header-title-right min-w-0">
           {(() => {
-            // 大会名が確定していたらヘッダーに大会名を表示
             const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
-            if (tName) {
-              // 「令和○年度」「第○回」等のプレフィックスを抽出
-              const prefixMatch = tName.match(/^((?:令和|平成|昭和)[\d０-９]+年度\s*|第[\d０-９]+回\s*)/);
-              const prefix = prefixMatch ? prefixMatch[1].trim() : '';
-              const mainName = prefix ? tName.slice(prefixMatch![0].length).trim() : tName;
-              return (<>
-                <p className="header-org-name" style={{ color: '#fbbf24' }}>{prefix || '鳥取市テニス協会'}</p>
-                <h1 className="header-title">{mainName}</h1>
-              </>);
-            }
+            const mainName = tName
+              ? tName.replace(/\(.*?\)|（.*?）/g, '').trim()
+              : '大会運営システム';
             return (<>
               <p className="header-org-name">鳥取市テニス協会</p>
-              <h1 className="header-title">大会運営システム</h1>
+              <h1 className="header-title truncate">{mainName}</h1>
             </>);
           })()}
         </div>
-
-        {/* 右側: 同期 & リンク & バージョン */}
-        <div className="flex items-center gap-2 shrink-0">
-          <SyncStatusIndicator />
-          <button
-            onClick={() => setVoiceSettingsOpen(true)}
-            className="header-link"
-            title="音声設定（Gemini TTS）"
-            aria-label="音声設定"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">音声</span>
-          </button>
-          <PublicViewHeaderLink />
-          <a
-            href="https://www.tottori-tenis.net/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-link"
-            title="鳥取県テニス協会HPを開く"
-          >
-            <span className="hidden sm:inline">テニス協会HP</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
-
-          <button
-            onClick={() => setVersionModalOpen(true)}
-            className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
-            title="バージョン情報・更新履歴"
-          >
-            <span className="header-version">Ver 2.2</span>
-            <span className="text-[8px] text-white/40 leading-tight mt-0.5 whitespace-nowrap">{__BUILD_TIMESTAMP__}</span>
-          </button>
-        </div>
       </header>
 
-      {/* ===== 大会情報バー（ハンバーガーメニュー内蔵） ===== */}
+      {/* ===== 流れる表示バー（ティッカー・全幅） ===== */}
       {(() => {
-        const hasTournament = tournament || (isMixedImported && mixedTournamentInfo) || (isTeamImported && teamTournamentInfo);
         const displayName = isMixedImported && mixedTournamentInfo
           ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
           : isTeamImported && teamTournamentInfo
@@ -440,35 +408,22 @@ export default function AppLayout() {
             : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
         const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
         return (
-          <div className="info-bar flex items-center shrink-0 h-11 overflow-hidden text-xs sticky top-0 z-20">
-            {/* 左端：ハンバーガーボタン + メニュー名 */}
-            <button
-              className="hamburger-inline-btn"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="メニューを開く"
-            >
-              <Menu style={{ width: 20, height: 20 }} />
-              <span className="hamburger-inline-label">{currentPageLabel}</span>
-            </button>
-
-            {/* 右側：ティッカー（流れる文字） */}
-            {hasTournament && (
-              <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-                <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                  {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
-                    <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                      {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                      <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                      {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
-                    </span>
-                  )) : (
-                    <span className="info-ticker-item">
-                      <span>{displayName || '大会運営システム'}</span>
-                    </span>
-                  )}
-                </div>
+          <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
+            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+              <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
+                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                  </span>
+                )) : (
+                  <span className="info-ticker-item">
+                    <span>{displayName || '大会運営システム'}</span>
+                  </span>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
       })()}
@@ -513,8 +468,44 @@ export default function AppLayout() {
             );
           })}
         </div>
-        {/* 下部ロゴ */}
+        {/* 下部: 操作ボタン4つ → バージョン情報 → 協会ロゴ */}
         <div className="hamburger-drawer-footer">
+          {/* 画面上部ボタン4つ */}
+          <div className="drawer-action-row">
+            <SyncStatusIndicator />
+            <button
+              onClick={() => setVoiceSettingsOpen(true)}
+              className="header-link"
+              title="音声設定（Gemini TTS）"
+              aria-label="音声設定"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>音声</span>
+            </button>
+            <PublicViewHeaderLink />
+            <a
+              href="https://www.tottori-tenis.net/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="header-link"
+              title="鳥取県テニス協会HPを開く"
+            >
+              <span>テニス協会HP</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          {/* バージョン情報（ver.と更新日） */}
+          <button
+            onClick={() => setVersionModalOpen(true)}
+            className="drawer-version-btn"
+            title="バージョン情報・更新履歴"
+          >
+            <span className="header-version">Ver 2.2</span>
+            <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
+          </button>
+
+          {/* 協会ロゴ */}
           <img
             src={`${import.meta.env.BASE_URL}logo-tcta.png`}
             alt="鳥取市テニス協会"
@@ -578,7 +569,7 @@ function PublicViewHeaderLink() {
       }
     >
       <Eye className="w-3 h-3" />
-      <span className="hidden sm:inline">観戦用</span>
+      <span>観戦用</span>
     </a>
   );
 }
