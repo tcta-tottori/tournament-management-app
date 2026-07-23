@@ -417,12 +417,14 @@ export function autoSchedule(
 ): ScheduleSlot[] {
   const { courtCount, courtNames, matchDuration, startTime } = config;
 
-  // ソート: ラウンド昇順 → ドローサイズ降順 → 種目順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
-  // これにより対戦順（matchOrder）と同じ並びでタイムテーブルに配置される
+  // ソート: ラウンド昇順 → 種目順(eventOrder) → ドローサイズ降順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
+  // 種目順を優先することで、ドロー表の記載順（＝A級を先に9:00開始 等）と同じ順に
+  // コートを埋める。ドローサイズ降順を先にすると大きな種目(例:B級64)が先に配置され、
+  // 先頭種目(A級32)が後ろの時間帯に押し出されてしまうため種目順を優先する。
   const sorted = [...matches].sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
-    if (a.drawSize !== b.drawSize) return b.drawSize - a.drawSize;
     if (a.eventOrder !== b.eventOrder) return a.eventOrder - b.eventOrder;
+    if (a.drawSize !== b.drawSize) return b.drawSize - a.drawSize;
     // 左山(L) → 右山(R) → 決勝(F) の順
     const halfOrder = (h: string) => h === 'L' ? 0 : h === 'R' ? 1 : 2;
     if (a.halfLabel !== b.halfLabel) return halfOrder(a.halfLabel) - halfOrder(b.halfLabel);
