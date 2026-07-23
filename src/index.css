@@ -311,6 +311,81 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* ===== ヘッダー左: ハンバーガーボタン + 現在ページ名 ===== */
+.header-hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(218, 185, 92, 0.08);
+  border: 1px solid rgba(218, 185, 92, 0.25);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.header-hamburger-btn:hover {
+  background: rgba(218, 185, 92, 0.18);
+  border-color: rgba(218, 185, 92, 0.45);
+}
+
+.header-page-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.header-page-name svg {
+  color: #ffd978;
+}
+
+/* ===== ヘッダー右: 協会名 + 大会名（右揃え） ===== */
+.header-title-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  max-width: 62%;
+}
+
+/* ===== ドロワー下部: 操作ボタン4つ ===== */
+.drawer-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding-bottom: 4px;
+}
+
+/* ===== ドロワー下部: バージョン情報（ver.と更新日） ===== */
+.drawer-version-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.drawer-version-btn:hover {
+  opacity: 0.8;
+}
+.drawer-version-date {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 /* ===========================================================
    ナビゲーションバー
    =========================================================== */
