@@ -316,8 +316,10 @@ export default function ScheduleSheet() {
     }
 
     // Strategy 1: Match by courtId + scheduledTime (most reliable when schedule import has been done)
+    // 不戦勝(BYE)は時間割に載らないので除外する
     const matchByCourtTime = new Map<string, Match>();
     for (const m of allMatches) {
+      if (m.status === 'walkover') continue;
       if (m.courtId && m.scheduledTime) {
         matchByCourtTime.set(`${m.courtId}|${m.scheduledTime}`, m);
       }
@@ -366,8 +368,12 @@ export default function ScheduleSheet() {
         const roundNum = parseRoundFromLabel(roundLabel, totalRounds);
         if (roundNum === null) continue;
 
+        // 不戦勝(BYE)は時間割に載らない実試合ではないので除外する。
+        // 除外しないと importedSchedule（BYE無し）と件数がずれ、BYEが表示され
+        // 対戦カードも1つずつずれてしまう。
         const dbMatchesForRound = allMatches
-          .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum && !alreadyLinkedMatchIds.has(m.matchId))
+          .filter(m => m.eventId === matchedEvent.eventId && m.round === roundNum
+            && m.status !== 'walkover' && !alreadyLinkedMatchIds.has(m.matchId))
           .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
 
         const sortedIndices = [...indices].sort((a, b) => {
@@ -376,9 +382,30 @@ export default function ScheduleSheet() {
           return (parseInt(sa.courtName, 10) || 0) - (parseInt(sb.courtName, 10) || 0);
         });
 
-        for (let j = 0; j < sortedIndices.length && j < dbMatchesForRound.length; j++) {
-          lookup.set(sortedIndices[j], dbMatchesForRound[j]);
-          alreadyLinkedMatchIds.add(dbMatchesForRound[j].matchId);
+        // まず選手名で紐付け（順序ズレに強い）。ヒントは自動生成時に付与される。
+        const normName = (s?: string) => (s || '').replace(/\s+/g, '');
+        const keyOf = (a?: string, b?: string) => [normName(a), normName(b)].filter(Boolean).sort().join('|');
+        const remaining = [...dbMatchesForRound];
+        const leftover: number[] = [];
+        for (const idx of sortedIndices) {
+          const item = importedSchedule[idx];
+          const hintKey = keyOf(item.player1Hint, item.player2Hint);
+          let pos = -1;
+          if (hintKey) {
+            pos = remaining.findIndex(m => keyOf(m.player1Name, m.player2Name) === hintKey);
+          }
+          if (pos >= 0) {
+            const m = remaining.splice(pos, 1)[0];
+            lookup.set(idx, m);
+            alreadyLinkedMatchIds.add(m.matchId);
+          } else {
+            leftover.push(idx);
+          }
+        }
+        // 名前で紐付かなかった分は順番でフォールバック
+        for (let j = 0; j < leftover.length && j < remaining.length; j++) {
+          lookup.set(leftover[j], remaining[j]);
+          alreadyLinkedMatchIds.add(remaining[j].matchId);
         }
       }
     }
@@ -1086,11 +1113,24 @@ export default function ScheduleSheet() {
             {(() => {
               const item = importedSchedule[editingCell.scheduleIndex];
               if (!item) return null;
+              const dbMatch = matchLookup.get(editingCell.scheduleIndex);
+              const p1 = dbMatch?.player1Name || item.player1Hint || '';
+              const p2 = dbMatch?.player2Name || item.player2Hint || '';
               return (
                 <div className="space-y-3">
-                  <div className="p-3 bg-gray-50 rounded-lg text-sm">
-                    <span className="font-medium">{item.eventName}</span>
-                    <span className="ml-2 text-gray-500">{item.roundLabel}</span>
+                  <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
+                    <div>
+                      <span className="font-medium">{item.eventName}</span>
+                      <span className="ml-2 text-gray-500">{roundLabelToJapanese(item.roundLabel)}</span>
+                    </div>
+                    {(p1 || p2) && (
+                      <div className="text-gray-900 font-semibold">
+                        {p1} <span className="text-gray-400 font-normal mx-0.5">vs</span> {p2}
+                      </div>
+                    )}
+                    {dbMatch?.score && (
+                      <div className="text-xs text-gray-500">スコア: {dbMatch.score}</div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">コート</label>
