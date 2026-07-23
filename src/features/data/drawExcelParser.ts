@@ -657,19 +657,38 @@ export function parseDrawExcel(
       const leftByeCount = Math.max(0, halfSize - leftReal.length);
       const rightByeCount = Math.max(0, halfSize - rightReal.length);
 
-      if (leftByeCount > 0 || rightByeCount > 0) {
+      // 各半分がブラケット全体を明示しているか判定。
+      // シート上にBYE行を含めてhalfSize個ぶんのエントリが並んでいる場合、
+      // ドロー番号がそのまま正しいブラケット位置を表す（手書きで完成したドロー）。
+      // この場合はR1ペアリング再計算をせず、抽出済み位置をそのまま採用する。
+      // 再計算すると、BYEで不戦勝の選手を次戦の相手とR1ペアと誤検出し、
+      // BYEスロットが詰められて以降の選手が繰り上がってしまう。
+      const leftPreFilled = leftPlayers.length === halfSize;
+      const rightPreFilled = rightPlayers.length === halfSize;
+
+      // --- 左半分 ---
+      if (leftPreFilled) {
+        // 抽出済み位置(1..halfSize)をそのまま使用。BYE行の位置は空きスロットになる。
+      } else if (leftByeCount > 0) {
         // Excelの試合時刻からR1ペアリングを検出してブラケット位置を割り当て
         assignPositionsFromR1Pairings(
           leftReal, leftRealRows, halfSize, 0, rows, 'left',
-        );
-        assignPositionsFromR1Pairings(
-          rightReal, rightRealRows, halfSize, halfSize, rows, 'right',
         );
       } else {
         // BYE不要の場合: 連番でそのまま配置
         for (let i = 0; i < leftReal.length; i++) {
           leftReal[i].position = i + 1;
         }
+      }
+
+      // --- 右半分 ---
+      if (rightPreFilled) {
+        // 抽出済み位置(halfSize+1..drawSize)をそのまま使用。
+      } else if (rightByeCount > 0) {
+        assignPositionsFromR1Pairings(
+          rightReal, rightRealRows, halfSize, halfSize, rows, 'right',
+        );
+      } else {
         for (let i = 0; i < rightReal.length; i++) {
           rightReal[i].position = halfSize + i + 1;
         }
