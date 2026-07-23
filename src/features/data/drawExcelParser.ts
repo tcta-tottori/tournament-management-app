@@ -12,6 +12,8 @@ export interface ParsedDrawPlayer {
   seed: number;
   partnerName?: string;
   partnerAffiliation?: string;
+  /** 抽出元のシート行インデックス（試合開始時刻の抽出に使用） */
+  row?: number;
 }
 
 import type { MatchFormatType } from '../../db/database';
@@ -37,6 +39,11 @@ export interface ParsedDrawEvent {
   isRoundRobin: boolean;
   /** 回戦別ゲームルール（複数ルールがある場合） */
   roundGameRules: RoundGameRule[];
+  /**
+   * 1回戦の各試合の開始時刻（'HH:MM'）。キーはそのペアの上側（小さい方）の
+   * ブラケット位置。ドロー表に記載された時刻をそのまま配置に使う。
+   */
+  matchTimes: Record<number, string>;
 }
 
 export interface ParsedDrawFile {
@@ -196,6 +203,57 @@ function analyzeStartTimes(
   }
 
   return { earliestStartTime: earliest, suggestedCourtCount: maxCount };
+}
+
+/**
+ * 1回戦の各試合の開始時刻を抽出する。
+ * ペア（ブラケット位置 2k-1, 2k）の2選手の行の間に書かれた時刻セルを、その試合の
+ * 開始時刻とみなす。BYE側は試合が無いのでスキップ。
+ * キーはペアの上側（小さい方）の位置。
+ */
+function extractR1MatchTimes(
+  rows: unknown[][],
+  players: ParsedDrawPlayer[],
+  drawSize: number,
+  leftLayout: ColumnLayout,
+  rightLayout: ColumnLayout,
+): Record<number, string> {
+  const rowByPos = new Map<number, number>();
+  for (const p of players) {
+    if (!p.isBye && p.row != null) rowByPos.set(p.position, p.row);
+  }
+  const half = drawSize / 2;
+  // 左右の時刻列を中央で分ける。左山ペアは左側の列、右山ペアは右側の列の時刻を使う。
+  // （同じ行に左山・右山両方の時刻が書かれるため、半分で絞らないと誤取得する）
+  const leftNameCol = leftLayout.nameCol >= 0 ? leftLayout.nameCol : 1;
+  const rightNumCol = rightLayout.numCol >= 0 ? rightLayout.numCol : leftNameCol + 18;
+  const centerCol = Math.round((leftNameCol + rightNumCol) / 2);
+
+  const result: Record<number, string> = {};
+  for (let a = 1; a < drawSize; a += 2) {
+    const ra = rowByPos.get(a);
+    const rb = rowByPos.get(a + 1);
+    if (ra == null || rb == null) continue; // どちらかがBYE → 試合なし
+    const lo = Math.min(ra, rb);
+    const hi = Math.max(ra, rb);
+    // 位置が離れすぎている場合は隣接ペアでない可能性が高く誤取得を避ける
+    if (hi - lo > 4) continue;
+    // この試合が属する半分の列範囲だけ走査する
+    const isLeft = a <= half;
+    const cStart = isLeft ? 0 : centerCol + 1;
+    const cEnd = isLeft ? centerCol - 1 : rightNumCol - 1;
+    let time = '';
+    for (let r = lo; r <= hi && !time; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      for (let c = cStart; c <= cEnd && c < row.length; c++) {
+        const hm = timeValueToHM(row[c]);
+        if (hm) { time = hm; break; }
+      }
+    }
+    if (time) result[a] = time;
+  }
+  return result;
 }
 
 /**
@@ -657,6 +715,7 @@ function extractPlayersFromHalf(
       affiliation: bye ? '' : affiliation,
       isBye: bye,
       seed: 0,
+      row: r,
     };
 
     if (isDoubles && !bye) {
@@ -933,6 +992,9 @@ export function parseDrawExcel(
     // 実選手が1人もいない種目（誤検出したタイトル行など）は取り込まない
     if (!allPlayers.some((p) => !p.isBye)) continue;
 
+    // 1回戦の各試合の開始時刻をドロー表から抽出
+    const matchTimes = extractR1MatchTimes(rows, allPlayers, drawSize, leftLayout, rightLayout);
+
     events.push({
       eventName: section.eventName,
       matchFormat: section.matchFormat,
@@ -941,6 +1003,7 @@ export function parseDrawExcel(
       players: allPlayers,
       isRoundRobin,
       roundGameRules,
+      matchTimes,
     });
   }
 
