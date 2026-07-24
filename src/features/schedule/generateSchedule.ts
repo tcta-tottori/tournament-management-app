@@ -202,6 +202,24 @@ export async function generateScheduleFromDraws(
   const dbMatches = eventIds.length > 0
     ? await db.matches.where('eventId').anyOf(eventIds).toArray()
     : [];
+
+  // 古い（時間割再生成前の）コート割当・状態を一掃する。
+  // 終了・不戦勝はそのまま。それ以外はコート/時刻/状態をリセットしてから再適用する。
+  // これをしないと存在しないコートを指す古い割当や、以前の「試合中」が残り、
+  // 初回コート確定などで別種目が混ざる原因になる。
+  for (const dm of dbMatches) {
+    if (dm.id == null) continue;
+    if (dm.status === 'finished' || dm.status === 'walkover') continue;
+    if (dm.courtId != null || dm.status !== 'waiting') {
+      await db.matches.update(dm.id, {
+        courtId: null,
+        scheduledTime: null,
+        status: 'waiting',
+        updatedAt: now,
+      });
+    }
+  }
+
   const keyOf = (eid: string, round: number, pos: number) => `${eid}|${round}|${pos}`;
   const dbByKey = new Map<string, (typeof dbMatches)[number]>();
   for (const dm of dbMatches) dbByKey.set(keyOf(dm.eventId, dm.round, dm.position), dm);
@@ -209,7 +227,7 @@ export async function generateScheduleFromDraws(
     const m = matchMap.get(slot.matchId);
     if (!m) continue;
     const dm = dbByKey.get(keyOf(m.eventCode, m.round, m.matchNumInRound));
-    if (dm && dm.id != null) {
+    if (dm && dm.id != null && dm.status !== 'finished' && dm.status !== 'walkover') {
       const courtId = courtNameToId.get(slot.courtName) || null;
       await db.matches.update(dm.id, {
         courtId,
