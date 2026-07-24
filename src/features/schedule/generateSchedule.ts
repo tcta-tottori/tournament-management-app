@@ -174,6 +174,51 @@ export async function generateScheduleFromDraws(
     });
   }
 
+  // --- コートをDBに作成し、割当を db.matches へ反映する ---
+  // これをしないと db.courts が空のままで「初回コート確定」等でコートが無い扱いになる。
+  const now = Date.now();
+  const existingCourts = await db.courts.where('tournamentId').equals(tournamentId).toArray();
+  const courtNameToId = new Map(existingCourts.map((c) => [c.name, c.courtId]));
+  let courtOrder = existingCourts.length;
+  for (const cn of courtNames) {
+    if (!courtNameToId.has(cn)) {
+      courtOrder++;
+      const courtId = `C-${now}-${courtOrder}`;
+      await db.courts.add({
+        tournamentId,
+        courtId,
+        name: cn,
+        surface: '',
+        isAvailable: true,
+        currentMatchId: null,
+        order: courtOrder,
+      });
+      courtNameToId.set(cn, courtId);
+    }
+  }
+
+  // 生成した時間割のコート・開始時刻を該当する db.matches に書き込む（不戦勝は対象外）
+  const eventIds = allEvents.map((e) => e.eventId);
+  const dbMatches = eventIds.length > 0
+    ? await db.matches.where('eventId').anyOf(eventIds).toArray()
+    : [];
+  const keyOf = (eid: string, round: number, pos: number) => `${eid}|${round}|${pos}`;
+  const dbByKey = new Map<string, (typeof dbMatches)[number]>();
+  for (const dm of dbMatches) dbByKey.set(keyOf(dm.eventId, dm.round, dm.position), dm);
+  for (const slot of slots) {
+    const m = matchMap.get(slot.matchId);
+    if (!m) continue;
+    const dm = dbByKey.get(keyOf(m.eventCode, m.round, m.matchNumInRound));
+    if (dm && dm.id != null) {
+      const courtId = courtNameToId.get(slot.courtName) || null;
+      await db.matches.update(dm.id, {
+        courtId,
+        scheduledTime: slot.startTime,
+        updatedAt: now,
+      });
+    }
+  }
+
   const usedCourts = new Set(items.map((i) => i.courtName));
   return {
     items,
