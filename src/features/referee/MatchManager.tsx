@@ -637,23 +637,48 @@ export default function MatchManager() {
     const availableCourts = courts.filter(c => c.isAvailable).sort((a, b) => (parseInt(a.name) || 0) - (parseInt(b.name) || 0));
     if (availableCourts.length === 0) { alert('使用可能なコートがありません。'); return; }
 
-    // 対戦順の上からコート数分の待機試合を取得
-    const waitingMatches = globalSortedMatches.filter(m =>
+    const isReal = (m: Match) =>
       (m.status === 'waiting' || m.status === 'ready')
       && !!m.player1Name && !!m.player2Name
-      && m.player1Name !== 'BYE' && m.player2Name !== 'BYE'
+      && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+    const toMin = (t?: string | null) => {
+      if (!t) return Number.POSITIVE_INFINITY;
+      const mm = t.match(/^(\d{1,2}):(\d{2})$/);
+      return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
+    };
+
+    // 時間割でコート・時刻が割り当てられている試合（現存コートのみ）
+    const courtIds = new Set(availableCourts.map(c => c.courtId));
+    const scheduled = globalSortedMatches.filter(m =>
+      isReal(m) && !!m.courtId && courtIds.has(m.courtId) && !!m.scheduledTime,
     );
 
-    const assignCount = Math.min(waitingMatches.length, availableCourts.length);
-    if (assignCount === 0) { alert('割り当てる試合がありません。'); return; }
+    let assignments: { match: Match & { eventName: string }; court: Court }[] = [];
+    if (scheduled.length > 0) {
+      // 時間割どおり: 最早時刻の試合を、それぞれ割り当てられたコートで開始する。
+      // これにより「A級で埋めるべき初回コートにB級が混ざる」ことを防ぐ。
+      const earliest = Math.min(...scheduled.map(m => toMin(m.scheduledTime)));
+      const firstSlot = scheduled.filter(m => toMin(m.scheduledTime) === earliest);
+      for (const court of availableCourts) {
+        const cm = firstSlot
+          .filter(m => m.courtId === court.courtId)
+          .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0));
+        if (cm.length > 0) assignments.push({ match: cm[0], court });
+      }
+    } else {
+      // フォールバック（時間割未生成時）: 対戦順の上からコート数分
+      const waitingMatches = globalSortedMatches.filter(isReal);
+      const assignCount = Math.min(waitingMatches.length, availableCourts.length);
+      assignments = waitingMatches.slice(0, assignCount).map((m, i) => ({
+        match: m,
+        court: availableCourts[i],
+      }));
+    }
 
-    const assignments = waitingMatches.slice(0, assignCount).map((m, i) => ({
-      match: m,
-      court: availableCourts[i],
-    }));
+    if (assignments.length === 0) { alert('割り当てる試合がありません。'); return; }
 
     const confirmed = confirm(
-      `${assignCount}試合にコートを割り当てて試合開始にします。\n\n` +
+      `${assignments.length}試合にコートを割り当てて試合開始にします。\n\n` +
       assignments.map(a => `${a.court.name}番コート: ${a.match.player1Name} vs ${a.match.player2Name}`).join('\n')
     );
     if (!confirmed) return;
