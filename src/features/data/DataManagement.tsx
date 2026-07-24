@@ -347,7 +347,7 @@ export default function DataManagement() {
   const [externalTournamentExcel, setExternalTournamentExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
   const [externalScheduleExcel, setExternalScheduleExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
   // ウィザードからの自動インポート情報
-  const [wizardAutoImport, setWizardAutoImport] = useState<{ name: string; date: string; venue: string; reserveDate: string } | null>(null);
+  const [wizardAutoImport, setWizardAutoImport] = useState<{ name: string; date: string; venue: string; reserveDate: string; courtNames?: string } | null>(null);
 
   // 全データリセット用
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -435,7 +435,7 @@ export default function DataManagement() {
   }, []);
 
   // ウィザードで大会確認後に自動インポート
-  const handleWizardTournamentConfirmed = useCallback((arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string }) => {
+  const handleWizardTournamentConfirmed = useCallback((arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string }) => {
     setWizardAutoImport(info);
     setExternalTournamentExcel({ arrayBuffer, fileName });
     setDataImportOpen(true);

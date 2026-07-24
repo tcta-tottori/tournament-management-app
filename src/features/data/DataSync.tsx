@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
+import { assignVenueCourtNames } from '../schedule/scheduleEngine';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
 import { parseClubExcel, type ClubVenueSection } from '../team/clubExcelParser';
@@ -279,7 +280,7 @@ interface DataSyncProps {
   /** GDriveから時間割Excelダウンロード完了時 */
   onScheduleExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
   /** ウィザードで大会確認後に自動インポート指示 */
-  onWizardTournamentConfirmed?: (arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string }) => void;
+  onWizardTournamentConfirmed?: (arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string }) => void;
 }
 
 export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded, onWizardTournamentConfirmed }: DataSyncProps) {
@@ -341,6 +342,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardEditDate, setWizardEditDate] = useState('');
   const [wizardEditVenue, setWizardEditVenue] = useState('');
   const [wizardEditReserveDate, setWizardEditReserveDate] = useState('');
+  const [wizardEditCourtNames, setWizardEditCourtNames] = useState('');
   const [wizardSourceDate, setWizardSourceDate] = useState('');
   const [wizardSourceReserveDate, setWizardSourceReserveDate] = useState('');
   const [wizardSourceVenue, setWizardSourceVenue] = useState('');
@@ -839,6 +841,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           if (result.venue) { setWizardEditVenue(result.venue); setWizardSourceVenue(result.venue); }
           if (result.reserveDate) { setWizardSourceReserveDate(result.reserveDate); setWizardEditReserveDate(result.reserveDate); }
           if (result.reserveVenue) setWizardSourceReserveVenue(result.reserveVenue);
+          setWizardEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
           setWizardDateMode('normal');
           setWizardVenueMode('normal');
           // 種目名にミックス/団体/クラブ対抗が含まれるかチェック（時間割不要）
@@ -912,6 +915,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           date: wizardEditDate,
           venue: wizardEditVenue,
           reserveDate: wizardEditReserveDate,
+          courtNames: wizardEditCourtNames,
         });
         // ミックス/団体戦の場合は時間割スキップ
         if (wizardIsMixedOrTeam) {
@@ -930,7 +934,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     } finally {
       setWizardIsImporting(false);
     }
-  }, [wizardTeamPending, wizardMixedPending, wizardTournamentArrayBuffer, wizardTournamentFileName, wizardEditName, wizardEditDate, wizardEditVenue, wizardEditReserveDate, wizardIsMixedOrTeam, wizardScheduleFiles, onWizardTournamentConfirmed, navigate]);
+  }, [wizardTeamPending, wizardMixedPending, wizardTournamentArrayBuffer, wizardTournamentFileName, wizardEditName, wizardEditDate, wizardEditVenue, wizardEditReserveDate, wizardEditCourtNames, wizardIsMixedOrTeam, wizardScheduleFiles, onWizardTournamentConfirmed, navigate]);
 
   // ウィザード内: 時間割ファイル選択→ダウンロード→完了
   const handleWizardSelectSchedule = useCallback(async (file: GoogleDriveFile) => {
@@ -1605,6 +1609,19 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       </div>
                     )}
 
+                    {/* 使用コート（通常大会のみ） */}
+                    {!(wizardMixedPending || wizardTeamPending) && (
+                      <div>
+                        <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
+                        <input type="text" value={wizardEditCourtNames} onChange={e => setWizardEditCourtNames(e.target.value)}
+                          placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          ドロー表の開始時刻から検出（{wizardParsedExcel?.suggestedCourtCount || '—'}面）。時間割生成でもこのコートを使います。
+                        </p>
+                      </div>
+                    )}
+
                   </div>
 
                   {/* アクション */}
@@ -1626,10 +1643,25 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               {/* Phase: select-schedule */}
               {wizardPhase === 'select-schedule' && (
                 <div className="px-3 py-3">
+                  {/* 自動生成の選択肢 */}
+                  <button
+                    onClick={() => { setWizardOpen(false); navigate('/schedule-sheet'); }}
+                    className="w-full flex items-center gap-3 px-3 py-3 mb-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 transition-all text-left"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-sm shrink-0">
+                      <Dices className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-gray-800">ドローから自動生成</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">記載の開始時刻・使用コートで時間割を自動作成します</div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
+                  </button>
+
                   <div className="px-2 mb-2">
                     <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                       <CalendarClock className="w-4 h-4 text-[#1a73e8]" />
-                      時間割ファイルを選択
+                      または時間割ファイルを選択
                     </h4>
                     <p className="text-[11px] text-gray-500 mt-0.5">{wizardScheduleFiles.length}件のファイル</p>
                   </div>

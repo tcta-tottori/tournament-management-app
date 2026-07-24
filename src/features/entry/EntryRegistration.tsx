@@ -697,6 +697,8 @@ function NormalEntryRegistration() {
         const isWalkover = s1.isBye || s2.isBye;
         const p1Info = resolvePlayerFromSlot(s1);
         const p2Info = resolvePlayerFromSlot(s2);
+        // ドロー表に記載された1回戦の開始時刻を標準の予定時刻として設定
+        const drawMatchTime = draw.matchTimes?.[Math.min(s1.position, s2.position)] ?? null;
 
         newMatches.push({
           eventId, matchId: `M-R1-${matchOrder}`, round: 1, matchOrder,
@@ -705,7 +707,7 @@ function NormalEntryRegistration() {
           player1Name: p1Info.name, player2Name: p2Info.name,
           player1Affiliation: p1Info.affiliation, player2Affiliation: p2Info.affiliation,
           score: '', winnerEntryId: isWalkover ? (s1.isBye ? p2Info.entryId : p1Info.entryId) : null,
-          courtId: null, scheduledTime: null,
+          courtId: null, scheduledTime: isWalkover ? null : drawMatchTime,
           status: isWalkover ? 'walkover' : 'waiting',
           refereeId: null, refereeName: '', updatedAt: Date.now()
         });
