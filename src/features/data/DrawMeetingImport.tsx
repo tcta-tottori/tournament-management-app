@@ -505,7 +505,7 @@ interface DataImportProps {
   /** GDriveからダウンロードされた時間割Excel (DataSyncから渡される) */
   externalScheduleExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
   /** ウィザードで確認済みの自動インポート情報（設定されている場合はモーダル表示せず直接インポート） */
-  wizardAutoImport?: { name: string; date: string; venue: string; reserveDate: string } | null;
+  wizardAutoImport?: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string } | null;
 }
 
 export default function DataImport({ externalTournamentExcel, externalScheduleExcel, wizardAutoImport }: DataImportProps) {
@@ -697,6 +697,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         setEditDate(wizardAutoImport.date);
         setEditVenue(wizardAutoImport.venue);
         setEditReserveDate(wizardAutoImport.reserveDate);
+        if (wizardAutoImport.courtNames) setEditCourtNames(wizardAutoImport.courtNames);
         // モーダルを表示せず自動インポートをトリガー
         setAutoImportPending(true);
       } else {

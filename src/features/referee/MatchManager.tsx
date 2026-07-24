@@ -332,7 +332,19 @@ export default function MatchManager() {
     }
 
     if (importedSchedule.length === 0) {
-      return arr.sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
+      // 時間割未生成時は、ドロー記載の開始時刻(scheduledTime)がある試合を時刻順に、
+      // 無い試合は対戦順(matchOrder)で並べる
+      const toMin = (t?: string | null) => {
+        if (!t) return Number.POSITIVE_INFINITY;
+        const m = t.match(/^(\d{1,2}):(\d{2})$/);
+        return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : Number.POSITIVE_INFINITY;
+      };
+      return arr.sort((a, b) => {
+        const ta = toMin(a.scheduledTime);
+        const tb = toMin(b.scheduledTime);
+        if (ta !== tb) return ta - tb;
+        return (a.matchOrder || 9999) - (b.matchOrder || 9999);
+      });
     }
 
     // 種目+ラウンド別にDB試合をプール化（ポジション順にソート）
