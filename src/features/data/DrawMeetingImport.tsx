@@ -6,6 +6,7 @@ import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, C
 import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
+import { assignVenueCourtNames } from '../schedule/scheduleEngine';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
@@ -523,6 +524,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
+  // 使用コート（カンマ区切り、ドロー検出値で初期化。時間割生成でも使う）
+  const [editCourtNames, setEditCourtNames] = useState('');
   // 会場・日程の選択モード: 'normal' | 'reserve' | 'custom'
   const [venueMode, setVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
   const [dateMode, setDateMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
@@ -652,6 +655,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
       if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
       if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
+      setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
       setVenueMode('normal'); setDateMode('normal');
     } catch (err) {
       setImportResult({ success: false, message: `Excelの解析に失敗しました: ${(err as Error).message}` });
@@ -812,6 +816,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
         if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
         if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
+        setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
         setVenueMode('normal'); setDateMode('normal');
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
@@ -1369,6 +1374,23 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         isManual: false,
       }));
       await db.players.bulkPut(playersToSave);
+
+      // --- コート作成（指定コート名から） ---
+      const courtNames = editCourtNames
+        .split(/[,、\s]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (let ci = 0; ci < courtNames.length; ci++) {
+        await db.courts.add({
+          tournamentId,
+          courtId: `C-${now}-${ci}`,
+          name: courtNames[ci],
+          surface: '',
+          isAvailable: true,
+          currentMatchId: null,
+          order: ci + 1,
+        });
+      }
 
       // --- 6. 大会を選択状態にする ---
       setCurrentTournamentId(tournamentId);
@@ -2098,6 +2120,21 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             </div>
           </div>
 
+          {/* 使用コート */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 sm:p-4">
+            <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
+            <input
+              type="text"
+              value={editCourtNames}
+              onChange={e => setEditCourtNames(e.target.value)}
+              placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              ドロー表の開始時刻から検出（{parsedExcel.suggestedCourtCount || '—'}面）。時間割生成でもこのコートを使用します。
+            </p>
+          </div>
+
           {/* 種目詳細 */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <button
@@ -2533,6 +2570,12 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
                   )}
                 </div>
+              </div>
+              <div className="mt-2">
+                <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
+                <input type="text" value={editCourtNames} onChange={e => setEditCourtNames(e.target.value)}
+                  placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
               </div>
             </div>
 

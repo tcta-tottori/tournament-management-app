@@ -419,9 +419,10 @@ function LiveDashboardInner() {
   // -- Stats --
   const stats = useMemo(() => {
     const playing = allMatches.filter(m => m.status === 'playing');
-    const finished = allMatches.filter(m => m.status === 'finished' || m.status === 'walkover');
+    // 不戦勝(BYE)は実際に行う試合ではないので総数・完了数から除外する
+    const finished = allMatches.filter(m => m.status === 'finished');
     const waiting = allMatches.filter(m => m.status === 'waiting' || m.status === 'ready');
-    const total = allMatches.length;
+    const total = allMatches.filter(m => m.status !== 'walkover').length;
     const progressPercent = total > 0 ? Math.round((finished.length / total) * 100) : 0;
     return { playing, finished, waiting, total, progressPercent };
   }, [allMatches]);
