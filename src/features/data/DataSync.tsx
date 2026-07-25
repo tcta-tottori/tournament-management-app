@@ -925,15 +925,13 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           reserveDate: wizardEditReserveDate,
           courtNames: wizardEditCourtNames,
         });
-        // ミックス/団体戦の場合は時間割スキップ
+        // ミックス/団体戦の場合は時間割スキップ。通常大会は必ず時間割ステップへ
+        // （時間割ファイルが無くてもドローから自動生成できるため常に表示する）
         if (wizardIsMixedOrTeam) {
           setWizardResult({ success: true, message: '一括読込が完了しました' });
           setWizardPhase('done');
-        } else if (wizardScheduleFiles.length > 0) {
-          setWizardPhase('select-schedule');
         } else {
-          setWizardResult({ success: true, message: '一括読込が完了しました' });
-          setWizardPhase('done');
+          setWizardPhase('select-schedule');
         }
       }
     } catch (err) {
@@ -1727,9 +1725,13 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                   <div className="px-2 mb-2">
                     <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                       <CalendarClock className="w-4 h-4 text-[#1a73e8]" />
-                      または時間割ファイルを選択
+                      {wizardScheduleFiles.length > 0 ? 'または時間割ファイルを選択' : '時間割ファイルはありません'}
                     </h4>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{wizardScheduleFiles.length}件のファイル</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {wizardScheduleFiles.length > 0
+                        ? `${wizardScheduleFiles.length}件のファイル`
+                        : '上の「ドローから自動生成」で時間割を作成できます'}
+                    </p>
                   </div>
                   <div className="space-y-1 max-h-64 overflow-y-auto">
                     {wizardScheduleFiles.map(f => {
