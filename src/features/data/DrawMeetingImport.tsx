@@ -500,6 +500,61 @@ function normalizeScheduleTime(raw: string): string {
   return trimmed;
 }
 
+/** 使用コートのプリセット */
+const STANDARD_COURTS = Array.from({ length: 16 }, (_, i) => String(i + 1)).join(','); // 1〜16
+const RANGE5_COURTS = Array.from({ length: 12 }, (_, i) => String(i + 5)).join(',');    // 5〜16
+
+/**
+ * 使用コート選択（ボタン式）。
+ * - 標準: 1〜16番コート
+ * - 5〜16番コート
+ * - その他: カンマ区切りで自由指定
+ */
+function CourtSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [customOverride, setCustomOverride] = useState(false);
+  const norm = value.replace(/[\s、]+/g, ',').replace(/,+/g, ',').replace(/^,|,$/g, '');
+  const isStandard = norm === STANDARD_COURTS;
+  const isRange5 = norm === RANGE5_COURTS;
+  const mode: 'standard' | 'range5' | 'custom' =
+    customOverride ? 'custom' : isStandard ? 'standard' : isRange5 ? 'range5' : 'custom';
+
+  const btn = (active: boolean) =>
+    `flex-1 px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
+      active
+        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50'
+    }`;
+
+  return (
+    <div>
+      <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート</label>
+      <div className="flex gap-2">
+        <button type="button" className={btn(mode === 'standard')}
+          onClick={() => { setCustomOverride(false); onChange(STANDARD_COURTS); }}>
+          標準<span className="block text-[9px] font-normal opacity-80">1〜16番</span>
+        </button>
+        <button type="button" className={btn(mode === 'range5')}
+          onClick={() => { setCustomOverride(false); onChange(RANGE5_COURTS); }}>
+          5〜16番<span className="block text-[9px] font-normal opacity-80">12面</span>
+        </button>
+        <button type="button" className={btn(mode === 'custom')}
+          onClick={() => setCustomOverride(true)}>
+          その他<span className="block text-[9px] font-normal opacity-80">個別指定</span>
+        </button>
+      </div>
+      {mode === 'custom' && (
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="例: 5,6,7,8,9,10,11,12,13,14,15,16"
+          className="w-full mt-2 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+        />
+      )}
+    </div>
+  );
+}
+
 interface DataImportProps {
   /** GDriveからダウンロードされた大会Excel (DataSyncから渡される) */
   externalTournamentExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
@@ -529,6 +584,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [editReserveDate, setEditReserveDate] = useState('');
   // 使用コート（カンマ区切り、ドロー検出値で初期化。時間割生成でも使う）
   const [editCourtNames, setEditCourtNames] = useState('');
+  // コートの開始時刻（時間割自動生成の開始基準。ドロー検出値で初期化、手動変更可）
+  const [editStartTime, setEditStartTime] = useState('09:00');
   // 会場・日程の選択モード: 'normal' | 'reserve' | 'custom'
   const [venueMode, setVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
   const [dateMode, setDateMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
@@ -661,6 +718,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
       if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
       setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
+      setEditStartTime(result.earliestStartTime || '09:00');
       setVenueMode('normal'); setDateMode('normal');
     } catch (err) {
       setImportResult({ success: false, message: `Excelの解析に失敗しました: ${(err as Error).message}` });
@@ -825,6 +883,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
         if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
         setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
+      setEditStartTime(result.earliestStartTime || '09:00');
         setVenueMode('normal'); setDateMode('normal');
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
@@ -876,9 +935,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         .split(/[,、\s]+/)
         .map(s => s.trim())
         .filter(s => s.length > 0);
-      // ドロー表から検出した開始時刻を既定値に使用
+      // 指定された開始時刻を使用（未指定時はドロー検出値→09:00）
       const tournament = await db.tournaments.where('tournamentId').equals(tid).first();
-      const startTime = tournament?.drawStartTime || '09:00';
+      const startTime = editStartTime || tournament?.drawStartTime || '09:00';
       const result = await generateScheduleFromDraws(tid, {
         courtNames: courtNames.length > 0 ? courtNames : undefined,
         startTime,
@@ -897,7 +956,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     } finally {
       setIsGeneratingSchedule(false);
     }
-  }, [editCourtNames]);
+  }, [editCourtNames, editStartTime]);
 
   // --- File dispatcher: detect type by extension ---
   const handleFile = useCallback((file: File) => {
@@ -1299,8 +1358,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         reserveDate: editReserveDate,
         reserveVenue: parsedExcel.reserveVenue || '',
         createdAt: now,
-        // ドロー表から検出した開始時刻・同時進行試合数（時間割自動生成の既定値）
-        drawStartTime: parsedExcel.earliestStartTime || undefined,
+        // 指定/検出した開始時刻・同時進行試合数（時間割自動生成の既定値）
+        drawStartTime: editStartTime || parsedExcel.earliestStartTime || undefined,
         suggestedCourtCount: parsedExcel.suggestedCourtCount || undefined,
       });
 
@@ -2174,18 +2233,21 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             </div>
           </div>
 
-          {/* 使用コート */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 sm:p-4">
-            <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
-            <input
-              type="text"
-              value={editCourtNames}
-              onChange={e => setEditCourtNames(e.target.value)}
-              placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
-            />
-            <p className="text-[10px] text-gray-400 mt-1">
-              ドロー表の開始時刻から検出（{parsedExcel.suggestedCourtCount || '—'}面）。時間割生成でもこのコートを使用します。
+          {/* 使用コート・開始時刻 */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 sm:p-4 space-y-3">
+            <CourtSelector value={editCourtNames} onChange={setEditCourtNames} />
+            {/* コート開始時刻 */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-500 block mb-1">開始時刻</label>
+              <input
+                type="time"
+                value={editStartTime}
+                onChange={e => setEditStartTime(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400">
+              ドロー表から検出（{parsedExcel.suggestedCourtCount || '—'}面）。この使用コート・開始時刻をもとに時間割を生成します。
             </p>
           </div>
 
@@ -2659,9 +2721,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                 </div>
               </div>
               <div className="mt-2">
-                <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
-                <input type="text" value={editCourtNames} onChange={e => setEditCourtNames(e.target.value)}
-                  placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
+                <CourtSelector value={editCourtNames} onChange={setEditCourtNames} />
+              </div>
+              <div className="mt-2">
+                <label className="text-[11px] font-medium text-gray-500 block mb-1">開始時刻</label>
+                <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
               </div>
             </div>
