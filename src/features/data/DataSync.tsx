@@ -1053,6 +1053,15 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setWizardOpen(false);
   }, []);
 
+  // 一括読込（大会取込）が完了したら、すぐにエントリーページへ移動する。
+  // ふりがな・所属のみの読込（メッセージが異なる）は対象外。
+  useEffect(() => {
+    if (wizardPhase === 'done' && wizardResult?.success && wizardResult.message === '一括読込が完了しました') {
+      setWizardOpen(false);
+      navigate('/entry');
+    }
+  }, [wizardPhase, wizardResult, navigate]);
+
   const formattedLastSync = lastSyncTime
     ? new Date(lastSyncTime).toLocaleString('ja-JP', {
         year: 'numeric', month: '2-digit', day: '2-digit',
