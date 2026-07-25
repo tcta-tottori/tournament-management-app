@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
-import { assignVenueCourtNames } from '../schedule/scheduleEngine';
-import CourtSelector from './CourtSelector';
+import CourtSelector, { STANDARD_COURTS } from './CourtSelector';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
@@ -347,8 +346,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardEditDate, setWizardEditDate] = useState('');
   const [wizardEditVenue, setWizardEditVenue] = useState('');
   const [wizardEditReserveDate, setWizardEditReserveDate] = useState('');
-  const [wizardEditCourtNames, setWizardEditCourtNames] = useState('');
-  // コートの開始時刻（時間割自動生成の開始基準。ドロー検出値で初期化、手動変更可）
+  // 使用コート（既定は全面=1〜16）
+  const [wizardEditCourtNames, setWizardEditCourtNames] = useState(STANDARD_COURTS);
+  // コートの開始時刻（既定は9:00。時間割自動生成の開始基準、手動変更可）
   const [wizardEditStartTime, setWizardEditStartTime] = useState('09:00');
   const [wizardSourceDate, setWizardSourceDate] = useState('');
   const [wizardSourceReserveDate, setWizardSourceReserveDate] = useState('');
@@ -860,8 +860,9 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           if (result.venue) { setWizardEditVenue(result.venue); setWizardSourceVenue(result.venue); }
           if (result.reserveDate) { setWizardSourceReserveDate(result.reserveDate); setWizardEditReserveDate(result.reserveDate); }
           if (result.reserveVenue) setWizardSourceReserveVenue(result.reserveVenue);
-          setWizardEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
-          setWizardEditStartTime(result.earliestStartTime || '09:00');
+          // 既定は全面（1〜16）・9:00。必要に応じてユーザーがボタン/入力で変更する。
+          setWizardEditCourtNames(STANDARD_COURTS);
+          setWizardEditStartTime('09:00');
           setWizardDateMode('normal');
           setWizardVenueMode('normal');
           // 種目名にミックス/団体/クラブ対抗が含まれるかチェック（時間割不要）

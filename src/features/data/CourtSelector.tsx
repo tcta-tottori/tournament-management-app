@@ -31,11 +31,11 @@ export default function CourtSelector({ value, onChange }: { value: string; onCh
       <div className="flex gap-2">
         <button type="button" className={btn(mode === 'standard')}
           onClick={() => { setCustomOverride(false); onChange(STANDARD_COURTS); }}>
-          標準<span className="block text-[9px] font-normal opacity-80">1〜16番</span>
+          全面<span className="block text-[9px] font-normal opacity-80">1〜16面</span>
         </button>
         <button type="button" className={btn(mode === 'range5')}
           onClick={() => { setCustomOverride(false); onChange(RANGE5_COURTS); }}>
-          5〜16番<span className="block text-[9px] font-normal opacity-80">12面</span>
+          12面<span className="block text-[9px] font-normal opacity-80">5〜16面</span>
         </button>
         <button type="button" className={btn(mode === 'custom')}
           onClick={() => setCustomOverride(true)}>

@@ -6,8 +6,7 @@ import { Upload, CheckCircle2, AlertCircle, Users, Trophy, Dices, ChevronDown, C
 import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
-import { assignVenueCourtNames } from '../schedule/scheduleEngine';
-import CourtSelector from './CourtSelector';
+import CourtSelector, { STANDARD_COURTS } from './CourtSelector';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
@@ -528,9 +527,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [editDate, setEditDate] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editReserveDate, setEditReserveDate] = useState('');
-  // 使用コート（カンマ区切り、ドロー検出値で初期化。時間割生成でも使う）
-  const [editCourtNames, setEditCourtNames] = useState('');
-  // コートの開始時刻（時間割自動生成の開始基準。ドロー検出値で初期化、手動変更可）
+  // 使用コート（既定は全面=1〜16。時間割生成でも使う）
+  const [editCourtNames, setEditCourtNames] = useState(STANDARD_COURTS);
+  // コートの開始時刻（既定は9:00。時間割自動生成の開始基準、手動変更可）
   const [editStartTime, setEditStartTime] = useState('09:00');
   // 会場・日程の選択モード: 'normal' | 'reserve' | 'custom'
   const [venueMode, setVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
@@ -663,8 +662,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
       if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
       if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
-      setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
-      setEditStartTime(result.earliestStartTime || '09:00');
+      // 既定は全面（1〜16）・9:00。必要に応じてユーザーがボタン/入力で変更する。
+      setEditCourtNames(STANDARD_COURTS);
+      setEditStartTime('09:00');
       setVenueMode('normal'); setDateMode('normal');
     } catch (err) {
       setImportResult({ success: false, message: `Excelの解析に失敗しました: ${(err as Error).message}` });
@@ -828,8 +828,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         if (result.venue) { setEditVenue(result.venue); setSourceVenue(result.venue); }
         if (result.reserveDate) { setSourceReserveDate(result.reserveDate); setEditReserveDate(result.reserveDate); }
         if (result.reserveVenue) setSourceReserveVenue(result.reserveVenue);
-        setEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
-      setEditStartTime(result.earliestStartTime || '09:00');
+        // 既定は全面（1〜16）・9:00。必要に応じてユーザーがボタン/入力で変更する。
+      setEditCourtNames(STANDARD_COURTS);
+      setEditStartTime('09:00');
         setVenueMode('normal'); setDateMode('normal');
       } catch (err) {
         setImportResult({ success: false, message: `Excelファイルの解析に失敗しました: ${(err as Error).message}` });
