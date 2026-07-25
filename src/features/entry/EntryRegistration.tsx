@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
+import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock, X, Check } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
@@ -262,6 +263,40 @@ function NormalEntryRegistration() {
       };
     });
   }, [drawMap, allEntries, entryMap, playerMap]);
+
+  // 検索ポップアップ用: 全種目のエントリーを平坦化した検索リスト
+  type SearchRow = CheckInSlot & { eventId: string; eventName: string };
+  const allSearchRows = useMemo<SearchRow[]>(() => {
+    const list: SearchRow[] = [];
+    for (const e of events) {
+      for (const s of buildSlotsForEvent(e.eventId)) {
+        if (!s.entry || s.isBye) continue; // 実エントリーのみ
+        list.push({ ...s, eventId: e.eventId, eventName: e.name });
+      }
+    }
+    return list;
+  }, [events, buildSlotsForEvent]);
+
+  // 検索ポップアップの状態
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const searchModalInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (searchModalOpen) setTimeout(() => searchModalInputRef.current?.focus(), 50);
+  }, [searchModalOpen]);
+  // 閉じるときは検索語をクリアし、下の一覧を元に戻す
+  const closeSearchModal = useCallback(() => { setSearchModalOpen(false); setSearchQuery(''); }, []);
+
+  // ポップアップの検索結果（選手名・所属・種目名で絞り込み）
+  const searchModalResults = useMemo<SearchRow[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allSearchRows.filter(r =>
+      r.playerName.toLowerCase().includes(q) ||
+      r.partnerName.toLowerCase().includes(q) ||
+      r.affiliation.toLowerCase().includes(q) ||
+      r.eventName.toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [searchQuery, allSearchRows]);
 
   // Filter slots by search
   const getSearchMatchSet = useCallback((slots: CheckInSlot[]): Set<number> => {
@@ -1620,8 +1655,10 @@ function NormalEntryRegistration() {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-gray-500" />
               </div>
-              <input type="text" placeholder="選手名・所属で検索..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500" />
+              <input type="text" readOnly placeholder="選手名・所属で検索..." value={searchQuery}
+                onClick={() => setSearchModalOpen(true)}
+                onFocus={() => setSearchModalOpen(true)}
+                className="block w-full pl-10 pr-3 py-2 border border-border-main rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-[3px] focus:ring-primary-500/15 focus:border-primary-500" />
             </div>
 
             {(showAllEvents || selectedEventId) && (
@@ -1702,6 +1739,92 @@ function NormalEntryRegistration() {
         onConfirm={handleConfirmOk}
         onCancel={handleConfirmCancel}
       />
+
+      {/* 検索ポップアップ（タップで表示。検索して選手を受付/取消できる） */}
+      {searchModalOpen && createPortal(
+        <div className="fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[8vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeSearchModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-[confirmSlideUp_0.2s_ease-out] flex flex-col max-h-[80vh]">
+            {/* ヘッダー: 検索入力 */}
+            <div className="p-3 border-b border-gray-100 flex items-center gap-2 shrink-0">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-500" />
+                </div>
+                <input ref={searchModalInputRef} type="text" placeholder="選手名・所属・種目で検索..." value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50/50 focus:bg-white focus:border-primary-500 focus:ring-[3px] focus:ring-primary-500/15 outline-none" />
+              </div>
+              <button onClick={closeSearchModal}
+                className="shrink-0 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* 検索結果リスト */}
+            <div className="overflow-y-auto flex-1">
+              {!searchQuery.trim() ? (
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  <Search className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                  選手名・所属・種目名で検索してください
+                </div>
+              ) : searchModalResults.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                  該当する選手が見つかりません
+                </div>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {searchModalResults.map((row) => {
+                    const isAbsent = row.entry?.status === 'withdrawn';
+                    const isChecked = !isAbsent && !!row.entryId && confirmedIds.has(row.entryId);
+                    return (
+                      <li key={`${row.eventId}-${row.entryId}`}>
+                        <button onClick={() => handleCheckIn(row)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors">
+                          {/* 受付状態インジケーター */}
+                          <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center border ${
+                            isAbsent ? 'bg-red-50 border-red-300 text-red-500'
+                              : isChecked ? 'bg-green-500 border-green-500 text-white'
+                              : 'bg-white border-gray-300 text-transparent'
+                          }`}>
+                            {isAbsent ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold text-gray-800 truncate">
+                              {row.playerName}{row.partnerName && ` / ${row.partnerName}`}
+                            </div>
+                            <div className="text-[11px] text-gray-500 truncate">
+                              {row.affiliation}{row.affiliation && ' ・ '}<span className="text-primary-600">{row.eventName}</span>
+                            </div>
+                          </div>
+                          <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isAbsent ? 'bg-red-50 text-red-600'
+                              : isChecked ? 'bg-green-50 text-green-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {isAbsent ? '欠場' : isChecked ? '受付済' : '未受付'}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* フッター */}
+            <div className="p-2.5 border-t border-gray-100 shrink-0 flex items-center justify-between">
+              <span className="text-[11px] text-gray-400 pl-1">タップで受付／取消</span>
+              <button onClick={closeSearchModal}
+                className="px-4 py-1.5 text-sm font-bold text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors">
+                完了
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
