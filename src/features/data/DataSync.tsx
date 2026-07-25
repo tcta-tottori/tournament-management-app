@@ -12,6 +12,7 @@ import {
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { assignVenueCourtNames } from '../schedule/scheduleEngine';
+import CourtSelector from './CourtSelector';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
@@ -347,6 +348,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardEditVenue, setWizardEditVenue] = useState('');
   const [wizardEditReserveDate, setWizardEditReserveDate] = useState('');
   const [wizardEditCourtNames, setWizardEditCourtNames] = useState('');
+  // コートの開始時刻（時間割自動生成の開始基準。ドロー検出値で初期化、手動変更可）
+  const [wizardEditStartTime, setWizardEditStartTime] = useState('09:00');
   const [wizardSourceDate, setWizardSourceDate] = useState('');
   const [wizardSourceReserveDate, setWizardSourceReserveDate] = useState('');
   const [wizardSourceVenue, setWizardSourceVenue] = useState('');
@@ -858,6 +861,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           if (result.reserveDate) { setWizardSourceReserveDate(result.reserveDate); setWizardEditReserveDate(result.reserveDate); }
           if (result.reserveVenue) setWizardSourceReserveVenue(result.reserveVenue);
           setWizardEditCourtNames(assignVenueCourtNames(result.suggestedCourtCount || 6).join(','));
+          setWizardEditStartTime(result.earliestStartTime || '09:00');
           setWizardDateMode('normal');
           setWizardVenueMode('normal');
           // 種目名にミックス/団体/クラブ対抗が含まれるかチェック（時間割不要）
@@ -1000,8 +1004,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
         .split(/[,、\s]+/)
         .map(s => s.trim())
         .filter(s => s.length > 0);
-      // ドロー表から検出した開始時刻を既定値に使用
-      const startTime = wizardParsedExcel?.earliestStartTime || '09:00';
+      // 指定された開始時刻を使用（未指定時はドロー検出値→09:00）
+      const startTime = wizardEditStartTime || wizardParsedExcel?.earliestStartTime || '09:00';
       const result = await generateScheduleFromDraws(tid, {
         courtNames: courtNames.length > 0 ? courtNames : undefined,
         startTime,
@@ -1023,7 +1027,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setWizardScheduleGenerating(false);
       setWizardAutoGenPending(false);
     }
-  }, [wizardEditCourtNames, wizardParsedExcel]);
+  }, [wizardEditCourtNames, wizardParsedExcel, wizardEditStartTime]);
 
   // 自動生成ボタン: 大会インポートのDB書込が完了していれば即実行、未完了なら完了待ち
   const handleWizardAutoGenerateSchedule = useCallback(() => {
@@ -1698,15 +1702,17 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       </div>
                     )}
 
-                    {/* 使用コート（通常大会のみ） */}
+                    {/* 使用コート・開始時刻（通常大会のみ） */}
                     {!(wizardMixedPending || wizardTeamPending) && (
-                      <div>
-                        <label className="text-[11px] font-medium text-gray-500 block mb-1">使用コート（カンマ区切り）</label>
-                        <input type="text" value={wizardEditCourtNames} onChange={e => setWizardEditCourtNames(e.target.value)}
-                          placeholder="5,6,7,8,9,10,11,12,13,14,15,16"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
-                        <p className="text-[10px] text-gray-400 mt-1">
-                          ドロー表の開始時刻から検出（{wizardParsedExcel?.suggestedCourtCount || '—'}面）。時間割生成でもこのコートを使います。
+                      <div className="space-y-3">
+                        <CourtSelector value={wizardEditCourtNames} onChange={setWizardEditCourtNames} />
+                        <div>
+                          <label className="text-[11px] font-medium text-gray-500 block mb-1">開始時刻</label>
+                          <input type="time" value={wizardEditStartTime} onChange={e => setWizardEditStartTime(e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                        </div>
+                        <p className="text-[10px] text-gray-400">
+                          ドロー表から検出（{wizardParsedExcel?.suggestedCourtCount || '—'}面）。この使用コート・開始時刻をもとに時間割を生成します。
                         </p>
                       </div>
                     )}
