@@ -21,6 +21,48 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 2.3',
+    date: '2026-07-26',
+    highlights: 'コール改善・スコア入力をドロー画面へ統合・個人戦の観戦公開・一括取込のコート/開始時刻指定',
+    timeGroups: [
+      {
+        time: '—',
+        summary: '音声コールの改善',
+        changes: [
+          { type: 'feat', text: 'コール設定をポップアップ化し、コート・開始時刻・読み上げ内容を事前に確認/修正してからコール' },
+          { type: 'feat', text: '名前は苗字のみでコール。読み上げ内容を「漢字（ふりがな）」表示し、実際はふりがなで読み上げ' },
+          { type: 'feat', text: '同姓選手の共通読みから苗字のふりがなを自動推定' },
+          { type: 'feat', text: '開始時刻を任意化（標準は指定なし）、上部に番号・フルネーム・所属を表示' },
+          { type: 'feat', text: 'スコアシート・コート側のコールもポップアップに統一' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'スコア入力・ドロー画面',
+        changes: [
+          { type: 'feat', text: '「スコア」シートを廃止し、「ドロー」画面の試合をタップしてスコア入力できるように' },
+          { type: 'fix', text: '種目別進行の完了率から不戦勝(BYE)を除外し、未消化なのに進行済みに見える不具合を修正' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '個人戦の観戦用ページ',
+        changes: [
+          { type: 'feat', text: '個人戦の観戦用ページ（ドロー/LIVEの2タブ・読み取り専用）を追加し、団体戦と同じ同期方式でどの端末からでも閲覧可能に' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '一括取り込み・その他',
+        changes: [
+          { type: 'feat', text: '一括取込の使用コートをボタン選択に変更（標準1〜16 / 5〜16 / その他）' },
+          { type: 'feat', text: '一括取込でコートの開始時刻を指定し、それをもとに時間割を生成' },
+          { type: 'fix', text: 'アプリを開いたままでも新バージョンを自動で取り込むよう更新確認を強化' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 2.2',
     date: '2026-04-13',
     highlights: 'マルチデバイス同期・ハンバーガーメニュー・UI全面リニューアル・結果画像改善',
@@ -463,7 +505,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 2.2</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 2.3</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">

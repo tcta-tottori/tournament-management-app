@@ -12,21 +12,36 @@ loadSeedDataIfNeeded();
 
 // PWA Service Worker 更新検知 — 新バージョン検出時に自動リロード
 if ('serviceWorker' in navigator) {
+  // 既にSWが制御していた場合のみ、SW切替時にリロードする（初回インストール時の不要なリロードを避ける）
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading || !hadController) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   navigator.serviceWorker.ready.then((registration) => {
+    const checkForUpdate = () => registration.update().catch(() => { /* オフライン等は無視 */ });
+
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
       if (!newWorker) return;
       newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'activated') {
-          // 新バージョンがアクティブ化されたらリロード
+        if (newWorker.state === 'activated' && navigator.serviceWorker.controller && hadController) {
           window.location.reload();
         }
       });
     });
-  });
-  // 起動時に即座にアップデートを確認
-  navigator.serviceWorker.getRegistration().then((reg) => {
-    reg?.update();
+
+    // 起動時に確認
+    checkForUpdate();
+    // アプリを開いたまま放置していても新デプロイを拾えるよう、定期的に確認（60秒毎）
+    setInterval(checkForUpdate, 60 * 1000);
+    // バックグラウンドから復帰した時にも確認（PWAの再開時に確実に最新化）
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkForUpdate();
+    });
   });
 }
 
