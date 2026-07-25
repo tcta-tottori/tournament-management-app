@@ -524,8 +524,10 @@ function LiveDashboardInner() {
   const eventProgress = useMemo(() => {
     return events.map(e => {
       const eventMatches = allMatches.filter(m => m.eventId === e.eventId);
-      const finished = eventMatches.filter(m => m.status === 'finished' || m.status === 'walkover').length;
-      const total = eventMatches.length;
+      // 不戦勝(BYE)は実際に行う試合ではないので総数・完了数から除外する（全体statsと同じ基準）。
+      // これを含めると、実試合が1つも終わっていないのに完了率が上がって「既に進行済み」に見えてしまう。
+      const finished = eventMatches.filter(m => m.status === 'finished').length;
+      const total = eventMatches.filter(m => m.status !== 'walkover').length;
       const playing = eventMatches.filter(m => m.status === 'playing').length;
       const draw = draws.find(d => d.eventId === e.eventId);
       const totalRounds = draw ? Math.log2(draw.drawSize) : 1;
