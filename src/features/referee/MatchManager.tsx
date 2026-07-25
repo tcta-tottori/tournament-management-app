@@ -7,7 +7,7 @@ import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDo
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
-import { buildCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, familyName } from '../broadcast/callTextBuilder';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
@@ -455,8 +455,10 @@ export default function MatchManager() {
   };
   const [callTargetMatchId, setCallTargetMatchId] = useState<string | null>(null);
   const [callCourtNumber, setCallCourtNumber] = useState('');
-  // コール設定ポップアップ用の試合開始時刻（HH:MM）。事前に指定が無ければコール不可。
+  // コール設定ポップアップ用の試合開始時刻（HH:MM）。標準は「指定なし」で、未指定でもコール可能。
   const [callStartTime, setCallStartTime] = useState('');
+  // コール設定ポップアップ用の読み上げテキスト（ひらがな）。事前に表示・修正してからコールできる。
+  const [callText, setCallText] = useState('');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
@@ -578,11 +580,11 @@ export default function MatchManager() {
 
   // コール実行
   // startTimeOverride を指定した場合はその開始時刻でコールする（ポップアップからの指定）。
-  const handleVoiceCall = useCallback((m: Match, courtNum: string, startTimeOverride?: string) => {
+  // 開始時刻は任意（標準は「指定なし」）で、未指定でもコール可能。
+  // textOverride を指定した場合は、その修正済みテキストでコールする（ポップアップで編集した内容）。
+  const handleVoiceCall = useCallback((m: Match, courtNum: string, startTimeOverride?: string, textOverride?: string) => {
     if (!courtNum) return;
     const startTime = startTimeOverride ?? m.scheduledTime ?? '';
-    // 試合開始時刻が未指定の場合はコールしない
-    if (!startTime) return;
     // グローバル表示でも正しくイベント・ラウンド数を解決
     const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
     const evDraw = allDraws.get(m.eventId);
@@ -602,7 +604,10 @@ export default function MatchManager() {
       }
     }
 
-    const text = buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
+    // 修正済みテキストがあればそれを優先。無ければ通常どおり生成。
+    const text = (textOverride && textOverride.trim())
+      ? textOverride.trim()
+      : buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
     setSpeakingMatchId(m.matchId);
 
     speak(text, voiceSettings, () => {
@@ -630,7 +635,9 @@ export default function MatchManager() {
   const openCallModal = useCallback((m: Match) => {
     setCallTargetMatchId(m.matchId);
     setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
+    // 開始時刻の標準は「指定なし」。既に指定済みならその値を引き継ぐ。
     setCallStartTime(m.scheduledTime || '');
+    setCallText('');
   }, [courtIdToName]);
 
   // コール設定ポップアップを閉じる
@@ -638,7 +645,25 @@ export default function MatchManager() {
     setCallTargetMatchId(null);
     setCallCourtNumber('');
     setCallStartTime('');
+    setCallText('');
   }, []);
+
+  // コール設定ポップアップの読み上げテキスト（ひらがな）を、選択中のコート・開始時刻から生成する。
+  // コート/開始時刻を変更すると再生成され、その内容をテキスト欄で修正してからコールできる。
+  useEffect(() => {
+    if (!callTargetMatchId) return;
+    const cm = allMatchesFlat.find(mm => mm.matchId === callTargetMatchId);
+    if (!cm || !callCourtNumber) { setCallText(''); return; }
+    const evt = events.find(e => e.eventId === cm.eventId) || currentEvent;
+    const evDraw = allDraws.get(cm.eventId);
+    const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+    const matchCall = buildMatchCall(cm, callCourtNumber, evt, evTotalRounds);
+    if (!matchCall) { setCallText(''); return; }
+    setCallText(buildCallText(matchCall, callCourtNumber, callStartTime, affiliationFuriganaMap));
+    // buildMatchCall / affiliationFuriganaMap は依存に含めない（入力途中の再生成で編集内容を消さないため、
+    // コート・開始時刻の変更時のみ再生成する）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callTargetMatchId, callCourtNumber, callStartTime]);
 
   // (生成機能は削除済み - ドロー画面から試合生成を行う)
 
@@ -2353,7 +2378,11 @@ ${printableMatches.map(m => {
         if (!cm) return null;
         const evt = events.find(e => e.eventId === cm.eventId);
         const availCourts = courts.filter(c => c.isAvailable);
-        const canCall = !!callCourtNumber && !!callStartTime;
+        // 開始時刻は任意。コートと読み上げテキストがあればコール可能。
+        const canCall = !!callCourtNumber && !!callText.trim();
+        // 表示用に苗字のみへ変換（ダブルスの「A / B」はそれぞれ苗字に）
+        const surnameOnly = (name: string) =>
+          name.split('/').map(p => familyName(p.trim())).filter(Boolean).join(' / ');
         return createPortal(
           <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 overflow-y-auto">
             <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeCallModal} />
@@ -2374,11 +2403,11 @@ ${printableMatches.map(m => {
 
               {/* 本体 */}
               <div className="px-5 py-4 space-y-4">
-                {/* 対戦カード */}
+                {/* 対戦カード（名前は苗字のみ表示） */}
                 <div className="text-center py-1">
-                  <div className="text-sm font-bold text-gray-800">{cm.player1Name || '(未定)'}</div>
+                  <div className="text-sm font-bold text-gray-800">{cm.player1Name ? surnameOnly(cm.player1Name) : '(未定)'}</div>
                   <div className="text-[11px] text-gray-400 my-0.5">vs</div>
-                  <div className="text-sm font-bold text-gray-800">{cm.player2Name || '(未定)'}</div>
+                  <div className="text-sm font-bold text-gray-800">{cm.player2Name ? surnameOnly(cm.player2Name) : '(未定)'}</div>
                 </div>
 
                 {/* コート指定（指定済みなら初期選択・修正可） */}
@@ -2396,14 +2425,35 @@ ${printableMatches.map(m => {
                   </select>
                 </div>
 
-                {/* 開始時刻（事前に指定しなければコール不可） */}
+                {/* 開始時刻（標準は「指定なし」。任意で指定できる） */}
                 <div>
                   <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
                     <Clock className="w-3 h-3" />開始時刻
+                    <span className="text-gray-400 font-medium">（任意）</span>
                   </label>
-                  <input type="time" value={callStartTime} onChange={e => setCallStartTime(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
-                  {!callStartTime && <p className="text-[10px] text-amber-600 mt-1">開始時刻を指定するとコールできます。</p>}
+                  <div className="flex items-center gap-2">
+                    <input type="time" value={callStartTime} onChange={e => setCallStartTime(e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                    {callStartTime && (
+                      <button type="button" onClick={() => setCallStartTime('')}
+                        className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all">
+                        指定なし
+                      </button>
+                    )}
+                  </div>
+                  {!callStartTime && <p className="text-[10px] text-gray-400 mt-1">指定なし（開始時刻を読み上げません）。</p>}
+                </div>
+
+                {/* コール読み上げ内容（ひらがな）: 事前に表示・修正してからコールできる */}
+                <div>
+                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
+                    <Volume2 className="w-3 h-3" />コール内容（修正可）
+                  </label>
+                  <textarea value={callText} onChange={e => setCallText(e.target.value)}
+                    rows={5}
+                    placeholder={callCourtNumber ? '' : 'コートを選択すると読み上げ内容が表示されます。'}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm leading-relaxed bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all resize-y" />
+                  <p className="text-[10px] text-gray-400 mt-1">この内容（ひらがな）でコールします。読みが違う場合は修正してください。</p>
                 </div>
               </div>
 
@@ -2414,7 +2464,7 @@ ${printableMatches.map(m => {
                   キャンセル
                 </button>
                 <button
-                  onClick={() => { if (canCall) { handleVoiceCall(cm, callCourtNumber, callStartTime); closeCallModal(); } }}
+                  onClick={() => { if (canCall) { handleVoiceCall(cm, callCourtNumber, callStartTime, callText); closeCallModal(); } }}
                   disabled={!canCall}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all">
                   <Volume2 className="w-4 h-4" />コール
