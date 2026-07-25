@@ -5,6 +5,7 @@ import { useAppStore } from '../../stores/appStore';
 import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedEntryView from '../mixed/MixedEntryView';
 import { useTeamStore } from '../team/teamStore';
@@ -426,6 +427,35 @@ function NormalEntryRegistration() {
   };
 
   // 全種目の対戦順を時間割ベースで再計算
+  // === 確定後の実際の対戦に合わせて自動生成時間割を再編成する ===
+  // エントリーに欠場（不足）が出て確定された場合、不戦勝（BYE）を除いた
+  // 実際の試合だけで時間割を作り直す。手動でExcel取込した固定時間割は変更しない。
+  const maybeRegenerateSchedule = useCallback(async () => {
+    const { scheduleFileName, importedSchedule, currentTournamentId: tid } = useAppStore.getState();
+    if (!tid) return;
+    // 自動生成した時間割のみ再編成対象（取込済みの固定時間割は保持）
+    if (importedSchedule.length === 0) return;
+    if (scheduleFileName !== AUTO_GENERATED_SCHEDULE_LABEL) return;
+
+    // 既存の使用コート・開始時刻を引き継いで再生成する
+    const tournament = await db.tournaments.where('tournamentId').equals(tid).first();
+    const courts = await db.courts.where('tournamentId').equals(tid).toArray();
+    const courtNames = courts
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map(c => c.name);
+    const startTime = tournament?.drawStartTime || '09:00';
+
+    const result = await generateScheduleFromDraws(tid, {
+      courtNames: courtNames.length > 0 ? courtNames : undefined,
+      startTime,
+    });
+    if (result.items.length > 0) {
+      useAppStore.getState().setImportedSchedule(result.items);
+      useAppStore.getState().setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+    }
+  }, []);
+
   const recalculateGlobalMatchOrder = useCallback(async () => {
     const { importedSchedule, currentTournamentId: tid } = useAppStore.getState();
     if (importedSchedule.length === 0 || !tid) return;
@@ -776,8 +806,11 @@ function NormalEntryRegistration() {
       ]);
     }
 
-    // === 時間割に基づくグローバル対戦順再計算 ===
+    // === 確定後の実際の対戦に合わせて時間割を再編成し、対戦順を再計算 ===
     if (!skipReorder) {
+      // 欠場（不足）を反映した実際の試合だけで自動生成時間割を作り直す
+      await maybeRegenerateSchedule();
+      // 再編成した時間割どおりに対戦順（matchOrder）・コート・時刻を並び替える
       await recalculateGlobalMatchOrder();
     }
 
@@ -796,7 +829,7 @@ function NormalEntryRegistration() {
         setProcModalResult({ success: false, message: `確定処理に失敗: ${(err as Error).message}` });
       }
     }
-  }, [events, isLeagueEvent, recalculateGlobalMatchOrder]);
+  }, [events, isLeagueEvent, maybeRegenerateSchedule, recalculateGlobalMatchOrder]);
 
   const handleConfirmAll = useCallback(async () => {
     const currentDraws = eventIds.length > 0
@@ -823,9 +856,10 @@ function NormalEntryRegistration() {
         await handleConfirmEvent(targets[i].eventId, true, true);
         setProcModalSteps(prev => prev.map((s, j) => j === i ? { ...s, status: 'done', label: targets[i].name } : s));
       }
-      // 時間割紐付け
+      // 時間割紐付け（欠場を反映して再編成 → 対戦順を並び替え）
       setProcModalSteps(prev => prev.map((s, j) => j === targets.length ? { ...s, status: 'loading', label: '時間割と紐付け中...' } : s));
       setProcModalProgress(Math.round((targets.length / (targets.length + 1)) * 100));
+      await maybeRegenerateSchedule();
       await recalculateGlobalMatchOrder();
       setProcModalSteps(prev => prev.map((s, j) => j === targets.length ? { ...s, status: 'done', label: '時間割と紐付け完了' } : s));
       setProcModalProgress(100);
@@ -833,7 +867,7 @@ function NormalEntryRegistration() {
     } catch (err) {
       setProcModalResult({ success: false, message: `確定処理に失敗: ${(err as Error).message}` });
     }
-  }, [events, eventIds, handleConfirmEvent, recalculateGlobalMatchOrder]);
+  }, [events, eventIds, handleConfirmEvent, maybeRegenerateSchedule, recalculateGlobalMatchOrder]);
 
   // === 確定リセット（対戦表削除）===
   const handleRevertConfirm = useCallback(async (eventId: string) => {

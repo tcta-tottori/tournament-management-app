@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { assignVenueCourtNames } from '../schedule/scheduleEngine';
+import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
@@ -506,9 +507,11 @@ interface DataImportProps {
   externalScheduleExcel?: { arrayBuffer: ArrayBuffer; fileName: string } | null;
   /** ウィザードで確認済みの自動インポート情報（設定されている場合はモーダル表示せず直接インポート） */
   wizardAutoImport?: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string } | null;
+  /** ウィザード自動インポート完了時（DBに大会・ドローが書き込まれた後）に呼ばれる。tournamentIdを渡す。 */
+  onAutoImportComplete?: (tournamentId: string) => void;
 }
 
-export default function DataImport({ externalTournamentExcel, externalScheduleExcel, wizardAutoImport }: DataImportProps) {
+export default function DataImport({ externalTournamentExcel, externalScheduleExcel, wizardAutoImport, onAutoImportComplete }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const persistedImportedSchedule = useAppStore(state => state.importedSchedule);
@@ -567,6 +570,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [scheduleItems, setScheduleItems] = useState<ImportedScheduleItem[]>([]);
   const [scheduleFileName, setScheduleFileName] = useState('');
   const [scheduleError, setScheduleError] = useState('');
+  // 時間割自動生成中フラグ
+  const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
 
   // マウント時：永続化された時間割データを復元
   const initializedRef = useRef(false);
@@ -685,6 +690,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   const [showGDriveModal, setShowGDriveModal] = useState(false);
   // ウィザードからの自動インポートフラグ
   const [autoImportPending, setAutoImportPending] = useState(false);
+  // 実行中のインポートがウィザード自動インポート経由かどうか（完了通知の判定用）
+  const wizardImportRef = useRef(false);
 
   // GDriveから大会Excelが渡されたら処理してモーダル表示（またはウィザード経由で自動インポート）
   useEffect(() => {
@@ -854,6 +861,43 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     reader.readAsArrayBuffer(file);
   }, []);
 
+
+  // --- ドローから時間割を自動生成（読込済みのドローデータを使用） ---
+  const handleGenerateSchedule = useCallback(async () => {
+    const tid = useAppStore.getState().currentTournamentId;
+    if (!tid) {
+      setScheduleError('大会が選択されていません。先に大会データを読み込んでください。');
+      return;
+    }
+    setScheduleError('');
+    setIsGeneratingSchedule(true);
+    try {
+      const courtNames = editCourtNames
+        .split(/[,、\s]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      // ドロー表から検出した開始時刻を既定値に使用
+      const tournament = await db.tournaments.where('tournamentId').equals(tid).first();
+      const startTime = tournament?.drawStartTime || '09:00';
+      const result = await generateScheduleFromDraws(tid, {
+        courtNames: courtNames.length > 0 ? courtNames : undefined,
+        startTime,
+      });
+      if (result.items.length === 0) {
+        setScheduleError('自動生成できる試合がありません。ドロー（対戦表）を先に読み込んでください。');
+        return;
+      }
+      setScheduleItems(result.items);
+      setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      useAppStore.getState().setImportedSchedule(result.items);
+      useAppStore.getState().setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      setScheduleOpen(true);
+    } catch (err) {
+      setScheduleError(`時間割の自動生成に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setIsGeneratingSchedule(false);
+    }
+  }, [editCourtNames]);
 
   // --- File dispatcher: detect type by extension ---
   const handleFile = useCallback((file: File) => {
@@ -1401,9 +1445,17 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         message: `Excelインポート完了: ${playersToSave.length}名の選手、${parsedExcel.events.length}種目、${totalEntryCount}エントリー、${totalDrawCount}ドローを取り込みました。`,
       });
       setParsedExcel(null);
+
+      // ウィザード自動インポート経由の場合、DBへの書き込み完了を親に通知する
+      // （ウィザード側で時間割の自動生成に使用する）
+      if (wizardImportRef.current) {
+        wizardImportRef.current = false;
+        onAutoImportComplete?.(tournamentId);
+      }
     } catch (err) {
       console.error('Excelインポートエラー:', err);
       setImportResult({ success: false, message: `インポート失敗: ${(err as Error).message}` });
+      wizardImportRef.current = false;
     } finally {
       setIsImporting(false);
     }
@@ -1413,6 +1465,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
   useEffect(() => {
     if (autoImportPending && parsedExcel && !isImporting) {
       setAutoImportPending(false);
+      wizardImportRef.current = true;
       handleExcelImport();
     }
   }, [autoImportPending, parsedExcel, isImporting]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2319,6 +2372,27 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
         </div>
         );
       })()}
+      {/* ── 時間割 自動生成（ドロー読込済み・時間割未読込時に表示） ── */}
+      {!isMixedImported && currentTournamentId && scheduleItems.length === 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-sm shrink-0">
+            <Dices className="w-4.5 h-4.5 text-emerald-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-gray-800">ドローから時間割を自動生成</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">読込済みのドロー・開始時刻・使用コートで時間割を作成します</p>
+          </div>
+          <button
+            onClick={handleGenerateSchedule}
+            disabled={isGeneratingSchedule}
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {isGeneratingSchedule ? '生成中...' : '自動生成'}
+          </button>
+        </div>
+      )}
+
       {/* ── 時間割読込セクション（ミックス/団体戦モードでは非表示） ── */}
       {!isMixedImported && scheduleItems.length > 0 && (() => {
         // 色分けロジック: 男子=青系, 女子=赤系, 種目ごとに色味を変え, ラウンドで濃淡
@@ -2434,16 +2508,28 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                     </p>
                   </div>
                   {renderScheduleGrid('max-h-64')}
-                  <button
-                    onClick={() => {
-                      setScheduleItems([]);
-                      setScheduleFileName('');
-                      useAppStore.getState().setImportedSchedule([]);
-                    }}
-                    className="text-xs text-gray-500 hover:text-red-500 transition-colors"
-                  >
-                    時間割をクリア
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {currentTournamentId && (
+                      <button
+                        onClick={handleGenerateSchedule}
+                        disabled={isGeneratingSchedule}
+                        className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50 transition-colors"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        {isGeneratingSchedule ? '生成中...' : 'ドローから再生成'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setScheduleItems([]);
+                        setScheduleFileName('');
+                        useAppStore.getState().setImportedSchedule([]);
+                      }}
+                      className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      時間割をクリア
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
