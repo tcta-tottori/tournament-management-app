@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText } from '../broadcast/callTextBuilder';
+import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -107,6 +108,11 @@ export default function ScoreInputDialog({
   const [elapsedTime, setElapsedTime] = useState('');
   /** W.O（ウォークオーバー）モード: null=通常, 1=P1のW.O, 2=P2のW.O */
   const [retPlayer, setRetPlayer] = useState<1 | 2 | null>(null);
+  // コール設定ポップアップ用の状態（コート・開始時刻・読み上げ内容を事前に確認・修正）
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [callCourtNumber, setCallCourtNumber] = useState('');
+  const [callStartTime, setCallStartTime] = useState('');
+  const [callText, setCallText] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -461,10 +467,26 @@ export default function ScoreInputDialog({
   };
 
   // --- ブロードキャストコール ---
-  const handleCall = () => {
-    if (!match) return;
-    const courtName = courts.find(c => c.courtId === match.courtId)?.name ?? '';
-    const courtNumber = match.courtId ? courtName.replace(/コート.*$/, '') || match.courtId : '';
+  // コート名から番号部分を取り出す（例: "16番コート" → "16"、"16" → "16"）
+  const courtNumberOf = useCallback((name: string) => name.replace(/コート.*$/, '') || name, []);
+
+  // コート選択肢と、番号→courtId の対応表
+  const callCourtOptions = useMemo(
+    () => courts.map(c => ({ value: courtNumberOf(c.name), label: `${courtNumberOf(c.name)}番コート` })),
+    [courts, courtNumberOf]
+  );
+  const courtNumberToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of courts) map.set(courtNumberOf(c.name), c.courtId);
+    return map;
+  }, [courts, courtNumberOf]);
+
+  // W.O/リタイアモードでは、コート・開始時刻はコール文に含めない
+  const isWoRet = !!retPlayer;
+
+  // 現在の選択（コート・開始時刻）から読み上げ内容（ひらがな）を生成する
+  const generateCallText = useCallback((courtNumber: string, startTime: string): string => {
+    if (!match) return '';
     const numA = parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0;
     const numB = parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0;
     const callData: MatchCall = {
@@ -472,25 +494,58 @@ export default function ScoreInputDialog({
       numberA: numA, nameA: match.player1Name, affA: match.player1Affiliation,
       numberB: numB, nameB: match.player2Name, affB: match.player2Affiliation,
       type: 'singles', status: 'pending', courtNumber,
-      startTime: match.scheduledTime ?? '',
+      startTime: startTime,
     };
-
-    // W.O/Retの場合は専用コール
+    // W.O/Retの場合は専用コール文
     if (retPlayer) {
       const retNum = retPlayer === 1 ? numA : numB;
       const retName = retPlayer === 1 ? match.player1Name : match.player2Name;
       const winNum = retPlayer === 1 ? numB : numA;
       const winName = retPlayer === 1 ? match.player2Name : match.player1Name;
-      if (match.status === 'playing') {
-        // 試合中 → リタイアコール
-        speak(buildRetirementCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
-      } else {
-        // 試合前 → ウォークオーバーコール
-        speak(buildWalkoverCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap), DEFAULT_VOICE);
-      }
-    } else {
-      speak(buildCallText(callData, courtNumber, match.scheduledTime ?? '', affiliationFuriganaMap), DEFAULT_VOICE);
+      return match.status === 'playing'
+        ? buildRetirementCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap)
+        : buildWalkoverCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap);
     }
+    return buildCallText(callData, courtNumber, startTime, affiliationFuriganaMap);
+  }, [match, retPlayer, getRoundName, affiliationFuriganaMap]);
+
+  // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）
+  const handleCall = () => {
+    if (!match) return;
+    const courtName = courts.find(c => c.courtId === match.courtId)?.name ?? '';
+    const initCourt = match.courtId ? courtNumberOf(courtName) : '';
+    const initStart = match.scheduledTime ?? '';
+    setCallCourtNumber(initCourt);
+    setCallStartTime(initStart);
+    setCallText(generateCallText(initCourt, initStart));
+    setCallModalOpen(true);
+  };
+
+  // ポップアップのコート・開始時刻を変更したら、読み上げ内容を再生成する
+  // （W.O/リタイアはコート・時刻に依存しないため再生成しない）
+  useEffect(() => {
+    if (!callModalOpen || isWoRet) return;
+    setCallText(generateCallText(callCourtNumber, callStartTime));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callCourtNumber, callStartTime, callModalOpen]);
+
+  // 修正した内容でコールを実行する
+  const doCall = async () => {
+    if (!match || !callText.trim()) return;
+    // 変更したコート・開始時刻を試合へ反映（W.O/リタイアを除く）
+    if (!isWoRet) {
+      const resolvedCourtId = courtNumberToId.get(callCourtNumber) || match.courtId || null;
+      if (resolvedCourtId !== match.courtId || callStartTime !== (match.scheduledTime || '')) {
+        await db.matches.update(match.dbId, {
+          courtId: resolvedCourtId,
+          scheduledTime: callStartTime || null,
+          updatedAt: Date.now(),
+        }).catch(() => { /* 反映失敗は無視（コールは続行） */ });
+        onMatchUpdate();
+      }
+    }
+    speak(callText.trim(), DEFAULT_VOICE);
+    setCallModalOpen(false);
   };
 
   if (!match) return null;
@@ -879,6 +934,26 @@ export default function ScoreInputDialog({
           </div>
         </div>
       </div>
+
+      {/* コール設定ポップアップ（コート・開始時刻・読み上げ内容を事前に確認・修正してからコール） */}
+      <CallSettingsModal
+        open={callModalOpen}
+        eventName={match.eventName}
+        player1Name={match.player1Name || ''}
+        player2Name={match.player2Name || ''}
+        showCourtAndTime={!isWoRet}
+        courtOptions={callCourtOptions}
+        courtNumber={callCourtNumber}
+        onCourtChange={setCallCourtNumber}
+        courtAssigned={!!match.courtId}
+        startTime={callStartTime}
+        onStartTimeChange={setCallStartTime}
+        callText={callText}
+        onCallTextChange={setCallText}
+        canCall={!!callText.trim() && (isWoRet || !!callCourtNumber)}
+        onCall={doCall}
+        onClose={() => setCallModalOpen(false)}
+      />
     </div>,
     document.body
   );

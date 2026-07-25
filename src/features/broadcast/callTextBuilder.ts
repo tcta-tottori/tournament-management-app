@@ -28,7 +28,7 @@ function addGradePause(eventName: string): string {
  * フルネームから苗字のみを取得する
  * スペース（全角・半角）区切りで最初の部分を返す
  */
-function familyName(name: string): string {
+export function familyName(name: string): string {
   if (!name) return '';
   return name.trim().split(/[\s　]+/)[0];
 }

@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2, Upload, Clock, MapPin } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
 import { buildCallText } from '../broadcast/callTextBuilder';
+import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
@@ -455,8 +455,10 @@ export default function MatchManager() {
   };
   const [callTargetMatchId, setCallTargetMatchId] = useState<string | null>(null);
   const [callCourtNumber, setCallCourtNumber] = useState('');
-  // コール設定ポップアップ用の試合開始時刻（HH:MM）。事前に指定が無ければコール不可。
+  // コール設定ポップアップ用の試合開始時刻（HH:MM）。標準は「指定なし」で、未指定でもコール可能。
   const [callStartTime, setCallStartTime] = useState('');
+  // コール設定ポップアップ用の読み上げテキスト（ひらがな）。事前に表示・修正してからコールできる。
+  const [callText, setCallText] = useState('');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
@@ -578,11 +580,11 @@ export default function MatchManager() {
 
   // コール実行
   // startTimeOverride を指定した場合はその開始時刻でコールする（ポップアップからの指定）。
-  const handleVoiceCall = useCallback((m: Match, courtNum: string, startTimeOverride?: string) => {
+  // 開始時刻は任意（標準は「指定なし」）で、未指定でもコール可能。
+  // textOverride を指定した場合は、その修正済みテキストでコールする（ポップアップで編集した内容）。
+  const handleVoiceCall = useCallback((m: Match, courtNum: string, startTimeOverride?: string, textOverride?: string) => {
     if (!courtNum) return;
     const startTime = startTimeOverride ?? m.scheduledTime ?? '';
-    // 試合開始時刻が未指定の場合はコールしない
-    if (!startTime) return;
     // グローバル表示でも正しくイベント・ラウンド数を解決
     const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
     const evDraw = allDraws.get(m.eventId);
@@ -602,7 +604,10 @@ export default function MatchManager() {
       }
     }
 
-    const text = buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
+    // 修正済みテキストがあればそれを優先。無ければ通常どおり生成。
+    const text = (textOverride && textOverride.trim())
+      ? textOverride.trim()
+      : buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
     setSpeakingMatchId(m.matchId);
 
     speak(text, voiceSettings, () => {
@@ -630,7 +635,9 @@ export default function MatchManager() {
   const openCallModal = useCallback((m: Match) => {
     setCallTargetMatchId(m.matchId);
     setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
+    // 開始時刻の標準は「指定なし」。既に指定済みならその値を引き継ぐ。
     setCallStartTime(m.scheduledTime || '');
+    setCallText('');
   }, [courtIdToName]);
 
   // コール設定ポップアップを閉じる
@@ -638,7 +645,25 @@ export default function MatchManager() {
     setCallTargetMatchId(null);
     setCallCourtNumber('');
     setCallStartTime('');
+    setCallText('');
   }, []);
+
+  // コール設定ポップアップの読み上げテキスト（ひらがな）を、選択中のコート・開始時刻から生成する。
+  // コート/開始時刻を変更すると再生成され、その内容をテキスト欄で修正してからコールできる。
+  useEffect(() => {
+    if (!callTargetMatchId) return;
+    const cm = allMatchesFlat.find(mm => mm.matchId === callTargetMatchId);
+    if (!cm || !callCourtNumber) { setCallText(''); return; }
+    const evt = events.find(e => e.eventId === cm.eventId) || currentEvent;
+    const evDraw = allDraws.get(cm.eventId);
+    const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+    const matchCall = buildMatchCall(cm, callCourtNumber, evt, evTotalRounds);
+    if (!matchCall) { setCallText(''); return; }
+    setCallText(buildCallText(matchCall, callCourtNumber, callStartTime, affiliationFuriganaMap));
+    // buildMatchCall / affiliationFuriganaMap は依存に含めない（入力途中の再生成で編集内容を消さないため、
+    // コート・開始時刻の変更時のみ再生成する）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callTargetMatchId, callCourtNumber, callStartTime]);
 
   // (生成機能は削除済み - ドロー画面から試合生成を行う)
 
@@ -2353,76 +2378,27 @@ ${printableMatches.map(m => {
         if (!cm) return null;
         const evt = events.find(e => e.eventId === cm.eventId);
         const availCourts = courts.filter(c => c.isAvailable);
-        const canCall = !!callCourtNumber && !!callStartTime;
-        return createPortal(
-          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 overflow-y-auto">
-            <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeCallModal} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm my-auto overflow-hidden animate-[confirmSlideUp_0.2s_ease-out]">
-              {/* ヘッダー */}
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                  <Volume2 className="w-5 h-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-white">コール設定</h3>
-                  <p className="text-[11px] text-white/70 truncate">{evt?.name || ''}</p>
-                </div>
-                <button onClick={closeCallModal} className="ml-auto shrink-0 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
-                  <X className="w-4 h-4 text-white" />
-                </button>
-              </div>
-
-              {/* 本体 */}
-              <div className="px-5 py-4 space-y-4">
-                {/* 対戦カード */}
-                <div className="text-center py-1">
-                  <div className="text-sm font-bold text-gray-800">{cm.player1Name || '(未定)'}</div>
-                  <div className="text-[11px] text-gray-400 my-0.5">vs</div>
-                  <div className="text-sm font-bold text-gray-800">{cm.player2Name || '(未定)'}</div>
-                </div>
-
-                {/* コート指定（指定済みなら初期選択・修正可） */}
-                <div>
-                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
-                    <MapPin className="w-3 h-3" />コート
-                    {cm.courtId && <span className="text-emerald-600 font-medium">（指定済み・修正可）</span>}
-                  </label>
-                  <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all">
-                    <option value="">選択してください</option>
-                    {availCourts.length > 0
-                      ? availCourts.map(c => <option key={c.courtId} value={c.name}>{c.name}番コート</option>)
-                      : Array.from({ length: 16 }, (_, i) => i + 1).map(n => <option key={n} value={String(n)}>{n}番コート</option>)}
-                  </select>
-                </div>
-
-                {/* 開始時刻（事前に指定しなければコール不可） */}
-                <div>
-                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
-                    <Clock className="w-3 h-3" />開始時刻
-                  </label>
-                  <input type="time" value={callStartTime} onChange={e => setCallStartTime(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
-                  {!callStartTime && <p className="text-[10px] text-amber-600 mt-1">開始時刻を指定するとコールできます。</p>}
-                </div>
-              </div>
-
-              {/* アクション */}
-              <div className="px-5 pb-4 flex items-center gap-2.5">
-                <button onClick={closeCallModal}
-                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-all">
-                  キャンセル
-                </button>
-                <button
-                  onClick={() => { if (canCall) { handleVoiceCall(cm, callCourtNumber, callStartTime); closeCallModal(); } }}
-                  disabled={!canCall}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all">
-                  <Volume2 className="w-4 h-4" />コール
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
+        const courtOptions = availCourts.map(c => ({ value: c.name, label: `${c.name}番コート` }));
+        // 開始時刻は任意。コートと読み上げテキストがあればコール可能。
+        const canCall = !!callCourtNumber && !!callText.trim();
+        return (
+          <CallSettingsModal
+            open
+            eventName={evt?.name || ''}
+            player1Name={cm.player1Name || ''}
+            player2Name={cm.player2Name || ''}
+            courtOptions={courtOptions}
+            courtNumber={callCourtNumber}
+            onCourtChange={setCallCourtNumber}
+            courtAssigned={!!cm.courtId}
+            startTime={callStartTime}
+            onStartTimeChange={setCallStartTime}
+            callText={callText}
+            onCallTextChange={setCallText}
+            canCall={canCall}
+            onCall={() => { handleVoiceCall(cm, callCourtNumber, callStartTime, callText); closeCallModal(); }}
+            onClose={closeCallModal}
+          />
         );
       })()}
     </div>

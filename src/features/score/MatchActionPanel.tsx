@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../../db/database';
 import { buildCallText } from '../broadcast/callTextBuilder';
+import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import {
@@ -82,6 +83,11 @@ export default function MatchActionPanel({
   // ---- local state ----
   const [scoreInput, setScoreInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  // コール設定ポップアップ用の状態（コート・開始時刻・読み上げ内容を事前に確認・修正）
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [callCourtNumber, setCallCourtNumber] = useState('');
+  const [callStartTime, setCallStartTime] = useState('');
+  const [callText, setCallText] = useState('');
 
   const { isSpeaking, speak, stop } = useGeminiTts();
 
@@ -241,34 +247,80 @@ export default function MatchActionPanel({
   // Broadcast call
   // ------------------------------------------------------------------
 
+  // コート名から番号部分を取り出す（例: "16番コート" → "16"、"16" → "16"）
+  const courtNumberOf = useCallback((name: string) => name.replace(/コート.*$/, '') || name, []);
+
+  // コート選択肢と、番号→courtId の対応表
+  const callCourtOptions = useMemo(
+    () => courts.map((c) => ({ value: courtNumberOf(c.name), label: `${courtNumberOf(c.name)}番コート` })),
+    [courts, courtNumberOf],
+  );
+  const courtNumberToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of courts) map.set(courtNumberOf(c.name), c.courtId);
+    return map;
+  }, [courts, courtNumberOf]);
+
+  // 現在の選択（コート・開始時刻）から読み上げ内容（ひらがな）を生成する
+  const generateCallText = useCallback(
+    (courtNumber: string, startTime: string): string => {
+      if (!match) return '';
+      const callData: MatchCall = {
+        id: match.dbId,
+        eventName: match.eventName,
+        round: getRoundName(match.round),
+        numberA: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0,
+        nameA: match.player1Name,
+        affA: match.player1Affiliation,
+        numberB: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0,
+        nameB: match.player2Name,
+        affB: match.player2Affiliation,
+        type: 'singles',
+        status: 'pending',
+        courtNumber,
+        startTime,
+      };
+      return buildCallText(callData, courtNumber, startTime);
+    },
+    [match, getRoundName],
+  );
+
+  // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）
   const handleCall = () => {
     if (!match) return;
+    const courtName = courts.find((c) => c.courtId === match.courtId)?.name ?? '';
+    const initCourt = match.courtId ? courtNumberOf(courtName) : '';
+    const initStart = match.scheduledTime ?? '';
+    setCallCourtNumber(initCourt);
+    setCallStartTime(initStart);
+    setCallText(generateCallText(initCourt, initStart));
+    setCallModalOpen(true);
+  };
 
-    const courtName =
-      courts.find((c) => c.courtId === match.courtId)?.name ?? '';
-    // Extract court number from name (e.g. "A-1コート" -> "A-1", or use courtId)
-    const courtNumber = match.courtId
-      ? courtName.replace(/コート.*$/, '') || match.courtId
-      : '';
+  // ポップアップのコート・開始時刻を変更したら、読み上げ内容を再生成する
+  useEffect(() => {
+    if (!callModalOpen) return;
+    setCallText(generateCallText(callCourtNumber, callStartTime));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callCourtNumber, callStartTime, callModalOpen]);
 
-    const callData: MatchCall = {
-      id: match.dbId,
-      eventName: match.eventName,
-      round: getRoundName(match.round),
-      numberA: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0,
-      nameA: match.player1Name,
-      affA: match.player1Affiliation,
-      numberB: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0,
-      nameB: match.player2Name,
-      affB: match.player2Affiliation,
-      type: 'singles',
-      status: 'pending',
-      courtNumber,
-      startTime: match.scheduledTime ?? '',
-    };
-
-    const text = buildCallText(callData, courtNumber, match.scheduledTime ?? '');
-    speak(text, DEFAULT_VOICE);
+  // 修正した内容でコールを実行する
+  const doCall = async () => {
+    if (!match || !callText.trim()) return;
+    // 変更したコート・開始時刻を試合へ反映
+    const resolvedCourtId = courtNumberToId.get(callCourtNumber) || match.courtId || null;
+    if (resolvedCourtId !== match.courtId || callStartTime !== (match.scheduledTime || '')) {
+      await db.matches
+        .update(match.dbId, {
+          courtId: resolvedCourtId,
+          scheduledTime: callStartTime || null,
+          updatedAt: Date.now(),
+        })
+        .catch(() => { /* 反映失敗は無視（コールは続行） */ });
+      onMatchUpdate();
+    }
+    speak(callText.trim(), DEFAULT_VOICE);
+    setCallModalOpen(false);
   };
 
   const handleStopCall = () => {
@@ -358,6 +410,7 @@ export default function MatchActionPanel({
   // ------------------------------------------------------------------
 
   return (
+    <>
     <div className="h-full flex flex-col bg-white rounded-xl shadow-lg border border-border-main overflow-hidden">
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-border-main bg-gray-50/60">
@@ -596,5 +649,25 @@ export default function MatchActionPanel({
         </div>
       </div>
     </div>
+
+    {/* コール設定ポップアップ（コート・開始時刻・読み上げ内容を事前に確認・修正してからコール） */}
+    <CallSettingsModal
+      open={callModalOpen}
+      eventName={match.eventName}
+      player1Name={match.player1Name || ''}
+      player2Name={match.player2Name || ''}
+      courtOptions={callCourtOptions}
+      courtNumber={callCourtNumber}
+      onCourtChange={setCallCourtNumber}
+      courtAssigned={!!match.courtId}
+      startTime={callStartTime}
+      onStartTimeChange={setCallStartTime}
+      callText={callText}
+      onCallTextChange={setCallText}
+      canCall={!!callText.trim() && !!callCourtNumber}
+      onCall={doCall}
+      onClose={() => setCallModalOpen(false)}
+    />
+    </>
   );
 }
