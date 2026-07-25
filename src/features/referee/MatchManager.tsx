@@ -6,7 +6,7 @@ import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDo
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
-import { buildCallText, familyReading, toSpeechText } from '../broadcast/callTextBuilder';
+import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
@@ -477,6 +477,37 @@ export default function MatchManager() {
     []
   ) || {};
 
+  // 苗字漢字 → 苗字の読み（ひらがな）の推定マップ。
+  // 選手のふりがな（フルネーム連結）はスペースが無く苗字を分割できないことが多いため、
+  // 同じ苗字の選手が複数いる場合、その読みの最長共通接頭辞を苗字の読みとして採用する。
+  // 例: 「田中」の選手が「たなかよしひろ」「たなかまさし」→ 共通「たなか」
+  const surnameReadingMap = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const p of players) {
+      const surname = familyName(p.name);
+      const reading = kataToHira((p.furigana || '').trim());
+      if (!surname || !reading) continue;
+      const arr = groups.get(surname);
+      if (arr) arr.push(reading); else groups.set(surname, [reading]);
+    }
+    const map: Record<string, string> = {};
+    for (const [surname, readings] of groups) {
+      if (readings.length < 2) continue; // 1人だけでは苗字の読みを特定できない
+      // 最長共通接頭辞
+      let lcp = readings[0];
+      for (const r of readings) {
+        let i = 0;
+        while (i < lcp.length && i < r.length && lcp[i] === r[i]) i++;
+        lcp = lcp.slice(0, i);
+        if (!lcp) break;
+      }
+      // 読みが完全一致（全員同姓同名読み）だと名前まで含むため、異なる読みが2種以上ある場合のみ採用
+      const distinct = new Set(readings);
+      if (lcp.length >= 1 && distinct.size >= 2) map[surname] = lcp;
+    }
+    return map;
+  }, [players]);
+
   // Match → MatchCall 変換
   const buildMatchCall = useCallback((m: Match, courtNum: string, overrideEvent?: Event, overrideTotalRounds?: number): MatchCall | null => {
     if (!m.player1Name || !m.player2Name) return null;
@@ -489,18 +520,34 @@ export default function MatchManager() {
       // 該当種目のdrawを使用（選択種目以外の試合にも対応）
       const draw = eventId ? allDraws.get(eventId) : drawData;
       if (!draw?.slots) return 0;
+      // まずは entryId で直接一致
       const slot = draw.slots.find((s: DrawSlot) => s.entryId === entryId);
-      return slot?.position ?? 0;
+      if (slot) return slot.position ?? 0;
+      // フォールバック: entryId が一致しない（再抽選等でIDがずれた）場合は playerId で照合
+      const entry = entries.find(e => e.entryId === entryId) || allEntries.find(e => e.entryId === entryId);
+      if (entry) {
+        for (const s of draw.slots as DrawSlot[]) {
+          if (!s.entryId) continue;
+          const se = entries.find(e => e.entryId === s.entryId) || allEntries.find(e => e.entryId === s.entryId);
+          if (se && se.playerId === entry.playerId) return s.position ?? 0;
+        }
+      }
+      return 0;
     };
 
-    // 名前は漢字（フルネーム）、所属も漢字で返す。苗字の読みは furigana から取得（表示は「漢字（かな）」）。
+    // 苗字の読み（ひらがな）を取得。ふりがなにスペースがあればそこから、
+    // 無ければ同姓の共通接頭辞マップから推定する（表示は「漢字（かな）」）。
+    const resolveSurnameReading = (kanjiName: string, furigana: string) =>
+      familyReading(furigana) || surnameReadingMap[familyName(kanjiName)] || '';
+
+    // 名前は漢字（フルネーム）、所属も漢字で返す。
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
-      if (!entryId) return { name: fallbackName, reading: '', aff: fallbackAff };
+      if (!entryId) return { name: fallbackName, reading: resolveSurnameReading(fallbackName, ''), aff: fallbackAff };
       const entry = entries.find(e => e.entryId === entryId) || allEntries.find(e => e.entryId === entryId);
-      if (!entry) return { name: fallbackName, reading: '', aff: fallbackAff };
+      if (!entry) return { name: fallbackName, reading: resolveSurnameReading(fallbackName, ''), aff: fallbackAff };
       const player = players.find(p => p.playerId === entry.playerId);
-      if (!player) return { name: fallbackName, reading: '', aff: fallbackAff };
-      return { name: player.name || fallbackName, reading: familyReading(player.furigana), aff: player.affiliation || fallbackAff };
+      if (!player) return { name: fallbackName, reading: resolveSurnameReading(fallbackName, ''), aff: fallbackAff };
+      return { name: player.name || fallbackName, reading: resolveSurnameReading(player.name || fallbackName, player.furigana), aff: player.affiliation || fallbackAff };
     };
 
     const isDoubles = useEvent?.type === 'Doubles';
@@ -526,14 +573,14 @@ export default function MatchManager() {
         const entry1 = entries.find(e => e.entryId === m.player1EntryId) || allEntries.find(e => e.entryId === m.player1EntryId);
         if (entry1?.partnerId) {
           const partner = players.find(p => p.playerId === entry1.partnerId);
-          if (partner) partnerA = { name: partner.name, reading: familyReading(partner.furigana), aff: partner.affiliation };
+          if (partner) partnerA = { name: partner.name, reading: resolveSurnameReading(partner.name, partner.furigana), aff: partner.affiliation };
         }
       }
       if (m.player2EntryId) {
         const entry2 = entries.find(e => e.entryId === m.player2EntryId) || allEntries.find(e => e.entryId === m.player2EntryId);
         if (entry2?.partnerId) {
           const partner = players.find(p => p.playerId === entry2.partnerId);
-          if (partner) partnerB = { name: partner.name, reading: familyReading(partner.furigana), aff: partner.affiliation };
+          if (partner) partnerB = { name: partner.name, reading: resolveSurnameReading(partner.name, partner.furigana), aff: partner.affiliation };
         }
       }
 
@@ -582,7 +629,7 @@ export default function MatchManager() {
         startTime: m.scheduledTime || '',
       };
     }
-  }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap]);
+  }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap, surnameReadingMap]);
 
   // コール実行
   // startTimeOverride を指定した場合はその開始時刻でコールする（ポップアップからの指定）。

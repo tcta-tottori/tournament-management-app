@@ -1,25 +1,51 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Trophy, Users, Radio, Info, Wifi, WifiOff } from 'lucide-react';
+import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/database';
+import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
 import { usePublicSync } from './usePublicSync';
 
 /**
  * 参加者・HP訪問者向け公開ビューのレイアウト
- * 運営用の左側ドロワーや編集機能を排し、
- * 予選リーグ / 決勝トーナメント / LIVE の3タブのみを提供する。
+ * 運営用の左側ドロワーや編集機能を排した読み取り専用ページ。
+ * - 団体戦/ミックス: 予選リーグ / 全トーナメント / LIVE
+ * - 個人戦: ドロー / LIVE
  */
 export default function PublicLayout() {
   const mixedInfo = useMixedStore(s => s.tournamentInfo);
   const teamInfo = useTeamStore(s => s.tournamentInfo);
-  const info = mixedInfo || teamInfo;
+  const groupInfo = mixedInfo || teamInfo;
+  const isGroup = !!groupInfo;
+
+  // 個人戦: 同期で受信した選択中大会の情報
+  const currentTournamentId = useAppStore(s => s.currentTournamentId);
+  const individualTournament = useLiveQuery(
+    () => (!isGroup && currentTournamentId
+      ? db.tournaments.where('tournamentId').equals(currentTournamentId).first()
+      : undefined),
+    [isGroup, currentTournamentId]
+  );
+
+  const info = isGroup
+    ? groupInfo
+    : individualTournament
+      ? { name: individualTournament.name, date: individualTournament.date, venue: individualTournament.venue }
+      : null;
+
   const sync = usePublicSync();
 
-  const tabs = [
-    { to: 'league', label: '予選リーグ', icon: Users },
-    { to: 'bracket', label: '全トーナメント', icon: Trophy },
-    { to: 'live', label: 'LIVE', icon: Radio },
-  ];
+  const tabs = isGroup
+    ? [
+        { to: 'league', label: '予選リーグ', icon: Users },
+        { to: 'bracket', label: '全トーナメント', icon: Trophy },
+        { to: 'live', label: 'LIVE', icon: Radio },
+      ]
+    : [
+        { to: 'draw', label: 'ドロー', icon: Network },
+        { to: 'live', label: 'LIVE', icon: Radio },
+      ];
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-t-lg transition-all border-b-2 ${

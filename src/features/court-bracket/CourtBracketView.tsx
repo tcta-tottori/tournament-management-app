@@ -33,6 +33,8 @@ interface CourtBracketViewProps {
   matchResults: MatchResult[];
   eventType?: 'Singles' | 'Doubles' | 'Team';
   totalRounds: number;
+  /** 試合ノードのクリックでスコア入力を開く（指定時のみクリック可能） */
+  onMatchSelect?: (round: number, position: number) => void;
 }
 
 const SLOT_HEIGHT = 36;
@@ -57,6 +59,7 @@ export default function CourtBracketView({
   matchResults,
   eventType,
   totalRounds,
+  onMatchSelect,
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
@@ -284,13 +287,21 @@ export default function CourtBracketView({
       const isFinished = matchResult && (matchResult.status === 'finished' || matchResult.status === 'walkover');
       const isPlaying = matchResult?.status === 'playing';
 
+      // このノードがクリックでスコア入力できるか（両選手が確定している場合のみ）
+      const clickable = !!(onMatchSelect && matchResult && matchResult.player1Name && matchResult.player2Name);
+      const clickProps = clickable
+        ? { onClick: () => onMatchSelect!(matchResult!.round, matchResult!.position), role: 'button' as const }
+        : {};
+      const clickCls = clickable ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : '';
+
       // 決勝ラウンド
       if (r === roundsCount) {
         const displayName = matchResult ? getWinnerName(matchResult) : '';
 
         matchElements.push(
           <div key={`f-${r}-${m}`}
-            className={`absolute flex items-center rounded transition-all ${
+            {...clickProps}
+            className={`absolute flex items-center rounded transition-all${clickCls} ${
               isFinished
                 ? 'border-2 border-amber-500 bg-amber-50'
                 : isPlaying
@@ -338,7 +349,8 @@ export default function CourtBracketView({
       // 通常ノード
       matchElements.push(
         <div key={`m-${r}-${m}`}
-          className={`absolute flex items-center rounded transition-all ${
+          {...clickProps}
+          className={`absolute flex items-center rounded transition-all${clickCls} ${
             isFinished
               ? 'border border-gray-400 bg-white'
               : isPlaying

@@ -28,7 +28,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-06', path: '/referee', label: '対戦順', icon: ClipboardList },
   { id: 'S-06b', path: '/schedule-sheet', label: 'タイムテーブル', icon: CalendarClock },
   { id: 'S-07', path: '/score', label: 'スコア', icon: Trophy },
-  { id: 'S-07b', path: '/court-bracket', label: 'ドロー状況', icon: Network },
+  { id: 'S-07b', path: '/court-bracket', label: 'ドロー', icon: Network },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
@@ -270,7 +270,9 @@ export default function AppLayout() {
         return t;
       });
     } else {
-      // 通常モード: ミックス/団体戦の種目がなければ抽選・ドロー表タブを非表示
+      // 通常モード（個人戦）: スコアは廃止し、ドロー画面で入力する
+      tabs = tabs.filter((t) => t.path !== '/score');
+      // ミックス/団体戦の種目がなければ抽選・ドロー表タブを非表示
       const hasDrawEvents = (events ?? []).some(
         (e) =>
           /ミックス|団体|mixed|team/i.test(e.name) ||
@@ -545,16 +547,21 @@ function PublicViewHeaderLink() {
   const roomCode = useSyncStore((s) => s.roomCode);
   const serverUrl = useSyncStore((s) => s.serverUrl);
   const syncEnabled = useSyncStore((s) => s.syncEnabled);
+  const isMixedImported = useMixedStore((s) => s.isImported);
+  const isTeamImported = useTeamStore((s) => s.isImported);
+
+  // 団体戦/ミックスは予選リーグ、個人戦はドローを既定タブにする
+  const viewPath = isMixedImported || isTeamImported ? '/view/league' : '/view/draw';
 
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  let href = `${base}/view/league`;
+  let href = `${base}${viewPath}`;
   if (syncEnabled && roomCode) {
     // 既定サーバー/固定公開ルームと同じ値ならクエリを省略し、固定URLにする
     const qs = new URLSearchParams();
     if (roomCode && roomCode !== PUBLIC_ROOM) qs.set('room', roomCode);
     if (serverUrl && serverUrl !== DEFAULT_SERVER_URL) qs.set('server', serverUrl);
     const q = qs.toString();
-    href = `${base}/view/league${q ? `?${q}` : ''}`;
+    href = `${base}${viewPath}${q ? `?${q}` : ''}`;
   }
 
   return (
