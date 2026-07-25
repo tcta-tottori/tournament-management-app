@@ -3,9 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
-import type { Event, RoundGameRule } from '../../db/database';
+import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
 import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
+import ScoreInputDialog from '../score/ScoreInputDialog';
+import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 
 function getGameRulesText(evt: Event | undefined): string {
   if (!evt) return '';
@@ -17,9 +19,65 @@ function getGameRulesText(evt: Event | undefined): string {
   return rules.map(r => `${r.roundLabel}: ${r.ruleText}`).join(' / ');
 }
 
-export default function CourtBracketPage() {
+function getRoundName(round: number, totalRounds: number): string {
+  if (round === totalRounds) return '決勝';
+  if (round === totalRounds - 1) return '準決勝';
+  if (round === totalRounds - 2) return '準々決勝';
+  return `${round}回戦`;
+}
+
+/** 回戦に応じたゲームルールを取得 */
+function getGameRuleForRound(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
+  if (!evt) return null;
+  const rules: RoundGameRule[] = evt.roundGameRules || [];
+  if (rules.length === 0) return null;
+  if (rules.length === 1) return rules[0];
+  const roundName = getRoundName(round, totalRounds);
+  for (const rule of rules) {
+    const label = rule.roundLabel;
+    if (label === '全回戦') continue;
+    const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+    if (rangeMatch) {
+      const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
+      if (round >= from && round <= to) return rule;
+      continue;
+    }
+    if (label.includes('以降')) {
+      const cleanLabel = label.replace('以降', '');
+      if (cleanLabel.includes('準々決勝') && round >= totalRounds - 2) return rule;
+      if (cleanLabel.includes('準決勝') && round >= totalRounds - 1) return rule;
+      if (cleanLabel.includes('決勝') && !cleanLabel.includes('準') && round >= totalRounds) return rule;
+      const roundNumMatch = cleanLabel.match(/(\d+)回戦/);
+      if (roundNumMatch && round >= parseInt(roundNumMatch[1])) return rule;
+      continue;
+    }
+    if (roundName === label || label.includes(roundName)) return rule;
+  }
+  return rules[0];
+}
+
+function getGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  if (rule) return rule.ruleText;
+  const g = evt?.gameRules?.games ?? 6;
+  return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
+}
+
+function getMatchFormat(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  return rule?.matchFormat || 'game';
+}
+
+interface CourtBracketPageProps {
+  /** スコア入力を有効にするか（公開ビューでは false で読み取り専用） */
+  enableScoreInput?: boolean;
+}
+
+export default function CourtBracketPage({ enableScoreInput = true }: CourtBracketPageProps) {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
+  // スコア入力対象の試合キー "round-position"
+  const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
 
   const events = useLiveQuery(
     () => currentTournamentId
@@ -136,6 +194,25 @@ export default function CourtBracketPage() {
     return realPlayers.length >= 2 && realPlayers.length <= 5 && drawData.drawSize <= 8;
   }, [drawData, slots]);
 
+  // スコア入力対象の試合（"round-position" キーから解決）
+  const selectedMatch: ScoreInputMatch | null = useMemo(() => {
+    if (!enableScoreInput || !selectedMatchKey) return null;
+    const [rs, ps] = selectedMatchKey.split('-');
+    const round = parseInt(rs), position = parseInt(ps);
+    if (isNaN(round) || isNaN(position)) return null;
+    const m = matches.find(mt => mt.round === round && mt.position === position);
+    if (!m || m.id == null) return null;
+    return {
+      matchId: m.matchId, dbId: m.id, round: m.round, position: m.position,
+      matchOrder: m.matchOrder, player1Name: m.player1Name, player2Name: m.player2Name,
+      player1Affiliation: m.player1Affiliation, player2Affiliation: m.player2Affiliation,
+      player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
+      score: m.score, winnerEntryId: m.winnerEntryId, courtId: m.courtId,
+      status: m.status, scheduledTime: m.scheduledTime,
+      eventName: selectedEvent?.name || '', updatedAt: m.updatedAt,
+    };
+  }, [enableScoreInput, selectedMatchKey, matches, selectedEvent]);
+
   if (!currentTournamentId) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -227,6 +304,7 @@ export default function CourtBracketPage() {
             matchResults={matchResults}
             eventType={selectedEvent?.type as 'Singles' | 'Doubles' | 'Team'}
             totalRounds={totalRounds}
+            onMatchSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
           />
         ) : isRoundRobin ? (
           <div className="p-6 text-center text-gray-500">
@@ -240,6 +318,20 @@ export default function CourtBracketPage() {
           </div>
         )}
       </div>
+
+      {/* スコア入力ダイアログ（ドロー画面から試合をタップして入力） */}
+      {selectedMatch && (
+        <ScoreInputDialog
+          match={selectedMatch}
+          courts={courts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
+          onClose={() => setSelectedMatchKey(null)}
+          onMatchUpdate={() => {}}
+          getRoundName={(round) => getRoundName(round, totalRounds)}
+          isLeague={false}
+          gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
+          matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
+        />
+      )}
     </div>
   );
 }

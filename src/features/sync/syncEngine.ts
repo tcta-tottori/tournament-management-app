@@ -8,6 +8,7 @@ import { db } from '../../db/database';
 import { useSyncStore, DEFAULT_SERVER_URL } from './syncStore';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
+import { useAppStore } from '../../stores/appStore';
 import { BroadcastTransport } from './broadcastTransport';
 import { WebSocketTransport } from './websocketTransport';
 import type {
@@ -37,6 +38,8 @@ class SyncEngine {
   /** Zustand スナップショット送信のデバウンスタイマー */
   private mixedDebounce: ReturnType<typeof setTimeout> | null = null;
   private teamDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** appStore（個人戦の選択中大会ID）監視のデバウンス */
+  private appDebounce: ReturnType<typeof setTimeout> | null = null;
   /** サーバーキャッシュへの完全スナップショット送信デバウンスタイマー */
   private cachePushDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -169,6 +172,7 @@ class SyncEngine {
 
     if (this.mixedDebounce) clearTimeout(this.mixedDebounce);
     if (this.teamDebounce) clearTimeout(this.teamDebounce);
+    if (this.appDebounce) clearTimeout(this.appDebounce);
     if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
 
     store.setSyncEnabled(false);
@@ -245,7 +249,7 @@ class SyncEngine {
   }
 
   /** Zustand のスナップショットをブロードキャスト */
-  broadcastZustandSnapshot(storeName: 'mixed' | 'team', state: Record<string, unknown>): void {
+  broadcastZustandSnapshot(storeName: 'mixed' | 'team' | 'app', state: Record<string, unknown>): void {
     if (!this.active || isApplyingRemote) return;
     const syncStore = useSyncStore.getState();
     this.broadcast({
@@ -474,6 +478,22 @@ class SyncEngine {
       }, 500);
     });
     this.zustandUnsubscribers.push(teamUnsub);
+
+    // App Store の監視（個人戦の選択中大会IDを観戦端末へ伝える）
+    const appUnsub = useAppStore.subscribe((state, prev) => {
+      if (isApplyingRemote) return;
+      if (state.currentTournamentId === prev.currentTournamentId) return;
+      if (this.appDebounce) clearTimeout(this.appDebounce);
+      this.appDebounce = setTimeout(() => {
+        this.broadcastZustandSnapshot('app', this.extractAppState());
+      }, 300);
+    });
+    this.zustandUnsubscribers.push(appUnsub);
+  }
+
+  /** App Store から同期対象のデータのみ抽出（選択中大会ID） */
+  private extractAppState(): Record<string, unknown> {
+    return { currentTournamentId: useAppStore.getState().currentTournamentId };
   }
 
   /** Mixed Store から同期対象のデータのみ抽出（関数を除外） */
@@ -515,6 +535,8 @@ class SyncEngine {
         useMixedStore.setState(payload.state);
       } else if (payload.store === 'team') {
         useTeamStore.setState(payload.state);
+      } else if (payload.store === 'app') {
+        useAppStore.setState({ currentTournamentId: (payload.state.currentTournamentId as string | null) ?? null });
       }
     } catch (err) {
       console.warn('[Sync] Zustandスナップショット適用エラー:', err);
@@ -571,9 +593,11 @@ class SyncEngine {
   private async pushSnapshotToCache(): Promise<void> {
     if (this.viewerMode || !this.active) return;
     if (!this.wsTransport.isOpen()) return; // 中継サーバー未接続なら送らない
-    // 共有すべきデータが無ければ送らない
+    // 共有すべきデータが無ければ送らない（個人戦は選択中大会IDの有無で判定）
     const hasData =
-      useMixedStore.getState().isImported || useTeamStore.getState().isImported;
+      useMixedStore.getState().isImported ||
+      useTeamStore.getState().isImported ||
+      !!useAppStore.getState().currentTournamentId;
     if (!hasData) return;
     try {
       this.wsTransport.sendCache(await this.buildSnapshotMessage());
@@ -605,6 +629,10 @@ class SyncEngine {
     if (teamState.isImported) {
       result.push({ store: 'team', state: this.extractTeamState(teamState as unknown as Record<string, unknown>) });
     }
+    // 個人戦: 選択中の大会IDを常に含める（観戦端末が同じ大会を表示できるようにする）
+    if (useAppStore.getState().currentTournamentId) {
+      result.push({ store: 'app', state: this.extractAppState() });
+    }
     return result;
   }
 
@@ -628,6 +656,8 @@ class SyncEngine {
             useMixedStore.setState(storeData.state);
           } else if (storeData.store === 'team') {
             useTeamStore.setState(storeData.state);
+          } else if (storeData.store === 'app') {
+            useAppStore.setState({ currentTournamentId: (storeData.state.currentTournamentId as string | null) ?? null });
           }
         }
       }
