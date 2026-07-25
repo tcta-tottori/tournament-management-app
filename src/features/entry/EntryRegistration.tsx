@@ -1628,8 +1628,9 @@ function NormalEntryRegistration() {
           {controlsOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
 
-        <div className={`transition-all duration-300 overflow-hidden ${controlsOpen ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-border-main space-y-3">
+        {/* モバイルでは絶対配置のドロップダウンとして表示（スクロール中でもボタン直下に確実に展開） */}
+        <div className={`transition-all duration-300 overflow-hidden absolute left-0 right-0 top-full z-30 lg:static lg:z-auto ${controlsOpen ? 'max-h-[500px] opacity-100 mt-2 pointer-events-auto' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+          <div className="bg-white p-4 rounded-xl shadow-lg lg:shadow-sm border border-border-main space-y-3">
             <div className="flex flex-col gap-2">
               <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full">
                 <button onClick={() => setShowAllEvents(true)}
