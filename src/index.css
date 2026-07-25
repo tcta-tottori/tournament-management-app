@@ -655,7 +655,12 @@
 }
 
 .page-enter {
-  animation: page-float-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* fill-mode は backwards のみ。
+     `both`（=forwards）だと終了後も transform: translateY(0) が残り、
+     配下の position: fixed なモーダルの包含ブロックになってしまい、
+     ポップアップがビューポートではなくページ全体の中央に表示される不具合になる。
+     backwards は開始前フレームにのみ適用され、終了後に transform を残さない。 */
+  animation: page-float-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* ===========================================================
