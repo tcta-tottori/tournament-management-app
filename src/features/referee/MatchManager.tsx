@@ -6,7 +6,7 @@ import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDo
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
-import { buildCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, familyReading, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
@@ -493,14 +493,14 @@ export default function MatchManager() {
       return slot?.position ?? 0;
     };
 
+    // 名前は漢字（フルネーム）、所属も漢字で返す。苗字の読みは furigana から取得（表示は「漢字（かな）」）。
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
-      if (!entryId) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
+      if (!entryId) return { name: fallbackName, reading: '', aff: fallbackAff };
       const entry = entries.find(e => e.entryId === entryId) || allEntries.find(e => e.entryId === entryId);
-      if (!entry) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
+      if (!entry) return { name: fallbackName, reading: '', aff: fallbackAff };
       const player = players.find(p => p.playerId === entry.playerId);
-      if (!player) return { name: fallbackName, aff: affiliationFuriganaMap[fallbackAff] || fallbackAff };
-      const affReading = affiliationFuriganaMap[player.affiliation] || player.affiliation;
-      return { name: player.furigana || player.name, aff: affReading };
+      if (!player) return { name: fallbackName, reading: '', aff: fallbackAff };
+      return { name: player.name || fallbackName, reading: familyReading(player.furigana), aff: player.affiliation || fallbackAff };
     };
 
     const isDoubles = useEvent?.type === 'Doubles';
@@ -519,21 +519,21 @@ export default function MatchManager() {
       const p1 = resolveFurigana(m.player1EntryId, fallbackNameA, fallbackAffA);
       const p2 = resolveFurigana(m.player2EntryId, fallbackNameB, fallbackAffB);
 
-      let partnerA = { name: fallbackPairNameA.trim(), aff: fallbackPairAffA.trim() };
-      let partnerB = { name: fallbackPairNameB.trim(), aff: fallbackPairAffB.trim() };
+      let partnerA = { name: fallbackPairNameA.trim(), reading: '', aff: fallbackPairAffA.trim() };
+      let partnerB = { name: fallbackPairNameB.trim(), reading: '', aff: fallbackPairAffB.trim() };
 
       if (m.player1EntryId) {
         const entry1 = entries.find(e => e.entryId === m.player1EntryId) || allEntries.find(e => e.entryId === m.player1EntryId);
         if (entry1?.partnerId) {
           const partner = players.find(p => p.playerId === entry1.partnerId);
-          if (partner) partnerA = { name: partner.furigana || partner.name, aff: partner.affiliation };
+          if (partner) partnerA = { name: partner.name, reading: familyReading(partner.furigana), aff: partner.affiliation };
         }
       }
       if (m.player2EntryId) {
         const entry2 = entries.find(e => e.entryId === m.player2EntryId) || allEntries.find(e => e.entryId === m.player2EntryId);
         if (entry2?.partnerId) {
           const partner = players.find(p => p.playerId === entry2.partnerId);
-          if (partner) partnerB = { name: partner.furigana || partner.name, aff: partner.affiliation };
+          if (partner) partnerB = { name: partner.name, reading: familyReading(partner.furigana), aff: partner.affiliation };
         }
       }
 
@@ -544,13 +544,17 @@ export default function MatchManager() {
         numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
         affA: p1.aff,
+        nameAReading: p1.reading,
         pairNameA: partnerA.name,
         pairAffA: partnerA.aff,
+        pairNameAReading: partnerA.reading,
         numberB: getPos(m.player2EntryId, m.eventId),
         nameB: p2.name,
         affB: p2.aff,
+        nameBReading: p2.reading,
         pairNameB: partnerB.name,
         pairAffB: partnerB.aff,
+        pairNameBReading: partnerB.reading,
         type: 'doubles',
         status: 'pending',
         courtNumber: courtNum,
@@ -567,9 +571,11 @@ export default function MatchManager() {
         numberA: getPos(m.player1EntryId, m.eventId),
         nameA: p1.name,
         affA: p1.aff,
+        nameAReading: p1.reading,
         numberB: getPos(m.player2EntryId, m.eventId),
         nameB: p2.name,
         affB: p2.aff,
+        nameBReading: p2.reading,
         type: 'singles',
         status: 'pending',
         courtNumber: courtNum,
@@ -604,13 +610,14 @@ export default function MatchManager() {
       }
     }
 
-    // 修正済みテキストがあればそれを優先。無ければ通常どおり生成。
+    // 修正済みテキスト（漢字（かな）注釈付き）があればそれを優先。無ければ通常どおり生成。
     const text = (textOverride && textOverride.trim())
       ? textOverride.trim()
       : buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
     setSpeakingMatchId(m.matchId);
 
-    speak(text, voiceSettings, () => {
+    // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
+    speak(toSpeechText(text), voiceSettings, () => {
       setSpeakingMatchId(null);
       const roundName = getRoundName(m.round, evTotalRounds);
       setCallLog(prev => [{
@@ -789,7 +796,8 @@ export default function MatchManager() {
       const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
       const matchCall = buildMatchCall(m, courtNum, evt, evTotalRounds);
       if (!matchCall) continue;
-      const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap, true);
+      // 一斉コールは編集画面が無いため、読み上げ用（かな）テキストをそのまま格納する
+      const text = toSpeechText(buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap, true));
 
       bulkItems.push({
         matchId: m.matchId,
@@ -2379,6 +2387,10 @@ ${printableMatches.map(m => {
         const evt = events.find(e => e.eventId === cm.eventId);
         const availCourts = courts.filter(c => c.isAvailable);
         const courtOptions = availCourts.map(c => ({ value: c.name, label: `${c.name}番コート` }));
+        // 上部表示用のドロー番号を取得（番号はコートに依存しない）
+        const evDraw = allDraws.get(cm.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+        const headerCall = buildMatchCall(cm, callCourtNumber || '0', evt, evTotalRounds);
         // 開始時刻は任意。コートと読み上げテキストがあればコール可能。
         const canCall = !!callCourtNumber && !!callText.trim();
         return (
@@ -2387,6 +2399,8 @@ ${printableMatches.map(m => {
             eventName={evt?.name || ''}
             player1Name={cm.player1Name || ''}
             player2Name={cm.player2Name || ''}
+            player1={{ number: headerCall?.numberA, name: cm.player1Name || '', affiliation: cm.player1Affiliation || '' }}
+            player2={{ number: headerCall?.numberB, name: cm.player2Name || '', affiliation: cm.player2Affiliation || '' }}
             courtOptions={courtOptions}
             courtNumber={callCourtNumber}
             onCourtChange={setCallCourtNumber}

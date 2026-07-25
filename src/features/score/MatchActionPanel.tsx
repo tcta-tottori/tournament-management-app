@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
-import { buildCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
@@ -90,6 +91,14 @@ export default function MatchActionPanel({
   const [callText, setCallText] = useState('');
 
   const { isSpeaking, speak, stop } = useGeminiTts();
+
+  // 所属ふりがなマップ（コール文のふりがな注釈用）
+  const affiliationFuriganaMap = useLiveQuery(async () => {
+    const all = await db.affiliationFurigana.toArray();
+    const map: Record<string, string> = {};
+    for (const a of all) map[a.name] = a.furigana;
+    return map;
+  }) || {};
 
   // Sync score input when a different match is selected
   useEffect(() => {
@@ -280,9 +289,9 @@ export default function MatchActionPanel({
         courtNumber,
         startTime,
       };
-      return buildCallText(callData, courtNumber, startTime);
+      return buildCallText(callData, courtNumber, startTime, affiliationFuriganaMap);
     },
-    [match, getRoundName],
+    [match, getRoundName, affiliationFuriganaMap],
   );
 
   // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）
@@ -319,7 +328,8 @@ export default function MatchActionPanel({
         .catch(() => { /* 反映失敗は無視（コールは続行） */ });
       onMatchUpdate();
     }
-    speak(callText.trim(), DEFAULT_VOICE);
+    // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
+    speak(toSpeechText(callText.trim()), DEFAULT_VOICE);
     setCallModalOpen(false);
   };
 
@@ -656,6 +666,8 @@ export default function MatchActionPanel({
       eventName={match.eventName}
       player1Name={match.player1Name || ''}
       player2Name={match.player2Name || ''}
+      player1={{ number: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player1Name || '', affiliation: match.player1Affiliation || '' }}
+      player2={{ number: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player2Name || '', affiliation: match.player2Affiliation || '' }}
       courtOptions={callCourtOptions}
       courtNumber={callCourtNumber}
       onCourtChange={setCallCourtNumber}

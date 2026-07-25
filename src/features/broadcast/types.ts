@@ -12,6 +12,11 @@ export interface MatchCall {
   affB: string;
   pairNameB?: string;
   pairAffB?: string;
+  // 苗字の読み（ひらがな）。表示は「漢字（かな）」、読み上げはかな。未指定なら漢字のまま。
+  nameAReading?: string;
+  nameBReading?: string;
+  pairNameAReading?: string;
+  pairNameBReading?: string;
   type: 'singles' | 'doubles';
   status: 'pending' | 'speaking' | 'done';
   courtNumber: string;
