@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Mic, ChevronRight, Megaphone, Settings2, Gauge, BookOpen, Plus, Trash2, Upload, Clock, MapPin } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
@@ -398,6 +399,10 @@ export default function MatchManager() {
 
   const courts = useLiveQuery(() => db.courts.toArray()) || [];
 
+  // コートID ↔ コート名（番号）の相互マップ
+  const courtIdToName = useMemo(() => new Map(courts.map(c => [c.courtId, c.name])), [courts]);
+  const courtNameToId = useMemo(() => new Map(courts.map(c => [c.name, c.courtId])), [courts]);
+
   // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
   const standbyInfo = useMemo(() => {
     const availableCourts = courts.filter(c => c.isAvailable);
@@ -450,6 +455,8 @@ export default function MatchManager() {
   };
   const [callTargetMatchId, setCallTargetMatchId] = useState<string | null>(null);
   const [callCourtNumber, setCallCourtNumber] = useState('');
+  // コール設定ポップアップ用の試合開始時刻（HH:MM）。事前に指定が無ければコール不可。
+  const [callStartTime, setCallStartTime] = useState('');
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
@@ -570,8 +577,12 @@ export default function MatchManager() {
   }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap]);
 
   // コール実行
-  const handleVoiceCall = useCallback((m: Match, courtNum: string) => {
+  // startTimeOverride を指定した場合はその開始時刻でコールする（ポップアップからの指定）。
+  const handleVoiceCall = useCallback((m: Match, courtNum: string, startTimeOverride?: string) => {
     if (!courtNum) return;
+    const startTime = startTimeOverride ?? m.scheduledTime ?? '';
+    // 試合開始時刻が未指定の場合はコールしない
+    if (!startTime) return;
     // グローバル表示でも正しくイベント・ラウンド数を解決
     const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
     const evDraw = allDraws.get(m.eventId);
@@ -579,7 +590,19 @@ export default function MatchManager() {
     const matchCall = buildMatchCall(m, courtNum, evt, evTotalRounds);
     if (!matchCall) return;
 
-    const text = buildCallText(matchCall, courtNum, m.scheduledTime || '', affiliationFuriganaMap);
+    // ポップアップで確定したコート・開始時刻を試合へ反映（次回以降も同じコートでコール可能に）
+    if (m.id != null) {
+      const resolvedCourtId = courtNameToId.get(courtNum) || m.courtId || null;
+      if (resolvedCourtId !== m.courtId || startTime !== (m.scheduledTime || '')) {
+        db.matches.update(m.id, {
+          courtId: resolvedCourtId,
+          scheduledTime: startTime,
+          updatedAt: Date.now(),
+        }).catch(() => { /* 反映失敗は無視（コールは続行） */ });
+      }
+    }
+
+    const text = buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
     setSpeakingMatchId(m.matchId);
 
     speak(text, voiceSettings, () => {
@@ -594,7 +617,7 @@ export default function MatchManager() {
         matchId: m.id || 0,
       }, ...prev]);
     });
-  }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds, events, allDraws]);
+  }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds, events, allDraws, courtNameToId]);
 
   // コール停止
   const handleVoiceStop = useCallback(() => {
@@ -602,15 +625,20 @@ export default function MatchManager() {
     setSpeakingMatchId(null);
   }, [stop]);
 
-  // コール対象選択
-  const toggleCallTarget = useCallback((m: Match) => {
-    if (callTargetMatchId === m.matchId) {
-      setCallTargetMatchId(null);
-    } else {
-      setCallTargetMatchId(m.matchId);
-      setCallCourtNumber(m.courtId || '');
-    }
-  }, [callTargetMatchId]);
+  // コール設定ポップアップを開く（どの導線から押しても必ずポップアップを表示）
+  // 既にコートが決まっていればそのコートを初期選択し、開始時刻も引き継ぐ（どちらも修正可）。
+  const openCallModal = useCallback((m: Match) => {
+    setCallTargetMatchId(m.matchId);
+    setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
+    setCallStartTime(m.scheduledTime || '');
+  }, [courtIdToName]);
+
+  // コール設定ポップアップを閉じる
+  const closeCallModal = useCallback(() => {
+    setCallTargetMatchId(null);
+    setCallCourtNumber('');
+    setCallStartTime('');
+  }, []);
 
   // (生成機能は削除済み - ドロー画面から試合生成を行う)
 
@@ -1696,7 +1724,7 @@ ${printableMatches.map(m => {
                                       </button>
                                     ) : (
                                       <button
-                                        onClick={() => toggleCallTarget(m)}
+                                        onClick={() => openCallModal(m)}
                                         className={`p-0.5 rounded border transition-all ${
                                           callTargetMatchId === m.matchId
                                             ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
@@ -1735,27 +1763,6 @@ ${printableMatches.map(m => {
                                       <X className="w-3 h-3 inline mr-0.5" />取消
                                     </button>
                                     {autoWinner && <span className="text-[10px] text-primary-600 font-bold">勝: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                            {callTargetMatchId === m.matchId && (
-                              <tr className="bg-emerald-50 border-b border-emerald-200">
-                                <td colSpan={10} className="px-3 py-2">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-bold text-emerald-700">コート:</span>
-                                    <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)} className="px-1.5 py-1 border rounded text-xs">
-                                      <option value="">選択</option>
-                                      {courts.filter(c => c.isAvailable).map(c => (
-                                        <option key={c.courtId} value={c.name}>{c.name}番</option>
-                                      ))}
-                                    </select>
-                                    <button onClick={() => { if (callCourtNumber) { handleVoiceCall(m, callCourtNumber); setCallTargetMatchId(null); } }} disabled={!callCourtNumber} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
-                                      <Volume2 className="w-3 h-3 inline mr-0.5" />コール
-                                    </button>
-                                    <button onClick={() => setCallTargetMatchId(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
-                                      閉じる
-                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -2151,7 +2158,7 @@ ${printableMatches.map(m => {
                                             <button
                                               onClick={() => {
                                                 if (!isActive) setSelectedEventId(m.eventId);
-                                                toggleCallTarget(m);
+                                                openCallModal(m);
                                               }}
                                               className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                                 isCallTarget
@@ -2167,50 +2174,6 @@ ${printableMatches.map(m => {
                                       </div>
                                     </td>
                                   </tr>
-                                  {isCallTarget && !isThisSpeaking && (
-                                    <tr className="border-b border-emerald-200">
-                                      <td colSpan={7} className="py-0 px-0">
-                                        <div className="flex items-center gap-3 flex-wrap px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50">
-                                          <div className="flex items-center gap-1.5">
-                                            <label className="text-xs font-medium text-slate-600">コート:</label>
-                                            <select
-                                              value={callCourtNumber}
-                                              onChange={e => setCallCourtNumber(e.target.value)}
-                                              className="border border-emerald-300 rounded-md px-2 py-1 text-sm w-20 bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                                            >
-                                              <option value="">--</option>
-                                              {Array.from({ length: 16 }, (_, i) => i + 1).map(n => (
-                                                <option key={n} value={String(n)}>{n}番</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                          <button
-                                            onClick={() => {
-                                              if (callCourtNumber) {
-                                                handleVoiceCall(m, callCourtNumber);
-                                                setCallTargetMatchId(null);
-                                              }
-                                            }}
-                                            disabled={!callCourtNumber}
-                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm ${
-                                              callCourtNumber
-                                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-md'
-                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                            }`}
-                                          >
-                                            <Play className="w-3.5 h-3.5" />
-                                            コール
-                                          </button>
-                                          <button
-                                            onClick={() => setCallTargetMatchId(null)}
-                                            className="text-xs text-slate-400 hover:text-slate-600 transition-colors ml-auto"
-                                          >
-                                            閉じる
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  )}
                                 </React.Fragment>
                               );
                             })}
@@ -2381,6 +2344,85 @@ ${printableMatches.map(m => {
               </div>
             </div>
           </div>
+        );
+      })()}
+
+      {/* コール設定ポップアップ（どの導線からでも表示。ビューポート中央に表示） */}
+      {callTargetMatchId && (() => {
+        const cm = allMatchesFlat.find(mm => mm.matchId === callTargetMatchId);
+        if (!cm) return null;
+        const evt = events.find(e => e.eventId === cm.eventId);
+        const availCourts = courts.filter(c => c.isAvailable);
+        const canCall = !!callCourtNumber && !!callStartTime;
+        return createPortal(
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 overflow-y-auto">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeCallModal} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm my-auto overflow-hidden animate-[confirmSlideUp_0.2s_ease-out]">
+              {/* ヘッダー */}
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Volume2 className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-white">コール設定</h3>
+                  <p className="text-[11px] text-white/70 truncate">{evt?.name || ''}</p>
+                </div>
+                <button onClick={closeCallModal} className="ml-auto shrink-0 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              {/* 本体 */}
+              <div className="px-5 py-4 space-y-4">
+                {/* 対戦カード */}
+                <div className="text-center py-1">
+                  <div className="text-sm font-bold text-gray-800">{cm.player1Name || '(未定)'}</div>
+                  <div className="text-[11px] text-gray-400 my-0.5">vs</div>
+                  <div className="text-sm font-bold text-gray-800">{cm.player2Name || '(未定)'}</div>
+                </div>
+
+                {/* コート指定（指定済みなら初期選択・修正可） */}
+                <div>
+                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
+                    <MapPin className="w-3 h-3" />コート
+                    {cm.courtId && <span className="text-emerald-600 font-medium">（指定済み・修正可）</span>}
+                  </label>
+                  <select value={callCourtNumber} onChange={e => setCallCourtNumber(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all">
+                    <option value="">選択してください</option>
+                    {availCourts.length > 0
+                      ? availCourts.map(c => <option key={c.courtId} value={c.name}>{c.name}番コート</option>)
+                      : Array.from({ length: 16 }, (_, i) => i + 1).map(n => <option key={n} value={String(n)}>{n}番コート</option>)}
+                  </select>
+                </div>
+
+                {/* 開始時刻（事前に指定しなければコール不可） */}
+                <div>
+                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
+                    <Clock className="w-3 h-3" />開始時刻
+                  </label>
+                  <input type="time" value={callStartTime} onChange={e => setCallStartTime(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  {!callStartTime && <p className="text-[10px] text-amber-600 mt-1">開始時刻を指定するとコールできます。</p>}
+                </div>
+              </div>
+
+              {/* アクション */}
+              <div className="px-5 pb-4 flex items-center gap-2.5">
+                <button onClick={closeCallModal}
+                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-all">
+                  キャンセル
+                </button>
+                <button
+                  onClick={() => { if (canCall) { handleVoiceCall(cm, callCourtNumber, callStartTime); closeCallModal(); } }}
+                  disabled={!canCall}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all">
+                  <Volume2 className="w-4 h-4" />コール
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
         );
       })()}
     </div>
