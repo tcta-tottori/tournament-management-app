@@ -19,6 +19,9 @@ import {
   type ScheduleMatch,
 } from './scheduleEngine';
 
+/** ドローから自動生成した時間割であることを示す表示名（scheduleFileName） */
+export const AUTO_GENERATED_SCHEDULE_LABEL = '（ドローから自動生成）';
+
 export interface GenerateScheduleOptions {
   /** 使用コート名（明示指定）。未指定なら courtCount から自動割当。 */
   courtNames?: string[];

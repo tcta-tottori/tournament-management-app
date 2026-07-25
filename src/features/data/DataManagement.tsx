@@ -348,6 +348,8 @@ export default function DataManagement() {
   const [externalScheduleExcel, setExternalScheduleExcel] = useState<{ arrayBuffer: ArrayBuffer; fileName: string } | null>(null);
   // ウィザードからの自動インポート情報
   const [wizardAutoImport, setWizardAutoImport] = useState<{ name: string; date: string; venue: string; reserveDate: string; courtNames?: string } | null>(null);
+  // ウィザード自動インポートでDBに書き込まれた大会ID（時間割自動生成に使用）
+  const [wizardImportedTournamentId, setWizardImportedTournamentId] = useState<string | null>(null);
 
   // 全データリセット用
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -436,9 +438,15 @@ export default function DataManagement() {
 
   // ウィザードで大会確認後に自動インポート
   const handleWizardTournamentConfirmed = useCallback((arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string }) => {
+    setWizardImportedTournamentId(null);
     setWizardAutoImport(info);
     setExternalTournamentExcel({ arrayBuffer, fileName });
     setDataImportOpen(true);
+  }, []);
+
+  // ウィザード自動インポートがDBへの書込を完了したとき（時間割自動生成用にIDを保持）
+  const handleAutoImportComplete = useCallback((tournamentId: string) => {
+    setWizardImportedTournamentId(tournamentId);
   }, []);
 
   // GDriveから時間割Excelがダウンロードされたとき
@@ -512,6 +520,7 @@ export default function DataManagement() {
         onTournamentExcelLoaded={handleTournamentExcelLoaded}
         onScheduleExcelLoaded={handleScheduleExcelLoaded}
         onWizardTournamentConfirmed={handleWizardTournamentConfirmed}
+        wizardImportedTournamentId={wizardImportedTournamentId}
       />
 
       {/* 大会データ読込パネル（Excelボタン方式） */}
@@ -532,6 +541,7 @@ export default function DataManagement() {
               externalTournamentExcel={externalTournamentExcel}
               externalScheduleExcel={externalScheduleExcel}
               wizardAutoImport={wizardAutoImport}
+              onAutoImportComplete={handleAutoImportComplete}
             />
           </div>
         )}

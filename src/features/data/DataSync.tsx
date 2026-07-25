@@ -12,6 +12,7 @@ import {
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import { assignVenueCourtNames } from '../schedule/scheduleEngine';
+import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
 import { parseTeamExcel } from '../team/teamExcelParser';
 import { parseClubExcel, type ClubVenueSection } from '../team/clubExcelParser';
@@ -19,6 +20,7 @@ import { useTeamStore } from '../team/teamStore';
 import type { TeamTournamentInfo, TeamLeague as ITeamLeague, TeamLeagueMatch as ITeamLeagueMatch } from '../team/types';
 import type { TournamentInfo, MixedLeague, LeagueMatchScore } from '../mixed/types';
 import { useMixedStore } from '../mixed/mixedStore';
+import { useAppStore } from '../../stores/appStore';
 import { useNavigate } from 'react-router-dom';
 import DriveLoadingModal, { type LoadingStep } from '../../components/ui/DriveLoadingModal';
 import {
@@ -281,9 +283,11 @@ interface DataSyncProps {
   onScheduleExcelLoaded?: (arrayBuffer: ArrayBuffer, fileName: string) => void;
   /** ウィザードで大会確認後に自動インポート指示 */
   onWizardTournamentConfirmed?: (arrayBuffer: ArrayBuffer, fileName: string, info: { name: string; date: string; venue: string; reserveDate: string; courtNames?: string }) => void;
+  /** ウィザード自動インポートがDBへの書込を完了した大会ID（時間割自動生成に使用） */
+  wizardImportedTournamentId?: string | null;
 }
 
-export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded, onWizardTournamentConfirmed }: DataSyncProps) {
+export default function DataSync({ onConnectionChange, onDataLoaded, onTournamentExcelLoaded, onScheduleExcelLoaded, onWizardTournamentConfirmed, wizardImportedTournamentId }: DataSyncProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('');
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string[] } | null>(null);
@@ -351,6 +355,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardVenueMode, setWizardVenueMode] = useState<'normal' | 'reserve' | 'custom'>('normal');
   const [wizardIsMixedOrTeam, setWizardIsMixedOrTeam] = useState(false);
   const [wizardIsImporting, setWizardIsImporting] = useState(false);
+  // 時間割自動生成の状態（select-scheduleフェーズ用）
+  const [wizardScheduleGenerating, setWizardScheduleGenerating] = useState(false);
+  // 大会インポート完了待ちで自動生成が保留中か
+  const [wizardAutoGenPending, setWizardAutoGenPending] = useState(false);
 
   // DB counts
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
@@ -953,6 +961,57 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setWizardLoadingFileId(null);
     }
   }, [onScheduleExcelLoaded]);
+
+  // ウィザード内: ドローから時間割を自動生成
+  const runWizardScheduleGeneration = useCallback(async (tid: string) => {
+    setWizardScheduleGenerating(true);
+    try {
+      const courtNames = wizardEditCourtNames
+        .split(/[,、\s]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      // ドロー表から検出した開始時刻を既定値に使用
+      const startTime = wizardParsedExcel?.earliestStartTime || '09:00';
+      const result = await generateScheduleFromDraws(tid, {
+        courtNames: courtNames.length > 0 ? courtNames : undefined,
+        startTime,
+      });
+      if (result.items.length === 0) {
+        setWizardResult({ success: false, message: '自動生成できる試合がありませんでした。ドローをご確認ください。' });
+        setWizardPhase('done');
+        return;
+      }
+      useAppStore.getState().setImportedSchedule(result.items);
+      useAppStore.getState().setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      setWizardDetails([`時間割を自動生成しました（${result.matchCount}試合 / ${result.usedCourtCount}コート）`]);
+      setWizardResult({ success: true, message: '一括読込が完了しました' });
+      setWizardPhase('done');
+    } catch (err) {
+      setWizardResult({ success: false, message: `時間割の自動生成に失敗しました: ${(err as Error).message}` });
+      setWizardPhase('done');
+    } finally {
+      setWizardScheduleGenerating(false);
+      setWizardAutoGenPending(false);
+    }
+  }, [wizardEditCourtNames, wizardParsedExcel]);
+
+  // 自動生成ボタン: 大会インポートのDB書込が完了していれば即実行、未完了なら完了待ち
+  const handleWizardAutoGenerateSchedule = useCallback(() => {
+    const tid = wizardImportedTournamentId || useAppStore.getState().currentTournamentId;
+    if (tid) {
+      runWizardScheduleGeneration(tid);
+    } else {
+      // 大会インポートのDB書込完了を待ってから生成する
+      setWizardAutoGenPending(true);
+    }
+  }, [wizardImportedTournamentId, runWizardScheduleGeneration]);
+
+  // 大会インポート完了待ちだった場合、IDが揃ったら自動生成を実行
+  useEffect(() => {
+    if (wizardAutoGenPending && wizardImportedTournamentId && !wizardScheduleGenerating) {
+      runWizardScheduleGeneration(wizardImportedTournamentId);
+    }
+  }, [wizardAutoGenPending, wizardImportedTournamentId, wizardScheduleGenerating, runWizardScheduleGeneration]);
 
   // ウィザード閉じる
   const handleWizardClose = useCallback(() => {
@@ -1645,15 +1704,22 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                 <div className="px-3 py-3">
                   {/* 自動生成の選択肢 */}
                   <button
-                    onClick={() => { setWizardOpen(false); navigate('/schedule-sheet'); }}
-                    className="w-full flex items-center gap-3 px-3 py-3 mb-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 transition-all text-left"
+                    onClick={handleWizardAutoGenerateSchedule}
+                    disabled={wizardScheduleGenerating || wizardAutoGenPending}
+                    className="w-full flex items-center gap-3 px-3 py-3 mb-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 transition-all text-left disabled:opacity-60"
                   >
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-sm shrink-0">
-                      <Dices className="w-5 h-5 text-emerald-600" />
+                      {(wizardScheduleGenerating || wizardAutoGenPending)
+                        ? <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
+                        : <Dices className="w-5 h-5 text-emerald-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-bold text-gray-800">ドローから自動生成</div>
-                      <div className="text-[11px] text-gray-500 mt-0.5">記載の開始時刻・使用コートで時間割を自動作成します</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        {(wizardScheduleGenerating || wizardAutoGenPending)
+                          ? '時間割を生成しています…'
+                          : '記載の開始時刻・使用コートで時間割を自動作成します'}
+                      </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
                   </button>
