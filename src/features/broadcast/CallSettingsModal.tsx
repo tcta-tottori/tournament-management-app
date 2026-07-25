@@ -50,7 +50,7 @@ function PlayerCardLine({ info, fallbackName }: { info?: CallPlayerInfo; fallbac
   return (
     <div>
       <div className="text-sm font-bold text-gray-800">
-        {info?.number ? <span className="text-emerald-600 mr-1">{info.number}番</span> : null}
+        {info?.number ? <span className="text-emerald-600 mr-1">{info.number}.</span> : null}
         {name}
       </div>
       {info?.affiliation && <div className="text-[11px] text-gray-500 mt-0.5">{info.affiliation}</div>}
