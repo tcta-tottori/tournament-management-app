@@ -410,7 +410,9 @@ export function extractMatchesFromDraw(
  * 試合一覧をコート×時間枠のグリッドに自動配置する
  * 照明制約・コート集約ロジック付き
  *
- * ソート: ラウンド昇順 → ドローサイズ降順 → 種目順（eventOrder）
+ * 1回戦は「級（種目）単位」で順に配置する。ある級の1回戦をすべて入れ終えて
+ * から次の級に移り、各級はコート番号の若い方から詰めて、埋まったら次の時間枠へ。
+ * ドロー表の開始時刻が読める場合は、早い時刻の級から先に配置する。
  * 照明制約: コート 1-8 は 18:00 以降使用不可、コート 9-16 は 21:00 まで
  *
  * @param matches ScheduleMatch 配列（複数種目を含む）
@@ -424,26 +426,45 @@ export function autoSchedule(
   const { courtCount, courtNames, matchDuration, startTime, targetSlotByMatchId } = config;
   const targetOf = (m: ScheduleMatch): number | undefined => targetSlotByMatchId?.get(m.matchId);
 
-  // ソート: ラウンド昇順 → 記載時刻(目標スロット)昇順 → 種目順(eventOrder)
-  //        → ドローサイズ降順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
-  // ドロー表に記載された開始時刻がある試合は、その時刻が早い順に先にコートを埋める。
-  // 記載時刻が無い試合（2回戦以降）は同ラウンド内で種目順に配置する。
+  // --- 級（種目）ごとの1回戦の最早開始スロットを求める ---
+  // ドロー表に開始時刻がある場合、その級の最も早い時刻をその級の開始スロットとして扱う。
+  // これを使って「どの級から先に入れるか」を級単位で決定する（試合単位では割り込ませない）。
+  const classEarliestSlot = new Map<string, number>();
+  for (const m of matches) {
+    if (m.round !== 1) continue;
+    const t = targetOf(m);
+    if (t == null) continue;
+    const cur = classEarliestSlot.get(m.eventCode);
+    classEarliestSlot.set(m.eventCode, cur == null ? t : Math.min(cur, t));
+  }
+  const classEarliest = (code: string): number | null =>
+    classEarliestSlot.has(code) ? classEarliestSlot.get(code)! : null;
+  const halfOrder = (h: string) => h === 'L' ? 0 : h === 'R' ? 1 : 2;
+
+  // ソート:
+  //  1回戦は「級（種目）単位」で順序を決める。ドロー表の開始時刻が読める場合は
+  //  早い時刻の級から、無ければ種目順(eventOrder)。同一級内はドロー順（左山→右山→
+  //  上から下）で詰める。これにより、ある級の1回戦を全部入れ終えてから次の級に移る。
+  //  2回戦以降は 種目順 → ドローサイズ降順 → 山 → 上から下。
   const sorted = [...matches].sort((a, b) => {
     if (a.round !== b.round) return a.round - b.round;
-    const ta = targetOf(a);
-    const tb = targetOf(b);
-    if (ta != null && tb != null) {
-      if (ta !== tb) return ta - tb;
-    } else if (ta != null || tb != null) {
-      // 記載時刻がある試合を先に
-      return ta != null ? -1 : 1;
+
+    if (a.round === 1 && b.round === 1) {
+      const ea = classEarliest(a.eventCode);
+      const eb = classEarliest(b.eventCode);
+      if (ea != null && eb != null) {
+        if (ea !== eb) return ea - eb; // 早い時刻の級を先に
+      } else if (ea != null || eb != null) {
+        return ea != null ? -1 : 1; // 時刻が読める級を先に
+      }
+      if (a.eventOrder !== b.eventOrder) return a.eventOrder - b.eventOrder;
+      if (a.halfLabel !== b.halfLabel) return halfOrder(a.halfLabel) - halfOrder(b.halfLabel);
+      return a.matchNumInRound - b.matchNumInRound;
     }
+
     if (a.eventOrder !== b.eventOrder) return a.eventOrder - b.eventOrder;
     if (a.drawSize !== b.drawSize) return b.drawSize - a.drawSize;
-    // 左山(L) → 右山(R) → 決勝(F) の順
-    const halfOrder = (h: string) => h === 'L' ? 0 : h === 'R' ? 1 : 2;
     if (a.halfLabel !== b.halfLabel) return halfOrder(a.halfLabel) - halfOrder(b.halfLabel);
-    // 同じ山の中で上から下へ
     return a.matchNumInRound - b.matchNumInRound;
   });
 
@@ -514,10 +535,16 @@ export function autoSchedule(
         minSlot = Math.max(minSlot, depSlot + 1);
       }
     }
-    // ドロー表に記載された開始時刻がある場合はその時刻以降に配置する
-    const target = targetOf(match);
-    if (target != null) {
-      minSlot = Math.max(minSlot, target);
+    // 開始時刻（ドロー表記載）の扱い:
+    //  - 1回戦: 級単位の最早スロットのみを下限にする。級内は詰めて配置し、
+    //    まず1回転目を埋めてから残りを2回転目のコート番号の若い方から入れる。
+    //  - 2回戦以降: 記載時刻があればその時刻以降に配置する。
+    if (match.round === 1) {
+      const ce = classEarliest(match.eventCode);
+      if (ce != null) minSlot = Math.max(minSlot, ce);
+    } else {
+      const target = targetOf(match);
+      if (target != null) minSlot = Math.max(minSlot, target);
     }
 
     let assigned = false;
