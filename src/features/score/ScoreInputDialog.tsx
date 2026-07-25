@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
-import { buildCallText, buildWalkoverCallText, buildRetirementCallText } from '../broadcast/callTextBuilder';
+import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
@@ -544,7 +544,8 @@ export default function ScoreInputDialog({
         onMatchUpdate();
       }
     }
-    speak(callText.trim(), DEFAULT_VOICE);
+    // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
+    speak(toSpeechText(callText.trim()), DEFAULT_VOICE);
     setCallModalOpen(false);
   };
 
@@ -941,6 +942,8 @@ export default function ScoreInputDialog({
         eventName={match.eventName}
         player1Name={match.player1Name || ''}
         player2Name={match.player2Name || ''}
+        player1={{ number: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player1Name || '', affiliation: match.player1Affiliation || '' }}
+        player2={{ number: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player2Name || '', affiliation: match.player2Affiliation || '' }}
         showCourtAndTime={!isWoRet}
         courtOptions={callCourtOptions}
         courtNumber={callCourtNumber}

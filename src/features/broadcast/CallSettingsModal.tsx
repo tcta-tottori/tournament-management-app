@@ -1,19 +1,31 @@
 import { createPortal } from 'react-dom';
 import { Volume2, X, MapPin, Clock } from 'lucide-react';
-import { familyName } from './callTextBuilder';
 
 export interface CallCourtOption {
   value: string;
   label: string;
 }
 
+/** 上部表示の1選手（またはペア）の情報 */
+export interface CallPlayerInfo {
+  /** ドロー番号（表示のみ。無ければ非表示） */
+  number?: number;
+  /** フルネーム（ダブルスは「A / B」） */
+  name: string;
+  /** 所属（ダブルスは「A / B」） */
+  affiliation?: string;
+}
+
 interface CallSettingsModalProps {
   open: boolean;
-  /** ヘッダーに表示する種目名など */
+  /** ヘッダーに表示する種目名（級・部を含む） */
   eventName?: string;
-  /** 対戦カード（苗字のみに変換して表示。ダブルスの「A / B」は各苗字） */
+  /** 対戦カード（フルネーム）。players が渡されればそちらを優先して情報付きで表示 */
   player1Name: string;
   player2Name: string;
+  /** 上部表示に番号・フルネーム・所属をすべて出す場合に渡す */
+  player1?: CallPlayerInfo;
+  player2?: CallPlayerInfo;
   /** コート・開始時刻の欄を表示するか（W.O/リタイアなど不要な場合は false） */
   showCourtAndTime?: boolean;
   courtOptions?: CallCourtOption[];
@@ -31,9 +43,19 @@ interface CallSettingsModalProps {
   onClose: () => void;
 }
 
-/** 表示用に苗字のみへ変換（ダブルスの「A / B」はそれぞれ苗字に） */
-function surnameOnly(name: string): string {
-  return name.split('/').map(p => familyName(p.trim())).filter(Boolean).join(' / ');
+/** 上部表示の1行（番号・フルネーム・所属） */
+function PlayerCardLine({ info, fallbackName }: { info?: CallPlayerInfo; fallbackName: string }) {
+  const name = info?.name || fallbackName;
+  if (!name) return <div className="text-sm font-bold text-gray-800">(未定)</div>;
+  return (
+    <div>
+      <div className="text-sm font-bold text-gray-800">
+        {info?.number ? <span className="text-emerald-600 mr-1">{info.number}番</span> : null}
+        {name}
+      </div>
+      {info?.affiliation && <div className="text-[11px] text-gray-500 mt-0.5">{info.affiliation}</div>}
+    </div>
+  );
 }
 
 /**
@@ -47,6 +69,8 @@ export default function CallSettingsModal({
   eventName,
   player1Name,
   player2Name,
+  player1,
+  player2,
   showCourtAndTime = true,
   courtOptions = [],
   courtNumber = '',
@@ -82,11 +106,11 @@ export default function CallSettingsModal({
 
         {/* 本体 */}
         <div className="px-5 py-4 space-y-4">
-          {/* 対戦カード（名前は苗字のみ表示） */}
-          <div className="text-center py-1">
-            <div className="text-sm font-bold text-gray-800">{player1Name ? surnameOnly(player1Name) : '(未定)'}</div>
-            <div className="text-[11px] text-gray-400 my-0.5">vs</div>
-            <div className="text-sm font-bold text-gray-800">{player2Name ? surnameOnly(player2Name) : '(未定)'}</div>
+          {/* 対戦カード（番号・フルネーム・所属をすべて表示。級・部はヘッダーの種目名） */}
+          <div className="text-center py-1 space-y-1.5">
+            <PlayerCardLine info={player1} fallbackName={player1Name} />
+            <div className="text-[11px] text-gray-400">vs</div>
+            <PlayerCardLine info={player2} fallbackName={player2Name} />
           </div>
 
           {showCourtAndTime && (
@@ -112,17 +136,9 @@ export default function CallSettingsModal({
                   <Clock className="w-3 h-3" />開始時刻
                   <span className="text-gray-400 font-medium">（任意）</span>
                 </label>
-                <div className="flex items-center gap-2">
-                  <input type="time" value={startTime} onChange={e => onStartTimeChange?.(e.target.value)}
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
-                  {startTime && (
-                    <button type="button" onClick={() => onStartTimeChange?.('')}
-                      className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all">
-                      指定なし
-                    </button>
-                  )}
-                </div>
-                {!startTime && <p className="text-[10px] text-gray-400 mt-1">指定なし（開始時刻を読み上げません）。</p>}
+                <input type="time" value={startTime} onChange={e => onStartTimeChange?.(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                {!startTime && <p className="text-[10px] text-gray-400 mt-1">指定なし（開始時刻を読み上げません）。必要なときだけ選択してください。</p>}
               </div>
             </>
           )}
