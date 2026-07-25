@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
-  X, Loader2, CalendarClock, ChevronRight, Trophy, Dices, Calendar, MapPin, Sparkles,
+  X, Loader2, CalendarClock, ChevronRight, ChevronDown, Trophy, Dices, Calendar, MapPin, Sparkles,
 } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
@@ -359,6 +359,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardScheduleGenerating, setWizardScheduleGenerating] = useState(false);
   // 大会インポート完了待ちで自動生成が保留中か
   const [wizardAutoGenPending, setWizardAutoGenPending] = useState(false);
+  // 時間割ファイル一覧（Googleドライブから読み込む）の開閉・取得状態
+  const [wizardScheduleListOpen, setWizardScheduleListOpen] = useState(false);
+  const [wizardScheduleListLoading, setWizardScheduleListLoading] = useState(false);
+  const [wizardScheduleListError, setWizardScheduleListError] = useState('');
 
   // DB counts
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
@@ -638,6 +642,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setWizardDetails([]);
     setWizardTournamentFiles([]);
     setWizardScheduleFiles([]);
+    setWizardScheduleListOpen(false);
+    setWizardScheduleListLoading(false);
+    setWizardScheduleListError('');
+    setWizardAutoGenPending(false);
     setIsProcessing(true);
     setProcessingLabel('一括読込中...');
     setResult(null);
@@ -959,6 +967,30 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setWizardLoadingFileId(null);
     }
   }, [onScheduleExcelLoaded]);
+
+  // ウィザード内: Googleドライブの時間割フォルダからファイル一覧を取得して表示
+  const handleWizardBrowseSchedule = useCallback(async () => {
+    // 開いていれば閉じる
+    if (wizardScheduleListOpen) { setWizardScheduleListOpen(false); return; }
+    setWizardScheduleListError('');
+    setWizardScheduleListOpen(true);
+    // 既に取得済みならそのまま表示
+    if (wizardScheduleFiles.length > 0) return;
+    // 未取得ならGoogleドライブから取得する
+    const token = gdriveGetSavedToken();
+    if (!token) { setWizardScheduleListError('Googleドライブに接続されていません。'); return; }
+    setWizardScheduleListLoading(true);
+    try {
+      const files = await listScheduleExcelFiles(token);
+      setWizardScheduleFiles(files);
+      setScheduleGDriveFiles(files);
+      if (files.length === 0) setWizardScheduleListError('時間割フォルダにExcelファイルが見つかりませんでした。');
+    } catch (err) {
+      setWizardScheduleListError(`時間割一覧の取得に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setWizardScheduleListLoading(false);
+    }
+  }, [wizardScheduleListOpen, wizardScheduleFiles]);
 
   // ウィザード内: ドローから時間割を自動生成
   const runWizardScheduleGeneration = useCallback(async (tid: string) => {
@@ -1722,43 +1754,76 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
                   </button>
 
-                  <div className="px-2 mb-2">
-                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                      <CalendarClock className="w-4 h-4 text-[#1a73e8]" />
-                      {wizardScheduleFiles.length > 0 ? 'または時間割ファイルを選択' : '時間割ファイルはありません'}
-                    </h4>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      {wizardScheduleFiles.length > 0
-                        ? `${wizardScheduleFiles.length}件のファイル`
-                        : '上の「ドローから自動生成」で時間割を作成できます'}
-                    </p>
-                  </div>
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {wizardScheduleFiles.map(f => {
-                      const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
-                      const modDate = new Date(f.modifiedTime);
-                      const isLoading = wizardLoadingFileId === f.id;
-                      return (
-                        <button
-                          key={f.id}
-                          onClick={() => handleWizardSelectSchedule(f)}
-                          disabled={!!wizardLoadingFileId}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 group"
-                        >
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm shrink-0">
-                            {isLoading ? <Loader2 className="w-5 h-5 text-green-500 animate-spin" /> : <CalendarClock className="w-5 h-5 text-green-600" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
-                            <div className="text-[11px] text-gray-400 mt-0.5">
-                              {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-green-500 shrink-0" />
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {/* Googleドライブから時間割ファイルを読み込む */}
+                  <button
+                    onClick={handleWizardBrowseSchedule}
+                    disabled={wizardScheduleListLoading}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 transition-all text-left disabled:opacity-60"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-sky-100 flex items-center justify-center shadow-sm shrink-0">
+                      {wizardScheduleListLoading
+                        ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                        : <CalendarClock className="w-5 h-5 text-blue-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-gray-800">Googleドライブから読み込む</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        「時間割」フォルダのExcelファイルを選択します
+                        {wizardScheduleFiles.length > 0 ? `（${wizardScheduleFiles.length}件）` : ''}
+                      </div>
+                    </div>
+                    {wizardScheduleListOpen
+                      ? <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />}
+                  </button>
+
+                  {/* 時間割ファイル一覧（展開時） */}
+                  {wizardScheduleListOpen && (
+                    <div className="mt-2">
+                      {wizardScheduleListLoading ? (
+                        <div className="flex items-center gap-2 px-3 py-4 text-sm text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          時間割ファイルを検索中...
+                        </div>
+                      ) : wizardScheduleListError ? (
+                        <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          <span>{wizardScheduleListError}</span>
+                        </div>
+                      ) : wizardScheduleFiles.length === 0 ? (
+                        <div className="px-3 py-4 text-[12px] text-gray-500 text-center">
+                          時間割フォルダにファイルがありません。
+                        </div>
+                      ) : (
+                        <div className="space-y-1 max-h-64 overflow-y-auto">
+                          {wizardScheduleFiles.map(f => {
+                            const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
+                            const modDate = new Date(f.modifiedTime);
+                            const isLoading = wizardLoadingFileId === f.id;
+                            return (
+                              <button
+                                key={f.id}
+                                onClick={() => handleWizardSelectSchedule(f)}
+                                disabled={!!wizardLoadingFileId}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 group"
+                              >
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm shrink-0">
+                                  {isLoading ? <Loader2 className="w-5 h-5 text-green-500 animate-spin" /> : <CalendarClock className="w-5 h-5 text-green-600" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
+                                  <div className="text-[11px] text-gray-400 mt-0.5">
+                                    {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                                <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-green-500 shrink-0" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {/* スキップ */}
                   <div className="mt-3 px-2">
                     <button
