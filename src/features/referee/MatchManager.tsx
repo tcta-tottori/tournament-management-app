@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { FURIGANA_SEED } from '../../db/seedData';
 import { useAppStore } from '../../stores/appStore';
 import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -519,6 +520,22 @@ export default function MatchManager() {
   // 同じ苗字の選手が複数いる場合、その読みの最長共通接頭辞を苗字の読みとして採用する。
   // 例: 「田中」の選手が「たなかよしひろ」「たなかまさし」→ 共通「たなか」
   const surnameReadingMap = useMemo(() => {
+    // 同姓読みの最長共通接頭辞（LCP）を苗字の読みとして採用するヘルパー。
+    // 異なる読みが2種以上ある場合のみ採用（1種だと名前まで含む可能性がある）。
+    const lcpOf = (readings: string[]): string => {
+      if (readings.length < 2) return '';
+      let lcp = readings[0];
+      for (const r of readings) {
+        let i = 0;
+        while (i < lcp.length && i < r.length && lcp[i] === r[i]) i++;
+        lcp = lcp.slice(0, i);
+        if (!lcp) break;
+      }
+      const distinct = new Set(readings);
+      return (lcp.length >= 1 && distinct.size >= 2) ? lcp : '';
+    };
+
+    // 1) 現在の選手群から推定
     const groups = new Map<string, string[]>();
     for (const p of players) {
       const surname = familyName(p.name);
@@ -529,21 +546,47 @@ export default function MatchManager() {
     }
     const map: Record<string, string> = {};
     for (const [surname, readings] of groups) {
-      if (readings.length < 2) continue; // 1人だけでは苗字の読みを特定できない
-      // 最長共通接頭辞
-      let lcp = readings[0];
-      for (const r of readings) {
-        let i = 0;
-        while (i < lcp.length && i < r.length && lcp[i] === r[i]) i++;
-        lcp = lcp.slice(0, i);
-        if (!lcp) break;
+      const lcp = lcpOf(readings);
+      if (lcp) map[surname] = lcp;
+    }
+
+    // 2) 未解決の苗字を全国名簿(FURIGANA_SEED)から解決する。
+    // シードは「漢字フルネーム(スペース無)」→「かなフルネーム(スペース無)」。
+    // 対象の苗字で前方一致する同姓者を集め、その読みのLCPを苗字読みとする。
+    const need = new Set<string>();
+    for (const p of players) {
+      const s = familyName(p.name);
+      if (s && !map[s]) need.add(s);
+    }
+    for (const s of need) {
+      const readings: string[] = [];
+      for (const [name, furi] of FURIGANA_SEED) {
+        if (name.length > s.length && name.startsWith(s)) readings.push(kataToHira(furi));
       }
-      // 読みが完全一致（全員同姓同名読み）だと名前まで含むため、異なる読みが2種以上ある場合のみ採用
-      const distinct = new Set(readings);
-      if (lcp.length >= 1 && distinct.size >= 2) map[surname] = lcp;
+      const lcp = lcpOf(readings);
+      if (lcp) map[s] = lcp;
     }
     return map;
   }, [players]);
+
+  // entryId → ドロー番号（コールの番号と同じ slot.position）。
+  const getDrawNumber = useCallback((entryId: string | null, eventId?: string): number => {
+    if (!entryId) return 0;
+    const draw = eventId ? allDraws.get(eventId) : undefined;
+    if (!draw?.slots) return 0;
+    const slot = (draw.slots as DrawSlot[]).find(s => s.entryId === entryId);
+    if (slot) return slot.position ?? 0;
+    // entryId がずれている場合は playerId で照合
+    const entry = allEntries.find(e => e.entryId === entryId);
+    if (entry) {
+      for (const s of draw.slots as DrawSlot[]) {
+        if (!s.entryId) continue;
+        const se = allEntries.find(e => e.entryId === s.entryId);
+        if (se && se.playerId === entry.playerId) return s.position ?? 0;
+      }
+    }
+    return 0;
+  }, [allDraws, allEntries]);
 
   // Match → MatchCall 変換
   const buildMatchCall = useCallback((m: Match, courtNum: string, overrideEvent?: Event, overrideTotalRounds?: number): MatchCall | null => {
@@ -1732,10 +1775,13 @@ ${printableMatches.map(m => {
                   const firstFinishedId = finishedMatches[0]?.matchId;
                   let seqNum = 0;
 
-                  const renderPlayer = (name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
+                  const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
                     <div className="min-w-0 flex-1">
-                      <div className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
-                        {name || '-'}
+                      <div className="flex items-baseline gap-1 min-w-0">
+                        {num > 0 && <span className="text-[10px] font-mono font-bold text-blue-400 shrink-0">{num}</span>}
+                        <span className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
+                          {name || '-'}
+                        </span>
                       </div>
                       {affiliation && affiliation !== 'BYE' && (
                         <div className="text-[10px] leading-tight text-gray-500 truncate" title={affiliation}>{affiliation}</div>
@@ -1795,6 +1841,8 @@ ${printableMatches.map(m => {
                       : (courtAssignMap.get(m.matchId) || '-');
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                     const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
+                    const num1 = getDrawNumber(m.player1EntryId, m.eventId);
+                    const num2 = getDrawNumber(m.player2EntryId, m.eventId);
 
                     return (
                       <React.Fragment key={m.matchId}>
@@ -1819,21 +1867,14 @@ ${printableMatches.map(m => {
                             </span>
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
                           </div>
-                          {/* 選手 */}
-                          <div className="flex items-stretch gap-2 pl-1">
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center gap-1">
-                                {renderPlayer(m.player1Name, m.player1Affiliation, w1, isFinished)}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-blue-300 shrink-0 w-4 text-center">vs</span>
-                                <div className="flex-1 h-px bg-gray-200" />
-                                {isFinished && m.score && <span className="text-[10px] font-mono font-bold text-gray-500 shrink-0">{m.score}</span>}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {renderPlayer(m.player2Name, m.player2Affiliation, w2, isFinished)}
-                              </div>
+                          {/* 選手（横並び） */}
+                          <div className="flex items-start gap-2 pl-1">
+                            {renderPlayer(num1, m.player1Name, m.player1Affiliation, w1, isFinished)}
+                            <div className="flex flex-col items-center justify-center shrink-0 pt-0.5 min-w-[28px]">
+                              <span className="text-[10px] font-bold text-blue-300 leading-none">vs</span>
+                              {isFinished && m.score && <span className="text-[9px] font-mono font-bold text-gray-500 leading-tight mt-0.5">{m.score}</span>}
                             </div>
+                            {renderPlayer(num2, m.player2Name, m.player2Affiliation, w2, isFinished)}
                           </div>
                           {/* フッター行 */}
                           <div className="flex items-center gap-2 mt-1.5 pl-1">
