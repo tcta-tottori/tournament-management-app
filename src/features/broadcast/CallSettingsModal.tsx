@@ -16,6 +16,16 @@ export interface CallPlayerInfo {
   affiliation?: string;
 }
 
+/** フリガナ編集用の1項目（漢字表示＋読みの入力） */
+export interface CallReadingItem {
+  /** 一意キー（漢字そのものを使う） */
+  key: string;
+  /** 画面に表示する漢字（またはそのまま） */
+  kanji: string;
+  /** 読み（ふりがな）。修正可能。 */
+  reading: string;
+}
+
 interface CallSettingsModalProps {
   open: boolean;
   /** ヘッダーに表示する種目名（級・部を含む） */
@@ -35,9 +45,17 @@ interface CallSettingsModalProps {
   courtAssigned?: boolean;
   startTime?: string;
   onStartTimeChange?: (v: string) => void;
-  /** コール読み上げ内容（ひらがな）。修正可能。 */
-  callText: string;
-  onCallTextChange: (v: string) => void;
+  /** コール読み上げ内容（ひらがな）。修正可能。フリガナ編集モードでは未使用。 */
+  callText?: string;
+  onCallTextChange?: (v: string) => void;
+  /**
+   * フリガナ編集モード：これらを渡すと、コール全文のテキスト欄ではなく
+   * 「苗字・所属の読み（フリガナ）」を個別に修正できるUIを表示する。
+   */
+  nameReadings?: CallReadingItem[];
+  onNameReadingChange?: (key: string, value: string) => void;
+  affReadings?: CallReadingItem[];
+  onAffReadingChange?: (key: string, value: string) => void;
   canCall: boolean;
   onCall: () => void;
   onClose: () => void;
@@ -80,11 +98,18 @@ export default function CallSettingsModal({
   onStartTimeChange,
   callText,
   onCallTextChange,
+  nameReadings,
+  onNameReadingChange,
+  affReadings,
+  onAffReadingChange,
   canCall,
   onCall,
   onClose,
 }: CallSettingsModalProps) {
   if (!open) return null;
+
+  // nameReadings が渡されていればフリガナ編集モード（コール全文は表示しない）
+  const furiganaMode = Array.isArray(nameReadings);
 
   return createPortal(
     <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 overflow-y-auto">
@@ -143,17 +168,66 @@ export default function CallSettingsModal({
             </>
           )}
 
-          {/* コール読み上げ内容（ひらがな）: 事前に表示・修正してからコールできる */}
-          <div>
-            <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
-              <Volume2 className="w-3 h-3" />コール内容（修正可）
-            </label>
-            <textarea value={callText} onChange={e => onCallTextChange(e.target.value)}
-              rows={5}
-              placeholder={showCourtAndTime && !courtNumber ? 'コートを選択すると読み上げ内容が表示されます。' : ''}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm leading-relaxed bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all resize-y" />
-            <p className="text-[10px] text-gray-400 mt-1">この内容（ひらがな）でコールします。読みが違う場合は修正してください。</p>
-          </div>
+          {furiganaMode ? (
+            /* フリガナ編集モード：苗字・所属を漢字で表示し、その読み（フリガナ）を個別に修正できる */
+            <div className="space-y-3">
+              {nameReadings!.length > 0 && (
+                <div>
+                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1.5">
+                    <Volume2 className="w-3 h-3" />選手名（苗字）の読み・修正可
+                  </label>
+                  <div className="space-y-1.5">
+                    {nameReadings!.map(it => (
+                      <div key={it.key} className="flex items-center gap-2">
+                        <span className="w-20 shrink-0 text-sm font-bold text-gray-800 truncate" title={it.kanji}>{it.kanji}</span>
+                        <input
+                          type="text"
+                          value={it.reading}
+                          onChange={e => onNameReadingChange?.(it.key, e.target.value)}
+                          placeholder="ふりがな"
+                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {affReadings!.length > 0 && (
+                <div>
+                  <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1.5">
+                    <Volume2 className="w-3 h-3" />所属の読み・修正可
+                  </label>
+                  <div className="space-y-1.5">
+                    {affReadings!.map(it => (
+                      <div key={it.key} className="flex items-center gap-2">
+                        <span className="w-20 shrink-0 text-sm font-bold text-gray-800 truncate" title={it.kanji}>{it.kanji}</span>
+                        <input
+                          type="text"
+                          value={it.reading}
+                          onChange={e => onAffReadingChange?.(it.key, e.target.value)}
+                          placeholder="ふりがな"
+                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-400">苗字・所属は漢字（またはそのまま）で表示しています。読みが違う場合はフリガナを修正してからコールしてください。空欄のままだと漢字のまま読み上げます。</p>
+            </div>
+          ) : (
+            /* コール読み上げ内容（ひらがな）: 事前に表示・修正してからコールできる */
+            <div>
+              <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
+                <Volume2 className="w-3 h-3" />コール内容（修正可）
+              </label>
+              <textarea value={callText ?? ''} onChange={e => onCallTextChange?.(e.target.value)}
+                rows={5}
+                placeholder={showCourtAndTime && !courtNumber ? 'コートを選択すると読み上げ内容が表示されます。' : ''}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm leading-relaxed bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all resize-y" />
+              <p className="text-[10px] text-gray-400 mt-1">この内容（ひらがな）でコールします。読みが違う場合は修正してください。</p>
+            </div>
+          )}
         </div>
 
         {/* アクション */}
