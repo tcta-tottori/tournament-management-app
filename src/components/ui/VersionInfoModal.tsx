@@ -46,9 +46,10 @@ const CHANGELOG: ChangelogEntry[] = [
       },
       {
         time: '—',
-        summary: '観戦用ページ',
+        summary: 'コート状況・観戦用ページ',
         changes: [
-          { type: 'feat', text: '「スコア」メニューを「ダッシュボード」に改称' },
+          { type: 'feat', text: 'コート状況の対戦カードに「男子A級 1R」のような種目＋ラウンドのバッジを表示' },
+          { type: 'feat', text: '観戦用ページの「スコア」メニューを「ダッシュボード」に改称' },
         ],
       },
     ],
