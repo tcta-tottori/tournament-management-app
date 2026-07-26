@@ -197,48 +197,67 @@ export default function CourtBracketView({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      // 勝者の線は緑（従来は赤）
+      // 勝者の線は緑（従来は赤）。試合中は点滅クラスを付与。
       const getStroke = (isWinner: boolean) => isWinner ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8';
       const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1';
+      const lineClass = isPlaying ? 'bracket-line-blink' : undefined;
 
-      paths.push(<path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`}
-        fill="none" stroke={getStroke(!!winnerIsTop)} strokeWidth={getWidth(!!winnerIsTop)} />);
-      paths.push(<path key={`r${r}-m${m}-bot`} d={`M ${x} ${yBottom} L ${xMid} ${yBottom} L ${xMid} ${yMid}`}
-        fill="none" stroke={getStroke(!!winnerIsBottom)} strokeWidth={getWidth(!!winnerIsBottom)} />);
+      // 角に丸みを持たせたパスを生成（横→縦のエルボーを二次ベジェで滑らかに）。
+      const roundedElbow = (startX: number, y: number, midX: number, endY: number) => {
+        const dir = endY > y ? 1 : -1;
+        const R = Math.min(9, Math.abs(endY - y) / 2, Math.abs(midX - startX));
+        return `M ${startX} ${y} L ${midX - R} ${y} Q ${midX} ${y} ${midX} ${y + dir * R} L ${midX} ${endY}`;
+      };
+
+      paths.push(<path key={`r${r}-m${m}-top`} className={lineClass} d={roundedElbow(x, yTop, xMid, yMid)}
+        fill="none" stroke={getStroke(!!winnerIsTop)} strokeWidth={getWidth(!!winnerIsTop)}
+        strokeLinecap="round" strokeLinejoin="round" />);
+      paths.push(<path key={`r${r}-m${m}-bot`} className={lineClass} d={roundedElbow(x, yBottom, xMid, yMid)}
+        fill="none" stroke={getStroke(!!winnerIsBottom)} strokeWidth={getWidth(!!winnerIsBottom)}
+        strokeLinecap="round" strokeLinejoin="round" />);
 
       const winnerExists = winnerIsTop || winnerIsBottom;
-      paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
+      paths.push(<path key={`r${r}-m${m}-conn`} className={lineClass} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
         fill="none" stroke={winnerExists ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8'}
-        strokeWidth={winnerExists ? '2.5' : '1'} />);
+        strokeWidth={winnerExists ? '2.5' : '1'} strokeLinecap="round" />);
 
-      // 結果（スコア）を線のところに表示（手書きスケッチ準拠）。
+      // 結果（スコア）を横線の中央付近に、幅を持たせた丸みのあるピル背景＋大きな文字で表示。
       // 上側=player1、下側=player2。勝者側は緑、敗者側はグレー。
       if (isFinished && matchResult.score) {
         const raw = matchResult.score.trim();
         const nums = raw.match(/^(\d+)\s*-\s*(\d+)/);
+        const feederMidX = (x + xMid) / 2; // 横線の中央
         if (nums) {
-          const topColor = winnerIsTop ? '#16a34a' : '#94a3b8';
-          const botColor = winnerIsBottom ? '#16a34a' : '#94a3b8';
-          paths.push(
-            <text key={`sT-${r}-${m}`} x={xMid + 5} y={yTop - 4}
-              fill={topColor} fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="start">
-              {nums[1]}
-            </text>
-          );
-          paths.push(
-            <text key={`sB-${r}-${m}`} x={xMid + 5} y={yBottom + 12}
-              fill={botColor} fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="start">
-              {nums[2]}
-            </text>
-          );
+          const topWin = !!winnerIsTop;
+          const botWin = !!winnerIsBottom;
+          const pill = (key: string, cx: number, cy: number, val: string, win: boolean) => {
+            const w = 20, h = 16;
+            return (
+              <g key={key}>
+                <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={7}
+                  fill={win ? '#16a34a' : '#ffffff'} stroke={win ? '#16a34a' : '#cbd5e1'} strokeWidth="1" />
+                <text x={cx} y={cy + 4.5} fill={win ? '#ffffff' : '#64748b'}
+                  fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                  {val}
+                </text>
+              </g>
+            );
+          };
+          paths.push(pill(`sT-${r}-${m}`, feederMidX, yTop, nums[1], topWin));
+          paths.push(pill(`sB-${r}-${m}`, feederMidX, yBottom, nums[2], botWin));
         } else {
-          // Ret / W.O 等は勝者側の線に緑で表示
-          const wy = winnerIsTop ? yTop - 4 : yBottom + 12;
+          // Ret / W.O 等は勝者側の横線中央に緑ピルで表示
+          const wy = winnerIsTop ? yTop : yBottom;
+          const w = Math.max(24, raw.length * 7 + 8);
           paths.push(
-            <text key={`sX-${r}-${m}`} x={xMid + 5} y={wy}
-              fill="#16a34a" fontSize="9" fontWeight="bold" textAnchor="start">
-              {raw}
-            </text>
+            <g key={`sX-${r}-${m}`}>
+              <rect x={feederMidX - w / 2} y={wy - 8} width={w} height={16} rx={7}
+                fill="#16a34a" />
+              <text x={feederMidX} y={wy + 4.5} fill="#ffffff"
+                fontSize="10" fontWeight="bold" textAnchor="middle">
+                {raw}
+              </text>
+            </g>
           );
         }
       }
@@ -371,7 +390,7 @@ export default function CourtBracketView({
             isFinished
               ? 'border border-gray-400 bg-white'
               : isPlaying
-                ? 'border-2 border-green-500 bg-green-50'
+                ? 'border-2 border-green-500 bg-green-50 animate-pulse'
                 : matchResult?.status === 'ready'
                   ? 'border border-blue-400 bg-blue-50'
                   : 'border border-dashed border-gray-300 bg-white'
