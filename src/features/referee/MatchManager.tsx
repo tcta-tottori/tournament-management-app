@@ -65,6 +65,10 @@ export default function MatchManager() {
     [currentTournamentId]
   ) || [];
 
+  // コールで修正した苗字読みの上書き辞書（localStorage永続化）
+  const nameReadingOverrides = useAppStore(state => state.nameReadingOverrides);
+  const setNameReadingOverride = useAppStore(state => state.setNameReadingOverride);
+
   // 全種目の試合データを一括取得
   const allMatchesByEvent = useLiveQuery(
     async () => {
@@ -386,7 +390,7 @@ export default function MatchManager() {
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { speak, stop } = useGeminiTts();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(
@@ -503,8 +507,9 @@ export default function MatchManager() {
 
     // 苗字の読み（ひらがな）を取得。ふりがなにスペースがあればそこから、
     // 無ければ同姓の共通接頭辞マップから推定する（表示は「漢字（かな）」）。
+    // 一度コールで修正した苗字読みは最優先で使用する（ふりがな自動推定より優先）。
     const resolveSurnameReading = (kanjiName: string, furigana: string) =>
-      familyReading(furigana) || surnameReadingMap[familyName(kanjiName)] || '';
+      nameReadingOverrides[familyName(kanjiName)] || familyReading(furigana) || surnameReadingMap[familyName(kanjiName)] || '';
 
     // 名前は漢字（フルネーム）、所属も漢字で返す。
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
@@ -595,7 +600,7 @@ export default function MatchManager() {
         startTime: m.scheduledTime || '',
       };
     }
-  }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap, surnameReadingMap]);
+  }, [drawData, allDraws, entries, allEntries, players, currentEvent, totalRounds, affiliationFuriganaMap, surnameReadingMap, nameReadingOverrides]);
 
   // コール実行
   // startTimeOverride を指定した場合はその開始時刻でコールする（ポップアップからの指定）。
@@ -1643,15 +1648,6 @@ ${printableMatches.map(m => {
               </button>
             )}
             {/* コール中の停止操作は画面下部の固定ポップアップから行う */}
-            {isSpeaking && (
-              <button
-                onClick={handleVoiceStop}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-bold border border-red-200 hover:bg-red-100 transition-all"
-              >
-                <Square className="w-4 h-4" />
-                コール停止
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -1801,27 +1797,17 @@ ${printableMatches.map(m => {
                                 </button>
                               )}
                               {hasPlayers && m.status !== 'walkover' && (
-                                speakingMatchId === m.matchId ? (
-                                  <button
-                                    onClick={handleVoiceStop}
-                                    className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-300 transition-all animate-pulse"
-                                    title="停止"
-                                  >
-                                    <Square className="w-4 h-4" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => openCallModal(m)}
-                                    className={`p-1.5 rounded-lg border transition-all ${
-                                      callTargetMatchId === m.matchId
-                                        ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
-                                        : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
-                                    }`}
-                                    title="音声コール"
-                                  >
-                                    <Volume2 className="w-4 h-4" />
-                                  </button>
-                                )
+                                <button
+                                  onClick={() => openCallModal(m)}
+                                  className={`p-1.5 rounded-lg border transition-all ${
+                                    callTargetMatchId === m.matchId
+                                      ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
+                                      : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
+                                  }`}
+                                  title="音声コール"
+                                >
+                                  <Volume2 className="w-4 h-4" />
+                                </button>
                               )}
                             </div>
                           </div>
@@ -2289,36 +2275,37 @@ ${printableMatches.map(m => {
         const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
         return (
           <div className="fixed inset-x-0 bottom-0 z-[9998] flex justify-center px-3 pb-3 pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-lg rounded-xl border-2 border-emerald-400 bg-white shadow-2xl overflow-hidden animate-pulse">
-              <div className="flex items-center gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2">
+            {/* 枠のみ点滅・背景は半透明・赤ベース */}
+            <div className="pointer-events-auto w-full max-w-lg rounded-xl border-2 bg-white/80 backdrop-blur-sm shadow-2xl overflow-hidden call-popup-blink">
+              <div className="flex items-center gap-3 bg-gradient-to-r from-red-600/90 to-rose-600/90 px-4 py-2">
                 <div className="relative shrink-0">
                   <Megaphone className="w-5 h-5 text-white" />
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-400 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-bold">
                     コール中{courtName ? ` ・ ${courtName}番コート` : ''}
                   </p>
-                  <p className="text-white/80 text-[11px] truncate">
+                  <p className="text-white/90 text-[11px] truncate">
                     {evt?.name || ''} {roundName}
                   </p>
                 </div>
                 <button
                   onClick={handleVoiceStop}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition-colors shrink-0"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-white/25 hover:bg-white/40 text-white text-xs font-bold rounded-lg transition-colors shrink-0"
                 >
                   <Square className="w-3.5 h-3.5" />
                   停止
                 </button>
               </div>
-              <div className="flex items-center justify-center gap-3 px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-3 px-4 py-3 text-center bg-red-50/70">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-gray-900 truncate">{sm.player1Name || '-'}</p>
                   {sm.player1Affiliation && sm.player1Affiliation !== 'BYE' && (
                     <p className="text-[10px] text-gray-500 truncate">{sm.player1Affiliation}</p>
                   )}
                 </div>
-                <span className="text-xs font-bold text-emerald-500 shrink-0">vs</span>
+                <span className="text-xs font-bold text-red-500 shrink-0">vs</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-gray-900 truncate">{sm.player2Name || '-'}</p>
                   {sm.player2Affiliation && sm.player2Affiliation !== 'BYE' && (
@@ -2512,6 +2499,22 @@ ${printableMatches.map(m => {
             onAffReadingChange={(key, value) => setCallAffReadings(prev => ({ ...prev, [key]: value }))}
             canCall={canCall}
             onCall={() => {
+              // 修正した読みを永続化: 苗字はストア、所属はDBへ保存し以後のコールにも反映する
+              for (const [surname, reading] of Object.entries(callNameReadings)) {
+                if (reading && reading.trim()) setNameReadingOverride(surname, reading.trim());
+              }
+              void (async () => {
+                for (const [aff, reading] of Object.entries(callAffReadings)) {
+                  const v = (reading || '').trim();
+                  if (!v) continue;
+                  const existing = await db.affiliationFurigana.where('name').equals(aff).first();
+                  if (existing?.id != null) {
+                    await db.affiliationFurigana.update(existing.id, { furigana: v, updatedAt: Date.now() });
+                  } else {
+                    await db.affiliationFurigana.add({ name: aff, furigana: v, updatedAt: Date.now() });
+                  }
+                }
+              })();
               const text = buildCallTextFromReadings(cm, callCourtNumber, callStartTime, callNameReadings, callAffReadings);
               handleVoiceCall(cm, callCourtNumber, callStartTime, text);
               closeCallModal();
