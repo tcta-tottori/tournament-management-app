@@ -11,7 +11,7 @@ import HeaderBackdrop from '../../components/layout/HeaderBackdrop';
 
 /**
  * 参加者・HP訪問者向け公開ビューのレイアウト（読み取り専用）。
- * - 個人戦: 本アプリと同じヘッダー＋流れる表示＋ハンバーガーメニュー（ドロー / スコア の2項目）
+ * - 個人戦: 本アプリと同じヘッダー＋流れる表示＋ハンバーガーメニュー（ドロー / ダッシュボード の2項目）
  * - 団体戦/ミックス: 従来のタブUI（予選リーグ / 全トーナメント / LIVE）
  */
 export default function PublicLayout() {
@@ -109,7 +109,7 @@ export default function PublicLayout() {
 
   const menuItems = [
     { path: '/view/draw', label: 'ドロー', icon: Network },
-    { path: '/view/live', label: 'スコア', icon: Radio },
+    { path: '/view/live', label: 'ダッシュボード', icon: Radio },
   ];
   const current = menuItems.find(mi => location.pathname.startsWith(mi.path)) || menuItems[0];
   const CurrentIcon = current.icon;
