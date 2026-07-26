@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Volume2, X, MapPin, Clock } from 'lucide-react';
+import { estimateReadings } from './autoReading';
 
 export interface CallCourtOption {
   value: string;
@@ -106,10 +108,32 @@ export default function CallSettingsModal({
   onCall,
   onClose,
 }: CallSettingsModalProps) {
-  if (!open) return null;
-
   // nameReadings が渡されていればフリガナ編集モード（コール全文は表示しない）
   const furiganaMode = Array.isArray(nameReadings);
+
+  // フリガナを自動で一旦入れておく（kuromojiで読みを推定）。空欄の項目だけ埋め、
+  // ユーザーが入力済み・既知の読みは上書きしない。間違っていればその場で修正できる。
+  const nameKeySig = (nameReadings || []).map(i => i.key).join(',');
+  const affKeySig = (affReadings || []).map(i => i.key).join(',');
+  useEffect(() => {
+    if (!open || !furiganaMode) return;
+    const emptyNames = (nameReadings || []).filter(it => !it.reading.trim());
+    const emptyAffs = (affReadings || []).filter(it => !it.reading.trim());
+    const targets = [...emptyNames.map(i => i.kanji), ...emptyAffs.map(i => i.kanji)];
+    if (targets.length === 0) return;
+    let cancelled = false;
+    estimateReadings(targets).then(readings => {
+      if (cancelled) return;
+      let idx = 0;
+      for (const it of emptyNames) { const r = readings[idx++]; if (r) onNameReadingChange?.(it.key, r); }
+      for (const it of emptyAffs) { const r = readings[idx++]; if (r) onAffReadingChange?.(it.key, r); }
+    }).catch(() => { /* 推定失敗時は空欄のまま（手入力可） */ });
+    return () => { cancelled = true; };
+    // 対象試合（キー構成）が変わったときのみ実行。読みの変更では再実行しない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, furiganaMode, nameKeySig, affKeySig]);
+
+  if (!open) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 overflow-y-auto">
@@ -143,16 +167,17 @@ export default function CallSettingsModal({
           </div>
 
           {showCourtAndTime && (
-            <>
+            /* コート・開始時刻を1行（左右）で表示 */
+            <div className="grid grid-cols-2 gap-3">
               {/* コート指定（指定済みなら初期選択・修正可） */}
-              <div>
+              <div className="min-w-0">
                 <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
-                  <MapPin className="w-3 h-3" />コート
-                  {courtAssigned && <span className="text-emerald-600 font-medium">（指定済み・修正可）</span>}
+                  <MapPin className="w-3 h-3 shrink-0" />コート
+                  {courtAssigned && <span className="text-emerald-600 font-medium">（修正可）</span>}
                 </label>
                 <select value={courtNumber} onChange={e => onCourtChange?.(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all">
-                  <option value="">選択してください</option>
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all">
+                  <option value="">選択</option>
                   {courtOptions.length > 0
                     ? courtOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)
                     : Array.from({ length: 16 }, (_, i) => i + 1).map(n => <option key={n} value={String(n)}>{n}番コート</option>)}
@@ -160,16 +185,15 @@ export default function CallSettingsModal({
               </div>
 
               {/* 開始時刻（標準は「指定なし」。任意で指定できる） */}
-              <div>
+              <div className="min-w-0">
                 <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
-                  <Clock className="w-3 h-3" />開始時刻
+                  <Clock className="w-3 h-3 shrink-0" />開始時刻
                   <span className="text-gray-400 font-medium">（任意）</span>
                 </label>
                 <input type="time" value={startTime} onChange={e => onStartTimeChange?.(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
-                {!startTime && <p className="text-[10px] text-gray-400 mt-1">指定なし（開始時刻を読み上げません）。必要なときだけ選択してください。</p>}
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
               </div>
-            </>
+            </div>
           )}
 
           {furiganaMode ? (
@@ -180,16 +204,16 @@ export default function CallSettingsModal({
                   <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1.5">
                     <Volume2 className="w-3 h-3" />選手名（苗字）の読み・修正可
                   </label>
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {nameReadings!.map(it => (
-                      <div key={it.key} className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 text-sm font-bold text-gray-800 truncate" title={it.kanji}>{it.kanji}</span>
+                      <div key={it.key} className="min-w-0">
+                        <div className="text-sm font-bold text-gray-800 truncate mb-0.5" title={it.kanji}>{it.kanji}</div>
                         <input
                           type="text"
                           value={it.reading}
                           onChange={e => onNameReadingChange?.(it.key, e.target.value)}
                           placeholder="ふりがな"
-                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
                         />
                       </div>
                     ))}
@@ -201,23 +225,23 @@ export default function CallSettingsModal({
                   <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1.5">
                     <Volume2 className="w-3 h-3" />所属の読み・修正可
                   </label>
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {affReadings!.map(it => (
-                      <div key={it.key} className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 text-sm font-bold text-gray-800 truncate" title={it.kanji}>{it.kanji}</span>
+                      <div key={it.key} className="min-w-0">
+                        <div className="text-sm font-bold text-gray-800 truncate mb-0.5" title={it.kanji}>{it.kanji}</div>
                         <input
                           type="text"
                           value={it.reading}
                           onChange={e => onAffReadingChange?.(it.key, e.target.value)}
                           placeholder="ふりがな"
-                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-gray-400">苗字・所属は漢字（またはそのまま）で表示しています。読みが違う場合はフリガナを修正してからコールしてください。空欄のままだと漢字のまま読み上げます。</p>
+              <p className="text-[10px] text-gray-400">フリガナは自動で入力しています。読みが違う場合は修正してからコールしてください。空欄のままだと漢字のまま読み上げます。</p>
             </div>
           ) : (
             /* コール読み上げ内容（ひらがな）: 事前に表示・修正してからコールできる */
