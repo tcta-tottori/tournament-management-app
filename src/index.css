@@ -763,15 +763,6 @@
   animation: block-warning-red-blink 0.9s ease-in-out infinite;
 }
 
-/* ドロー：試合中の対戦線の点滅 */
-@keyframes bracket-line-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-.bracket-line-blink {
-  animation: bracket-line-blink 1.1s ease-in-out infinite;
-}
-
 /* ティッカーアイテム */
 .info-ticker-item {
   display: inline-flex;
