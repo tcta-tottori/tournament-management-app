@@ -3,8 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { FURIGANA_SEED } from '../../db/seedData';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2 } from 'lucide-react';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
@@ -83,9 +82,6 @@ type DrawSlot = { position: number; entryId: string | null; seed: number; isBye:
 export default function MatchManager() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const importedSchedule = useAppStore(state => state.importedSchedule);
-  const setImportedSchedule = useAppStore(state => state.setImportedSchedule);
-  const scheduleFileName = useAppStore(state => state.scheduleFileName);
-  const setScheduleFileName = useAppStore(state => state.setScheduleFileName);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'event' | 'global'>('global'); // 種目別 or 対戦順
 
@@ -179,114 +175,6 @@ export default function MatchManager() {
     return map;
   }, [allMatchesByEvent]);
 
-  // --- 試合順Excelインポート ---
-  const matchOrderInputRef = useRef<HTMLInputElement>(null);
-  /** セルテキストを正規化（全角→半角、全角スペース→半角） */
-  const normalizeLabel = useCallback((text: string): string => {
-    return text
-      .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-      .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-      .replace(/[\u3000]+/g, ' ')
-      .trim();
-  }, []);
-
-  const handleImportMatchOrder = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
-      const wb = XLSX.read(data, { type: 'array' });
-      const roundPattern = /^(.+?)\s*(\d+R|QF|SF|F)\s*$/i;
-
-      const parseLabel = (raw: string): { eventName: string; roundLabel: string } => {
-        const norm = normalizeLabel(raw);
-        const rm = norm.match(roundPattern);
-        if (rm) return { eventName: rm[1].trim(), roundLabel: rm[2].toUpperCase() };
-        return { eventName: norm, roundLabel: '' };
-      };
-
-      let flatList: { eventName: string; roundLabel: string }[] = [];
-
-      // 全シートを走査し「パターン2」のB列フラットリストを探す（最後のシートから）
-      for (let si = wb.SheetNames.length - 1; si >= 0; si--) {
-        const ws = wb.Sheets[wb.SheetNames[si]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-        // 「パターン2」行を探し、「コートNO.」行の次からB列を読む
-        let dataStart = -1;
-        for (let i = 0; i < rows.length; i++) {
-          const cellA = normalizeLabel(String(rows[i]?.[0] ?? ''));
-          if (/パターン\s*2/i.test(cellA)) {
-            for (let j = i + 1; j < Math.min(i + 5, rows.length); j++) {
-              const a = normalizeLabel(String(rows[j]?.[0] ?? ''));
-              if (/コート/i.test(a)) {
-                dataStart = j + 1;
-                break;
-              }
-            }
-            if (dataStart === -1) dataStart = i + 2;
-            break;
-          }
-        }
-
-        if (dataStart >= 0) {
-          for (let i = dataStart; i < rows.length; i++) {
-            const cellB = String(rows[i]?.[1] ?? '').trim();
-            if (!cellB) continue;
-            flatList.push(parseLabel(cellB));
-          }
-          if (flatList.length > 10) break;
-          flatList = [];
-        }
-      }
-
-      // フラットリストが見つからない場合、旧ロジック(2列形式)にフォールバック
-      if (flatList.length === 0) {
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        let startRow = 0;
-        for (let i = 0; i < Math.min(rows.length, 5); i++) {
-          const firstCell = String(rows[i][0] || '').toLowerCase().trim();
-          if (firstCell === 'no' || firstCell === 'no.' || firstCell === '#') {
-            startRow = i + 1;
-            break;
-          }
-        }
-        if (startRow === 0 && rows.length > 1) {
-          startRow = /^\d+$/.test(String(rows[0][0]).trim()) ? 0 : 1;
-        }
-        for (let i = startRow; i < rows.length; i++) {
-          const row = rows[i];
-          let label = '';
-          if (row.length >= 2 && String(row[1]).trim()) label = String(row[1]).trim();
-          else if (String(row[0]).trim()) label = String(row[0]).trim();
-          if (!label) continue;
-          flatList.push(parseLabel(label));
-        }
-      }
-
-      if (flatList.length === 0) {
-        alert('有効なデータが見つかりませんでした。');
-        return;
-      }
-
-      // フラットリストをimportedSchedule形式に変換（1行=1試合分）
-      const items = flatList.map((item, i) => ({
-        eventName: item.eventName,
-        roundLabel: item.roundLabel,
-        matchOrder: i + 1,
-        courtName: '',
-        startTime: '',
-      }));
-
-      setImportedSchedule(items);
-      setScheduleFileName(file.name);
-      alert(`試合順を取り込みました: ${items.length}項目\n${file.name}`);
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = '';
-  }, [setImportedSchedule, setScheduleFileName, normalizeLabel]);
 
   // イベント名の略称マッチング（正規化して比較）
   const normalizeEventName = useCallback((name: string): string => {
@@ -1691,17 +1579,25 @@ ${printableMatches.map(m => {
 
   useEffect(() => {
     const el = matchContentRef.current;
-    if (!el) return;
-    let lastScrollY = 0;
-    const onScroll = () => {
-      const y = el.scrollTop;
-      if (y > 20 && y > lastScrollY) {
-        setControlsOpen(false);
-      }
-      lastScrollY = y;
+    // コンテナ内スクロール（デスクトップ）とウィンドウスクロール（モバイル）の両方に対応
+    let lastContainerY = 0;
+    let lastWindowY = window.scrollY;
+    const onContainerScroll = () => {
+      const y = el ? el.scrollTop : 0;
+      if (y > 20 && y > lastContainerY) setControlsOpen(false);
+      lastContainerY = y;
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
+    const onWindowScroll = () => {
+      const y = window.scrollY;
+      if (y > 20 && y > lastWindowY) setControlsOpen(false);
+      lastWindowY = y;
+    };
+    el?.addEventListener('scroll', onContainerScroll, { passive: true });
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    return () => {
+      el?.removeEventListener('scroll', onContainerScroll);
+      window.removeEventListener('scroll', onWindowScroll);
+    };
   }, []);
 
   const statusLabels: Record<string, { text: string; color: string }> = {
@@ -1744,19 +1640,6 @@ ${printableMatches.map(m => {
               </button>
             </div>
             {/* 試合順インポート */}
-            <div className="flex items-center gap-2">
-              <input ref={matchOrderInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportMatchOrder} className="hidden" />
-              <button
-                onClick={() => matchOrderInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                試合順取込
-              </button>
-              {scheduleFileName && (
-                <span className="text-[10px] text-gray-500 truncate max-w-[200px]" title={scheduleFileName}>{scheduleFileName}</span>
-              )}
-            </div>
             {/* 初回コート確定 */}
             {!hasPlayingMatches && globalSortedMatches.some(m => (m.status === 'waiting' || m.status === 'ready') && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE') && (
               <button
