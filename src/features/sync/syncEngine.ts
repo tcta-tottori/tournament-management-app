@@ -356,25 +356,32 @@ class SyncEngine {
       };
       table.hook('creating', createHook);
 
-      // updating フック
+      const lkField = engine.getLogicalKeyField(tableName);
+
+      // updating フック（obj から論理キー・eventIdを取得して端末間で安定して行を特定できるようにする）
+      // Dexie updating フックのシグネチャ: (modifications, primKey, obj, transaction)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updateHook = function (this: any, mods: any, primKey: any) {
+      const updateHook = function (this: any, mods: any, primKey: any, obj: any) {
         engine.broadcastDexieChange({
           table: tableName,
           operation: 'update',
           key: primKey as number | string,
+          logicalKey: lkField ? (obj?.[lkField] as string | undefined) : undefined,
+          scopeEventId: obj?.eventId as string | undefined,
           modifications: { ...mods },
         });
       };
       table.hook('updating', updateHook);
 
-      // deleting フック
+      // deleting フック。Dexie deleting フックのシグネチャ: (primKey, obj, transaction)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const deleteHook = function (this: any, primKey: any) {
+      const deleteHook = function (this: any, primKey: any, obj: any) {
         engine.broadcastDexieChange({
           table: tableName,
           operation: 'delete',
           key: primKey as number | string,
+          logicalKey: lkField ? (obj?.[lkField] as string | undefined) : undefined,
+          scopeEventId: obj?.eventId as string | undefined,
         });
       };
       table.hook('deleting', deleteHook);
@@ -387,6 +394,27 @@ class SyncEngine {
     }
   }
 
+  /**
+   * 論理キー（＋必要ならeventId）でローカルの行を特定する。
+   * Dexieの数値ID(++id)は端末ごとに異なるため、端末間の update/delete では
+   * 数値IDではなく論理キーで行を突き合わせる必要がある。
+   */
+  private async findLocalRow(
+    tableName: string,
+    logicalKeyValue: string | undefined,
+    scopeEventId: string | undefined,
+  ): Promise<Record<string, unknown> | undefined> {
+    const lkField = this.getLogicalKeyField(tableName);
+    if (!lkField || logicalKeyValue == null) return undefined;
+    let rows = await db.table(tableName).where(lkField).equals(logicalKeyValue).toArray();
+    // 同一論理キーが種目間で衝突する場合（matchId等）は eventId で絞り込む
+    if (rows.length > 1 && scopeEventId != null) {
+      const filtered = rows.filter(r => (r as Record<string, unknown>).eventId === scopeEventId);
+      if (filtered.length > 0) rows = filtered;
+    }
+    return rows[0] as Record<string, unknown> | undefined;
+  }
+
   private async applyDexieChange(payload: DexieChangePayload): Promise<void> {
     isApplyingRemote = true;
     try {
@@ -394,15 +422,16 @@ class SyncEngine {
       switch (payload.operation) {
         case 'create':
           if (payload.data) {
-            // 既存チェック: 同じ論理キーがあれば上書き
+            // 既存チェック: 同じ論理キー（＋eventId）があれば上書き
             const logicalKey = this.getLogicalKeyField(payload.table);
             if (logicalKey && payload.data[logicalKey]) {
-              const existing = await table
-                .where(logicalKey)
-                .equals(payload.data[logicalKey] as string)
-                .first();
+              const existing = await this.findLocalRow(
+                payload.table,
+                payload.data[logicalKey] as string,
+                payload.data.eventId as string | undefined,
+              );
               if (existing) {
-                const id = (existing as Record<string, unknown>).id ?? (existing as Record<string, unknown>).name;
+                const id = existing.id ?? existing.name;
                 if (id !== undefined) {
                   await table.update(id as number, payload.data);
                   break;
@@ -417,13 +446,26 @@ class SyncEngine {
           break;
 
         case 'update':
-          if (payload.key && payload.modifications) {
-            await table.update(payload.key as number, payload.modifications);
+          if (payload.modifications) {
+            if (payload.logicalKey != null) {
+              // 論理キーでローカル行を特定して適用（端末間で安定）
+              const existing = await this.findLocalRow(payload.table, payload.logicalKey, payload.scopeEventId);
+              const id = existing ? (existing.id ?? existing.name) : undefined;
+              if (id !== undefined) await table.update(id as number, payload.modifications);
+              // ローカルに該当行が無ければ何もしない（数値IDでの誤爆を防ぐ）
+            } else if (payload.key) {
+              // 論理キー未対応の旧端末からの変更のみ、数値IDでフォールバック
+              await table.update(payload.key as number, payload.modifications);
+            }
           }
           break;
 
         case 'delete':
-          if (payload.key) {
+          if (payload.logicalKey != null) {
+            const existing = await this.findLocalRow(payload.table, payload.logicalKey, payload.scopeEventId);
+            const id = existing ? (existing.id ?? existing.name) : undefined;
+            if (id !== undefined) await table.delete(id as number);
+          } else if (payload.key) {
             await table.delete(payload.key as number);
           }
           break;
