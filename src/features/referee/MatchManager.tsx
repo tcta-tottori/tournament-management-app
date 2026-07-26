@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { FURIGANA_SEED } from '../../db/seedData';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2 } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Clock } from 'lucide-react';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
@@ -1575,6 +1575,13 @@ ${printableMatches.map(m => {
     };
   }, []);
 
+  // 試合経過時間の表示用に現在時刻を定期更新（30秒ごと）
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const statusLabels: Record<string, { text: string; color: string }> = {
     waiting: { text: '待機', color: 'bg-gray-100 text-gray-500' },
     ready: { text: '準備完了', color: 'bg-primary-50 text-primary-500' },
@@ -1742,12 +1749,12 @@ ${printableMatches.map(m => {
                           </div>
                         )}
                         <div className={`rounded-lg border p-2 transition-all ${cardClass}`}>
-                          {/* ヘッダー行: クラス・コート・状態を同じ行に表示 */}
-                          <div className="flex items-center gap-1.5 mb-1.5">
+                          {/* ヘッダー行: クラス(左)・コート(中央)・状態(右) */}
+                          <div className="relative flex items-center gap-1.5 mb-1.5 min-h-[20px]">
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
                             <div className="flex-1" />
                             {(isPlaying || isFinished) && courtObj?.name && (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                              <span className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
                                 {courtObj.name}番コート
                               </span>
                             )}
@@ -1762,6 +1769,21 @@ ${printableMatches.map(m => {
                             </div>
                             {renderPlayer(num2, m.player2Name, m.player2Affiliation, w2, isFinished)}
                           </div>
+                          {/* 試合中はカード中央下側に経過時間を表示 */}
+                          {isPlaying && m.updatedAt && (() => {
+                            const mins = Math.max(0, Math.floor((now - m.updatedAt) / 60000));
+                            const h = Math.floor(mins / 60);
+                            const mm = mins % 60;
+                            const label = h > 0 ? `${h}時間${mm}分` : `${mm}分`;
+                            return (
+                              <div className="flex justify-center mt-1.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold font-mono">
+                                  <Clock className="w-3 h-3" />
+                                  経過 {label}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           {/* フッター行 */}
                           <div className="flex items-center gap-2 mt-1.5 pl-1">
                             {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
