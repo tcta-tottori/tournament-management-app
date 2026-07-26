@@ -167,6 +167,17 @@ export default function MatchManager() {
     return events.filter(e => (allMatchesByEvent.get(e.eventId)?.length || 0) > 0);
   }, [events, allMatchesByEvent]);
 
+  // 種目ごとの最大ラウンド（ドロー未取得時のラウンド表示フォールバック用）
+  const eventMaxRound = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [eventId, matches] of allMatchesByEvent) {
+      let mx = 1;
+      for (const m of matches) if (m.round > mx) mx = m.round;
+      map.set(eventId, mx);
+    }
+    return map;
+  }, [allMatchesByEvent]);
+
   // --- 試合順Excelインポート ---
   const matchOrderInputRef = useRef<HTMLInputElement>(null);
   /** セルテキストを正規化（全角→半角、全角スペース→半角） */
@@ -322,14 +333,40 @@ export default function MatchManager() {
   // 全試合を時間割のフラットリスト順でソート（対戦順表示用）
   // importedScheduleの各アイテムを1つずつDB試合にマッピングし、時間割と同じ並びにする
   const globalSortedMatches = useMemo(() => {
-    const arr: (Match & { eventName: string })[] = [];
+    const raw: (Match & { eventName: string })[] = [];
     for (const [eventId, matches] of allMatchesByEvent) {
       const evt = events.find(e => e.eventId === eventId);
       const name = evt?.name || '';
       for (const m of matches) {
         if (m.status === 'walkover') continue;
-        arr.push({ ...m, eventName: name });
+        raw.push({ ...m, eventName: name });
       }
+    }
+
+    // 同期不整合による「幻の後半ラウンド重複」を除去する。
+    // シングルエリミネーションでは同一2名は1度しか対戦しないため、同一種目内で
+    // 同じ対戦カード（2名）が複数ラウンドに現れる場合は不整合とみなし、実際の対戦
+    // である最小ラウンドの1件のみを残す（ドロー表どおりの表示にするため）。
+    const arr: (Match & { eventName: string })[] = [];
+    const bestByPair = new Map<string, Match & { eventName: string }>();
+    for (const m of raw) {
+      const p1 = (m.player1Name || '').trim();
+      const p2 = (m.player2Name || '').trim();
+      const dedupable = !isLeagueEvent(m.eventId)
+        && p1 && p2 && p1 !== 'BYE' && p2 !== 'BYE';
+      if (!dedupable) { arr.push(m); continue; }
+      const pairKey = `${m.eventId}|${[p1, p2].sort().join('')}`;
+      const cur = bestByPair.get(pairKey);
+      if (!cur) {
+        bestByPair.set(pairKey, m);
+        arr.push(m);
+      } else if (m.round < cur.round || (m.round === cur.round && (m.position || 0) < (cur.position || 0))) {
+        // より小さいラウンド（実際の対戦）を採用し、既存の幻ラウンドを差し替える
+        const idx = arr.indexOf(cur);
+        if (idx >= 0) arr[idx] = m;
+        bestByPair.set(pairKey, m);
+      }
+      // それ以外（既存より後半ラウンドの重複）は破棄
     }
 
     if (importedSchedule.length === 0) {
@@ -1674,185 +1711,210 @@ ${printableMatches.map(m => {
                   <span className="text-white/70 text-[10px]">{globalSortedMatches.length}試合</span>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400">
-                      <th className="px-1.5 py-1.5 text-center whitespace-nowrap">#</th>
-                      <th className="px-1.5 py-1.5 whitespace-nowrap">種目</th>
-                      <th className="px-1 py-1.5 text-center whitespace-nowrap">G</th>
-                      <th className="px-1.5 py-1.5 whitespace-nowrap">選手1</th>
-                      <th className="px-0.5 py-1.5 text-center whitespace-nowrap"></th>
-                      <th className="px-1.5 py-1.5 whitespace-nowrap">選手2</th>
-                      <th className="px-1 py-1.5 text-center whitespace-nowrap">時間</th>
-                      <th className="px-1 py-1.5 text-center whitespace-nowrap">C</th>
-                      <th className="px-1 py-1.5 text-center whitespace-nowrap">状態</th>
-                      <th className="px-1 py-1.5 text-center whitespace-nowrap">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const availableCourtCount = courts.filter(c => c.isAvailable).length;
-                      let courtNum = 1;
-                      const courtAssignMap = new Map<string, string>();
-                      for (const m of globalSortedMatches) {
-                        if (m.status === 'playing' || m.status === 'finished') continue;
-                        const hasP = !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                        if (!hasP) continue;
-                        if (courtNum <= availableCourtCount) {
-                          courtAssignMap.set(m.matchId, String(courtNum));
-                          courtNum++;
-                        }
-                      }
-                      let seqNum = 0;
-                      let prevEventRound = '';
-                      return globalSortedMatches.map((m) => {
-                        seqNum++;
-                        const st = statusLabels[m.status] || statusLabels.waiting;
-                        const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
-                        const eventDraw = allDraws.get(m.eventId);
-                        const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : 1;
-                        const rName = shortRoundName(m.round, evTotalRounds);
-                        const hasPlayers = !!m.player1Name && !!m.player2Name
-                          && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                        const evt = events.find(e => e.eventId === m.eventId);
-                        const gameInfo = getGameCountForRound(evt, m.round, evTotalRounds);
-                        const gameDisplay = gameInfo.format === 'twoSetsSuper10' ? '2S' : String(gameInfo.count);
-                        const evLabel = `${shortEventName(m.eventName)} ${rName}`;
-                        const schedTime = m.scheduledTime || '';
-                        const sb = standbyInfo.get(m.matchId);
-                        const evColor = getEventColor(m.eventName);
-                        // グループ区切り線（種目+ラウンドが変わったら太線）
-                        const curEventRound = `${m.eventId}|${m.round}`;
-                        const isNewGroup = prevEventRound !== '' && curEventRound !== prevEventRound;
-                        prevEventRound = curEventRound;
-                        let statusDisplay: { text: string; color: string };
-                        if (m.status === 'playing') {
-                          statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
-                        } else if (m.status === 'finished') {
-                          statusDisplay = st;
-                        } else if (sb?.type === 'court') {
-                          statusDisplay = { text: '次C', color: 'bg-amber-100 text-amber-700' };
-                        } else if (sb?.type === 'standby') {
-                          statusDisplay = { text: sb.label, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
-                        } else if (!hasPlayers) {
-                          statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
-                        } else {
-                          statusDisplay = st;
-                        }
-                        // 状態別の背景（色付きの上に重ねる）
-                        const statusBgClass =
-                          m.status === 'playing' ? 'bg-green-50' :
-                          m.status === 'finished' ? 'bg-gray-50/60' :
-                          sb?.type === 'court' ? 'bg-amber-50/40' :
-                          sb?.type === 'standby' ? 'bg-orange-50/30' : evColor.bg;
-                        return (
-                          <React.Fragment key={m.matchId}>
-                            <tr className={`${isNewGroup ? 'border-t-2 border-t-gray-300' : 'border-b border-gray-100'} ${
-                              !hasPlayers ? 'opacity-30' : ''
-                            } ${statusBgClass}`}>
-                              <td className="py-1.5 px-1.5 text-center font-mono text-blue-500 text-[10px] font-bold whitespace-nowrap">{seqNum}</td>
-                              <td className={`py-1.5 px-1.5 text-[10px] font-semibold whitespace-nowrap ${evColor.text}`} title={evLabel}>{evLabel}</td>
-                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-500 whitespace-nowrap">{gameDisplay}</td>
-                              <td className="py-1.5 px-1.5 whitespace-nowrap">
-                                <span className="text-xs font-medium">{m.player1Name || '-'}</span>
-                              </td>
-                              <td className="py-1.5 px-0.5 text-center text-blue-300 text-[10px] font-bold whitespace-nowrap">vs</td>
-                              <td className="py-1.5 px-1.5 whitespace-nowrap">
-                                <span className="text-xs font-medium">{m.player2Name || '-'}</span>
-                              </td>
-                              <td className="py-1.5 px-1 text-center text-[10px] text-gray-400 whitespace-nowrap">{schedTime}</td>
-                              <td className="py-1.5 px-1 text-center text-[10px] font-bold text-gray-700 whitespace-nowrap">{(() => {
-                                if (m.status === 'playing' || m.status === 'finished') return courtObj?.name || '-';
-                                const assignedCourt = courtAssignMap.get(m.matchId);
-                                if (assignedCourt) return assignedCourt;
-                                return '-';
-                              })()}</td>
-                              <td className="py-1.5 px-1 text-center whitespace-nowrap">
-                                <span className={`inline-block px-1 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${statusDisplay.color}`}>{statusDisplay.text}</span>
-                              </td>
-                              <td className="py-1 px-1 text-center whitespace-nowrap">
-                                <div className="flex items-center gap-0.5 justify-center">
+              <div className="p-2 space-y-2">
+                {(() => {
+                  const availableCourtCount = courts.filter(c => c.isAvailable).length;
+                  let courtNum = 1;
+                  const courtAssignMap = new Map<string, string>();
+                  for (const m of globalSortedMatches) {
+                    if (m.status === 'playing' || m.status === 'finished') continue;
+                    const hasP = !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+                    if (!hasP) continue;
+                    if (courtNum <= availableCourtCount) {
+                      courtAssignMap.set(m.matchId, String(courtNum));
+                      courtNum++;
+                    }
+                  }
+                  // 終了試合は末尾へ移動しグレー表示（次の控えを分かりやすくする）
+                  const activeMatches = globalSortedMatches.filter(m => m.status !== 'finished');
+                  const finishedMatches = globalSortedMatches.filter(m => m.status === 'finished');
+                  const ordered = [...activeMatches, ...finishedMatches];
+                  const firstFinishedId = finishedMatches[0]?.matchId;
+                  let seqNum = 0;
+
+                  const renderPlayer = (name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
+                    <div className="min-w-0 flex-1">
+                      <div className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
+                        {name || '-'}
+                      </div>
+                      {affiliation && affiliation !== 'BYE' && (
+                        <div className="text-[10px] leading-tight text-gray-500 truncate" title={affiliation}>{affiliation}</div>
+                      )}
+                    </div>
+                  );
+
+                  return ordered.map((m) => {
+                    seqNum++;
+                    const st = statusLabels[m.status] || statusLabels.waiting;
+                    const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+                    const eventDraw = allDraws.get(m.eventId);
+                    const evTotalRounds = eventDraw ? Math.log2(eventDraw.drawSize) : Math.max(1, eventMaxRound.get(m.eventId) || 1);
+                    const rName = shortRoundName(m.round, evTotalRounds);
+                    const hasPlayers = !!m.player1Name && !!m.player2Name
+                      && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
+                    const evt = events.find(e => e.eventId === m.eventId);
+                    const gameInfo = getGameCountForRound(evt, m.round, evTotalRounds);
+                    const gameDisplay = gameInfo.format === 'twoSetsSuper10' ? '2S' : `${gameInfo.count}G`;
+                    const evLabel = `${shortEventName(m.eventName)} ${rName}`;
+                    const schedTime = m.scheduledTime || '';
+                    const sb = standbyInfo.get(m.matchId);
+                    const evColor = getEventColor(m.eventName);
+                    const isPlaying = m.status === 'playing';
+                    const isFinished = m.status === 'finished';
+
+                    let statusDisplay: { text: string; color: string };
+                    if (isPlaying) {
+                      statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
+                    } else if (isFinished) {
+                      statusDisplay = st;
+                    } else if (sb?.type === 'court') {
+                      statusDisplay = { text: '次C', color: 'bg-amber-100 text-amber-700' };
+                    } else if (sb?.type === 'standby') {
+                      statusDisplay = { text: sb.label, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
+                    } else if (!hasPlayers) {
+                      statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
+                    } else {
+                      statusDisplay = st;
+                    }
+
+                    // カード枠の配色（試合中は枠のみ点滅 = bracket-card-blink）
+                    const cardClass = isFinished
+                      ? 'bg-gray-50 border-gray-200 opacity-60'
+                      : isPlaying
+                        ? 'bg-green-50 border-2 border-green-500 bracket-card-blink'
+                        : !hasPlayers
+                          ? 'bg-white border-gray-200 opacity-50'
+                          : sb?.type === 'court'
+                            ? 'bg-amber-50/60 border-amber-300'
+                            : sb?.type === 'standby'
+                              ? 'bg-orange-50/50 border-orange-200'
+                              : `${evColor.bg} border-gray-200`;
+
+                    const courtLabel = (isPlaying || isFinished)
+                      ? (courtObj?.name || '-')
+                      : (courtAssignMap.get(m.matchId) || '-');
+                    const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
+                    const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
+
+                    return (
+                      <React.Fragment key={m.matchId}>
+                        {m.matchId === firstFinishedId && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <div className="flex-1 h-px bg-gray-200" />
+                            <span className="text-[10px] font-bold text-gray-400">終了した試合</span>
+                            <div className="flex-1 h-px bg-gray-200" />
+                          </div>
+                        )}
+                        <div className={`rounded-lg border p-2 transition-all ${cardClass}`}>
+                          {/* ヘッダー行 */}
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <span className={`w-5 h-5 shrink-0 flex items-center justify-center rounded-full text-[10px] font-bold font-mono ${isFinished ? 'bg-gray-200 text-gray-500' : 'bg-blue-500 text-white'}`}>
+                              {seqNum}
+                            </span>
+                            <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
+                            <span className="text-[10px] font-bold text-gray-400 shrink-0">{gameDisplay}</span>
+                            <div className="flex-1" />
+                            <span className="text-[10px] font-bold text-gray-600 shrink-0">
+                              <span className="text-gray-400 font-normal">C</span>{courtLabel}
+                            </span>
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
+                          </div>
+                          {/* 選手 */}
+                          <div className="flex items-stretch gap-2 pl-1">
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center gap-1">
+                                {renderPlayer(m.player1Name, m.player1Affiliation, w1, isFinished)}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold text-blue-300 shrink-0 w-4 text-center">vs</span>
+                                <div className="flex-1 h-px bg-gray-200" />
+                                {isFinished && m.score && <span className="text-[10px] font-mono font-bold text-gray-500 shrink-0">{m.score}</span>}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {renderPlayer(m.player2Name, m.player2Affiliation, w2, isFinished)}
+                              </div>
+                            </div>
+                          </div>
+                          {/* フッター行 */}
+                          <div className="flex items-center gap-2 mt-1.5 pl-1">
+                            {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
+                            <div className="flex-1" />
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handlePrintMatch(m)}
+                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
+                                title="印刷"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              {hasPlayers && m.status !== 'walkover' && (
+                                <button
+                                  onClick={() => startEdit(m)}
+                                  className={`p-1 rounded border transition-all ${
+                                    isFinished
+                                      ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
+                                      : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
+                                  }`}
+                                  title={isFinished ? 'スコア修正' : 'スコア入力'}
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {hasPlayers && m.status !== 'walkover' && (
+                                speakingMatchId === m.matchId ? (
                                   <button
-                                    onClick={() => handlePrintMatch(m)}
-                                    className="p-0.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
-                                    title="印刷"
+                                    onClick={handleVoiceStop}
+                                    className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
+                                    title="停止"
                                   >
-                                    <Printer className="w-3 h-3" />
+                                    <Square className="w-3.5 h-3.5" />
                                   </button>
-                                  {hasPlayers && m.status !== 'walkover' && (
-                                    <button
-                                      onClick={() => startEdit(m)}
-                                      className={`p-0.5 rounded border transition-all ${
-                                        m.status === 'finished'
-                                          ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
-                                          : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
-                                      }`}
-                                      title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
-                                    >
-                                      <Edit3 className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                  {hasPlayers && m.status !== 'walkover' && (
-                                    speakingMatchId === m.matchId ? (
-                                      <button
-                                        onClick={handleVoiceStop}
-                                        className="p-0.5 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
-                                        title="停止"
-                                      >
-                                        <Square className="w-3 h-3" />
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => openCallModal(m)}
-                                        className={`p-0.5 rounded border transition-all ${
-                                          callTargetMatchId === m.matchId
-                                            ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
-                                            : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
-                                        }`}
-                                        title="音声コール"
-                                      >
-                                        <Volume2 className="w-3 h-3" />
-                                      </button>
-                                    )
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                            {editingMatchId === m.matchId && (
-                              <tr className="bg-blue-50 border-b border-blue-200">
-                                <td colSpan={10} className="px-3 py-2">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-bold text-gray-600">スコア:</span>
-                                    <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P1" autoFocus
-                                      onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                                    <span className="text-gray-400 font-bold text-xs">-</span>
-                                    <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P2"
-                                      onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                                    {isTiebreakScore && (
-                                      <>
-                                        <span className="text-[10px] text-gray-500">TB:</span>
-                                        <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="TB"
-                                          onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                                      </>
-                                    )}
-                                    <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-2 py-1 bg-primary-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
-                                      <Check className="w-3 h-3 inline mr-0.5" />確定
-                                    </button>
-                                    <button onClick={cancelEdit} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
-                                      <X className="w-3 h-3 inline mr-0.5" />取消
-                                    </button>
-                                    {autoWinner && <span className="text-[10px] text-primary-600 font-bold">勝: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
+                                ) : (
+                                  <button
+                                    onClick={() => openCallModal(m)}
+                                    className={`p-1 rounded border transition-all ${
+                                      callTargetMatchId === m.matchId
+                                        ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
+                                        : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
+                                    }`}
+                                    title="音声コール"
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                          {/* インラインスコア入力 */}
+                          {editingMatchId === m.matchId && (
+                            <div className="mt-2 pt-2 border-t border-blue-200 flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-bold text-gray-600">スコア:</span>
+                              <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P1" autoFocus
+                                onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                              <span className="text-gray-400 font-bold text-xs">-</span>
+                              <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P2"
+                                onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                              {isTiebreakScore && (
+                                <>
+                                  <span className="text-[10px] text-gray-500">TB:</span>
+                                  <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="TB"
+                                    onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
+                                </>
+                              )}
+                              <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-2 py-1 bg-primary-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
+                                <Check className="w-3 h-3 inline mr-0.5" />確定
+                              </button>
+                              <button onClick={cancelEdit} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
+                                <X className="w-3 h-3 inline mr-0.5" />取消
+                              </button>
+                              {autoWinner && <span className="text-[10px] text-primary-600 font-bold">勝: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </div>
             </div>
           ) : (
