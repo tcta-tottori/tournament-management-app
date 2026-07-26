@@ -131,11 +131,15 @@ export default function CallSettingsModal({
 
         {/* 本体 */}
         <div className="px-5 py-4 space-y-4">
-          {/* 対戦カード（番号・フルネーム・所属をすべて表示。級・部はヘッダーの種目名） */}
-          <div className="text-center py-1 space-y-1.5">
-            <PlayerCardLine info={player1} fallbackName={player1Name} />
-            <div className="text-[11px] text-gray-400">vs</div>
-            <PlayerCardLine info={player2} fallbackName={player2Name} />
+          {/* 対戦カード（番号・フルネーム・所属を横並びで表示。級・部はヘッダーの種目名） */}
+          <div className="flex items-center justify-center gap-2 py-1">
+            <div className="flex-1 min-w-0 text-center">
+              <PlayerCardLine info={player1} fallbackName={player1Name} />
+            </div>
+            <div className="shrink-0 px-1 text-[11px] font-bold text-gray-400">vs</div>
+            <div className="flex-1 min-w-0 text-center">
+              <PlayerCardLine info={player2} fallbackName={player2Name} />
+            </div>
           </div>
 
           {showCourtAndTime && (

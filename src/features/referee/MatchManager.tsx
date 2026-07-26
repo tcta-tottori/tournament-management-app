@@ -793,8 +793,8 @@ export default function MatchManager() {
   const openCallModal = useCallback((m: Match) => {
     setCallTargetMatchId(m.matchId);
     setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
-    // 開始時刻の標準は「指定なし」。既に指定済みならその値を引き継ぐ。
-    setCallStartTime(m.scheduledTime || '');
+    // 開始時刻の標準は「指定なし」（空欄）。9:00等の既定値は入れない。
+    setCallStartTime('');
 
     // 苗字・所属の読み（フリガナ）の初期値を用意する。コートに依存しないため '0' で生成。
     const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
