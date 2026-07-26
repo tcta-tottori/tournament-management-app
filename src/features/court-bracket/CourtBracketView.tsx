@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Timer } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 
 /** フルネームから苗字を抽出 */
@@ -63,7 +63,8 @@ export default function CourtBracketView({
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
-  const slotW = isDoubles ? (isMobile ? 200 : 260) : (isMobile ? 150 : 190);
+  // 所属を省略せず表示できるよう横幅を広めに確保
+  const slotW = isDoubles ? (isMobile ? 240 : 320) : (isMobile ? 200 : 250);
   const xSpacing = isMobile ? 36 : 50;
   const offsetX = isMobile ? 10 : 20;
   const roundsCount = Math.log2(drawSize);
@@ -173,7 +174,8 @@ export default function CourtBracketView({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      const getStroke = (isWinner: boolean) => isWinner ? '#dc2626' : isPlaying ? '#16a34a' : '#94a3b8';
+      // 勝者の線は緑（従来は赤）
+      const getStroke = (isWinner: boolean) => isWinner ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8';
       const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1';
 
       paths.push(<path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`}
@@ -183,57 +185,23 @@ export default function CourtBracketView({
 
       const winnerExists = winnerIsTop || winnerIsBottom;
       paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
-        fill="none" stroke={winnerExists ? '#dc2626' : isPlaying ? '#16a34a' : '#94a3b8'}
+        fill="none" stroke={winnerExists ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8'}
         strokeWidth={winnerExists ? '2.5' : '1'} />);
 
-      // スコアを線の上に赤字で表示（完了試合）
-      if (isFinished && matchResult.score) {
-        const scoreX = xMid + 4;
-        const scoreY = yMid - 6;
+      // 対戦カード（結果ノード）下部に、開始時刻(予定)と経過時間を表示する。
+      // コート番号・スコアはカード内部に表示（ここでは出さない）。
+      const cardCenterX = xNext + slotW / 2;
+      const cardBottomY = getCompactY(r + 1, m) + SLOT_HEIGHT + 10;
+      const bottomParts: { text: string; color: string }[] = [];
+      if (matchResult?.scheduledTime) bottomParts.push({ text: matchResult.scheduledTime, color: '#1e40af' });
+      if (isPlaying && matchResult?.updatedAt) bottomParts.push({ text: formatElapsed(matchResult.updatedAt), color: '#16a34a' });
+      if (bottomParts.length > 0) {
+        const label = bottomParts.map(p => p.text).join('  ');
         paths.push(
-          <text key={`sc-${r}-${m}`} x={scoreX} y={scoreY}
-            fill="#dc2626" fontSize="9" fontWeight="bold" fontFamily="monospace">
-            {matchResult.score}
-          </text>
-        );
-      }
-
-      // コートタイル（試合中の場合、接続線の中間に表示）
-      if (isPlaying && matchResult.courtName) {
-        const tileX = xMid - 14;
-        const tileY = yMid - 20;
-        paths.push(
-          <React.Fragment key={`ct-${r}-${m}`}>
-            <rect x={tileX} y={tileY} width="28" height="16" rx="3"
-              fill="#1d4ed8" stroke="#1e40af" strokeWidth="1" />
-            <text x={tileX + 14} y={tileY + 12} textAnchor="middle"
-              fill="white" fontSize="10" fontWeight="bold">
-              {matchResult.courtName}
-            </text>
-          </React.Fragment>
-        );
-      }
-
-      // 時間表示（1回戦のみ、scheduled time）
-      if (r === 0 && matchResult?.scheduledTime) {
-        const timeX = xMid - 2;
-        const timeY = yMid + 14;
-        paths.push(
-          <text key={`tm-${r}-${m}`} x={timeX} y={timeY}
-            fill="#1e40af" fontSize="8" fontWeight="bold" textAnchor="middle">
-            {matchResult.scheduledTime}
-          </text>
-        );
-      }
-
-      // 経過時間（試合中）
-      if (isPlaying && matchResult.updatedAt) {
-        const elX = xMid;
-        const elY = yMid + 14;
-        paths.push(
-          <text key={`el-${r}-${m}`} x={elX} y={elY}
-            fill="#16a34a" fontSize="8" fontWeight="bold" textAnchor="middle">
-            {formatElapsed(matchResult.updatedAt)}
+          <text key={`bt-${r}-${m}`} x={cardCenterX} y={cardBottomY}
+            fill={bottomParts.length === 1 ? bottomParts[0].color : '#16a34a'}
+            fontSize="8.5" fontWeight="bold" textAnchor="middle">
+            {label}
           </text>
         );
       }
@@ -267,7 +235,7 @@ export default function CourtBracketView({
           {slot.isBye ? <span className="text-gray-400">BYE</span> : slot.name}
         </div>
         {!slot.isBye && slot.affiliation && (
-          <div className="text-[9px] text-gray-500 truncate max-w-[40px] shrink-0" title={slot.affiliation}>
+          <div className="text-[9px] text-gray-500 whitespace-nowrap shrink-0" title={slot.affiliation}>
             {slot.affiliation}
           </div>
         )}
@@ -316,7 +284,7 @@ export default function CourtBracketView({
                   <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />
                   <span className="text-sm font-bold text-primary-700 truncate">{displayName}</span>
                   {matchResult.score && (
-                    <span className="text-[9px] text-red-600 font-bold font-mono ml-auto shrink-0">
+                    <span className="text-[9px] text-green-600 font-bold font-mono ml-auto shrink-0">
                       {matchResult.score}
                     </span>
                   )}
@@ -368,7 +336,7 @@ export default function CourtBracketView({
                   {winnerName}
                 </span>
                 {matchResult.score && (
-                  <span className="text-[9px] text-red-600 font-bold font-mono shrink-0">
+                  <span className="text-[9px] text-green-600 font-bold font-mono shrink-0">
                     {matchResult.score}
                   </span>
                 )}
@@ -380,15 +348,10 @@ export default function CourtBracketView({
                     ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
                     : ''}
                 </span>
+                {/* コート番号はカード内部に表示（経過時間はカード下部へ移動） */}
                 {matchResult.courtName && (
                   <span className="bg-blue-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
                     {matchResult.courtName}
-                  </span>
-                )}
-                {matchResult.updatedAt && (
-                  <span className="text-[8px] text-green-700 font-bold shrink-0 flex items-center gap-0.5">
-                    <Timer className="w-2.5 h-2.5" />
-                    {formatElapsed(matchResult.updatedAt)}
                   </span>
                 )}
               </>
@@ -399,13 +362,11 @@ export default function CourtBracketView({
                     ? `${getSurname(matchResult.player1Name)} vs ${getSurname(matchResult.player2Name)}`
                     : ''}
                 </span>
+                {/* コート番号はカード内部に表示（開始時刻はカード下部へ移動） */}
                 {matchResult.courtName && (
                   <span className="bg-blue-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
                     {matchResult.courtName}
                   </span>
-                )}
-                {matchResult.scheduledTime && matchResult.round === 1 && (
-                  <span className="text-[8px] text-blue-700 font-bold shrink-0">{matchResult.scheduledTime}</span>
                 )}
               </>
             ) : (
