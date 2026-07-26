@@ -4,7 +4,8 @@ import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
-  AlertTriangle, Network, Menu, X, Volume2
+  AlertTriangle, Network, Menu, X, Volume2,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -57,7 +58,24 @@ export default function AppLayout() {
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // PC表示：左側の常設サイドバー。デフォルト展開、アイコンのみ表示に折りたたみ可能。
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    typeof window !== 'undefined' && localStorage.getItem('sidebarCollapsed') === '1'
+  );
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0');
+  }, [sidebarCollapsed]);
 
   // モバイルの自動再生制約対策: 最初のユーザー操作でオーディオをアンロックする
   useEffect(() => {
@@ -283,7 +301,7 @@ export default function AppLayout() {
         {/* 左: ハンバーガーボタン + 現在ページ名 */}
         <button
           className="header-hamburger-btn"
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => isDesktop ? setSidebarCollapsed(v => !v) : setMenuOpen(!menuOpen)}
           aria-label="メニューを開く"
         >
           <Menu style={{ width: 24, height: 24 }} />
@@ -344,14 +362,14 @@ export default function AppLayout() {
         );
       })()}
 
-      {/* ===== スライドメニュー（右から展開） ===== */}
+      {/* ===== スライドメニュー（モバイル：右から展開）※PCは常設サイドバー ===== */}
       {/* オーバーレイ */}
       <div
-        className={`hamburger-overlay ${menuOpen ? 'hamburger-overlay-visible' : ''}`}
+        className={`hamburger-overlay lg:hidden ${menuOpen ? 'hamburger-overlay-visible' : ''}`}
         onClick={() => setMenuOpen(false)}
       />
       {/* ドロワー */}
-      <div className={`hamburger-drawer ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
+      <div className={`hamburger-drawer lg:hidden ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
         <div className="hamburger-drawer-header">
           <span>メニュー</span>
           <button
@@ -431,12 +449,91 @@ export default function AppLayout() {
         </div>
       </div>
 
-      {/* ===== メインコンテンツ（ページ遷移アニメーション） ===== */}
-      <main className="flex-1 overflow-y-auto relative bg-bg-main h-full">
-        <div key={location.pathname} className="page-enter min-h-full">
-          <Outlet />
-        </div>
-      </main>
+      {/* ===== 本体：PCは常設サイドバー＋メイン、モバイルはメインのみ ===== */}
+      <div className="flex flex-1 min-h-0">
+        {/* PC用 常設サイドバー（デフォルト展開・折りたたみでアイコンのみ） */}
+        <aside
+          className={`hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
+            sidebarCollapsed ? 'w-[64px]' : 'w-56'
+          }`}
+          style={{ background: 'linear-gradient(180deg, #0f3326 0%, #163d31 30%, #1b4d3e 100%)' }}
+        >
+          {/* 折りたたみトグル */}
+          <div className={`flex items-center h-10 shrink-0 border-b border-white/10 ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'}`}>
+            {!sidebarCollapsed && <span className="text-[11px] font-bold text-white/50 tracking-wide">メニュー</span>}
+            <button
+              onClick={() => setSidebarCollapsed(v => !v)}
+              className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded transition-colors"
+              title={sidebarCollapsed ? 'メニューを展開' : 'アイコンのみに縮小'}
+              aria-label={sidebarCollapsed ? 'メニューを展開' : 'メニューを縮小'}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* ナビゲーション */}
+          <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-0.5">
+            {allTabs.map((item) => {
+              const isActive = location.pathname.startsWith(item.path);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(item.path)}
+                  title={item.label}
+                  className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
+                  style={sidebarCollapsed ? { padding: '12px 0' } : undefined}
+                >
+                  <item.icon
+                    className="shrink-0"
+                    style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined }}
+                  />
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* フッター：操作ボタン・バージョン */}
+          <div className="border-t border-white/10 p-2 flex flex-col gap-1.5 shrink-0">
+            {sidebarCollapsed ? (
+              <>
+                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded" title="音声設定（Gemini TTS）">
+                  <Volume2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-amber-300/80 hover:text-amber-300 text-center py-1" title="バージョン情報">
+                  2.4
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center flex-wrap gap-1.5">
+                  <SyncStatusIndicator />
+                  <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定（Gemini TTS）" aria-label="音声設定">
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>音声</span>
+                  </button>
+                  <PublicViewHeaderLink />
+                  <a href="https://www.tottori-tenis.net/" target="_blank" rel="noopener noreferrer" className="header-link" title="鳥取県テニス協会HPを開く">
+                    <span>テニス協会HP</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <button onClick={() => setVersionModalOpen(true)} className="drawer-version-btn" title="バージョン情報・更新履歴">
+                  <span className="header-version">Ver 2.4</span>
+                  <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
+                </button>
+              </>
+            )}
+          </div>
+        </aside>
+
+        {/* メインコンテンツ（ページ遷移アニメーション） */}
+        <main className="flex-1 min-w-0 overflow-y-auto relative bg-bg-main">
+          <div key={location.pathname} className="page-enter min-h-full">
+            <Outlet />
+          </div>
+        </main>
+      </div>
 
       {/* バージョン情報モーダル */}
       <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />
