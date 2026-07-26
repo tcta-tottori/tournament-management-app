@@ -1661,15 +1661,7 @@ ${printableMatches.map(m => {
         {/* === 対戦順（グローバル）表示 === */}
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-              <div className="px-3 py-2 bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ListOrdered className="w-4 h-4 text-white" />
-                  <span className="font-bold text-white text-xs">対戦順</span>
-                  <span className="text-white/70 text-[10px]">{globalSortedMatches.length}試合</span>
-                </div>
-              </div>
-              <div className="p-2 space-y-2">
+            <div className="space-y-2">
                 {(() => {
                   // 終了試合は末尾へ移動しグレー表示（次の控えを分かりやすくする）
                   const activeMatches = globalSortedMatches.filter(m => m.status !== 'finished');
@@ -1680,7 +1672,7 @@ ${printableMatches.map(m => {
                   const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
                     <div className="min-w-0 flex-1 text-center">
                       <div className="flex items-baseline justify-center gap-1 min-w-0">
-                        {num > 0 && <span className="text-[10px] font-mono font-bold text-blue-400 shrink-0">{num}</span>}
+                        {num > 0 && <span className="text-sm font-mono font-bold text-blue-400 shrink-0">{num}</span>}
                         <span className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
                           {name || '-'}
                         </span>
@@ -1775,8 +1767,8 @@ ${printableMatches.map(m => {
                           {/* 選手（横並び・各エリア中央寄せ） */}
                           <div className="flex items-start gap-2">
                             {renderPlayer(num1, m.player1Name, m.player1Affiliation, w1, isFinished)}
-                            <div className="flex flex-col items-center justify-center shrink-0 pt-0.5 min-w-[28px]">
-                              <span className="text-[10px] font-bold text-blue-300 leading-none">vs</span>
+                            <div className="flex flex-col items-center justify-center shrink-0 pt-0.5 min-w-[32px]">
+                              <span className="text-base font-bold text-blue-300 leading-none">vs</span>
                               {isFinished && m.score && <span className="text-[9px] font-mono font-bold text-gray-500 leading-tight mt-0.5">{m.score}</span>}
                             </div>
                             {renderPlayer(num2, m.player2Name, m.player2Affiliation, w2, isFinished)}
@@ -1791,43 +1783,43 @@ ${printableMatches.map(m => {
                                 {elapsedLabel}
                               </span>
                             )}
-                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={() => handlePrintMatch(m)}
-                                className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-all"
+                                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-all"
                                 title="印刷"
                               >
-                                <Printer className="w-5 h-5" />
+                                <Printer className="w-4 h-4" />
                               </button>
                               {evt && (
                                 <button
                                   onClick={() => openRuleEditor(evt)}
-                                  className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg border border-amber-200 transition-all"
+                                  className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg border border-amber-200 transition-all"
                                   title="試合ルール"
                                 >
-                                  <BookOpen className="w-5 h-5" />
+                                  <BookOpen className="w-4 h-4" />
                                 </button>
                               )}
                               {hasPlayers && m.status !== 'walkover' && (
                                 speakingMatchId === m.matchId ? (
                                   <button
                                     onClick={handleVoiceStop}
-                                    className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-300 transition-all animate-pulse"
+                                    className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-300 transition-all animate-pulse"
                                     title="停止"
                                   >
-                                    <Square className="w-5 h-5" />
+                                    <Square className="w-4 h-4" />
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => openCallModal(m)}
-                                    className={`p-2 rounded-lg border transition-all ${
+                                    className={`p-1.5 rounded-lg border transition-all ${
                                       callTargetMatchId === m.matchId
                                         ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
                                         : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
                                     }`}
                                     title="音声コール"
                                   >
-                                    <Volume2 className="w-5 h-5" />
+                                    <Volume2 className="w-4 h-4" />
                                   </button>
                                 )
                               )}
@@ -1863,7 +1855,6 @@ ${printableMatches.map(m => {
                     );
                   });
                 })()}
-              </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white rounded-xl border border-dashed border-border-main shadow-sm">
