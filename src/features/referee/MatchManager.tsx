@@ -1738,6 +1738,15 @@ ${printableMatches.map(m => {
                     const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
                     const num1 = getDrawNumber(m.player1EntryId, m.eventId);
                     const num2 = getDrawNumber(m.player2EntryId, m.eventId);
+                    const evt = events.find(e => e.eventId === m.eventId);
+                    const canEditResult = hasPlayers && m.status !== 'walkover';
+                    let elapsedLabel = '';
+                    if (isPlaying && m.updatedAt) {
+                      const mins = Math.max(0, Math.floor((now - m.updatedAt) / 60000));
+                      const h = Math.floor(mins / 60);
+                      const mm = mins % 60;
+                      elapsedLabel = h > 0 ? `${h}時間${mm}分` : `${mm}分`;
+                    }
 
                     return (
                       <React.Fragment key={m.matchId}>
@@ -1748,7 +1757,10 @@ ${printableMatches.map(m => {
                             <div className="flex-1 h-px bg-gray-200" />
                           </div>
                         )}
-                        <div className={`rounded-lg border p-2 transition-all ${cardClass}`}>
+                        <div
+                          onClick={() => { if (canEditResult && editingMatchId !== m.matchId) startEdit(m); }}
+                          className={`rounded-lg border p-2 transition-all ${cardClass} ${canEditResult ? 'cursor-pointer' : ''}`}
+                        >
                           {/* ヘッダー行: クラス(左)・コート(中央)・状態(右) */}
                           <div className="relative flex items-center gap-1.5 mb-1.5 min-h-[20px]">
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
@@ -1769,26 +1781,17 @@ ${printableMatches.map(m => {
                             </div>
                             {renderPlayer(num2, m.player2Name, m.player2Affiliation, w2, isFinished)}
                           </div>
-                          {/* 試合中はカード中央下側に経過時間を表示 */}
-                          {isPlaying && m.updatedAt && (() => {
-                            const mins = Math.max(0, Math.floor((now - m.updatedAt) / 60000));
-                            const h = Math.floor(mins / 60);
-                            const mm = mins % 60;
-                            const label = h > 0 ? `${h}時間${mm}分` : `${mm}分`;
-                            return (
-                              <div className="flex justify-center mt-1.5">
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold font-mono">
-                                  <Clock className="w-3 h-3" />
-                                  経過 {label}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                          {/* フッター行 */}
-                          <div className="flex items-center gap-2 mt-1.5 pl-1">
+                          {/* フッター行: 開始時刻(左)・経過時間(中央)・操作ボタン(右) */}
+                          <div className="relative flex items-center gap-2 mt-1.5 pl-1 min-h-[36px]">
                             {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
                             <div className="flex-1" />
-                            <div className="flex items-center gap-1.5">
+                            {elapsedLabel && (
+                              <span className="absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold font-mono">
+                                <Clock className="w-3 h-3" />
+                                {elapsedLabel}
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={() => handlePrintMatch(m)}
                                 className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-all"
@@ -1796,6 +1799,15 @@ ${printableMatches.map(m => {
                               >
                                 <Printer className="w-5 h-5" />
                               </button>
+                              {evt && (
+                                <button
+                                  onClick={() => openRuleEditor(evt)}
+                                  className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg border border-amber-200 transition-all"
+                                  title="試合ルール"
+                                >
+                                  <BookOpen className="w-5 h-5" />
+                                </button>
+                              )}
                               {hasPlayers && m.status !== 'walkover' && (
                                 speakingMatchId === m.matchId ? (
                                   <button
@@ -1823,7 +1835,7 @@ ${printableMatches.map(m => {
                           </div>
                           {/* インラインスコア入力 */}
                           {editingMatchId === m.matchId && (
-                            <div className="mt-2 pt-2 border-t border-blue-200 flex items-center gap-2 flex-wrap">
+                            <div onClick={e => e.stopPropagation()} className="mt-2 pt-2 border-t border-blue-200 flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-bold text-gray-600">スコア:</span>
                               <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P1" autoFocus
                                 onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
