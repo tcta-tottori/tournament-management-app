@@ -6,7 +6,7 @@ import { useAppStore } from '../../stores/appStore';
 import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
-import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
+import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -521,7 +521,6 @@ export default function MatchManager() {
   // キーは漢字（苗字 or 所属）、値は読み（ひらがな）。空欄なら漢字のまま読み上げる。
   const [callNameReadings, setCallNameReadings] = useState<Record<string, string>>({});
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
-  const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
   const { isSpeaking, speak, stop } = useGeminiTts();
@@ -770,15 +769,6 @@ export default function MatchManager() {
     // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
     speak(toSpeechText(text), voiceSettings, () => {
       setSpeakingMatchId(null);
-      const roundName = getRoundName(m.round, evTotalRounds);
-      setCallLog(prev => [{
-        timestamp: new Date(),
-        courtNumber: courtNum,
-        eventName: evt?.name || '',
-        round: `${roundName} #${m.position}`,
-        text,
-        matchId: m.id || 0,
-      }, ...prev]);
     });
   }, [buildMatchCall, speak, voiceSettings, affiliationFuriganaMap, currentEvent, totalRounds, events, allDraws, courtNameToId]);
 
@@ -1787,27 +1777,16 @@ ${printableMatches.map(m => {
                 全コート初戦一斉コール
               </button>
             )}
-            {/* 音声コール設定: 詳細はヘッダーの「音声」ボタンから */}
-            <div>
-              <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-emerald-100 shadow-sm">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm">
-                  <Volume2 className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-800">音声エンジン: Gemini TTS</p>
-                  <p className="text-[10px] text-gray-500">ヘッダーの「音声」ボタンから設定・テストできます</p>
-                </div>
-                {isSpeaking && (
-                  <button
-                    onClick={handleVoiceStop}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200 hover:bg-red-100 transition-all"
-                  >
-                    <Square className="w-3 h-3" />
-                    停止
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* コール中の停止操作は画面下部の固定ポップアップから行う */}
+            {isSpeaking && (
+              <button
+                onClick={handleVoiceStop}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-bold border border-red-200 hover:bg-red-100 transition-all"
+              >
+                <Square className="w-4 h-4" />
+                コール停止
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1847,8 +1826,8 @@ ${printableMatches.map(m => {
                   let seqNum = 0;
 
                   const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-1 min-w-0">
+                    <div className="min-w-0 flex-1 text-center">
+                      <div className="flex items-baseline justify-center gap-1 min-w-0">
                         {num > 0 && <span className="text-[10px] font-mono font-bold text-blue-400 shrink-0">{num}</span>}
                         <span className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
                           {name || '-'}
@@ -1925,6 +1904,14 @@ ${printableMatches.map(m => {
                           </div>
                         )}
                         <div className={`rounded-lg border p-2 transition-all ${cardClass}`}>
+                          {/* コートに入っている場合はコート番号を中央上に表示 */}
+                          {isPlaying && courtObj?.name && (
+                            <div className="flex justify-center mb-1.5">
+                              <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-green-600 text-white text-xs font-bold shadow-sm">
+                                {courtObj.name}番コート
+                              </span>
+                            </div>
+                          )}
                           {/* ヘッダー行 */}
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <span className={`w-5 h-5 shrink-0 flex items-center justify-center rounded-full text-[10px] font-bold font-mono ${isFinished ? 'bg-gray-200 text-gray-500' : 'bg-blue-500 text-white'}`}>
@@ -1933,13 +1920,15 @@ ${printableMatches.map(m => {
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
                             <span className="text-[10px] font-bold text-gray-400 shrink-0">{gameDisplay}</span>
                             <div className="flex-1" />
-                            <span className="text-[10px] font-bold text-gray-600 shrink-0">
-                              <span className="text-gray-400 font-normal">C</span>{courtLabel}
-                            </span>
+                            {!isPlaying && (
+                              <span className="text-[10px] font-bold text-gray-600 shrink-0">
+                                <span className="text-gray-400 font-normal">C</span>{courtLabel}
+                              </span>
+                            )}
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
                           </div>
-                          {/* 選手（横並び） */}
-                          <div className="flex items-start gap-2 pl-1">
+                          {/* 選手（横並び・各エリア中央寄せ） */}
+                          <div className="flex items-start gap-2">
                             {renderPlayer(num1, m.player1Name, m.player1Affiliation, w1, isFinished)}
                             <div className="flex flex-col items-center justify-center shrink-0 pt-0.5 min-w-[28px]">
                               <span className="text-[10px] font-bold text-blue-300 leading-none">vs</span>
@@ -1951,47 +1940,34 @@ ${printableMatches.map(m => {
                           <div className="flex items-center gap-2 mt-1.5 pl-1">
                             {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
                             <div className="flex-1" />
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => handlePrintMatch(m)}
-                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-all"
+                                className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-all"
                                 title="印刷"
                               >
-                                <Printer className="w-3.5 h-3.5" />
+                                <Printer className="w-5 h-5" />
                               </button>
-                              {hasPlayers && m.status !== 'walkover' && (
-                                <button
-                                  onClick={() => startEdit(m)}
-                                  className={`p-1 rounded border transition-all ${
-                                    isFinished
-                                      ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50'
-                                      : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
-                                  }`}
-                                  title={isFinished ? 'スコア修正' : 'スコア入力'}
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                               {hasPlayers && m.status !== 'walkover' && (
                                 speakingMatchId === m.matchId ? (
                                   <button
                                     onClick={handleVoiceStop}
-                                    className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded border border-red-300 transition-all animate-pulse"
+                                    className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-300 transition-all animate-pulse"
                                     title="停止"
                                   >
-                                    <Square className="w-3.5 h-3.5" />
+                                    <Square className="w-5 h-5" />
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => openCallModal(m)}
-                                    className={`p-1 rounded border transition-all ${
+                                    className={`p-2 rounded-lg border transition-all ${
                                       callTargetMatchId === m.matchId
                                         ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
                                         : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
                                     }`}
                                     title="音声コール"
                                   >
-                                    <Volume2 className="w-3.5 h-3.5" />
+                                    <Volume2 className="w-5 h-5" />
                                   </button>
                                 )
                               )}
@@ -2451,30 +2427,59 @@ ${printableMatches.map(m => {
         ))}
       </div>
 
-      {/* コール履歴 */}
-      {callLog.length > 0 && (
-        <div className="shrink-0 mt-3 bg-white rounded-xl shadow-sm border border-border-main">
-          <div className="px-4 py-2 flex items-center gap-2 text-sm font-bold text-gray-900 border-b border-border-main">
-            <Volume2 className="w-4 h-4 text-primary-500" />
-            コール履歴 ({callLog.length}件)
-          </div>
-          <div className="px-4 py-2 max-h-32 overflow-auto">
-            <div className="space-y-1">
-              {callLog.map((log, i) => (
-                <div key={`${log.matchId}-${log.timestamp.getTime()}-${i}`} className="flex items-start gap-2 text-xs text-gray-500 py-1 border-b border-primary-50 last:border-0">
-                  <span className="font-mono text-gray-900 shrink-0">
-                    {log.timestamp.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                  <span className="bg-primary-50 text-primary-500 px-1.5 rounded shrink-0">
-                    {log.courtNumber}番
-                  </span>
-                  <span className="truncate">{log.eventName} {log.round}</span>
+      {/* コール中の固定ポップアップ（画面下部・点滅表示） */}
+      {speakingMatchId && (() => {
+        const sm = allMatchesFlat.find(mm => mm.matchId === speakingMatchId);
+        if (!sm) return null;
+        const evt = events.find(e => e.eventId === sm.eventId);
+        const evDraw = allDraws.get(sm.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
+        const roundName = getRoundName(sm.round, evTotalRounds);
+        const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
+        return (
+          <div className="fixed inset-x-0 bottom-0 z-[9998] flex justify-center px-3 pb-3 pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-lg rounded-xl border-2 border-emerald-400 bg-white shadow-2xl overflow-hidden animate-pulse">
+              <div className="flex items-center gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2">
+                <div className="relative shrink-0">
+                  <Megaphone className="w-5 h-5 text-white" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-400 rounded-full animate-ping" />
                 </div>
-              ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-bold">
+                    コール中{courtName ? ` ・ ${courtName}番コート` : ''}
+                  </p>
+                  <p className="text-white/80 text-[11px] truncate">
+                    {evt?.name || ''} {roundName}
+                  </p>
+                </div>
+                <button
+                  onClick={handleVoiceStop}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition-colors shrink-0"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  停止
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-3 px-4 py-3 text-center">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-gray-900 truncate">{sm.player1Name || '-'}</p>
+                  {sm.player1Affiliation && sm.player1Affiliation !== 'BYE' && (
+                    <p className="text-[10px] text-gray-500 truncate">{sm.player1Affiliation}</p>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-emerald-500 shrink-0">vs</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-gray-900 truncate">{sm.player2Name || '-'}</p>
+                  {sm.player2Affiliation && sm.player2Affiliation !== 'BYE' && (
+                    <p className="text-[10px] text-gray-500 truncate">{sm.player2Affiliation}</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
       {/* ゲームルール編集ダイアログ */}
       {editingRuleEventId && (() => {
         const ruleEvt = events.find(e => e.eventId === editingRuleEventId);
