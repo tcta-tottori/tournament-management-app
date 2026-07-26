@@ -197,10 +197,9 @@ export default function CourtBracketView({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      // 勝者の線は緑（従来は赤）。試合中は点滅クラスを付与。
+      // 勝者の線は緑（従来は赤）。線自体は点滅させない（点滅はカードのみ）。
       const getStroke = (isWinner: boolean) => isWinner ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8';
       const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1';
-      const lineClass = isPlaying ? 'bracket-line-blink' : undefined;
 
       // 角に丸みを持たせたパスを生成（横→縦のエルボーを二次ベジェで滑らかに）。
       const roundedElbow = (startX: number, y: number, midX: number, endY: number) => {
@@ -209,24 +208,24 @@ export default function CourtBracketView({
         return `M ${startX} ${y} L ${midX - R} ${y} Q ${midX} ${y} ${midX} ${y + dir * R} L ${midX} ${endY}`;
       };
 
-      paths.push(<path key={`r${r}-m${m}-top`} className={lineClass} d={roundedElbow(x, yTop, xMid, yMid)}
+      paths.push(<path key={`r${r}-m${m}-top`} d={roundedElbow(x, yTop, xMid, yMid)}
         fill="none" stroke={getStroke(!!winnerIsTop)} strokeWidth={getWidth(!!winnerIsTop)}
         strokeLinecap="round" strokeLinejoin="round" />);
-      paths.push(<path key={`r${r}-m${m}-bot`} className={lineClass} d={roundedElbow(x, yBottom, xMid, yMid)}
+      paths.push(<path key={`r${r}-m${m}-bot`} d={roundedElbow(x, yBottom, xMid, yMid)}
         fill="none" stroke={getStroke(!!winnerIsBottom)} strokeWidth={getWidth(!!winnerIsBottom)}
         strokeLinecap="round" strokeLinejoin="round" />);
 
       const winnerExists = winnerIsTop || winnerIsBottom;
-      paths.push(<path key={`r${r}-m${m}-conn`} className={lineClass} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
+      paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
         fill="none" stroke={winnerExists ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8'}
         strokeWidth={winnerExists ? '2.5' : '1'} strokeLinecap="round" />);
 
-      // 結果（スコア）を横線の中央付近に、幅を持たせた丸みのあるピル背景＋大きな文字で表示。
-      // 上側=player1、下側=player2。勝者側は緑、敗者側はグレー。
+      // 結果（スコア）を線が合流する付近に上下に並べて表示（手書きスケッチ準拠）。
+      // 上側=player1のスコアは合流点の上、下側=player2のスコアは下に配置。勝者側は緑ピル。
       if (isFinished && matchResult.score) {
         const raw = matchResult.score.trim();
         const nums = raw.match(/^(\d+)\s*-\s*(\d+)/);
-        const feederMidX = (x + xMid) / 2; // 横線の中央
+        const scoreX = (xMid + xNext) / 2; // 合流後の横線の中央付近
         if (nums) {
           const topWin = !!winnerIsTop;
           const botWin = !!winnerIsBottom;
@@ -243,17 +242,17 @@ export default function CourtBracketView({
               </g>
             );
           };
-          paths.push(pill(`sT-${r}-${m}`, feederMidX, yTop, nums[1], topWin));
-          paths.push(pill(`sB-${r}-${m}`, feederMidX, yBottom, nums[2], botWin));
+          // 合流点(yMid)を挟んで上に上側選手のスコア、下に下側選手のスコア
+          paths.push(pill(`sT-${r}-${m}`, scoreX, yMid - 11, nums[1], topWin));
+          paths.push(pill(`sB-${r}-${m}`, scoreX, yMid + 11, nums[2], botWin));
         } else {
-          // Ret / W.O 等は勝者側の横線中央に緑ピルで表示
-          const wy = winnerIsTop ? yTop : yBottom;
+          // Ret / W.O 等は合流点付近に緑ピルで表示
           const w = Math.max(24, raw.length * 7 + 8);
           paths.push(
             <g key={`sX-${r}-${m}`}>
-              <rect x={feederMidX - w / 2} y={wy - 8} width={w} height={16} rx={7}
+              <rect x={scoreX - w / 2} y={yMid - 8} width={w} height={16} rx={7}
                 fill="#16a34a" />
-              <text x={feederMidX} y={wy + 4.5} fill="#ffffff"
+              <text x={scoreX} y={yMid + 4.5} fill="#ffffff"
                 fontSize="10" fontWeight="bold" textAnchor="middle">
                 {raw}
               </text>
