@@ -51,31 +51,6 @@ function shortRoundName(round: number, totalRounds: number): string {
   return `${round}R`;
 }
 
-function getGameCountForRound(evt: { gameRules?: { games?: number }; roundGameRules?: { roundLabel: string; games: number; matchFormat?: string }[] } | undefined, round: number, totalRounds: number): { count: number; format?: string } {
-  if (!evt) return { count: 6 };
-  const rules = evt.roundGameRules;
-  if (!rules || rules.length === 0) return { count: evt.gameRules?.games ?? 6 };
-  if (rules.length === 1) return { count: rules[0].games, format: rules[0].matchFormat };
-  const rName = getRoundName(round, totalRounds);
-  for (const rule of rules) {
-    const label = rule.roundLabel;
-    if (label === '全回戦') continue;
-    const rm = label.match(/(\d+)～(\d+)回戦/);
-    if (rm && round >= parseInt(rm[1]) && round <= parseInt(rm[2])) return { count: rule.games, format: rule.matchFormat };
-    if (label.includes('以降')) {
-      const cl = label.replace('以降', '');
-      if (cl.includes('準々決勝') && round >= totalRounds - 2) return { count: rule.games, format: rule.matchFormat };
-      if (cl.includes('準決勝') && round >= totalRounds - 1) return { count: rule.games, format: rule.matchFormat };
-      if (cl.includes('決勝') && !cl.includes('準') && round >= totalRounds) return { count: rule.games, format: rule.matchFormat };
-      const rn = cl.match(/(\d+)回戦/);
-      if (rn && round >= parseInt(rn[1])) return { count: rule.games, format: rule.matchFormat };
-      continue;
-    }
-    if (rName === label || label.includes(rName)) return { count: rule.games, format: rule.matchFormat };
-  }
-  return { count: rules[0].games, format: rules[0].matchFormat };
-}
-
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
 
 
@@ -1689,24 +1664,11 @@ ${printableMatches.map(m => {
               </div>
               <div className="p-2 space-y-2">
                 {(() => {
-                  const availableCourtCount = courts.filter(c => c.isAvailable).length;
-                  let courtNum = 1;
-                  const courtAssignMap = new Map<string, string>();
-                  for (const m of globalSortedMatches) {
-                    if (m.status === 'playing' || m.status === 'finished') continue;
-                    const hasP = !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                    if (!hasP) continue;
-                    if (courtNum <= availableCourtCount) {
-                      courtAssignMap.set(m.matchId, String(courtNum));
-                      courtNum++;
-                    }
-                  }
                   // 終了試合は末尾へ移動しグレー表示（次の控えを分かりやすくする）
                   const activeMatches = globalSortedMatches.filter(m => m.status !== 'finished');
                   const finishedMatches = globalSortedMatches.filter(m => m.status === 'finished');
                   const ordered = [...activeMatches, ...finishedMatches];
                   const firstFinishedId = finishedMatches[0]?.matchId;
-                  let seqNum = 0;
 
                   const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
                     <div className="min-w-0 flex-1 text-center">
@@ -1723,7 +1685,6 @@ ${printableMatches.map(m => {
                   );
 
                   return ordered.map((m) => {
-                    seqNum++;
                     const st = statusLabels[m.status] || statusLabels.waiting;
                     const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
                     const eventDraw = allDraws.get(m.eventId);
@@ -1731,9 +1692,6 @@ ${printableMatches.map(m => {
                     const rName = shortRoundName(m.round, evTotalRounds);
                     const hasPlayers = !!m.player1Name && !!m.player2Name
                       && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
-                    const evt = events.find(e => e.eventId === m.eventId);
-                    const gameInfo = getGameCountForRound(evt, m.round, evTotalRounds);
-                    const gameDisplay = gameInfo.format === 'twoSetsSuper10' ? '2S' : `${gameInfo.count}G`;
                     const evLabel = `${shortEventName(m.eventName)} ${rName}`;
                     const schedTime = m.scheduledTime || '';
                     const sb = standbyInfo.get(m.matchId);
@@ -1769,9 +1727,6 @@ ${printableMatches.map(m => {
                               ? 'bg-orange-50/50 border-orange-200'
                               : `${evColor.bg} border-gray-200`;
 
-                    const courtLabel = (isPlaying || isFinished)
-                      ? (courtObj?.name || '-')
-                      : (courtAssignMap.get(m.matchId) || '-');
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                     const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
                     const num1 = getDrawNumber(m.player1EntryId, m.eventId);
@@ -1787,25 +1742,13 @@ ${printableMatches.map(m => {
                           </div>
                         )}
                         <div className={`rounded-lg border p-2 transition-all ${cardClass}`}>
-                          {/* コートに入っている場合はコート番号を中央上に表示 */}
-                          {isPlaying && courtObj?.name && (
-                            <div className="flex justify-center mb-1.5">
-                              <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-green-600 text-white text-xs font-bold shadow-sm">
-                                {courtObj.name}番コート
-                              </span>
-                            </div>
-                          )}
-                          {/* ヘッダー行 */}
+                          {/* ヘッダー行: クラス・コート・状態を同じ行に表示 */}
                           <div className="flex items-center gap-1.5 mb-1.5">
-                            <span className={`w-5 h-5 shrink-0 flex items-center justify-center rounded-full text-[10px] font-bold font-mono ${isFinished ? 'bg-gray-200 text-gray-500' : 'bg-blue-500 text-white'}`}>
-                              {seqNum}
-                            </span>
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
-                            <span className="text-[10px] font-bold text-gray-400 shrink-0">{gameDisplay}</span>
                             <div className="flex-1" />
-                            {!isPlaying && (
-                              <span className="text-[10px] font-bold text-gray-600 shrink-0">
-                                <span className="text-gray-400 font-normal">C</span>{courtLabel}
+                            {(isPlaying || isFinished) && courtObj?.name && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                {courtObj.name}番コート
                               </span>
                             )}
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
