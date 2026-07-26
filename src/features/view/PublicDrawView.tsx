@@ -6,8 +6,9 @@ import CourtBracketPage from '../court-bracket/CourtBracketPage';
  * enableScoreInput=false によりスコア入力は無効（観戦者は閲覧のみ）。
  */
 export default function PublicDrawView() {
+  // ヘッダー(56px)＋ティッカー(36px)を差し引いた高さでドロー画面を表示
   return (
-    <div className="-mx-3 md:-mx-4 h-[calc(100vh-190px)] min-h-[420px]">
+    <div className="h-[calc(100vh-92px)] min-h-[420px]">
       <CourtBracketPage enableScoreInput={false} />
     </div>
   );
