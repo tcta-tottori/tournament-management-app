@@ -331,8 +331,15 @@ export default function MatchManager() {
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
-  // 全試合を時間割のフラットリスト順でソート（対戦順表示用）
-  // importedScheduleの各アイテムを1つずつDB試合にマッピングし、時間割と同じ並びにする
+  const courts = useLiveQuery(() => db.courts.toArray()) || [];
+
+  // コートID ↔ コート名（番号）の相互マップ
+  const courtIdToName = useMemo(() => new Map(courts.map(c => [c.courtId, c.name])), [courts]);
+  const courtNameToId = useMemo(() => new Map(courts.map(c => [c.name, c.courtId])), [courts]);
+
+  // 全試合を時間割の並び順でソート（対戦順表示用）。
+  // タイムテーブル（生成/取込済みの開始時刻）がある場合はその並び（開始時刻→コート番号）を最優先し、
+  // 無い場合は試合順Excel（importedSchedule）→ドロー順にフォールバックする。
   const globalSortedMatches = useMemo(() => {
     const raw: (Match & { eventName: string })[] = [];
     for (const [eventId, matches] of allMatchesByEvent) {
@@ -370,14 +377,35 @@ export default function MatchManager() {
       // それ以外（既存より後半ラウンドの重複）は破棄
     }
 
+    const toMin = (t?: string | null) => {
+      if (!t) return Number.POSITIVE_INFINITY;
+      const m = t.match(/^(\d{1,2}):(\d{2})$/);
+      return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : Number.POSITIVE_INFINITY;
+    };
+    const courtNum = (courtId?: string | null) => {
+      const n = courtId ? parseInt(courtIdToName.get(courtId) || '', 10) : NaN;
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+
+    // タイムテーブル最優先: 開始時刻が設定されている試合が1件でもあれば、
+    // タイムテーブルの並び（開始時刻→コート番号→ラウンド→ポジション）で表示する。
+    // 開始時刻の無い試合（未スケジュール）は末尾にドロー順で続ける。
+    const hasScheduledTime = arr.some(m => !!m.scheduledTime);
+    if (hasScheduledTime) {
+      return [...arr].sort((a, b) => {
+        const ta = toMin(a.scheduledTime);
+        const tb = toMin(b.scheduledTime);
+        if (ta !== tb) return ta - tb;
+        const ca = courtNum(a.courtId);
+        const cb = courtNum(b.courtId);
+        if (ca !== cb) return ca - cb;
+        if (a.round !== b.round) return a.round - b.round;
+        return (a.position || 0) - (b.position || 0);
+      });
+    }
+
     if (importedSchedule.length === 0) {
-      // 時間割未生成時は、ドロー記載の開始時刻(scheduledTime)がある試合を時刻順に、
-      // 無い試合は対戦順(matchOrder)で並べる
-      const toMin = (t?: string | null) => {
-        if (!t) return Number.POSITIVE_INFINITY;
-        const m = t.match(/^(\d{1,2}):(\d{2})$/);
-        return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : Number.POSITIVE_INFINITY;
-      };
+      // 時間割未生成・開始時刻なし: 対戦順(matchOrder)で並べる
       return arr.sort((a, b) => {
         const ta = toMin(a.scheduledTime);
         const tb = toMin(b.scheduledTime);
@@ -432,14 +460,8 @@ export default function MatchManager() {
       if (oa !== ob) return oa - ob;
       return (a.matchOrder || 0) - (b.matchOrder || 0);
     });
-  }, [allMatchesByEvent, events, importedSchedule, allDraws, isLeagueEvent, matchEventName, matchRoundLabel]);
+  }, [allMatchesByEvent, events, importedSchedule, allDraws, isLeagueEvent, matchEventName, matchRoundLabel, courtIdToName]);
 
-
-  const courts = useLiveQuery(() => db.courts.toArray()) || [];
-
-  // コートID ↔ コート名（番号）の相互マップ
-  const courtIdToName = useMemo(() => new Map(courts.map(c => [c.courtId, c.name])), [courts]);
-  const courtNameToId = useMemo(() => new Map(courts.map(c => [c.name, c.courtId])), [courts]);
 
   // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
   const standbyInfo = useMemo(() => {
@@ -495,8 +517,10 @@ export default function MatchManager() {
   const [callCourtNumber, setCallCourtNumber] = useState('');
   // コール設定ポップアップ用の試合開始時刻（HH:MM）。標準は「指定なし」で、未指定でもコール可能。
   const [callStartTime, setCallStartTime] = useState('');
-  // コール設定ポップアップ用の読み上げテキスト（ひらがな）。事前に表示・修正してからコールできる。
-  const [callText, setCallText] = useState('');
+  // コール設定ポップアップ用の読み（フリガナ）。苗字・所属を漢字で表示し、その読みを個別に修正してコールする。
+  // キーは漢字（苗字 or 所属）、値は読み（ひらがな）。空欄なら漢字のまま読み上げる。
+  const [callNameReadings, setCallNameReadings] = useState<Record<string, string>>({});
+  const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const [callLog, setCallLog] = useState<CallLogEntry[]>([]);
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
@@ -771,33 +795,80 @@ export default function MatchManager() {
     setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
     // 開始時刻の標準は「指定なし」。既に指定済みならその値を引き継ぐ。
     setCallStartTime(m.scheduledTime || '');
-    setCallText('');
-  }, [courtIdToName]);
+
+    // 苗字・所属の読み（フリガナ）の初期値を用意する。コートに依存しないため '0' で生成。
+    const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
+    const evDraw = allDraws.get(m.eventId);
+    const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+    const mc = buildMatchCall(m, '0', evt, evTotalRounds);
+    const nameMap: Record<string, string> = {};
+    const affMap: Record<string, string> = {};
+    if (mc) {
+      const addName = (full: string | undefined, reading: string | undefined) => {
+        const s = familyName(full || '');
+        if (s && !(s in nameMap)) nameMap[s] = reading || '';
+      };
+      const addAff = (aff: string | undefined) => {
+        const a = (aff || '').trim();
+        if (a && !(a in affMap)) affMap[a] = affiliationFuriganaMap[a] || '';
+      };
+      addName(mc.nameA, mc.nameAReading);
+      addName(mc.nameB, mc.nameBReading);
+      addAff(mc.affA);
+      addAff(mc.affB);
+      if (mc.type === 'doubles') {
+        addName(mc.pairNameA, mc.pairNameAReading);
+        addName(mc.pairNameB, mc.pairNameBReading);
+        addAff(mc.pairAffA);
+        addAff(mc.pairAffB);
+      }
+    }
+    setCallNameReadings(nameMap);
+    setCallAffReadings(affMap);
+  }, [courtIdToName, events, currentEvent, allDraws, totalRounds, buildMatchCall, affiliationFuriganaMap]);
 
   // コール設定ポップアップを閉じる
   const closeCallModal = useCallback(() => {
     setCallTargetMatchId(null);
     setCallCourtNumber('');
     setCallStartTime('');
-    setCallText('');
+    setCallNameReadings({});
+    setCallAffReadings({});
   }, []);
 
-  // コール設定ポップアップの読み上げテキスト（ひらがな）を、選択中のコート・開始時刻から生成する。
-  // コート/開始時刻を変更すると再生成され、その内容をテキスト欄で修正してからコールできる。
-  useEffect(() => {
-    if (!callTargetMatchId) return;
-    const cm = allMatchesFlat.find(mm => mm.matchId === callTargetMatchId);
-    if (!cm || !callCourtNumber) { setCallText(''); return; }
-    const evt = events.find(e => e.eventId === cm.eventId) || currentEvent;
-    const evDraw = allDraws.get(cm.eventId);
+  // 修正済みの読み（フリガナ）からコール読み上げテキストを生成する。
+  const buildCallTextFromReadings = useCallback((
+    m: Match,
+    court: string,
+    startTime: string,
+    nameReadings: Record<string, string>,
+    affReadings: Record<string, string>,
+  ): string => {
+    const evt = events.find(e => e.eventId === m.eventId) || currentEvent;
+    const evDraw = allDraws.get(m.eventId);
     const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
-    const matchCall = buildMatchCall(cm, callCourtNumber, evt, evTotalRounds);
-    if (!matchCall) { setCallText(''); return; }
-    setCallText(buildCallText(matchCall, callCourtNumber, callStartTime, affiliationFuriganaMap));
-    // buildMatchCall / affiliationFuriganaMap は依存に含めない（入力途中の再生成で編集内容を消さないため、
-    // コート・開始時刻の変更時のみ再生成する）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callTargetMatchId, callCourtNumber, callStartTime]);
+    const mc = buildMatchCall(m, court, evt, evTotalRounds);
+    if (!mc) return '';
+    // 苗字ごとの読みを反映（空欄は既定の推定読みを使う）
+    const nr = (full: string | undefined, fallback: string | undefined): string => {
+      const s = familyName(full || '');
+      const v = s ? nameReadings[s] : '';
+      return v && v.trim() ? v.trim() : (fallback || '');
+    };
+    const withReadings = {
+      ...mc,
+      nameAReading: nr(mc.nameA, mc.nameAReading),
+      nameBReading: nr(mc.nameB, mc.nameBReading),
+      pairNameAReading: nr(mc.pairNameA || '', mc.pairNameAReading || ''),
+      pairNameBReading: nr(mc.pairNameB || '', mc.pairNameBReading || ''),
+    };
+    // 所属ごとの読みを反映（空欄は漢字のまま）
+    const affMap = { ...affiliationFuriganaMap };
+    for (const [k, v] of Object.entries(affReadings)) {
+      if (v && v.trim()) affMap[k] = v.trim();
+    }
+    return buildCallText(withReadings, court, startTime, affMap);
+  }, [events, currentEvent, allDraws, totalRounds, buildMatchCall, affiliationFuriganaMap]);
 
   // (生成機能は削除済み - ドロー画面から試合生成を行う)
 
@@ -2541,8 +2612,30 @@ ${printableMatches.map(m => {
         const evDraw = allDraws.get(cm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
         const headerCall = buildMatchCall(cm, callCourtNumber || '0', evt, evTotalRounds);
-        // 開始時刻は任意。コートと読み上げテキストがあればコール可能。
-        const canCall = !!callCourtNumber && !!callText.trim();
+        // 開始時刻は任意。コートが決まっていればコール可能。
+        const canCall = !!callCourtNumber;
+
+        // フリガナ編集用の一覧（苗字・所属）を対戦カードから構築する。
+        const seenName = new Set<string>();
+        const seenAff = new Set<string>();
+        const nameItems: { key: string; kanji: string; reading: string }[] = [];
+        const affItems: { key: string; kanji: string; reading: string }[] = [];
+        const pushName = (full?: string) => {
+          const s = familyName(full || '');
+          if (s && !seenName.has(s)) { seenName.add(s); nameItems.push({ key: s, kanji: s, reading: callNameReadings[s] ?? '' }); }
+        };
+        const pushAff = (aff?: string) => {
+          const a = (aff || '').trim();
+          if (a && !seenAff.has(a)) { seenAff.add(a); affItems.push({ key: a, kanji: a, reading: callAffReadings[a] ?? '' }); }
+        };
+        if (headerCall) {
+          pushName(headerCall.nameA); pushName(headerCall.nameB);
+          pushAff(headerCall.affA); pushAff(headerCall.affB);
+          if (headerCall.type === 'doubles') {
+            pushName(headerCall.pairNameA); pushName(headerCall.pairNameB);
+            pushAff(headerCall.pairAffA); pushAff(headerCall.pairAffB);
+          }
+        }
         return (
           <CallSettingsModal
             open
@@ -2557,10 +2650,16 @@ ${printableMatches.map(m => {
             courtAssigned={!!cm.courtId}
             startTime={callStartTime}
             onStartTimeChange={setCallStartTime}
-            callText={callText}
-            onCallTextChange={setCallText}
+            nameReadings={nameItems}
+            onNameReadingChange={(key, value) => setCallNameReadings(prev => ({ ...prev, [key]: value }))}
+            affReadings={affItems}
+            onAffReadingChange={(key, value) => setCallAffReadings(prev => ({ ...prev, [key]: value }))}
             canCall={canCall}
-            onCall={() => { handleVoiceCall(cm, callCourtNumber, callStartTime, callText); closeCallModal(); }}
+            onCall={() => {
+              const text = buildCallTextFromReadings(cm, callCourtNumber, callStartTime, callNameReadings, callAffReadings);
+              handleVoiceCall(cm, callCourtNumber, callStartTime, text);
+              closeCallModal();
+            }}
             onClose={closeCallModal}
           />
         );

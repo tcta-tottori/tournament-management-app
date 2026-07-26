@@ -30,8 +30,9 @@ interface CourtBracketViewProps {
 const SLOT_HEIGHT = 36;
 const Y_SPACING = 64;
 const OFFSET_Y = 40;
-// vs表示（両者確定）のカードは氏名＋所属を上下2段で表示するため背が高い
-const CARD_H_VS = 56;
+// vs表示（両者確定）のカードは氏名＋所属を上下2段で表示するため背が高い。
+// コート番号を左側に大きく表示し、氏名・所属も読みやすい大きさにするため背を高くする。
+const CARD_H_VS = 66;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(
@@ -264,9 +265,11 @@ export default function CourtBracketView({
       const nextCardH = nextIsVs ? CARD_H_VS : SLOT_HEIGHT;
       const cardCenterX = xNext + slotW / 2;
       const cardBottomY = getCompactY(r + 1, m) + (SLOT_HEIGHT + nextCardH) / 2 + 10;
+      // 開始時刻（scheduledTime）はドロー表には既定で表示しない（「9:00」等の既定値を出さない）。
+      // 試合中のみ経過時間を表示する。
       const bottomText = isPlaying
         ? (matchResult?.updatedAt ? formatElapsed(matchResult.updatedAt) : '')
-        : (matchResult?.scheduledTime || '');
+        : '';
       if (bottomText) {
         paths.push(
           <text key={`bt-${r}-${m}`} x={cardCenterX} y={cardBottomY}
@@ -302,11 +305,11 @@ export default function CourtBracketView({
             {slot.seed}
           </div>
         )}
-        <div className="flex-1 truncate font-medium text-gray-900 text-[11px]" title={slot.name}>
+        <div className="flex-1 truncate font-semibold text-gray-900 text-[13px]" title={slot.name}>
           {slot.isBye ? <span className="text-gray-400">BYE</span> : slot.name}
         </div>
         {!slot.isBye && slot.affiliation && (
-          <div className="text-[9px] text-gray-500 whitespace-nowrap shrink-0" title={slot.affiliation}>
+          <div className="text-[10px] text-gray-500 whitespace-nowrap shrink-0" title={slot.affiliation}>
             {slot.affiliation}
           </div>
         )}
@@ -315,24 +318,31 @@ export default function CourtBracketView({
   }
 
   // 対戦カード（vs）用の選手1行：番号＋フルネーム、所属は下段（改行）に表示。
+  // 氏名・所属は読みやすいよう十分な大きさで表示する。
   const playerRow = (entryId: string | null, name: string, key: string, dim: boolean) => {
     const full = numberedFullName(entryId, name);
     const aff = affiliationOf(entryId);
     return (
       <div key={key} className="min-w-0 leading-tight">
-        <div className={`text-[10px] font-semibold truncate ${dim ? 'text-gray-500' : 'text-gray-900'}`} title={full}>
+        <div className={`text-[13px] font-bold truncate ${dim ? 'text-gray-600' : 'text-gray-900'}`} title={full}>
           {full || '—'}
         </div>
-        {aff && <div className="text-[8px] text-gray-500 truncate" title={aff}>{aff}</div>}
+        {aff && <div className="text-[10px] text-gray-500 truncate" title={aff}>{aff}</div>}
       </div>
     );
   };
-  const courtBadge = (court: string) =>
-    court ? (
-      <span className="absolute top-0.5 right-1 bg-blue-700 text-white text-[8px] font-bold px-1 py-0.5 rounded shrink-0">
-        {court}
-      </span>
-    ) : null;
+  // コート番号を大きく表示する左側ブロック（カード左端・全高）。
+  const courtColumn = (court: string, tone: 'playing' | 'ready' | 'idle') => {
+    const num = (court || '').replace(/[^0-9]/g, '') || court;
+    if (!num) return null;
+    const bg = tone === 'playing' ? 'bg-green-600' : tone === 'ready' ? 'bg-blue-600' : 'bg-gray-400';
+    return (
+      <div className={`flex flex-col items-center justify-center shrink-0 text-white ${bg}`} style={{ width: 42 }}>
+        <span className="text-[8px] font-bold leading-none opacity-85">コート</span>
+        <span className="text-2xl font-black leading-none mt-0.5">{num}</span>
+      </div>
+    );
+  };
 
   // --- 2回戦以降のマッチノード ---
   const matchElements: React.ReactNode[] = [];
@@ -380,23 +390,26 @@ export default function CourtBracketView({
         content = (
           <div className="flex items-center gap-1 w-full min-w-0 px-2">
             {isFinal && <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />}
-            <span className={`truncate flex-1 ${isFinal ? 'text-[12px] font-bold text-primary-700' : 'text-[11px] font-medium text-gray-800'}`} title={winnerFull}>
+            <span className={`truncate flex-1 ${isFinal ? 'text-[13px] font-bold text-primary-700' : 'text-[12px] font-semibold text-gray-800'}`} title={winnerFull}>
               {winnerFull}
             </span>
             {winnerAff && (
-              <span className="text-[9px] text-gray-500 whitespace-nowrap shrink-0">{winnerAff}</span>
+              <span className="text-[10px] text-gray-500 whitespace-nowrap shrink-0">{winnerAff}</span>
             )}
           </div>
         );
       } else if (isVs) {
-        // vs表示：両選手を上下に、所属は各選手名の下（改行）に表示
+        // vs表示：左端にコート番号を大きく表示し、右側に両選手を上下2段（氏名＋所属）で表示
         const dim = !isPlaying && !isReady;
+        const tone: 'playing' | 'ready' | 'idle' = isPlaying ? 'playing' : isReady ? 'ready' : 'idle';
         content = (
-          <div className="relative flex flex-col justify-center w-full min-w-0 px-2 gap-1">
-            {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}
-            <div className="border-t border-gray-200" />
-            {playerRow(matchResult!.player2EntryId, matchResult!.player2Name, 'p2', dim)}
-            {courtBadge(matchResult!.courtName)}
+          <div className="flex items-stretch w-full h-full min-w-0">
+            {courtColumn(matchResult!.courtName, tone)}
+            <div className="flex-1 flex flex-col justify-center min-w-0 px-2 gap-0.5">
+              {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}
+              <div className="border-t border-gray-200" />
+              {playerRow(matchResult!.player2EntryId, matchResult!.player2Name, 'p2', dim)}
+            </div>
           </div>
         );
       } else {
@@ -418,7 +431,7 @@ export default function CourtBracketView({
       matchElements.push(
         <div key={`m-${r}-${m}`}
           {...clickProps}
-          className={`absolute flex items-center rounded transition-all${clickCls} ${cardClass}`}
+          className={`absolute flex items-center overflow-hidden rounded transition-all${clickCls} ${cardClass}`}
           style={{ left: x, top, width: slotW, height: cardH }}
         >
           {content}
