@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
-import { buildCallText, toSpeechText } from '../broadcast/callTextBuilder';
+import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
@@ -88,7 +88,9 @@ export default function MatchActionPanel({
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [callCourtNumber, setCallCourtNumber] = useState('');
   const [callStartTime, setCallStartTime] = useState('');
-  const [callText, setCallText] = useState('');
+  // 苗字・所属の読み（フリガナ）。キーは漢字、値は読み。空欄なら漢字のまま読み上げる。
+  const [callNameReadings, setCallNameReadings] = useState<Record<string, string>>({});
+  const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
 
   const { isSpeaking, speak, stop } = useGeminiTts();
 
@@ -271,9 +273,15 @@ export default function MatchActionPanel({
   }, [courts, courtNumberOf]);
 
   // 現在の選択（コート・開始時刻）から読み上げ内容（ひらがな）を生成する
-  const generateCallText = useCallback(
-    (courtNumber: string, startTime: string): string => {
+  // 修正済みの読み（フリガナ）からコール読み上げテキストを生成する
+  const buildCallTextFromReadings = useCallback(
+    (court: string, startTime: string, nameReadings: Record<string, string>, affReadings: Record<string, string>): string => {
       if (!match) return '';
+      const readingOf = (full: string) => {
+        const s = familyName(full || '');
+        const v = s ? nameReadings[s] : '';
+        return v && v.trim() ? v.trim() : '';
+      };
       const callData: MatchCall = {
         id: match.dbId,
         eventName: match.eventName,
@@ -281,41 +289,59 @@ export default function MatchActionPanel({
         numberA: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0,
         nameA: match.player1Name,
         affA: match.player1Affiliation,
+        nameAReading: readingOf(match.player1Name),
         numberB: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0,
         nameB: match.player2Name,
         affB: match.player2Affiliation,
+        nameBReading: readingOf(match.player2Name),
         type: 'singles',
         status: 'pending',
-        courtNumber,
+        courtNumber: court,
         startTime,
       };
-      return buildCallText(callData, courtNumber, startTime, affiliationFuriganaMap);
+      const affMap = { ...affiliationFuriganaMap };
+      for (const [k, v] of Object.entries(affReadings)) {
+        if (v && v.trim()) affMap[k] = v.trim();
+      }
+      return buildCallText(callData, court, startTime, affMap);
     },
     [match, getRoundName, affiliationFuriganaMap],
   );
 
-  // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）
+  // コールボタン → ポップアップを開く（コート・開始時刻・読みを事前に確認・修正できる）
   const handleCall = () => {
     if (!match) return;
     const courtName = courts.find((c) => c.courtId === match.courtId)?.name ?? '';
     const initCourt = match.courtId ? courtNumberOf(courtName) : '';
-    const initStart = match.scheduledTime ?? '';
     setCallCourtNumber(initCourt);
-    setCallStartTime(initStart);
-    setCallText(generateCallText(initCourt, initStart));
+    // 開始時刻の標準は「指定なし」（空欄）。9:00等の既定値は入れない。
+    setCallStartTime('');
+
+    // 苗字・所属の読み（フリガナ）の初期値
+    const nameMap: Record<string, string> = {};
+    const addName = (full?: string) => {
+      const s = familyName(full || '');
+      if (s && !(s in nameMap)) nameMap[s] = '';
+    };
+    addName(match.player1Name);
+    addName(match.player2Name);
+    const affMap: Record<string, string> = {};
+    const addAff = (aff?: string) => {
+      const a = (aff || '').trim();
+      if (a && !(a in affMap)) affMap[a] = affiliationFuriganaMap[a] || '';
+    };
+    addAff(match.player1Affiliation);
+    addAff(match.player2Affiliation);
+    setCallNameReadings(nameMap);
+    setCallAffReadings(affMap);
     setCallModalOpen(true);
   };
 
-  // ポップアップのコート・開始時刻を変更したら、読み上げ内容を再生成する
-  useEffect(() => {
-    if (!callModalOpen) return;
-    setCallText(generateCallText(callCourtNumber, callStartTime));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callCourtNumber, callStartTime, callModalOpen]);
-
   // 修正した内容でコールを実行する
   const doCall = async () => {
-    if (!match || !callText.trim()) return;
+    if (!match) return;
+    const text = buildCallTextFromReadings(callCourtNumber, callStartTime, callNameReadings, callAffReadings);
+    if (!text.trim()) return;
     // 変更したコート・開始時刻を試合へ反映
     const resolvedCourtId = courtNumberToId.get(callCourtNumber) || match.courtId || null;
     if (resolvedCourtId !== match.courtId || callStartTime !== (match.scheduledTime || '')) {
@@ -329,7 +355,7 @@ export default function MatchActionPanel({
       onMatchUpdate();
     }
     // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
-    speak(toSpeechText(callText.trim()), DEFAULT_VOICE);
+    speak(toSpeechText(text.trim()), DEFAULT_VOICE);
     setCallModalOpen(false);
   };
 
@@ -660,26 +686,46 @@ export default function MatchActionPanel({
       </div>
     </div>
 
-    {/* コール設定ポップアップ（コート・開始時刻・読み上げ内容を事前に確認・修正してからコール） */}
-    <CallSettingsModal
-      open={callModalOpen}
-      eventName={match.eventName}
-      player1Name={match.player1Name || ''}
-      player2Name={match.player2Name || ''}
-      player1={{ number: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player1Name || '', affiliation: match.player1Affiliation || '' }}
-      player2={{ number: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player2Name || '', affiliation: match.player2Affiliation || '' }}
-      courtOptions={callCourtOptions}
-      courtNumber={callCourtNumber}
-      onCourtChange={setCallCourtNumber}
-      courtAssigned={!!match.courtId}
-      startTime={callStartTime}
-      onStartTimeChange={setCallStartTime}
-      callText={callText}
-      onCallTextChange={setCallText}
-      canCall={!!callText.trim() && !!callCourtNumber}
-      onCall={doCall}
-      onClose={() => setCallModalOpen(false)}
-    />
+    {/* コール設定ポップアップ（コート・開始時刻・読み（フリガナ）を事前に確認・修正してからコール） */}
+    {(() => {
+      const seenName = new Set<string>();
+      const seenAff = new Set<string>();
+      const nameItems: { key: string; kanji: string; reading: string }[] = [];
+      const affItems: { key: string; kanji: string; reading: string }[] = [];
+      const pushName = (full?: string) => {
+        const s = familyName(full || '');
+        if (s && !seenName.has(s)) { seenName.add(s); nameItems.push({ key: s, kanji: s, reading: callNameReadings[s] ?? '' }); }
+      };
+      const pushAff = (aff?: string) => {
+        const a = (aff || '').trim();
+        if (a && !seenAff.has(a)) { seenAff.add(a); affItems.push({ key: a, kanji: a, reading: callAffReadings[a] ?? '' }); }
+      };
+      pushName(match.player1Name); pushName(match.player2Name);
+      pushAff(match.player1Affiliation); pushAff(match.player2Affiliation);
+      return (
+        <CallSettingsModal
+          open={callModalOpen}
+          eventName={match.eventName}
+          player1Name={match.player1Name || ''}
+          player2Name={match.player2Name || ''}
+          player1={{ number: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player1Name || '', affiliation: match.player1Affiliation || '' }}
+          player2={{ number: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || undefined, name: match.player2Name || '', affiliation: match.player2Affiliation || '' }}
+          courtOptions={callCourtOptions}
+          courtNumber={callCourtNumber}
+          onCourtChange={setCallCourtNumber}
+          courtAssigned={!!match.courtId}
+          startTime={callStartTime}
+          onStartTimeChange={setCallStartTime}
+          nameReadings={nameItems}
+          onNameReadingChange={(key, value) => setCallNameReadings(prev => ({ ...prev, [key]: value }))}
+          affReadings={affItems}
+          onAffReadingChange={(key, value) => setCallAffReadings(prev => ({ ...prev, [key]: value }))}
+          canCall={!!callCourtNumber}
+          onCall={doCall}
+          onClose={() => setCallModalOpen(false)}
+        />
+      );
+    })()}
     </>
   );
 }
