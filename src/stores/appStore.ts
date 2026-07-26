@@ -52,6 +52,11 @@ interface AppState {
   // 会場ごと・ブロックごとの使用終了時刻（コートマップの点滅アラート用）
   blockEndTimes: BlockEndTimesMap;
   setBlockEndTime: (venueId: string, blockIdx: number, endTime: string) => void;
+
+  // コールで修正した苗字の読み（ひらがな）の上書き辞書。
+  // キー: 苗字（漢字）、値: 読み（ひらがな）。一度修正するとその後のコールにも反映する。
+  nameReadingOverrides: Record<string, string>;
+  setNameReadingOverride: (surname: string, reading: string) => void;
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -93,6 +98,16 @@ export const useAppStore = create<AppState>()(
               [venueId]: venueMap,
             },
           };
+        }),
+      nameReadingOverrides: {},
+      setNameReadingOverride: (surname, reading) =>
+        set((state) => {
+          const key = (surname || '').trim();
+          if (!key) return {};
+          const next = { ...state.nameReadingOverrides };
+          const val = (reading || '').trim();
+          if (val) next[key] = val; else delete next[key];
+          return { nameReadingOverrides: next };
         }),
     }),
     {
