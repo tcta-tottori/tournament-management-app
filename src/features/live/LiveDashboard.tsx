@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -21,6 +21,14 @@ function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds - 1) return '準決勝';
   if (round === totalRounds - 2) return '準々決勝';
   return `${round}回戦`;
+}
+
+/** 短縮ラウンド名（コート状況バッジ用）: 1R / QF / SF / F */
+function shortRoundName(round: number, totalRounds: number): string {
+  if (round >= totalRounds) return 'F';
+  if (round === totalRounds - 1) return 'SF';
+  if (round === totalRounds - 2) return 'QF';
+  return `${round}R`;
 }
 
 /** "HH:MM" -> minutes since midnight */
@@ -169,9 +177,9 @@ function HorizontalCourtLines({ status }: { status: string }) {
 
 /** PC用横向きコートカード */
 function TennisCourtBlockH({
-  cs, isSelected, onSelect, eventName, isTimeOver,
+  cs, isSelected, onSelect, eventName, roundLabel, isTimeOver,
 }: {
-  cs: CourtStatus; isSelected: boolean; onSelect: () => void; eventName?: string; isTimeOver?: boolean;
+  cs: CourtStatus; isSelected: boolean; onSelect: () => void; eventName?: string; roundLabel?: string; isTimeOver?: boolean;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
     playing: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-800', glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]' },
@@ -221,7 +229,10 @@ function TennisCourtBlockH({
         {cs.currentMatch ? (
           <div className="flex-1 min-w-0 border-l border-green-200/60 pl-2 space-y-0">
             {eventName && (
-              <p className="text-[9px] font-bold text-green-600/80 truncate leading-none mb-0.5">{eventName}</p>
+              <span className="inline-flex items-center gap-0.5 max-w-full mb-0.5 bg-green-600 text-white rounded px-1 py-0.5 leading-none">
+                <span className="text-[8px] font-bold truncate">{eventName}</span>
+                {roundLabel && <span className="text-[8px] font-black bg-white/25 rounded-sm px-0.5 shrink-0">{roundLabel}</span>}
+              </span>
             )}
             <p className="text-[10px] font-bold text-green-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
             <p className="text-[7px] font-medium text-green-500 leading-none">vs</p>
@@ -254,12 +265,14 @@ function TennisCourtBlock({
   isSelected,
   onSelect,
   eventName,
+  roundLabel,
   isTimeOver,
 }: {
   cs: CourtStatus;
   isSelected: boolean;
   onSelect: () => void;
   eventName?: string;
+  roundLabel?: string;
   isTimeOver?: boolean;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
@@ -308,7 +321,10 @@ function TennisCourtBlock({
         {cs.currentMatch ? (
           <div className="w-full flex-1 flex flex-col items-center justify-center min-h-0 gap-0.5">
             {eventName && (
-              <p className="text-[9px] sm:text-[10px] font-bold text-green-600/80 truncate w-full text-center leading-none">{eventName}</p>
+              <span className="inline-flex items-center gap-0.5 max-w-full bg-green-600 text-white rounded px-1 py-0.5 leading-none">
+                <span className="text-[8px] sm:text-[9px] font-bold truncate">{eventName}</span>
+                {roundLabel && <span className="text-[8px] sm:text-[9px] font-black bg-white/25 rounded-sm px-0.5 shrink-0">{roundLabel}</span>}
+              </span>
             )}
             <p className="text-[10px] sm:text-xs font-bold text-green-900 truncate w-full text-center leading-tight">{cs.currentMatch.player1Name}</p>
             <p className="text-[8px] sm:text-[9px] font-medium text-green-500 leading-none">vs</p>
@@ -415,6 +431,28 @@ function LiveDashboardInner() {
     },
     [eventIds]
   ) || [];
+
+  // 種目ごとの総ラウンド数（ラウンドバッジ用）。ドロー未取得時は最大ラウンドで補完。
+  const eventTotalRounds = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of events) {
+      const draw = draws.find(d => d.eventId === e.eventId);
+      let tr = draw && draw.drawSize ? Math.log2(draw.drawSize) : 0;
+      if (!tr || !isFinite(tr)) {
+        let mx = 1;
+        for (const m of allMatches) if (m.eventId === e.eventId && m.round > mx) mx = m.round;
+        tr = mx;
+      }
+      map.set(e.eventId, Math.max(1, tr));
+    }
+    return map;
+  }, [events, draws, allMatches]);
+
+  // 試合のラウンドバッジ（例: "1R" / "SF" / "F"）
+  const roundLabelOf = useCallback((match: Match | null): string | undefined => {
+    if (!match) return undefined;
+    return shortRoundName(match.round, eventTotalRounds.get(match.eventId) || 1);
+  }, [eventTotalRounds]);
 
   // -- Stats --
   const stats = useMemo(() => {
@@ -704,6 +742,7 @@ function LiveDashboardInner() {
                             selectedCourtId === cs.court.courtId ? null : cs.court.courtId
                           )}
                           eventName={evtName}
+                          roundLabel={roundLabelOf(cs.currentMatch)}
                           isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
                         />
                       );
@@ -756,6 +795,7 @@ function LiveDashboardInner() {
                             selectedCourtId === cs.court.courtId ? null : cs.court.courtId
                           )}
                           eventName={evtName}
+                          roundLabel={roundLabelOf(cs.currentMatch)}
                           isTimeOver={timeOverCourtIds.has(cs.court.courtId)}
                         />
                       );

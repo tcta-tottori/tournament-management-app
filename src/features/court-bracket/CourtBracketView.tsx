@@ -2,16 +2,6 @@ import React from 'react';
 import { Trophy } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 
-/** フルネームから苗字を抽出 */
-function getSurname(name: string): string {
-  if (!name) return '';
-  if (name.includes('/') || name.includes('／')) {
-    return name.split(/[/／]/).map(n => getSurname(n.trim())).join('/');
-  }
-  const parts = name.trim().split(/\s+/);
-  return parts[0] || name;
-}
-
 /** 経過時間を H:MM 形式 */
 function formatElapsed(startedAt: number): string {
   const diff = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
@@ -38,8 +28,10 @@ interface CourtBracketViewProps {
 }
 
 const SLOT_HEIGHT = 36;
-const Y_SPACING = 44;
+const Y_SPACING = 64;
 const OFFSET_Y = 40;
+// vs表示（両者確定）のカードは氏名＋所属を上下2段で表示するため背が高い
+const CARD_H_VS = 56;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(
@@ -65,7 +57,7 @@ export default function CourtBracketView({
   const isDoubles = eventType === 'Doubles';
   // 所属を省略せず表示しつつ、幅は最適化（広すぎない）
   const slotW = isDoubles ? (isMobile ? 220 : 285) : (isMobile ? 185 : 205);
-  const xSpacing = isMobile ? 36 : 50;
+  const xSpacing = isMobile ? 56 : 78;
   const offsetX = isMobile ? 10 : 20;
   const roundsCount = Math.log2(drawSize);
   const halfSize = drawSize / 2;
@@ -125,27 +117,29 @@ export default function CourtBracketView({
   const containerWidth = offsetX * 2 + roundsCount * (slotW + xSpacing) + slotW;
   const containerHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
 
-  // entryId → ドロー番号（1回戦スロットの表示番号）
-  const entryNumberMap = new Map<string, number>();
+  // entryId → ドロー情報（番号・氏名・所属）。全選手は1回戦スロットに存在するので
+  // 2回戦以降でも entryId から氏名・所属を引ける。
+  const entryInfo = new Map<string, { number: number; name: string; affiliation: string }>();
   {
     let vi = 0;
     for (let i = 0; i < drawSize; i++) {
       const s = slots[i];
       if (!s || (s.isBye && !s.entryId)) continue;
       vi++;
-      if (s.entryId) entryNumberMap.set(s.entryId, vi);
+      if (s.entryId) {
+        entryInfo.set(s.entryId, { number: vi, name: s.name, affiliation: s.affiliation });
+      }
     }
   }
-  // 「番号 苗字」形式（番号が不明なら苗字のみ）
-  const numberedName = (entryId: string | null, fullName: string): string => {
-    const n = entryId ? entryNumberMap.get(entryId) : undefined;
-    return `${n ? n + ' ' : ''}${getSurname(fullName)}`;
+  // 「番号 フルネーム」形式（苗字に省略しない）
+  const numberedFullName = (entryId: string | null, fullName: string): string => {
+    const info = entryId ? entryInfo.get(entryId) : undefined;
+    const n = info?.number;
+    const name = fullName || info?.name || '';
+    return `${n ? n + ' ' : ''}${name}`;
   };
-  // 対戦カード用「番号 苗字 vs 番号 苗字」
-  const numberedVs = (mr: MatchResult): string => {
-    if (!mr.player1Name || !mr.player2Name) return '';
-    return `${numberedName(mr.player1EntryId, mr.player1Name)} vs ${numberedName(mr.player2EntryId, mr.player2Name)}`;
-  };
+  const affiliationOf = (entryId: string | null): string =>
+    (entryId ? entryInfo.get(entryId)?.affiliation : '') || '';
 
   // --- 回戦ヘッダー ---
   const roundHeaders: React.ReactNode[] = [];
@@ -246,13 +240,15 @@ export default function CourtBracketView({
           paths.push(pill(`sT-${r}-${m}`, scoreX, yMid - 11, nums[1], topWin));
           paths.push(pill(`sB-${r}-${m}`, scoreX, yMid + 11, nums[2], botWin));
         } else {
-          // Ret / W.O 等は合流点付近に緑ピルで表示
-          const w = Math.max(24, raw.length * 7 + 8);
+          // Ret / W.O 等は敗者側の横線上に表示（対象の人側に記載）。
+          const loserY = winnerIsTop ? yBottom : yTop; // 勝者でない側
+          const loserFeederMidX = (x + xMid) / 2;
+          const w = Math.max(26, raw.length * 7 + 10);
           paths.push(
             <g key={`sX-${r}-${m}`}>
-              <rect x={scoreX - w / 2} y={yMid - 8} width={w} height={16} rx={7}
-                fill="#16a34a" />
-              <text x={scoreX} y={yMid + 4.5} fill="#ffffff"
+              <rect x={loserFeederMidX - w / 2} y={loserY - 8} width={w} height={16} rx={7}
+                fill="#ffffff" stroke="#f87171" strokeWidth="1" />
+              <text x={loserFeederMidX} y={loserY + 4} fill="#dc2626"
                 fontSize="10" fontWeight="bold" textAnchor="middle">
                 {raw}
               </text>
@@ -262,9 +258,12 @@ export default function CourtBracketView({
       }
 
       // 対戦カード下部の時間表示。試合中は経過時間のみ（開始時刻は出さない）、
-      // それ以外は開始時刻(予定)を表示する。
+      // それ以外は開始時刻(予定)を表示する。カード高さ（vsは背高）に合わせて位置調整。
+      const nextBothPlayers = !!(matchResult?.player1Name && matchResult?.player2Name);
+      const nextIsVs = nextBothPlayers && !isFinished;
+      const nextCardH = nextIsVs ? CARD_H_VS : SLOT_HEIGHT;
       const cardCenterX = xNext + slotW / 2;
-      const cardBottomY = getCompactY(r + 1, m) + SLOT_HEIGHT + 10;
+      const cardBottomY = getCompactY(r + 1, m) + (SLOT_HEIGHT + nextCardH) / 2 + 10;
       const bottomText = isPlaying
         ? (matchResult?.updatedAt ? formatElapsed(matchResult.updatedAt) : '')
         : (matchResult?.scheduledTime || '');
@@ -315,6 +314,26 @@ export default function CourtBracketView({
     );
   }
 
+  // 対戦カード（vs）用の選手1行：番号＋フルネーム、所属は下段（改行）に表示。
+  const playerRow = (entryId: string | null, name: string, key: string, dim: boolean) => {
+    const full = numberedFullName(entryId, name);
+    const aff = affiliationOf(entryId);
+    return (
+      <div key={key} className="min-w-0 leading-tight">
+        <div className={`text-[10px] font-semibold truncate ${dim ? 'text-gray-500' : 'text-gray-900'}`} title={full}>
+          {full || '—'}
+        </div>
+        {aff && <div className="text-[8px] text-gray-500 truncate" title={aff}>{aff}</div>}
+      </div>
+    );
+  };
+  const courtBadge = (court: string) =>
+    court ? (
+      <span className="absolute top-0.5 right-1 bg-blue-700 text-white text-[8px] font-bold px-1 py-0.5 rounded shrink-0">
+        {court}
+      </span>
+    ) : null;
+
   // --- 2回戦以降のマッチノード ---
   const matchElements: React.ReactNode[] = [];
   for (let r = 1; r <= roundsCount; r++) {
@@ -323,122 +342,86 @@ export default function CourtBracketView({
       const x = getX(r);
       const y = getCompactY(r, m);
       const matchResult = findMatch(r, m + 1);
-      const winnerName = matchResult ? numberedName(matchResult.winnerEntryId, getWinnerName(matchResult)) : '';
       const isFinished = matchResult && (matchResult.status === 'finished' || matchResult.status === 'walkover');
       const isPlaying = matchResult?.status === 'playing';
+      const isReady = matchResult?.status === 'ready';
+      const isFinal = r === roundsCount;
+      const bothPlayers = !!(matchResult?.player1Name && matchResult?.player2Name);
+      const isVs = bothPlayers && !isFinished; // 両者確定・未確定 → vs 表示（背高カード）
+
+      // カード高さ：vs表示のみ氏名＋所属を2段で見せるため背を高くし、
+      // 取り付き位置（中心）は SLOT_HEIGHT 基準の合流点に合わせる。
+      const cardH = isVs ? CARD_H_VS : SLOT_HEIGHT;
+      const top = y + (SLOT_HEIGHT - cardH) / 2;
 
       // このノードがクリックでスコア入力できるか（両選手が確定している場合のみ）
-      const clickable = !!(onMatchSelect && matchResult && matchResult.player1Name && matchResult.player2Name);
+      const clickable = !!(onMatchSelect && bothPlayers);
       const clickProps = clickable
         ? { onClick: () => onMatchSelect!(matchResult!.round, matchResult!.position), role: 'button' as const }
         : {};
       const clickCls = clickable ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : '';
 
-      // 決勝ラウンド
-      if (r === roundsCount) {
-        const displayName = matchResult ? numberedName(matchResult.winnerEntryId, getWinnerName(matchResult)) : '';
+      // 枠の配色（点滅は枠のみ・カード内はそのまま = bracket-card-blink）
+      const cardClass = isFinished
+        ? (isFinal ? 'border-2 border-amber-500 bg-amber-50' : 'border border-gray-400 bg-white')
+        : isPlaying
+          ? 'border-2 border-green-500 bg-green-50 bracket-card-blink'
+          : isReady
+            ? 'border border-blue-400 bg-blue-50'
+            : isVs
+              ? 'border border-gray-300 bg-white'
+              : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
 
-        matchElements.push(
-          <div key={`f-${r}-${m}`}
-            {...clickProps}
-            className={`absolute flex items-center rounded transition-all${clickCls} ${
-              isFinished
-                ? 'border-2 border-amber-500 bg-amber-50'
-                : isPlaying
-                  ? 'border-2 border-green-500 bg-green-50 animate-pulse'
-                  : 'border border-dashed border-gray-400 bg-white'
-            }`}
-            style={{ left: x, top: y, width: slotW, height: SLOT_HEIGHT }}
-          >
-            <div className="flex items-center gap-1 w-full min-w-0 px-2">
-              {isFinished ? (
-                <>
-                  <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />
-                  <span className="text-sm font-bold text-primary-700 truncate">{displayName}</span>
-                </>
-              ) : isPlaying ? (
-                <>
-                  <span className="text-[11px] font-medium text-gray-800 truncate flex-1">
-                    {matchResult.player1Name && matchResult.player2Name
-                      ? numberedVs(matchResult)
-                      : '決勝'}
-                  </span>
-                  {matchResult.courtName && (
-                    <span className="bg-blue-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                      {matchResult.courtName}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Trophy className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                  <span className="text-[11px] text-gray-400 font-bold">決勝</span>
-                </>
-              )}
-            </div>
+      let content: React.ReactNode;
+      if (isFinished) {
+        // 勝者：番号＋フルネーム＋所属（1行）
+        const winnerFull = numberedFullName(matchResult.winnerEntryId, getWinnerName(matchResult));
+        const winnerAff = affiliationOf(matchResult.winnerEntryId);
+        content = (
+          <div className="flex items-center gap-1 w-full min-w-0 px-2">
+            {isFinal && <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />}
+            <span className={`truncate flex-1 ${isFinal ? 'text-[12px] font-bold text-primary-700' : 'text-[11px] font-medium text-gray-800'}`} title={winnerFull}>
+              {winnerFull}
+            </span>
+            {winnerAff && (
+              <span className="text-[9px] text-gray-500 whitespace-nowrap shrink-0">{winnerAff}</span>
+            )}
           </div>
         );
-        continue;
+      } else if (isVs) {
+        // vs表示：両選手を上下に、所属は各選手名の下（改行）に表示
+        const dim = !isPlaying && !isReady;
+        content = (
+          <div className="relative flex flex-col justify-center w-full min-w-0 px-2 gap-1">
+            {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}
+            <div className="border-t border-gray-200" />
+            {playerRow(matchResult!.player2EntryId, matchResult!.player2Name, 'p2', dim)}
+            {courtBadge(matchResult!.courtName)}
+          </div>
+        );
+      } else {
+        // 選手未確定
+        content = (
+          <div className="flex items-center gap-1 w-full min-w-0 px-2">
+            {isFinal ? (
+              <>
+                <Trophy className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                <span className="text-[11px] text-gray-400 font-bold">決勝</span>
+              </>
+            ) : (
+              <span className="text-[11px] text-gray-400 truncate flex-1">&nbsp;</span>
+            )}
+          </div>
+        );
       }
 
-      // 通常ノード
       matchElements.push(
         <div key={`m-${r}-${m}`}
           {...clickProps}
-          className={`absolute flex items-center rounded transition-all${clickCls} ${
-            isFinished
-              ? 'border border-gray-400 bg-white'
-              : isPlaying
-                ? 'border-2 border-green-500 bg-green-50 animate-pulse'
-                : matchResult?.status === 'ready'
-                  ? 'border border-blue-400 bg-blue-50'
-                  : 'border border-dashed border-gray-300 bg-white'
-          }`}
-          style={{ left: x, top: y, width: slotW, height: SLOT_HEIGHT }}
+          className={`absolute flex items-center rounded transition-all${clickCls} ${cardClass}`}
+          style={{ left: x, top, width: slotW, height: cardH }}
         >
-          <div className="flex items-center gap-1 w-full min-w-0 px-2">
-            {isFinished ? (
-              <>
-                <span className="text-[11px] font-medium text-gray-800 truncate flex-1" title={winnerName}>
-                  {winnerName}
-                </span>
-              </>
-            ) : isPlaying ? (
-              <>
-                <span className="text-[11px] font-medium text-gray-800 truncate flex-1">
-                  {matchResult.player1Name && matchResult.player2Name
-                    ? numberedVs(matchResult)
-                    : ''}
-                </span>
-                {/* コート番号はカード内部に表示（経過時間はカード下部へ移動） */}
-                {matchResult.courtName && (
-                  <span className="bg-blue-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                    {matchResult.courtName}
-                  </span>
-                )}
-              </>
-            ) : matchResult?.status === 'ready' ? (
-              <>
-                <span className="text-[11px] text-gray-700 truncate flex-1">
-                  {matchResult.player1Name && matchResult.player2Name
-                    ? numberedVs(matchResult)
-                    : ''}
-                </span>
-                {/* コート番号はカード内部に表示（開始時刻はカード下部へ移動） */}
-                {matchResult.courtName && (
-                  <span className="bg-blue-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                    {matchResult.courtName}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-[11px] text-gray-400 truncate flex-1">
-                {matchResult?.player1Name && matchResult?.player2Name
-                  ? numberedVs(matchResult)
-                  : ''}
-              </span>
-            )}
-          </div>
+          {content}
         </div>
       );
     }

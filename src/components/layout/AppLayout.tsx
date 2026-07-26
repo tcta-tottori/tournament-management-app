@@ -417,7 +417,7 @@ export default function AppLayout() {
             className="drawer-version-btn"
             title="バージョン情報・更新履歴"
           >
-            <span className="header-version">Ver 2.3</span>
+            <span className="header-version">Ver 2.4</span>
             <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
           </button>
 

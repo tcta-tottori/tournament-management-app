@@ -21,6 +21,40 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 2.4',
+    date: '2026-07-26',
+    highlights: 'ドロー表示の刷新・対戦順シートをカード化・表示不具合の修正',
+    timeGroups: [
+      {
+        time: '—',
+        summary: 'ドロー（トーナメント表）',
+        changes: [
+          { type: 'feat', text: 'スコアを線の合流点付近に見やすく表示、線を丸みのあるデザインに、線の間隔を拡大' },
+          { type: 'feat', text: '2回戦以降も番号・フルネーム・所属を表示（対戦カードは所属を改行）' },
+          { type: 'feat', text: '試合中はカードの枠のみ点滅表示。ret/w.o は敗者側に表示' },
+          { type: 'fix', text: '決勝の次に余分な回戦ラベルが出る不具合を修正' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '対戦順シート',
+        changes: [
+          { type: 'feat', text: '対戦順を見やすいカード形式に刷新し、所属を改行表示' },
+          { type: 'feat', text: '試合中はカードの枠のみ点滅、終了した試合は一番下へ移動してグレー表示（次の控えを分かりやすく）' },
+          { type: 'fix', text: '同期不整合による対戦カードの重複や「1R/F」等の誤ったラウンド表示を修正し、ドロー表どおりに表示' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'コート状況・観戦用ページ',
+        changes: [
+          { type: 'feat', text: 'コート状況の対戦カードに「男子A級 1R」のような種目＋ラウンドのバッジを表示' },
+          { type: 'feat', text: '観戦用ページの「スコア」メニューを「ダッシュボード」に改称' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 2.3',
     date: '2026-07-26',
     highlights: 'コール改善・スコア入力をドロー画面へ統合・個人戦の観戦公開・一括取込のコート/開始時刻指定',
@@ -505,7 +539,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 2.3</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 2.4</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">
