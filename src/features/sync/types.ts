@@ -15,7 +15,9 @@ export type SyncMessageType =
 export interface DexieChangePayload {
   table: string;                          // テーブル名 (tournaments, matches, etc.)
   operation: 'create' | 'update' | 'delete';
-  key: number | string;                   // プライマリキー
+  key: number | string;                   // 数値プライマリキー（端末間で不安定。旧端末互換のフォールバック用）
+  logicalKey?: string;                    // 論理キー値（matchId等。端末間で安定して行を特定する）
+  scopeEventId?: string;                  // 同一 logicalKey が種目間で衝突する場合の絞り込み（matches/draws用）
   data?: Record<string, unknown>;         // create/update 時のデータ
   modifications?: Record<string, unknown>; // update 時の差分
 }
