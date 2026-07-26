@@ -7,7 +7,7 @@ import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDo
 import * as XLSX from 'xlsx';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, CallLogEntry, VoiceSettings } from '../broadcast/types';
-import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
+import { buildCallText, familyName, kataToHira, toSpeechText, resolveSurnameReading as resolveSurnameReadingFn } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
@@ -616,9 +616,9 @@ export default function MatchManager() {
     };
 
     // 苗字の読み（ひらがな）を取得。ふりがなにスペースがあればそこから、
-    // 無ければ同姓の共通接頭辞マップから推定する（表示は「漢字（かな）」）。
+    // 無ければ苗字辞書＋同姓推定を本人のふりがなで検証して採用する（表示は「漢字（かな）」）。
     const resolveSurnameReading = (kanjiName: string, furigana: string) =>
-      familyReading(furigana) || surnameReadingMap[familyName(kanjiName)] || '';
+      resolveSurnameReadingFn(kanjiName, furigana, surnameReadingMap[familyName(kanjiName)]);
 
     // 名前は漢字（フルネーム）、所属も漢字で返す。
     const resolveFurigana = (entryId: string | null, fallbackName: string, fallbackAff: string) => {
@@ -2563,6 +2563,60 @@ ${printableMatches.map(m => {
             onCall={() => { handleVoiceCall(cm, callCourtNumber, callStartTime, callText); closeCallModal(); }}
             onClose={closeCallModal}
           />
+        );
+      })()}
+
+      {/* コール中インジケーター（画面下部の固定ポップアップ） */}
+      {speakingMatchId && (() => {
+        const sm = allMatchesFlat.find(mm => mm.matchId === speakingMatchId);
+        if (!sm) return null;
+        const evt = events.find(e => e.eventId === sm.eventId);
+        const evDraw = allDraws.get(sm.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : totalRounds;
+        const roundName = getRoundName(sm.round, evTotalRounds);
+        const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
+        const numA = getDrawNumber(sm.player1EntryId, sm.eventId);
+        const numB = getDrawNumber(sm.player2EntryId, sm.eventId);
+        return (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[500] w-[calc(100%-1.5rem)] max-w-md px-1">
+            <div className="rounded-2xl shadow-2xl border-2 border-green-500 bg-white overflow-hidden bracket-card-blink">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                </span>
+                <Volume2 className="w-4 h-4" />
+                <span className="text-sm font-bold">コール中…</span>
+                <span className="text-[11px] font-semibold bg-white/20 rounded px-1.5 py-0.5 truncate">
+                  {shortEventName(evt?.name || '')} {roundName}
+                </span>
+                {courtName && (
+                  <span className="ml-auto text-[11px] font-bold bg-white/25 rounded px-2 py-0.5 shrink-0">{courtName}</span>
+                )}
+              </div>
+              <div className="px-3 py-2.5 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-gray-900 truncate">
+                    {numA > 0 && <span className="text-blue-400 font-mono text-xs mr-1">{numA}</span>}{sm.player1Name}
+                  </div>
+                  {sm.player1Affiliation && <div className="text-[10px] text-gray-500 truncate">{sm.player1Affiliation}</div>}
+                  <div className="text-[9px] font-bold text-blue-300 my-0.5">vs</div>
+                  <div className="text-sm font-bold text-gray-900 truncate">
+                    {numB > 0 && <span className="text-blue-400 font-mono text-xs mr-1">{numB}</span>}{sm.player2Name}
+                  </div>
+                  {sm.player2Affiliation && <div className="text-[10px] text-gray-500 truncate">{sm.player2Affiliation}</div>}
+                </div>
+                <button
+                  onClick={handleVoiceStop}
+                  className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-colors"
+                  title="コール停止"
+                >
+                  <Square className="w-5 h-5 fill-white" />
+                  <span className="text-[10px]">停止</span>
+                </button>
+              </div>
+            </div>
+          </div>
         );
       })()}
     </div>

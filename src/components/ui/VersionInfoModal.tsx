@@ -21,6 +21,37 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Ver 2.5',
+    date: '2026-07-26',
+    highlights: 'コールの苗字ふりがな精度向上・コール中の表示・対戦順の見直し・PCサイドバー',
+    timeGroups: [
+      {
+        time: '—',
+        summary: '音声コール',
+        changes: [
+          { type: 'fix', text: '苗字のふりがな付けを改善（一般的な苗字辞書＋本人のふりがなで検証し、読みを正しく決定）' },
+          { type: 'feat', text: 'コール中は画面下部に「コール中」ポップアップを表示（種目・ラウンド・対戦選手・コート・停止ボタン）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '対戦順・コート状況・エントリー',
+        changes: [
+          { type: 'feat', text: '対戦順カードの対戦者を横並びにし、選手番号を表示' },
+          { type: 'feat', text: 'コート状況に種目＋ラウンドのバッジを表示' },
+          { type: 'feat', text: 'エントリー検索: PCは検索ボックス下にカードリスト表示、スマホはポップアップ' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '画面表示',
+        changes: [
+          { type: 'feat', text: 'PC表示に常設サイドバー（デフォルト展開・アイコンのみに折りたたみ可能）を追加' },
+        ],
+      },
+    ],
+  },
+  {
     version: 'Ver 2.4',
     date: '2026-07-26',
     highlights: 'ドロー表示の刷新・対戦順シートをカード化・表示不具合の修正',
@@ -539,7 +570,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                   <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">Ver 2.4</h2>
+                  <h2 className="text-2xl font-bold text-white">Ver 2.5</h2>
                   <span className="text-xs text-white/50">Latest</span>
                 </div>
                 <p className="text-[11px] text-white/60 mt-1">

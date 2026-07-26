@@ -435,7 +435,7 @@ export default function AppLayout() {
             className="drawer-version-btn"
             title="バージョン情報・更新履歴"
           >
-            <span className="header-version">Ver 2.4</span>
+            <span className="header-version">Ver 2.5</span>
             <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
           </button>
 
@@ -501,7 +501,7 @@ export default function AppLayout() {
                   <Volume2 className="w-4 h-4" />
                 </button>
                 <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-amber-300/80 hover:text-amber-300 text-center py-1" title="バージョン情報">
-                  2.4
+                  2.5
                 </button>
               </>
             ) : (
@@ -519,7 +519,7 @@ export default function AppLayout() {
                   </a>
                 </div>
                 <button onClick={() => setVersionModalOpen(true)} className="drawer-version-btn" title="バージョン情報・更新履歴">
-                  <span className="header-version">Ver 2.4</span>
+                  <span className="header-version">Ver 2.5</span>
                   <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
                 </button>
               </>

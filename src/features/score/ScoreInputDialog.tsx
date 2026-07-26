@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
-import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText } from '../broadcast/callTextBuilder';
+import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText, resolveSurnameReading as resolveSurnameReadingFn } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
@@ -123,6 +123,14 @@ export default function ScoreInputDialog({
     const all = await appDb.affiliationFurigana.toArray();
     const map: Record<string, string> = {};
     for (const a of all) map[a.name] = a.furigana;
+    return map;
+  }) || {} as Record<string, string>;
+
+  // 選手名→ふりがな（苗字読みの解決・検証用）
+  const nameFuriganaMap = useLiveQuery(async () => {
+    const all = await appDb.players.toArray();
+    const map: Record<string, string> = {};
+    for (const p of all) if (p.name) map[p.name] = p.furigana || '';
     return map;
   }) || {} as Record<string, string>;
 
@@ -508,7 +516,9 @@ export default function ScoreInputDialog({
     const callData: MatchCall = {
       id: match.dbId, eventName: match.eventName, round: getRoundName(match.round),
       numberA: numA, nameA: match.player1Name, affA: match.player1Affiliation,
+      nameAReading: resolveSurnameReadingFn(match.player1Name, nameFuriganaMap[match.player1Name] || ''),
       numberB: numB, nameB: match.player2Name, affB: match.player2Affiliation,
+      nameBReading: resolveSurnameReadingFn(match.player2Name, nameFuriganaMap[match.player2Name] || ''),
       type: 'singles', status: 'pending', courtNumber,
       startTime: startTime,
     };
@@ -523,7 +533,7 @@ export default function ScoreInputDialog({
         : buildWalkoverCallText(callData, retNum, retName, winNum, winName, affiliationFuriganaMap);
     }
     return buildCallText(callData, courtNumber, startTime, affiliationFuriganaMap);
-  }, [match, retPlayer, getRoundName, affiliationFuriganaMap]);
+  }, [match, retPlayer, getRoundName, affiliationFuriganaMap, nameFuriganaMap]);
 
   // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）
   const handleCall = () => {

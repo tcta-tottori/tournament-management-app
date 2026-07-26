@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
-import { buildCallText, toSpeechText } from '../broadcast/callTextBuilder';
+import { buildCallText, toSpeechText, resolveSurnameReading as resolveSurnameReadingFn } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
@@ -97,6 +97,14 @@ export default function MatchActionPanel({
     const all = await db.affiliationFurigana.toArray();
     const map: Record<string, string> = {};
     for (const a of all) map[a.name] = a.furigana;
+    return map;
+  }) || {};
+
+  // 選手名→ふりがな（苗字読みの解決・検証用）
+  const nameFuriganaMap = useLiveQuery(async () => {
+    const all = await db.players.toArray();
+    const map: Record<string, string> = {};
+    for (const p of all) if (p.name) map[p.name] = p.furigana || '';
     return map;
   }) || {};
 
@@ -281,9 +289,11 @@ export default function MatchActionPanel({
         numberA: parseInt(match.player1EntryId?.replace(/\D/g, '') || '0', 10) || 0,
         nameA: match.player1Name,
         affA: match.player1Affiliation,
+        nameAReading: resolveSurnameReadingFn(match.player1Name, nameFuriganaMap[match.player1Name] || ''),
         numberB: parseInt(match.player2EntryId?.replace(/\D/g, '') || '0', 10) || 0,
         nameB: match.player2Name,
         affB: match.player2Affiliation,
+        nameBReading: resolveSurnameReadingFn(match.player2Name, nameFuriganaMap[match.player2Name] || ''),
         type: 'singles',
         status: 'pending',
         courtNumber,
@@ -291,7 +301,7 @@ export default function MatchActionPanel({
       };
       return buildCallText(callData, courtNumber, startTime, affiliationFuriganaMap);
     },
-    [match, getRoundName, affiliationFuriganaMap],
+    [match, getRoundName, affiliationFuriganaMap, nameFuriganaMap],
   );
 
   // コールボタン → ポップアップを開く（コート・開始時刻・読み上げ内容を事前に確認・修正できる）

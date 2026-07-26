@@ -1,4 +1,5 @@
 import type { MatchCall } from './types';
+import { SURNAME_READINGS } from './surnameReadings';
 
 /**
  * カタカナをひらがなへ変換する
@@ -52,6 +53,35 @@ export function familyReading(furigana: string): string {
   // スペースで苗字と名前が分かれている場合のみ苗字の読みを特定できる
   if (parts.length > 1 && parts[0]) return parts[0];
   return '';
+}
+
+/**
+ * 苗字の読み（ひらがな）を総合的に解決する。
+ * 1. ふりがなにスペースがあればその先頭（苗字）を採用。
+ * 2. 苗字辞書(SURNAME_READINGS)の候補＋lcpHint のうち、本人のフルふりがなの
+ *    「先頭に一致する」最長の候補を採用（本人の読みで検証するため誤読しない）。
+ * 3. 検証できない場合は lcpHint（同姓グループからの推定）を採用。
+ * 4. ふりがなが無い場合のみ辞書の代表読みを採用。
+ * @param kanjiName フルネーム（漢字・スペース区切り）
+ * @param fullFurigana 本人のふりがな（フルネーム連結・カナ/ひらがな）
+ * @param lcpHint 同姓グループから推定した苗字読み（任意）
+ */
+export function resolveSurnameReading(kanjiName: string, fullFurigana: string, lcpHint?: string): string {
+  const spaced = familyReading(fullFurigana);
+  if (spaced) return spaced;
+  const surname = familyName(kanjiName);
+  const full = kataToHira((fullFurigana || '').trim());
+  const cands: string[] = [];
+  if (lcpHint) cands.push(lcpHint);
+  const dict = SURNAME_READINGS[surname];
+  if (dict) cands.push(...dict);
+  if (full) {
+    // 本人のふりがな先頭に一致する候補のうち最長を採用
+    const valid = cands.filter(c => c && full.startsWith(c) && full.length - c.length >= 1);
+    if (valid.length) return valid.sort((a, b) => b.length - a.length)[0];
+    return lcpHint || '';
+  }
+  return lcpHint || (dict && dict[0]) || '';
 }
 
 // ---------------------------------------------------------------------------
