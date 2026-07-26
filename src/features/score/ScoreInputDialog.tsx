@@ -343,15 +343,31 @@ export default function ScoreInputDialog({
     return scoreParts.join(' ');
   }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB, match?.status]);
 
+  // 規定ゲーム数（例: "8ゲームマッチ" → 8）。団体戦と同じ自動補完に使う。
+  const requiredGames = useMemo(() => {
+    const m = gameRuleText?.match(/(\d+)ゲームマッチ/);
+    return m ? parseInt(m[1]) : null;
+  }, [gameRuleText]);
+
   // セットスコア入力ハンドラ
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
     if (!/^\d{0,2}$/.test(value)) return;
     setSets(prev => {
       const next = [...prev];
-      next[setIdx] = { ...next[setIdx], [player]: value };
+      const cur = { ...next[setIdx], [player]: value };
+      // 団体戦と同じ自動補完: 負け側の数（規定未満）を入れたら勝者側を規定ゲーム数で埋める
+      if (requiredGames && value !== '') {
+        const num = parseInt(value);
+        if (player === 'p1' && num < requiredGames && cur.p2 === '') {
+          cur.p2 = String(requiredGames);
+        } else if (player === 'p2' && num < requiredGames && cur.p1 === '') {
+          cur.p1 = String(requiredGames);
+        }
+      }
+      next[setIdx] = cur;
       return next;
     });
-    // 自動フォーカス移動: 2桁入力で次の入力欄へ
+    // 自動フォーカス移動: 入力で次の入力欄へ
     if (value.length >= 1) {
       const nextRef = player === 'p1' ? setIdx * 3 + 1 : (setIdx + 1) * 3;
       setTimeout(() => inputRefs.current[nextRef]?.focus(), 50);
@@ -842,30 +858,21 @@ export default function ScoreInputDialog({
             </div>
           )}
 
-          {/* エントリー（結果確定）ボタン */}
+          {/* 結果確定ボタン（負け側のスコアを入れると勝者側が自動入力され、勝者は自動判定） */}
           {canFinish && (
             <div className="space-y-2">
               <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
                 <Trophy className="w-3.5 h-3.5 text-primary-500" />
-                エントリー（結果入力）
+                結果を確定
               </span>
               {autoWinner && !scoreValidationError ? (
                 <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
                   className="w-full inline-flex items-center justify-center gap-2 text-base font-bold px-4 py-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-primary-500/25 min-h-[56px]">
-                  <Trophy className="w-5 h-5" /> 結果確定
+                  <Trophy className="w-5 h-5" /> 結果確定（{autoWinner === 1 ? match.player1Name : match.player2Name} 勝利）
                 </button>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => handleFinishMatch(1)} disabled={isProcessing}
-                    className="inline-flex items-center justify-center gap-1.5 text-sm font-bold px-3 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[52px]">
-                    <Trophy className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{match.player1Name || 'P1'}</span>
-                  </button>
-                  <button onClick={() => handleFinishMatch(2)} disabled={isProcessing}
-                    className="inline-flex items-center justify-center gap-1.5 text-sm font-bold px-3 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[52px]">
-                    <Trophy className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{match.player2Name || 'P2'}</span>
-                  </button>
+                <div className="w-full text-center text-[11px] text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xl py-3">
+                  負け側のスコアを入力すると勝者側が自動入力され、確定できます
                 </div>
               )}
             </div>
