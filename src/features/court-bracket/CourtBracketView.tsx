@@ -344,6 +344,26 @@ export default function CourtBracketView({
     );
   };
 
+  // 控え状況／入るコートを左端に表示（対戦順シートと共通の控え番号）
+  const standbyColumn = (label: string, tone: 'enter' | 'standby') => {
+    const num = label.match(/(\d+)/)?.[1] ?? '';
+    return (
+      <div className={`flex flex-col items-center justify-center shrink-0 text-white ${tone === 'enter' ? 'bg-blue-600' : 'bg-blue-400'}`} style={{ width: 42 }}>
+        {tone === 'standby' ? (
+          <>
+            <span className="text-[8px] font-bold leading-none opacity-85">控え</span>
+            <span className="text-xl font-black leading-none mt-0.5">{num}</span>
+          </>
+        ) : (
+          <>
+            <span className="text-2xl font-black leading-none">{num}</span>
+            <span className="text-[8px] font-bold leading-none opacity-85 mt-0.5">番へ</span>
+          </>
+        )}
+      </div>
+    );
+  };
+
   // --- 2回戦以降のマッチノード ---
   const matchElements: React.ReactNode[] = [];
   for (let r = 1; r <= roundsCount; r++) {
@@ -403,7 +423,13 @@ export default function CourtBracketView({
         const dim = !isPlaying && !isReady;
         content = (
           <div className="flex items-stretch w-full h-full min-w-0">
-            {isPlaying && courtColumn(matchResult!.courtName, 'playing')}
+            {isPlaying
+              ? courtColumn(matchResult!.courtName, 'playing')
+              : matchResult!.enterCourtName
+                ? standbyColumn(matchResult!.enterCourtName, 'enter')
+                : matchResult!.standbyLabel
+                  ? standbyColumn(matchResult!.standbyLabel, 'standby')
+                  : null}
             <div className="flex-1 flex flex-col justify-center min-w-0 px-2 gap-0.5">
               {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}
               <div className="border-t border-gray-200" />

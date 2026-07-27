@@ -14,6 +14,7 @@ import type { BulkCallItem } from '../../stores/bulkCallStore';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import type { MatchFormatType } from '../../db/database';
+import { useStandbyMap } from './standbyRanking';
 
 /** 回戦に応じたゲームルール（試合方式）を解決する */
 function resolveRoundRule(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
@@ -373,43 +374,8 @@ export default function MatchManager() {
 
 
   // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
-  const standbyInfo = useMemo(() => {
-    // 使用可能コートを番号順で取得
-    const availableCourts = courts
-      .filter(c => c.isAvailable)
-      .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
-
-    // 現在コートに入っている（試合中）コートIDセット → 空きコートを算出
-    const playingCourtIds = new Set<string>();
-    for (const m of globalSortedMatches) {
-      if (m.status === 'playing' && m.courtId) playingCourtIds.add(m.courtId);
-    }
-    const emptyCourts = availableCourts.filter(c => !playingCourtIds.has(c.courtId));
-
-    // 入れる（対戦相手が決まっている待機）試合を対戦順で取得
-    const waitingMatches: (Match & { eventName: string })[] = [];
-    for (const m of globalSortedMatches) {
-      if (m.status !== 'waiting' && m.status !== 'ready') continue;
-      if (!m.player1Name || !m.player2Name) continue;
-      if (m.player1Name === 'BYE' || m.player2Name === 'BYE') continue;
-      waitingMatches.push(m);
-    }
-
-    // enterCourtName: 空きコートに応じて対戦順の若い試合へ順にコートを割当（点滅表示対象）
-    // standbyLabel: それ以降は控え番号
-    const standbyMap = new Map<string, { enterCourtName: string | null; standbyLabel: string | null }>();
-    let standbyNum = 1;
-    waitingMatches.forEach((m, i) => {
-      if (i < emptyCourts.length) {
-        standbyMap.set(m.matchId, { enterCourtName: emptyCourts[i].name, standbyLabel: null });
-      } else {
-        const n = standbyNum++;
-        standbyMap.set(m.matchId, { enterCourtName: null, standbyLabel: n <= 5 ? `控え${n}` : '控え' });
-      }
-    });
-
-    return standbyMap;
-  }, [globalSortedMatches, courts]);
+  // 控え／入るコートのランキング（対戦順シート・ドロー画面で共通）
+  const standbyInfo = useStandbyMap(currentTournamentId);
 
   // --- 音声コール ---
   // Gemini TTS では話速・音程は「音声設定」のスタイル指示で制御するため、
@@ -1785,7 +1751,7 @@ ${printableMatches.map(m => {
                     } else if (enterCourtName) {
                       statusDisplay = { text: `${enterCourtName}番コートへ`, color: 'bg-blue-600 text-white' };
                     } else if (sb?.standbyLabel) {
-                      statusDisplay = { text: sb.standbyLabel, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
+                      statusDisplay = { text: sb.standbyLabel, color: 'bg-blue-100 text-blue-700 border border-blue-300' };
                     } else if (!hasPlayers) {
                       statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
                     } else {
@@ -1795,7 +1761,8 @@ ${printableMatches.map(m => {
                     // カード枠の配色:
                     // - 試合中: 緑枠点滅
                     // - 空きコートに入れる（対戦順で若い順）: 青枠のみ点滅 + 入るコート表示
-                    // - 控え（入れる待機だが空きコートなし）: 薄オレンジ枠
+                    // - 控え1〜5: 青ベースのカード
+                    // - それ以外の待機: 通常カード
                     const cardClass = isFinished
                       ? 'bg-gray-50 border-gray-200 opacity-60'
                       : isPlaying
@@ -1804,7 +1771,9 @@ ${printableMatches.map(m => {
                           ? 'bg-white border-gray-200 opacity-50'
                           : enterCourtName
                             ? 'bg-blue-50 border-2 border-blue-500 enter-card-blink'
-                            : 'bg-orange-50/40 border-orange-200';
+                            : sb?.standbyLabel
+                              ? 'bg-blue-50 border-2 border-blue-300'
+                              : `${evColor.bg} border-gray-200`;
 
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                     const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;

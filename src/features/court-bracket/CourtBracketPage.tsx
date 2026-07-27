@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers } from 'lucide
 import CourtBracketView from './CourtBracketView';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
+import { useStandbyMap } from '../referee/standbyRanking';
 
 function getGameRulesText(evt: Event | undefined): string {
   if (!evt) return '';
@@ -88,6 +89,9 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
   const selectedEventId = events[selectedEventIdx]?.eventId || '';
   const selectedEvent = events[selectedEventIdx];
+
+  // 控え状況（対戦順シートと共通のランキング）
+  const standbyMap = useStandbyMap(currentTournamentId);
 
   // クラス切替（末尾↔先頭で循環）
   const gotoPrevEvent = useCallback(() => {
@@ -186,6 +190,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const matchResults: MatchResult[] = useMemo(() =>
     matches.map(m => {
       const court = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+      const sb = standbyMap.get(m.matchId);
       return {
         round: m.round, position: m.position,
         player1Name: m.player1Name, player2Name: m.player2Name,
@@ -194,9 +199,11 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
         score: m.score, status: m.status, courtId: m.courtId,
         courtName: court?.name || '', scheduledTime: m.scheduledTime,
         updatedAt: m.updatedAt,
+        standbyLabel: sb?.standbyLabel ?? null,
+        enterCourtName: sb?.enterCourtName ?? null,
       };
     }),
-    [matches, courts]
+    [matches, courts, standbyMap]
   );
 
   const totalRounds = drawData ? Math.log2(drawData.drawSize) : 1;
