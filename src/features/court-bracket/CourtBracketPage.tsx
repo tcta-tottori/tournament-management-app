@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -88,6 +88,38 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
   const selectedEventId = events[selectedEventIdx]?.eventId || '';
   const selectedEvent = events[selectedEventIdx];
+
+  // クラス切替（末尾↔先頭で循環）
+  const gotoPrevEvent = useCallback(() => {
+    setSelectedEventIdx(i => events.length > 0 ? (i - 1 + events.length) % events.length : 0);
+  }, [events.length]);
+  const gotoNextEvent = useCallback(() => {
+    setSelectedEventIdx(i => events.length > 0 ? (i + 1) % events.length : 0);
+  }, [events.length]);
+
+  // スワイプでクラス切替
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onSwipeStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  }, []);
+  const handleSwipeEnd = useCallback((e: React.TouchEvent, edgeEl?: HTMLElement | null) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || events.length <= 1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    // ブラケット上のスワイプは横スクロールの端でのみクラス切替する
+    if (edgeEl) {
+      const atLeft = edgeEl.scrollLeft <= 2;
+      const atRight = edgeEl.scrollLeft + edgeEl.clientWidth >= edgeEl.scrollWidth - 2;
+      if (dx < 0 && !atRight) return;
+      if (dx > 0 && !atLeft) return;
+    }
+    if (dx < 0) gotoNextEvent(); else gotoPrevEvent();
+  }, [events.length, gotoNextEvent, gotoPrevEvent]);
 
   const matches = useLiveQuery(
     () => selectedEventId
@@ -223,13 +255,16 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
   return (
     <div className="flex flex-col h-full">
-      {/* ヘッダー: 種目選択 + ルール */}
-      <div className="shrink-0 bg-white border-b px-3 py-2">
+      {/* ヘッダー: 種目選択 + ルール（上部固定・スワイプ切替） */}
+      <div
+        className="sticky top-0 z-30 shrink-0 bg-white border-b px-3 py-2 shadow-sm"
+        onTouchStart={onSwipeStart}
+        onTouchEnd={(e) => handleSwipeEnd(e)}
+      >
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setSelectedEventIdx(Math.max(0, selectedEventIdx - 1))}
-            disabled={selectedEventIdx <= 0}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+            onClick={gotoPrevEvent}
+            className="p-1 rounded hover:bg-gray-100"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -247,9 +282,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           </div>
 
           <button
-            onClick={() => setSelectedEventIdx(Math.min(events.length - 1, selectedEventIdx + 1))}
-            disabled={selectedEventIdx >= events.length - 1}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+            onClick={gotoNextEvent}
+            className="p-1 rounded hover:bg-gray-100"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -295,8 +329,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
         )}
       </div>
 
-      {/* ブラケット表示 */}
-      <div className="flex-1 overflow-auto bg-gray-50">
+      {/* ブラケット表示（横スクロール端でのスワイプでクラス切替） */}
+      <div
+        className="flex-1 overflow-auto bg-gray-50"
+        onTouchStart={onSwipeStart}
+        onTouchEnd={(e) => handleSwipeEnd(e, e.currentTarget)}
+      >
         {drawSize > 0 && !isRoundRobin ? (
           <CourtBracketView
             slots={slots}
