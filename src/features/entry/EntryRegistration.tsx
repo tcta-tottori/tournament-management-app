@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
+import HeatRulePatternInput, { applyHeatToRules } from '../data/HeatRulePatternInput';
 import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock, X, Check } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -125,6 +126,8 @@ export default function EntryRegistration() {
 
 function NormalEntryRegistration() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const heatRulePattern = useAppStore(state => state.heatRulePattern);
+  const setHeatRulePattern = useAppStore(state => state.setHeatRulePattern);
 
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -715,6 +718,17 @@ function NormalEntryRegistration() {
     // DBから最新データを直接取得（クロージャの古いデータに依存しない）
     const draw = await db.draws.where('eventId').equals(eventId).first();
     if (!draw) return;
+
+    // 熱中症警戒時の試合形式を指定している場合は種目の回戦ルールへ付与する
+    if (heatRulePattern.enabled) {
+      const evForHeat = await db.events.where('eventId').equals(eventId).first();
+      if (evForHeat?.id != null) {
+        const defaultGames = evForHeat.roundGameRules?.[0]?.games ?? evForHeat.gameRules?.games ?? 6;
+        const nextRules = applyHeatToRules(evForHeat.roundGameRules, defaultGames, heatRulePattern);
+        await db.events.update(evForHeat.id, { roundGameRules: nextRules });
+      }
+    }
+
     if (!skipConfirm) {
       const ok = await requestConfirm({ title: 'エントリー確定', message: 'エントリーを確定し対戦表を生成しますか？', confirmLabel: '確定する' });
       if (!ok) return;
@@ -912,7 +926,7 @@ function NormalEntryRegistration() {
         setProcModalResult({ success: false, message: `確定処理に失敗: ${(err as Error).message}` });
       }
     }
-  }, [events, isLeagueEvent, maybeRegenerateSchedule, recalculateGlobalMatchOrder]);
+  }, [events, isLeagueEvent, maybeRegenerateSchedule, recalculateGlobalMatchOrder, heatRulePattern]);
 
   const handleConfirmAll = useCallback(async () => {
     const currentDraws = eventIds.length > 0
@@ -1766,6 +1780,9 @@ function NormalEntryRegistration() {
                 </div>
               </div>
             )}
+
+            {/* 熱中症警戒時の試合形式（確定時に各種目へ付与） */}
+            <HeatRulePatternInput value={heatRulePattern} onChange={setHeatRulePattern} />
           </div>
         </div>
 

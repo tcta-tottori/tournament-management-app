@@ -58,6 +58,11 @@ export interface RoundGameRule {
   ruleText: string;           // "8ゲームマッチ（8-8タイブレーク）"
   games: number;              // ゲーム数
   matchFormat?: MatchFormatType; // 試合方式（省略時='game'）
+  // --- 熱中症警戒アラート時のパターン（任意） ---
+  // 設定されている場合、審判用紙に通常形式と併記する。
+  heatRuleText?: string;         // 熱中症時のルール文 "6ゲームマッチ（ノーアド）" 等
+  heatGames?: number;            // 熱中症時のゲーム数
+  heatMatchFormat?: MatchFormatType; // 熱中症時の試合方式
 }
 
 export interface Event {

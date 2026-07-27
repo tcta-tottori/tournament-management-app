@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
 import CourtSelector, { STANDARD_COURTS } from './CourtSelector';
+import HeatRulePatternInput, { applyHeatToRules } from './HeatRulePatternInput';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
@@ -514,6 +515,8 @@ interface DataImportProps {
 export default function DataImport({ externalTournamentExcel, externalScheduleExcel, wizardAutoImport, onAutoImportComplete }: DataImportProps) {
   const setCurrentTournamentId = useAppStore(state => state.setCurrentTournamentId);
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const heatRulePattern = useAppStore(state => state.heatRulePattern);
+  const setHeatRulePattern = useAppStore(state => state.setHeatRulePattern);
   const persistedImportedSchedule = useAppStore(state => state.importedSchedule);
   const persistedScheduleFileName = useAppStore(state => state.scheduleFileName);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
@@ -1106,6 +1109,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           name: eventDef.name,
           type: eventDef.type,
           gameRules: { sets: 1, games: 6, deuce: true, tiebreakPoint: 7 },
+          roundGameRules: applyHeatToRules(undefined, 6, heatRulePattern),
         });
       }
 
@@ -1329,7 +1333,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
           name: ev.eventName,
           type: ev.type,
           gameRules: { sets: 1, games: defaultGames, deuce: true, tiebreakPoint: defaultGames },
-          roundGameRules: ev.roundGameRules.length > 0 ? ev.roundGameRules : undefined,
+          roundGameRules: applyHeatToRules(ev.roundGameRules, defaultGames, heatRulePattern),
         });
 
         // --- 4. 選手 & エントリー作成 ---
@@ -2043,6 +2047,9 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
               </table>
             </div>
           )}
+
+          {/* 熱中症警戒時の試合形式 */}
+          <HeatRulePatternInput value={heatRulePattern} onChange={setHeatRulePattern} />
 
           {/* アクションボタン */}
           <div className="flex gap-2">
