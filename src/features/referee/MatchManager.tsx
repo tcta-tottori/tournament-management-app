@@ -292,23 +292,18 @@ export default function MatchManager() {
       const m = t.match(/^(\d{1,2}):(\d{2})$/);
       return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : Number.POSITIVE_INFINITY;
     };
-    const courtNum = (courtId?: string | null) => {
-      const n = courtId ? parseInt(courtIdToName.get(courtId) || '', 10) : NaN;
-      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
-    };
 
     // タイムテーブル最優先: 開始時刻が設定されている試合が1件でもあれば、
-    // タイムテーブルの並び（開始時刻→コート番号→ラウンド→ポジション）で表示する。
-    // 開始時刻の無い試合（未スケジュール）は末尾にドロー順で続ける。
+    // タイムテーブルの並び（開始時刻→対戦順(matchOrder)→ラウンド→ポジション）で表示する。
+    // matchOrder が大会全体の正規の対戦順なので、控えの採番とも一致させる。
     const hasScheduledTime = arr.some(m => !!m.scheduledTime);
     if (hasScheduledTime) {
       return [...arr].sort((a, b) => {
         const ta = toMin(a.scheduledTime);
         const tb = toMin(b.scheduledTime);
         if (ta !== tb) return ta - tb;
-        const ca = courtNum(a.courtId);
-        const cb = courtNum(b.courtId);
-        if (ca !== cb) return ca - cb;
+        const oa = a.matchOrder || 9999, ob = b.matchOrder || 9999;
+        if (oa !== ob) return oa - ob;
         if (a.round !== b.round) return a.round - b.round;
         return (a.position || 0) - (b.position || 0);
       });
