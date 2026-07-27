@@ -39,12 +39,8 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     const mm = t.match(/^(\d{1,2}):(\d{2})$/);
     return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
   };
-  const courtNum = (id?: string | null) => {
-    const n = id ? parseInt(courtNameById.get(id) || '', 10) : NaN;
-    return isNaN(n) ? Number.POSITIVE_INFINITY : n;
-  };
-
-  // 対戦順（開始時刻→コート番号→ラウンド→ポジション→対戦順）で並べる
+  // 対戦順（開始時刻→対戦順(matchOrder)→ラウンド→ポジション）で並べる。
+  // matchOrder が大会全体の正規の対戦順なので、控えの採番はこれに従う。
   const waiting = matches
     .filter(m =>
       (m.status === 'waiting' || m.status === 'ready')
@@ -53,11 +49,10 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     .sort((a, b) => {
       const ta = toMin(a.scheduledTime), tb = toMin(b.scheduledTime);
       if (ta !== tb) return ta - tb;
-      const ca = courtNum(a.courtId), cb = courtNum(b.courtId);
-      if (ca !== cb) return ca - cb;
+      const oa = a.matchOrder || 9999, ob = b.matchOrder || 9999;
+      if (oa !== ob) return oa - ob;
       if (a.round !== b.round) return a.round - b.round;
-      if ((a.position || 0) !== (b.position || 0)) return (a.position || 0) - (b.position || 0);
-      return (a.matchOrder || 9999) - (b.matchOrder || 9999);
+      return (a.position || 0) - (b.position || 0);
     });
 
   // 入るコートの割当:
