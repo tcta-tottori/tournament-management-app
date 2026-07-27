@@ -14,7 +14,7 @@ import type { BulkCallItem } from '../../stores/bulkCallStore';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import type { MatchFormatType } from '../../db/database';
-import { useStandbyMap } from './standbyRanking';
+import { assignStandbyInOrder } from './standbyRanking';
 
 /** 回戦に応じたゲームルール（試合方式）を解決する */
 function resolveRoundRule(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
@@ -368,9 +368,12 @@ export default function MatchManager() {
   }, [allMatchesByEvent, events, importedSchedule, allDraws, isLeagueEvent, matchEventName, matchRoundLabel, courtIdToName]);
 
 
-  // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
-  // 控え／入るコートのランキング（対戦順シート・ドロー画面で共通）
-  const standbyInfo = useStandbyMap(currentTournamentId);
+  // 控え／入るコートのランキング。表示中の対戦順(globalSortedMatches)そのままで採番し、
+  // 控え番号と表示位置を必ず一致させる。
+  const standbyInfo = useMemo(
+    () => assignStandbyInOrder(globalSortedMatches, courts),
+    [globalSortedMatches, courts],
+  );
 
   // --- 音声コール ---
   // Gemini TTS では話速・音程は「音声設定」のスタイル指示で制御するため、
@@ -1694,7 +1697,7 @@ ${printableMatches.map(m => {
       </div>
 
       {/* RIGHT: メインコンテンツ */}
-      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full">
+      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full pb-8">
         {/* === 対戦順（グローバル）表示 === */}
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
