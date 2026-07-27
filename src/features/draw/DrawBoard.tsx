@@ -41,6 +41,10 @@ export type MatchResult = {
   courtName: string;
   scheduledTime: string | null;
   updatedAt?: number;
+  /** 控え番号ラベル（控え1〜控え5）。対戦順の控え状況をドローにも表示するため。 */
+  standbyLabel?: string | null;
+  /** 空きコートに割り当てられた場合の入るコート名 */
+  enterCourtName?: string | null;
 };
 
 export default function DrawBoard() {
