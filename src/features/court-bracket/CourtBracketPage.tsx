@@ -103,7 +103,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     const t = e.touches[0];
     touchStart.current = { x: t.clientX, y: t.clientY };
   }, []);
-  const handleSwipeEnd = useCallback((e: React.TouchEvent, edgeEl?: HTMLElement | null) => {
+  const handleSwipeEnd = useCallback((e: React.TouchEvent) => {
     const start = touchStart.current;
     touchStart.current = null;
     if (!start || events.length <= 1) return;
@@ -111,13 +111,6 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    // ブラケット上のスワイプは横スクロールの端でのみクラス切替する
-    if (edgeEl) {
-      const atLeft = edgeEl.scrollLeft <= 2;
-      const atRight = edgeEl.scrollLeft + edgeEl.clientWidth >= edgeEl.scrollWidth - 2;
-      if (dx < 0 && !atRight) return;
-      if (dx > 0 && !atLeft) return;
-    }
     if (dx < 0) gotoNextEvent(); else gotoPrevEvent();
   }, [events.length, gotoNextEvent, gotoPrevEvent]);
 
@@ -329,12 +322,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
         )}
       </div>
 
-      {/* ブラケット表示（横スクロール端でのスワイプでクラス切替） */}
-      <div
-        className="flex-1 overflow-auto bg-gray-50"
-        onTouchStart={onSwipeStart}
-        onTouchEnd={(e) => handleSwipeEnd(e, e.currentTarget)}
-      >
+      {/* ブラケット表示 */}
+      <div className="flex-1 overflow-auto bg-gray-50">
         {drawSize > 0 && !isRoundRobin ? (
           <CourtBracketView
             slots={slots}
