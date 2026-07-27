@@ -399,12 +399,11 @@ export default function CourtBracketView({
           </div>
         );
       } else if (isVs) {
-        // vs表示：左端にコート番号を大きく表示し、右側に両選手を上下2段（氏名＋所属）で表示
+        // vs表示：実際に試合中のもののみ左端にコート番号を表示（控えは時間割上の仮割当のため非表示）。
         const dim = !isPlaying && !isReady;
-        const tone: 'playing' | 'ready' | 'idle' = isPlaying ? 'playing' : isReady ? 'ready' : 'idle';
         content = (
           <div className="flex items-stretch w-full h-full min-w-0">
-            {courtColumn(matchResult!.courtName, tone)}
+            {isPlaying && courtColumn(matchResult!.courtName, 'playing')}
             <div className="flex-1 flex flex-col justify-center min-w-0 px-2 gap-0.5">
               {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}
               <div className="border-t border-gray-200" />
