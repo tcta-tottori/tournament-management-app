@@ -13,17 +13,22 @@ export interface StandbyEntry {
 /** 最大何番目まで「控え」として番号表示するか */
 export const MAX_STANDBY = 5;
 
+const toMin = (t?: string | null) => {
+  if (!t) return Number.POSITIVE_INFINITY;
+  const mm = t.match(/^(\d{1,2}):(\d{2})$/);
+  return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
+};
+
 /**
- * 全種目の試合とコートから、対戦順（開始時刻→コート→ラウンド→ポジション→対戦順）に
- * 沿って「入れる（空きコート割当）」と「控え1〜5」を算出する。
- * 対戦順シートとドロー画面で共通の控え状況を表示するために使用する。
+ * 「対戦順に並んだ試合リスト」からコート割当と控え番号を算出する。
+ * orderedMatches は表示と同じ対戦順で渡すこと（採番＝表示順にするため再ソートしない）。
  */
-export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string, StandbyEntry> {
+export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): Map<string, StandbyEntry> {
   const courtNameById = new Map(courts.map(c => [c.courtId, c.name]));
 
   // 現在使用中（試合中）のコート名 → 空きコート名を算出
   const playingCourtNames = new Set<string>();
-  for (const m of matches) {
+  for (const m of orderedMatches) {
     if (m.status === 'playing' && m.courtId) {
       const n = courtNameById.get(m.courtId);
       if (n) playingCourtNames.add(n);
@@ -34,29 +39,14 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     .map(c => c.name);
   const emptyCourtSet = new Set(emptyCourtNames);
 
-  const toMin = (t?: string | null) => {
-    if (!t) return Number.POSITIVE_INFINITY;
-    const mm = t.match(/^(\d{1,2}):(\d{2})$/);
-    return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
-  };
-  // 対戦順（開始時刻→対戦順(matchOrder)→ラウンド→ポジション）で並べる。
-  // matchOrder が大会全体の正規の対戦順なので、控えの採番はこれに従う。
-  const waiting = matches
-    .filter(m =>
-      (m.status === 'waiting' || m.status === 'ready')
-      && !!m.player1Name && !!m.player2Name
-      && m.player1Name !== 'BYE' && m.player2Name !== 'BYE')
-    .sort((a, b) => {
-      const ta = toMin(a.scheduledTime), tb = toMin(b.scheduledTime);
-      if (ta !== tb) return ta - tb;
-      const oa = a.matchOrder || 9999, ob = b.matchOrder || 9999;
-      if (oa !== ob) return oa - ob;
-      if (a.round !== b.round) return a.round - b.round;
-      return (a.position || 0) - (b.position || 0);
-    });
+  // 入れる（対戦相手が決まった待機）試合を対戦順のまま抽出（再ソートしない）
+  const waiting = orderedMatches.filter(m =>
+    (m.status === 'waiting' || m.status === 'ready')
+    && !!m.player1Name && !!m.player2Name
+    && m.player1Name !== 'BYE' && m.player2Name !== 'BYE');
 
   // 入るコートの割当:
-  // 1) まず各試合の割当コート(courtId)が空いていれば、その自コートへ入れる（対戦順の若い方を優先）。
+  // 1) 各試合の割当コート(courtId)が空いていれば、その自コートへ入れる（対戦順の若い方を優先）。
   // 2) 余った空きコートは、対戦順の若い未割当試合へ順に割り当てる。
   const enterByMatch = new Map<string, string>();
   const usedCourts = new Set<string>();
@@ -88,6 +78,22 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     }
   }
   return map;
+}
+
+/**
+ * 全種目の試合とコートから、対戦順（開始時刻→対戦順(matchOrder)→ラウンド→ポジション）に
+ * 沿って控え状況を算出する。ドロー画面など、対戦順リストを持たない画面で使用する。
+ */
+export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string, StandbyEntry> {
+  const ordered = [...matches].sort((a, b) => {
+    const ta = toMin(a.scheduledTime), tb = toMin(b.scheduledTime);
+    if (ta !== tb) return ta - tb;
+    const oa = a.matchOrder || 9999, ob = b.matchOrder || 9999;
+    if (oa !== ob) return oa - ob;
+    if (a.round !== b.round) return a.round - b.round;
+    return (a.position || 0) - (b.position || 0);
+  });
+  return assignStandbyInOrder(ordered, courts);
 }
 
 /** 大会全体の控えランキングを購読するフック */

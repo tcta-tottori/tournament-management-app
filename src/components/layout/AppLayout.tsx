@@ -292,7 +292,7 @@ export default function AppLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col h-screen bg-bg-main overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-bg-main overflow-hidden">
 
       {/* ===== ヘッダー ===== */}
       <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
