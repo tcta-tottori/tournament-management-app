@@ -57,6 +57,19 @@ interface AppState {
   // キー: 苗字（漢字）、値: 読み（ひらがな）。一度修正するとその後のコールにも反映する。
   nameReadingOverrides: Record<string, string>;
   setNameReadingOverride: (surname: string, reading: string) => void;
+
+  // 熱中症警戒アラート時の試合形式（一括読込・エントリー確定時に指定するための既定パターン）。
+  // ここで指定した内容は各種目の回戦ルールに heat* として付与される（後から個別修整可）。
+  heatRulePattern: HeatRulePattern;
+  setHeatRulePattern: (pattern: Partial<HeatRulePattern>) => void;
+}
+
+// 熱中症警戒時の試合形式パターン
+export interface HeatRulePattern {
+  enabled: boolean;                          // 適用するか
+  games: number;                             // ゲーム数
+  matchFormat: 'game' | 'twoSetsSuper10';    // 試合方式
+  ruleText: string;                          // ルール文（空なら「Nゲームマッチ」を自動生成）
 }
 
 const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
@@ -109,6 +122,9 @@ export const useAppStore = create<AppState>()(
           if (val) next[key] = val; else delete next[key];
           return { nameReadingOverrides: next };
         }),
+      heatRulePattern: { enabled: false, games: 6, matchFormat: 'game', ruleText: '' },
+      setHeatRulePattern: (pattern) =>
+        set((state) => ({ heatRulePattern: { ...state.heatRulePattern, ...pattern } })),
     }),
     {
       name: 'tennis-tournament-storage', // localStorage に保存

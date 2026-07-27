@@ -1114,6 +1114,38 @@ export default function MatchManager() {
       return `${games}ゲームマッチ\n（${games}-${games}タイブレーク）`;
     };
 
+    /** 回戦に応じた熱中症警戒時ルール文字列（無ければ空） */
+    const getHeatMethodForRound = (round: number): string => {
+      const rules = evt?.roundGameRules;
+      if (!rules || rules.length === 0) return '';
+      const pick = (): RoundGameRule => {
+        if (rules.length === 1) return rules[0];
+        const roundN = getRoundName(round, eventTotalRounds);
+        let chosen = rules[0];
+        for (const rule of rules) {
+          const label = rule.roundLabel;
+          if (label === '全回戦') continue;
+          const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+          if (rangeMatch) { if (round >= parseInt(rangeMatch[1]) && round <= parseInt(rangeMatch[2])) { chosen = rule; break; } continue; }
+          if (label.includes('以降')) {
+            const cl = label.replace('以降', '');
+            if (cl.includes('準々決勝') && round >= eventTotalRounds - 2) { chosen = rule; break; }
+            if (cl.includes('準決勝') && round >= eventTotalRounds - 1) { chosen = rule; break; }
+            if (cl.includes('決勝') && !cl.includes('準') && round >= eventTotalRounds) { chosen = rule; break; }
+            const rn = cl.match(/(\d+)回戦/);
+            if (rn && round >= parseInt(rn[1])) { chosen = rule; break; }
+            continue;
+          }
+          if (roundN === label || label.includes(roundN)) { chosen = rule; break; }
+        }
+        return chosen;
+      };
+      const matched = pick();
+      if (matched.heatRuleText && matched.heatRuleText.trim()) return stripRoundPrefix(matched.heatRuleText.trim());
+      if (matched.heatGames) return `${matched.heatGames}ゲームマッチ`;
+      return '';
+    };
+
     const roundName = (round: number) => getRoundName(round, eventTotalRounds);
 
     // B5 landscape: 250mm x 176mm, margin 5mm → usable 240mm x 166mm
@@ -1282,7 +1314,7 @@ ${printableMatches.map(m => {
       <td colspan="9" rowspan="2"
           class="fg bt br bb2"
           style="text-align:center; font-size:18px; white-space:pre-line; line-height:1.3;">
-        ${getGameMethodForRound(m.round)}
+        ${getGameMethodForRound(m.round)}${(() => { const h = getHeatMethodForRound(m.round); return h ? `<div style="color:#c00;font-size:12px;line-height:1.2;margin-top:2px;">🌡熱中症警戒時<br>${h}</div>` : ''; })()}
       </td>
       <td colspan="5" rowspan="2"
           class="fg bt br bb2"
@@ -1480,28 +1512,34 @@ ${printableMatches.map(m => {
     // 回戦に応じたゲームルール
     const rules2 = evt.roundGameRules;
     let gameMethod: string;
+    let heatMethod = '';
     if (rules2 && rules2.length > 0) {
-      if (rules2.length === 1) { gameMethod = stripRoundPrefix(rules2[0].ruleText); }
-      else {
+      const pickRule = (): RoundGameRule => {
+        if (rules2.length === 1) return rules2[0];
         const rn2 = getRoundName(m.round, eventTotalRounds);
-        gameMethod = stripRoundPrefix(rules2[0].ruleText); // default
+        let chosen = rules2[0];
         for (const rule of rules2) {
           const label = rule.roundLabel;
           if (label === '全回戦') continue;
           const rm = label.match(/(\d+)～(\d+)回戦/);
-          if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { gameMethod = stripRoundPrefix(rule.ruleText); break; } continue; }
+          if (rm) { if (m.round >= parseInt(rm[1]) && m.round <= parseInt(rm[2])) { chosen = rule; break; } continue; }
           if (label.includes('以降')) {
             const cl = label.replace('以降', '');
-            if (cl.includes('準々決勝') && m.round >= eventTotalRounds - 2) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
-            if (cl.includes('準決勝') && m.round >= eventTotalRounds - 1) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
-            if (cl.includes('決勝') && !cl.includes('準') && m.round >= eventTotalRounds) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
+            if (cl.includes('準々決勝') && m.round >= eventTotalRounds - 2) { chosen = rule; break; }
+            if (cl.includes('準決勝') && m.round >= eventTotalRounds - 1) { chosen = rule; break; }
+            if (cl.includes('決勝') && !cl.includes('準') && m.round >= eventTotalRounds) { chosen = rule; break; }
             const rn3 = cl.match(/(\d+)回戦/);
-            if (rn3 && m.round >= parseInt(rn3[1])) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
+            if (rn3 && m.round >= parseInt(rn3[1])) { chosen = rule; break; }
             continue;
           }
-          if (rn2 === label || label.includes(rn2)) { gameMethod = stripRoundPrefix(rule.ruleText); break; }
+          if (rn2 === label || label.includes(rn2)) { chosen = rule; break; }
         }
-      }
+        return chosen;
+      };
+      const matched = pickRule();
+      gameMethod = stripRoundPrefix(matched.ruleText);
+      if (matched.heatRuleText && matched.heatRuleText.trim()) heatMethod = stripRoundPrefix(matched.heatRuleText.trim());
+      else if (matched.heatGames) heatMethod = `${matched.heatGames}ゲームマッチ`;
     } else {
       const gamesVal = evt.gameRules?.games ?? 6;
       gameMethod = `${gamesVal}ゲームマッチ\n（${gamesVal}-${gamesVal}タイブレーク）`;
@@ -1534,7 +1572,7 @@ ${printableMatches.map(m => {
 <tr style="height:${rh[0]};"><td colspan="38" rowspan="2" class="fg" style="text-align:center;font-size:32px;font-weight:bold;letter-spacing:0.5em;height:calc(${rh[0]}+${rh[1]});">審　判　用　紙</td></tr><tr style="height:${rh[1]};"></tr>
 <tr style="height:${rh[2]};"><td colspan="7" style="height:${rh[2]};"></td><td colspan="23" class="fg bb2" style="text-align:center;font-size:14px;">(${tournamentName})</td><td colspan="8" class="fg bb2" style="text-align:right;font-size:14px;padding-right:4px;">${tournamentDate}</td></tr>
 <tr style="height:${rh[3]};"><td colspan="6" rowspan="4" class="fg bl2 bt2 br bb" style="text-align:center;font-size:16px;height:calc(${rh[3]}+${rh[4]}+${rh[5]}+${rh[6]});">種　目</td><td colspan="13" rowspan="4" class="fg bt2 br bb" style="text-align:center;font-size:24px;white-space:nowrap;">${eventName}</td><td colspan="6" rowspan="4" class="fg bt2 br bb" style="text-align:center;font-size:18px;">回　戦</td><td colspan="13" rowspan="4" class="fg bt2 br2 bb" style="text-align:center;font-size:28px;font-weight:bold;">${rName}</td></tr><tr style="height:${rh[4]};"></tr><tr style="height:${rh[5]};"></tr><tr style="height:${rh[6]};"></tr>
-<tr style="height:${rh[7]};"><td colspan="6" rowspan="2" class="fg bl2 bt br bb2" style="text-align:center;font-size:16px;height:calc(${rh[7]}+${rh[8]});">コート№</td><td colspan="6" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:36px;font-weight:bold;">${courtDisplay}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">試合方法</td><td colspan="9" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:18px;white-space:pre-line;line-height:1.3;">${gameMethod}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">開始時間</td><td colspan="7" rowspan="2" class="fg bt br2 bb2" style="text-align:center;font-size:22px;font-weight:bold;">${m.scheduledTime || ''}</td></tr><tr style="height:${rh[8]};"></tr>
+<tr style="height:${rh[7]};"><td colspan="6" rowspan="2" class="fg bl2 bt br bb2" style="text-align:center;font-size:16px;height:calc(${rh[7]}+${rh[8]});">コート№</td><td colspan="6" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:36px;font-weight:bold;">${courtDisplay}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">試合方法</td><td colspan="9" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:18px;white-space:pre-line;line-height:1.3;">${gameMethod}${heatMethod ? `<div style="color:#c00;font-size:12px;line-height:1.2;margin-top:2px;">🌡熱中症警戒時<br>${heatMethod}</div>` : ''}</td><td colspan="5" rowspan="2" class="fg bt br bb2" style="text-align:center;font-size:16px;">開始時間</td><td colspan="7" rowspan="2" class="fg bt br2 bb2" style="text-align:center;font-size:22px;font-weight:bold;">${m.scheduledTime || ''}</td></tr><tr style="height:${rh[8]};"></tr>
 <tr style="height:${rh[9]};"><td colspan="38" style="height:${rh[9]};"></td></tr>
 <tr style="height:${rh[10]};"><td colspan="6" rowspan="2" class="fg bl2 bt2 br bb" style="text-align:center;font-size:14px;height:calc(${rh[10]}+${rh[11]});">エントリー№</td><td colspan="4" rowspan="2" class="ft bt2 bb" style="text-align:right;font-size:20px;padding-right:2px;border-left:1px solid #000;">No.</td><td colspan="12" rowspan="2" class="fp bt2 bb br" style="text-align:center;font-size:26px;">${entryNo1}</td><td colspan="4" rowspan="2" class="ft bt2 bb" style="text-align:right;font-size:20px;padding-right:2px;border-left:1px solid #000;">No.</td><td colspan="12" rowspan="2" class="fp bt2 bb br2" style="text-align:center;font-size:26px;">${entryNo2}</td></tr><tr style="height:${rh[11]};"></tr>
 <tr style="height:${rh[12]};"><td colspan="6" rowspan="6" class="fg bl2 bt br bb" style="text-align:center;font-size:14px;height:calc(${rh[12]}+${rh[13]}+${rh[14]}+${rh[15]}+${rh[16]}+${rh[17]});">選 手 氏 名</td><td colspan="16" rowspan="4" class="fp bt br" style="text-align:center;font-size:28px;white-space:nowrap;height:calc(${rh[12]}+${rh[13]}+${rh[14]}+${rh[15]});">${m.player1Name}</td><td colspan="16" rowspan="4" class="fp bt br2" style="text-align:center;font-size:28px;white-space:nowrap;">${m.player2Name}</td></tr><tr style="height:${rh[13]};"></tr><tr style="height:${rh[14]};"></tr><tr style="height:${rh[15]};"></tr>
@@ -2402,6 +2440,71 @@ ${printableMatches.map(m => {
                             <option value="game">ゲームマッチ</option>
                             <option value="twoSetsSuper10">2セット+STB</option>
                           </select>
+                        </div>
+                      </div>
+                      {/* 熱中症警戒アラート時の試合形式（任意） */}
+                      <div className="mt-1 pt-2 border-t border-dashed border-red-200 space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-red-600">🌡 熱中症警戒時の試合形式（任意）</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={rule.heatRuleText ?? ''}
+                          onChange={e => {
+                            const next = [...editingRules];
+                            const text = e.target.value;
+                            const gMatch = text.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30)).match(/(\d+)\s*ゲーム/);
+                            next[i] = { ...next[i], heatRuleText: text, heatGames: gMatch ? parseInt(gMatch[1]) : next[i].heatGames };
+                            setEditingRules(next);
+                          }}
+                          placeholder="例: 6ゲームマッチ（ノーアドバンテージ）"
+                          className="w-full text-sm border border-red-200 rounded-lg px-2.5 py-1.5 focus:border-red-400 focus:ring-2 focus:ring-red-200 outline-none"
+                        />
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={12}
+                              value={rule.heatGames ?? ''}
+                              onChange={e => {
+                                const next = [...editingRules];
+                                const v = e.target.value;
+                                next[i] = { ...next[i], heatGames: v === '' ? undefined : (parseInt(v) || undefined) };
+                                setEditingRules(next);
+                              }}
+                              placeholder="-"
+                              className="w-16 text-sm text-center border border-red-200 rounded-lg px-2 py-1 focus:border-red-400 outline-none"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] text-gray-500 font-medium">方式</label>
+                            <select
+                              value={rule.heatMatchFormat || 'game'}
+                              onChange={e => {
+                                const next = [...editingRules];
+                                next[i] = { ...next[i], heatMatchFormat: e.target.value as 'game' | 'twoSetsSuper10' };
+                                setEditingRules(next);
+                              }}
+                              className="text-xs border border-red-200 rounded-lg px-2 py-1 focus:border-red-400 outline-none"
+                            >
+                              <option value="game">ゲームマッチ</option>
+                              <option value="twoSetsSuper10">2セット+STB</option>
+                            </select>
+                          </div>
+                          {(rule.heatRuleText || rule.heatGames) && (
+                            <button
+                              onClick={() => {
+                                const next = [...editingRules];
+                                next[i] = { ...next[i], heatRuleText: undefined, heatGames: undefined, heatMatchFormat: undefined };
+                                setEditingRules(next);
+                              }}
+                              className="text-[10px] text-red-500 hover:text-red-700 underline"
+                            >
+                              クリア
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
