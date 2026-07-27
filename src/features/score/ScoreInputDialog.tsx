@@ -500,6 +500,15 @@ export default function ScoreInputDialog({
     return map;
   }, [courts, courtNumberOf]);
 
+  // 他の試合が現在使用中のコートID（空きコート判定用）
+  const occupiedCourtIds = useLiveQuery(async () => {
+    const all = await db.matches.toArray();
+    return new Set(
+      all.filter(m => m.status === 'playing' && m.courtId && m.matchId !== match?.matchId)
+        .map(m => m.courtId as string),
+    );
+  }, [match?.matchId]) || new Set<string>();
+
   // W.O/リタイアモードでは、コート・開始時刻はコール文に含めない
   const isWoRet = !!retPlayer;
 
@@ -619,8 +628,9 @@ export default function ScoreInputDialog({
 
   const statusCfg = STATUS_CONFIG[match.status] ?? STATUS_CONFIG.waiting;
   const isFinished = match.status === 'finished' || match.status === 'walkover';
-  const canReady = match.status === 'waiting' && !retPlayer;
-  const canStart = match.status === 'ready' && !retPlayer;
+  // 「準備完了」フェーズは廃止。待機からそのまま試合開始できる。
+  const canReady = false;
+  const canStart = (match.status === 'waiting' || match.status === 'ready') && !retPlayer;
   const canFinish = match.status === 'playing' || !!retPlayer;
   const canCall = !isFinished || !!retPlayer;
   const roundName = getRoundName(match.round);
@@ -723,21 +733,38 @@ export default function ScoreInputDialog({
             {!isFinished && (
               <div className="flex items-center gap-2 sm:gap-3">
                 <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
-                <select
-                  value={match.courtId ?? ''}
-                  onChange={e => handleAssignCourt(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                >
-                  <option value="">未割当</option>
-                  {courts.map(c => {
-                    const isCurrentCourt = c.courtId === match.courtId;
-                    const isOccupied = !c.isAvailable && !isCurrentCourt;
-                    if (isOccupied) return null;
-                    return (
-                      <option key={c.courtId} value={c.courtId}>{c.name}</option>
-                    );
-                  })}
-                </select>
+                {(() => {
+                  // 空きコート = 使用可能 かつ 他の試合が使用中でない（現在このコートは常に含む）
+                  const emptyCourts = courts.filter(c =>
+                    c.courtId === match.courtId || (c.isAvailable && !occupiedCourtIds.has(c.courtId)));
+                  const otherCourts = courts.filter(c =>
+                    c.courtId !== match.courtId && !(c.isAvailable && !occupiedCourtIds.has(c.courtId)));
+                  return (
+                    <select
+                      value={match.courtId ?? ''}
+                      onChange={e => handleAssignCourt(e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                    >
+                      <option value="">未割当</option>
+                      {emptyCourts.length > 0 && (
+                        <optgroup label="空きコート">
+                          {emptyCourts.map(c => (
+                            <option key={c.courtId} value={c.courtId}>{c.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherCourts.length > 0 && (
+                        <optgroup label="その他（使用中・使用不可）">
+                          {otherCourts.map(c => (
+                            <option key={c.courtId} value={c.courtId}>
+                              {c.name}{occupiedCourtIds.has(c.courtId) ? '（使用中）' : c.isAvailable ? '' : '（使用不可）'}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
             )}
 

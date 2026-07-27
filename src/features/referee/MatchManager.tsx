@@ -11,6 +11,48 @@ import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
+import ScoreInputDialog from '../score/ScoreInputDialog';
+import type { ScoreInputMatch } from '../score/ScoreInputDialog';
+import type { MatchFormatType } from '../../db/database';
+
+/** 回戦に応じたゲームルール（試合方式）を解決する */
+function resolveRoundRule(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
+  const rules = evt?.roundGameRules;
+  if (!rules || rules.length === 0) return null;
+  if (rules.length === 1) return rules[0];
+  const roundName = getRoundName(round, totalRounds);
+  for (const rule of rules) {
+    const label = rule.roundLabel;
+    if (label === '全回戦') continue;
+    const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+    if (rangeMatch) {
+      if (round >= parseInt(rangeMatch[1]) && round <= parseInt(rangeMatch[2])) return rule;
+      continue;
+    }
+    if (label.includes('以降')) {
+      const cl = label.replace('以降', '');
+      if (cl.includes('準々決勝') && round >= totalRounds - 2) return rule;
+      if (cl.includes('準決勝') && round >= totalRounds - 1) return rule;
+      if (cl.includes('決勝') && !cl.includes('準') && round >= totalRounds) return rule;
+      const rn = cl.match(/(\d+)回戦/);
+      if (rn && round >= parseInt(rn[1])) return rule;
+      continue;
+    }
+    if (roundName === label || label.includes(roundName)) return rule;
+  }
+  return rules[0];
+}
+
+function getMatchGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
+  const rule = resolveRoundRule(evt, round, totalRounds);
+  if (rule) return rule.ruleText;
+  const g = evt?.gameRules?.games ?? 6;
+  return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
+}
+
+function getMatchFormatForRound(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
+  return resolveRoundRule(evt, round, totalRounds)?.matchFormat || 'game';
+}
 
 function getRoundName(round: number, totalRounds: number): string {
   if (round === totalRounds) return '決勝';
@@ -332,18 +374,19 @@ export default function MatchManager() {
 
   // 控え表示ロジック: 使用可能コートを埋めてから控え1-5、以降は控え
   const standbyInfo = useMemo(() => {
-    const availableCourts = courts.filter(c => c.isAvailable);
-    const totalCourts = availableCourts.length;
+    // 使用可能コートを番号順で取得
+    const availableCourts = courts
+      .filter(c => c.isAvailable)
+      .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
 
-    // 現在コートに入っている試合のコートIDセット
+    // 現在コートに入っている（試合中）コートIDセット → 空きコートを算出
     const playingCourtIds = new Set<string>();
     for (const m of globalSortedMatches) {
       if (m.status === 'playing' && m.courtId) playingCourtIds.add(m.courtId);
     }
-    const onCourtCount = playingCourtIds.size;
-    const emptyCourtCount = Math.max(0, totalCourts - onCourtCount);
+    const emptyCourts = availableCourts.filter(c => !playingCourtIds.has(c.courtId));
 
-    // 待機中（対戦相手が決まっている）試合を対戦順で取得
+    // 入れる（対戦相手が決まっている待機）試合を対戦順で取得
     const waitingMatches: (Match & { eventName: string })[] = [];
     for (const m of globalSortedMatches) {
       if (m.status !== 'waiting' && m.status !== 'ready') continue;
@@ -352,21 +395,18 @@ export default function MatchManager() {
       waitingMatches.push(m);
     }
 
-    const standbyMap = new Map<string, { label: string; type: 'court' | 'standby' }>();
+    // enterCourtName: 空きコートに応じて対戦順の若い試合へ順にコートを割当（点滅表示対象）
+    // standbyLabel: それ以降は控え番号
+    const standbyMap = new Map<string, { enterCourtName: string | null; standbyLabel: string | null }>();
     let standbyNum = 1;
-    let courtAssigned = 0;
-
-    for (const m of waitingMatches) {
-      if (courtAssigned < emptyCourtCount) {
-        standbyMap.set(m.matchId, { label: '次コート', type: 'court' });
-        courtAssigned++;
-      } else if (standbyNum <= 5) {
-        standbyMap.set(m.matchId, { label: `控え${standbyNum}`, type: 'standby' });
-        standbyNum++;
+    waitingMatches.forEach((m, i) => {
+      if (i < emptyCourts.length) {
+        standbyMap.set(m.matchId, { enterCourtName: emptyCourts[i].name, standbyLabel: null });
       } else {
-        standbyMap.set(m.matchId, { label: '控え', type: 'standby' });
+        const n = standbyNum++;
+        standbyMap.set(m.matchId, { enterCourtName: null, standbyLabel: n <= 5 ? `控え${n}` : '控え' });
       }
-    }
+    });
 
     return standbyMap;
   }, [globalSortedMatches, courts]);
@@ -899,6 +939,8 @@ export default function MatchManager() {
 
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  // 対戦順カードのタップで開くスコア入力ポップアップの対象
+  const [scoreDialogMatchId, setScoreDialogMatchId] = useState<string | null>(null);
   const [editScore1, setEditScore1] = useState('');
   const [editScore2, setEditScore2] = useState('');
   const [editTiebreak, setEditTiebreak] = useState('');
@@ -1732,33 +1774,37 @@ ${printableMatches.map(m => {
                     const isPlaying = m.status === 'playing';
                     const isFinished = m.status === 'finished';
 
+                    // 空きコートが割り当たった（対戦順で若い順に）試合は枠のみ点滅させ、入るコートを表示する。
+                    const enterCourtName = sb?.enterCourtName || null;
+
                     let statusDisplay: { text: string; color: string };
                     if (isPlaying) {
                       statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
                     } else if (isFinished) {
                       statusDisplay = st;
-                    } else if (sb?.type === 'court') {
-                      statusDisplay = { text: '次C', color: 'bg-amber-100 text-amber-700' };
-                    } else if (sb?.type === 'standby') {
-                      statusDisplay = { text: sb.label, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
+                    } else if (enterCourtName) {
+                      statusDisplay = { text: `${enterCourtName}番コートへ`, color: 'bg-blue-600 text-white' };
+                    } else if (sb?.standbyLabel) {
+                      statusDisplay = { text: sb.standbyLabel, color: 'bg-orange-50 text-orange-600 border border-orange-200' };
                     } else if (!hasPlayers) {
                       statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
                     } else {
                       statusDisplay = st;
                     }
 
-                    // カード枠の配色（試合中は枠のみ点滅 = bracket-card-blink）
+                    // カード枠の配色:
+                    // - 試合中: 緑枠点滅
+                    // - 空きコートに入れる（対戦順で若い順）: 青枠のみ点滅 + 入るコート表示
+                    // - 控え（入れる待機だが空きコートなし）: 薄オレンジ枠
                     const cardClass = isFinished
                       ? 'bg-gray-50 border-gray-200 opacity-60'
                       : isPlaying
                         ? 'bg-green-50 border-2 border-green-500 bracket-card-blink'
                         : !hasPlayers
                           ? 'bg-white border-gray-200 opacity-50'
-                          : sb?.type === 'court'
-                            ? 'bg-amber-50/60 border-amber-300'
-                            : sb?.type === 'standby'
-                              ? 'bg-orange-50/50 border-orange-200'
-                              : `${evColor.bg} border-gray-200`;
+                          : enterCourtName
+                            ? 'bg-blue-50 border-2 border-blue-500 enter-card-blink'
+                            : 'bg-orange-50/40 border-orange-200';
 
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                     const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
@@ -1784,7 +1830,7 @@ ${printableMatches.map(m => {
                           </div>
                         )}
                         <div
-                          onClick={() => { if (canEditResult && editingMatchId !== m.matchId) startEdit(m); }}
+                          onClick={() => { if (canEditResult) setScoreDialogMatchId(m.matchId); }}
                           className={`rounded-lg border p-2 transition-all ${cardClass} ${canEditResult ? 'cursor-pointer' : ''}`}
                         >
                           {/* ヘッダー行: クラス(左)・コート(中央)・状態(右) */}
@@ -1849,31 +1895,6 @@ ${printableMatches.map(m => {
                               )}
                             </div>
                           </div>
-                          {/* インラインスコア入力 */}
-                          {editingMatchId === m.matchId && (
-                            <div onClick={e => e.stopPropagation()} className="mt-2 pt-2 border-t border-blue-200 flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-bold text-gray-600">スコア:</span>
-                              <input type="number" value={editScore1} onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P1" autoFocus
-                                onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                              <span className="text-gray-400 font-bold text-xs">-</span>
-                              <input type="number" value={editScore2} onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="P2"
-                                onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                              {isTiebreakScore && (
-                                <>
-                                  <span className="text-[10px] text-gray-500">TB:</span>
-                                  <input type="number" value={editTiebreak} onChange={e => setEditTiebreak(e.target.value)} className="w-14 px-1.5 py-1 border rounded text-center text-xs" placeholder="TB"
-                                    onKeyDown={e => { if (e.key === 'Enter') saveResult(m); if (e.key === 'Escape') cancelEdit(); }} />
-                                </>
-                              )}
-                              <button onClick={() => saveResult(m)} disabled={!autoWinner} className="px-2 py-1 bg-primary-500 text-white rounded text-[10px] font-bold disabled:opacity-30">
-                                <Check className="w-3 h-3 inline mr-0.5" />確定
-                              </button>
-                              <button onClick={cancelEdit} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">
-                                <X className="w-3 h-3 inline mr-0.5" />取消
-                              </button>
-                              {autoWinner && <span className="text-[10px] text-primary-600 font-bold">勝: {autoWinner === 1 ? m.player1Name : m.player2Name}</span>}
-                            </div>
-                          )}
                         </div>
                       </React.Fragment>
                     );
@@ -2544,6 +2565,47 @@ ${printableMatches.map(m => {
               </div>
             </div>
           </div>
+        );
+      })()}
+
+      {/* 対戦順カードのタップで開くスコア入力ポップアップ（ドローシートと同じダイアログ） */}
+      {scoreDialogMatchId && (() => {
+        const sm = allMatchesFlat.find(mm => mm.matchId === scoreDialogMatchId);
+        if (!sm) return null;
+        const evt = events.find(e => e.eventId === sm.eventId);
+        const evDraw = allDraws.get(sm.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : Math.max(1, eventMaxRound.get(sm.eventId) || 1);
+        const dialogMatch: ScoreInputMatch = {
+          matchId: sm.matchId,
+          dbId: sm.id || 0,
+          round: sm.round,
+          position: sm.position,
+          matchOrder: sm.matchOrder,
+          player1Name: sm.player1Name,
+          player2Name: sm.player2Name,
+          player1Affiliation: sm.player1Affiliation,
+          player2Affiliation: sm.player2Affiliation,
+          player1EntryId: sm.player1EntryId,
+          player2EntryId: sm.player2EntryId,
+          score: sm.score,
+          winnerEntryId: sm.winnerEntryId,
+          courtId: sm.courtId,
+          status: sm.status,
+          scheduledTime: sm.scheduledTime,
+          eventName: evt?.name || '',
+          updatedAt: sm.updatedAt,
+        };
+        return (
+          <ScoreInputDialog
+            match={dialogMatch}
+            courts={courts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
+            onClose={() => setScoreDialogMatchId(null)}
+            onMatchUpdate={() => {}}
+            getRoundName={(round) => getRoundName(round, evTotalRounds)}
+            isLeague={false}
+            gameRuleText={getMatchGameRuleText(evt, sm.round, evTotalRounds)}
+            matchFormat={getMatchFormatForRound(evt, sm.round, evTotalRounds)}
+          />
         );
       })()}
 
