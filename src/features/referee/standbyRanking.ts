@@ -19,15 +19,20 @@ export const MAX_STANDBY = 5;
  * 対戦順シートとドロー画面で共通の控え状況を表示するために使用する。
  */
 export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string, StandbyEntry> {
-  const availableCourts = courts
-    .filter(c => c.isAvailable)
-    .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
   const courtNameById = new Map(courts.map(c => [c.courtId, c.name]));
 
-  // 現在使用中（試合中）のコート → 空きコートを算出
-  const playingCourtIds = new Set<string>();
-  for (const m of matches) if (m.status === 'playing' && m.courtId) playingCourtIds.add(m.courtId);
-  const emptyCourts = availableCourts.filter(c => !playingCourtIds.has(c.courtId));
+  // 現在使用中（試合中）のコート名 → 空きコート名を算出
+  const playingCourtNames = new Set<string>();
+  for (const m of matches) {
+    if (m.status === 'playing' && m.courtId) {
+      const n = courtNameById.get(m.courtId);
+      if (n) playingCourtNames.add(n);
+    }
+  }
+  const emptyCourtNames = courts
+    .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
+    .map(c => c.name);
+  const emptyCourtSet = new Set(emptyCourtNames);
 
   const toMin = (t?: string | null) => {
     if (!t) return Number.POSITIVE_INFINITY;
@@ -39,6 +44,7 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     return isNaN(n) ? Number.POSITIVE_INFINITY : n;
   };
 
+  // 対戦順（開始時刻→コート番号→ラウンド→ポジション→対戦順）で並べる
   const waiting = matches
     .filter(m =>
       (m.status === 'waiting' || m.status === 'ready')
@@ -54,15 +60,38 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
       return (a.matchOrder || 9999) - (b.matchOrder || 9999);
     });
 
-  const map = new Map<string, StandbyEntry>();
-  waiting.forEach((m, i) => {
-    if (i < emptyCourts.length) {
-      map.set(m.matchId, { enterCourtName: emptyCourts[i].name, standbyLabel: null });
-    } else {
-      const idx = i - emptyCourts.length + 1; // 控え番号（1始まり）
-      map.set(m.matchId, { enterCourtName: null, standbyLabel: idx <= MAX_STANDBY ? `控え${idx}` : null });
+  // 入るコートの割当:
+  // 1) まず各試合の割当コート(courtId)が空いていれば、その自コートへ入れる（対戦順の若い方を優先）。
+  // 2) 余った空きコートは、対戦順の若い未割当試合へ順に割り当てる。
+  const enterByMatch = new Map<string, string>();
+  const usedCourts = new Set<string>();
+  for (const m of waiting) {
+    const own = m.courtId ? courtNameById.get(m.courtId) : undefined;
+    if (own && emptyCourtSet.has(own) && !usedCourts.has(own)) {
+      enterByMatch.set(m.matchId, own);
+      usedCourts.add(own);
     }
-  });
+  }
+  const leftoverCourts = emptyCourtNames.filter(n => !usedCourts.has(n));
+  let li = 0;
+  for (const m of waiting) {
+    if (li >= leftoverCourts.length) break;
+    if (enterByMatch.has(m.matchId)) continue;
+    enterByMatch.set(m.matchId, leftoverCourts[li++]);
+  }
+
+  // 控え番号は「入れない」試合を対戦順で1から採番
+  const map = new Map<string, StandbyEntry>();
+  let standbyIdx = 0;
+  for (const m of waiting) {
+    const enter = enterByMatch.get(m.matchId);
+    if (enter) {
+      map.set(m.matchId, { enterCourtName: enter, standbyLabel: null });
+    } else {
+      standbyIdx++;
+      map.set(m.matchId, { enterCourtName: null, standbyLabel: standbyIdx <= MAX_STANDBY ? `控え${standbyIdx}` : null });
+    }
+  }
   return map;
 }
 
