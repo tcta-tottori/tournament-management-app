@@ -241,7 +241,16 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
-  const courts = useLiveQuery(() => db.courts.toArray()) || [];
+  // コートは現在の大会に紐づくものだけを対象にする。
+  // db.courts.toArray()（全大会分）だと他大会・過去セッションの残存コートまで
+  // 「空きコート」として数えてしまい、控え計算で全試合が「◯番コートへ」になり
+  // 控えが一切表示されなくなる（ドロー画面の useStandbyMap は大会スコープで一致）。
+  const courts = useLiveQuery(
+    () => currentTournamentId
+      ? db.courts.where('tournamentId').equals(currentTournamentId).toArray()
+      : [],
+    [currentTournamentId]
+  ) || [];
 
   // コートID ↔ コート名（番号）の相互マップ
   const courtIdToName = useMemo(() => new Map(courts.map(c => [c.courtId, c.name])), [courts]);
