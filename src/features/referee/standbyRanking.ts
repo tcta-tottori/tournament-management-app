@@ -34,10 +34,13 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
       if (n) playingCourtNames.add(n);
     }
   }
-  const emptyCourtNames = courts
-    .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
-    .map(c => c.name);
-  const emptyCourtSet = new Set(emptyCourtNames);
+  // 空きコート名（重複コート定義があっても名前で一意化し、番号順に整列）
+  const availableCourts = new Set(
+    courts
+      .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
+      .map(c => c.name),
+  );
+  const emptyCourtsSorted = [...availableCourts].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
 
   // 入れる（対戦相手が決まった待機）試合を対戦順のまま抽出（再ソートしない）
   const waiting = orderedMatches.filter(m =>
@@ -45,24 +48,27 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
     && !!m.player1Name && !!m.player2Name
     && m.player1Name !== 'BYE' && m.player2Name !== 'BYE');
 
-  // 入るコートの割当:
-  // 1) 各試合の割当コート(courtId)が空いていれば、その自コートへ入れる（対戦順の若い方を優先）。
-  // 2) 余った空きコートは、対戦順の若い未割当試合へ順に割り当てる。
+  // 入るコートの割当（空きコート数を上限に、対戦順の上から順に割り当てる）:
+  // - まず自分の割当コート(courtId)が空いていればそれを優先（LIVEコートマップと一致）
+  // - 空いていなければ最も番号の若い空きコートを割り当てる
+  // - 空きコートが尽きたら以降は控え
+  // これにより初回割付前でも「1〜空きコート数」までしか入るコートが出ず、
+  // 以降は自動的に控え1〜5…となる（コート番号が1周して重複しない）。
+  const remaining = new Set(availableCourts);
   const enterByMatch = new Map<string, string>();
-  const usedCourts = new Set<string>();
   for (const m of waiting) {
+    if (remaining.size === 0) break;
     const own = m.courtId ? courtNameById.get(m.courtId) : undefined;
-    if (own && emptyCourtSet.has(own) && !usedCourts.has(own)) {
-      enterByMatch.set(m.matchId, own);
-      usedCourts.add(own);
+    let court: string | undefined;
+    if (own && remaining.has(own)) {
+      court = own;
+    } else {
+      court = emptyCourtsSorted.find(n => remaining.has(n));
     }
-  }
-  const leftoverCourts = emptyCourtNames.filter(n => !usedCourts.has(n));
-  let li = 0;
-  for (const m of waiting) {
-    if (li >= leftoverCourts.length) break;
-    if (enterByMatch.has(m.matchId)) continue;
-    enterByMatch.set(m.matchId, leftoverCourts[li++]);
+    if (court) {
+      enterByMatch.set(m.matchId, court);
+      remaining.delete(court);
+    }
   }
 
   // 控え番号は「入れない」試合を対戦順で1から採番
