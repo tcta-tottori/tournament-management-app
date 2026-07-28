@@ -97,7 +97,7 @@ function shortRoundName(round: number, totalRounds: number): string {
 type DrawSlot = { position: number; entryId: string | null; seed: number; isBye: boolean };
 
 
-export default function MatchManager() {
+export default function MatchManager({ readOnly = false }: { readOnly?: boolean } = {}) {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const importedSchedule = useAppStore(state => state.importedSchedule);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
@@ -1641,7 +1641,8 @@ ${printableMatches.map(m => {
 
   return (
     <div className="max-w-full mx-auto lg:h-full flex flex-col lg:flex-row lg:gap-4 p-4">
-      {/* LEFT: コントロールパネル */}
+      {/* LEFT: コントロールパネル（観戦用は非表示） */}
+      {!readOnly && (
       <div className="lg:w-[280px] shrink-0 order-1 lg:order-1 mb-3 lg:mb-0 sticky top-0 z-20 lg:self-start bg-bg-main pb-1">
         <button
           onClick={() => setControlsOpen(prev => !prev)}
@@ -1695,6 +1696,7 @@ ${printableMatches.map(m => {
           </div>
         </div>
       </div>
+      )}
 
       {/* RIGHT: メインコンテンツ */}
       <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full pb-8">
@@ -1797,8 +1799,8 @@ ${printableMatches.map(m => {
                           </div>
                         )}
                         <div
-                          onClick={() => { if (canEditResult) setScoreDialogMatchId(m.matchId); }}
-                          className={`rounded-lg border p-2 transition-all ${cardClass} ${canEditResult ? 'cursor-pointer' : ''}`}
+                          onClick={() => { if (!readOnly && canEditResult) setScoreDialogMatchId(m.matchId); }}
+                          className={`rounded-lg border p-2 transition-all ${cardClass} ${!readOnly && canEditResult ? 'cursor-pointer' : ''}`}
                         >
                           {/* ヘッダー行: クラス(左)・コート(中央)・状態(右) */}
                           <div className="relative flex items-center gap-1.5 mb-1.5 min-h-[20px]">
@@ -1830,6 +1832,7 @@ ${printableMatches.map(m => {
                                 {elapsedLabel}
                               </span>
                             )}
+                            {!readOnly && (
                             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={() => handlePrintMatch(m)}
@@ -1861,6 +1864,7 @@ ${printableMatches.map(m => {
                                 </button>
                               )}
                             </div>
+                            )}
                           </div>
                         </div>
                       </React.Fragment>

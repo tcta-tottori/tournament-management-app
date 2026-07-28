@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle } from 'lucide-react';
+import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -109,6 +109,7 @@ export default function PublicLayout() {
 
   const menuItems = [
     { path: '/view/draw', label: 'ドロー', icon: Network },
+    { path: '/view/order', label: '対戦順', icon: ClipboardList },
     { path: '/view/live', label: 'ダッシュボード', icon: Radio },
   ];
   const current = menuItems.find(mi => location.pathname.startsWith(mi.path)) || menuItems[0];
