@@ -6,6 +6,7 @@ import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
 import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
+import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { useStandbyMap } from '../referee/standbyRanking';
@@ -208,6 +209,13 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
   const totalRounds = drawData ? Math.log2(drawData.drawSize) : 1;
   const drawSize = drawData?.drawSize || 0;
+
+  // リーグ戦の対戦カード（対戦順）
+  const rrMatches = useMemo(() =>
+    matches
+      .filter(m => !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE')
+      .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0)),
+    [matches]);
   // 進捗
   const progress = useMemo(() => {
     const total = matches.filter(m => m.player1Name && m.player2Name && m.status !== 'walkover').length;
@@ -341,9 +349,61 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             onMatchSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
           />
         ) : isRoundRobin ? (
-          <div className="p-6 text-center text-gray-500">
-            <Layers className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-            リーグ戦は対応していません
+          <div className="p-3 space-y-3">
+            {/* リーグ表（星取表） */}
+            <RoundRobinRenderer slots={slots} matchResults={matchResults} />
+            {/* 対戦カード（タップでスコア入力） */}
+            {rrMatches.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-gray-500 px-1 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5" />
+                  対戦カード{enableScoreInput ? '（タップでスコア入力）' : ''}
+                </div>
+                {rrMatches.map(m => {
+                  const court = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
+                  const isFinished = m.status === 'finished' || m.status === 'walkover';
+                  const isPlaying = m.status === 'playing';
+                  const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
+                  const w2 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
+                  return (
+                    <button
+                      key={m.matchId}
+                      onClick={() => enableScoreInput && setSelectedMatchKey(`${m.round}-${m.position}`)}
+                      disabled={!enableScoreInput}
+                      className={`w-full text-left rounded-lg border p-2 transition-all ${
+                        isPlaying ? 'bg-green-50 border-2 border-green-500'
+                        : isFinished ? 'bg-gray-50 border-gray-200'
+                        : 'bg-white border-gray-200 hover:border-primary-300'} ${enableScoreInput ? 'cursor-pointer' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0 text-center">
+                          <span className={`text-sm truncate ${w1 ? 'font-bold text-primary-700' : 'font-semibold text-gray-900'}`}>{m.player1Name}</span>
+                        </div>
+                        <div className="shrink-0 text-center min-w-[52px]">
+                          {isFinished && m.score
+                            ? <span className="text-xs font-mono font-bold text-gray-700">{m.score}</span>
+                            : <span className="text-[11px] font-bold text-blue-300">vs</span>}
+                        </div>
+                        <div className="flex-1 min-w-0 text-center">
+                          <span className={`text-sm truncate ${w2 ? 'font-bold text-primary-700' : 'font-semibold text-gray-900'}`}>{m.player2Name}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 mt-1">
+                        {court && (isPlaying || isFinished) && (
+                          <span className="text-[10px] font-bold text-green-700">{court.name}番コート</span>
+                        )}
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                          isPlaying ? 'bg-green-100 text-green-700'
+                          : isFinished ? 'bg-gray-200 text-gray-500'
+                          : 'bg-gray-100 text-gray-500'}`}>
+                          {isPlaying ? '試合中' : isFinished ? '終了' : '待機'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           <div className="p-6 text-center text-gray-500">
@@ -361,7 +421,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           onClose={() => setSelectedMatchKey(null)}
           onMatchUpdate={() => {}}
           getRoundName={(round) => getRoundName(round, totalRounds)}
-          isLeague={false}
+          isLeague={isRoundRobin}
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
         />
