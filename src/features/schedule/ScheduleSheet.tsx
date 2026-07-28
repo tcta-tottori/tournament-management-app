@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Match } from '../../db/database';
+import { db, type Match, type Event, type RoundGameRule, type MatchFormatType } from '../../db/database';
 import { useAppStore, type ImportedScheduleItem } from '../../stores/appStore';
-import { CalendarClock, Download, FileSpreadsheet, FolderOpen, X, Loader2, Edit3, Save, Zap } from 'lucide-react';
+import { CalendarClock, Download, FileSpreadsheet, FolderOpen, X, Loader2, Edit3, Save, Zap, ArrowRightLeft, Clock, Trophy } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   getSavedToken as gdriveGetSavedToken,
@@ -12,6 +12,58 @@ import {
 } from '../backup/googleDriveApi';
 import { assignVenueCourtNames } from './scheduleEngine';
 import { generateScheduleFromDraws } from './generateSchedule';
+import ScoreInputDialog, { type ScoreInputMatch } from '../score/ScoreInputDialog';
+import { resolveRequiredGames } from '../score/gameRules';
+
+/** 回戦番号から日本語ラウンド名を返す */
+function getRoundNameJp(round: number, totalRounds: number): string {
+  if (round === totalRounds) return '決勝';
+  if (round === totalRounds - 1) return '準決勝';
+  if (round === totalRounds - 2) return '準々決勝';
+  return `${round}回戦`;
+}
+
+/** 回戦に応じたゲームルールを取得 */
+function getGameRuleForRound(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
+  if (!evt) return null;
+  const rules: RoundGameRule[] = evt.roundGameRules || [];
+  if (rules.length === 0) return null;
+  if (rules.length === 1) return rules[0];
+  const roundName = getRoundNameJp(round, totalRounds);
+  for (const rule of rules) {
+    const label = rule.roundLabel;
+    if (label === '全回戦') continue;
+    const rangeMatch = label.match(/(\d+)～(\d+)回戦/);
+    if (rangeMatch) {
+      const from = parseInt(rangeMatch[1]), to = parseInt(rangeMatch[2]);
+      if (round >= from && round <= to) return rule;
+      continue;
+    }
+    if (label.includes('以降')) {
+      const cleanLabel = label.replace('以降', '');
+      if (cleanLabel.includes('準々決勝') && round >= totalRounds - 2) return rule;
+      if (cleanLabel.includes('準決勝') && round >= totalRounds - 1) return rule;
+      if (cleanLabel.includes('決勝') && !cleanLabel.includes('準') && round >= totalRounds) return rule;
+      const roundNumMatch = cleanLabel.match(/(\d+)回戦/);
+      if (roundNumMatch && round >= parseInt(roundNumMatch[1])) return rule;
+      continue;
+    }
+    if (roundName === label || label.includes(roundName)) return rule;
+  }
+  return rules[0];
+}
+
+function getGameRuleText(evt: Event | undefined, round: number, totalRounds: number): string {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  if (rule) return rule.ruleText;
+  const g = evt?.gameRules?.games ?? 6;
+  return `${g}ゲームマッチ（${g}-${g}タイブレーク）`;
+}
+
+function getMatchFormat(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
+  const rule = getGameRuleForRound(evt, round, totalRounds);
+  return rule?.matchFormat || 'game';
+}
 
 const EVENT_COLORS = [
   { bg: 'bg-blue-100', text: 'text-blue-800' },
@@ -142,12 +194,19 @@ export default function ScheduleSheet() {
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState('');
 
-  // Edit modal
+  // Edit modal (時間変更)
   const [editingCell, setEditingCell] = useState<{
     scheduleIndex: number;
     courtName: string;
     startTime: string;
   } | null>(null);
+
+  // アクション選択ポップアップ（スコア入力 / 入れ替え / 時間変更）
+  const [actionIndex, setActionIndex] = useState<number | null>(null);
+  // スコア入力対象のスケジュールindex
+  const [scoreIndex, setScoreIndex] = useState<number | null>(null);
+  // 入れ替えモード: 入れ替え元のスケジュールindex（null=通常）
+  const [swapSourceIndex, setSwapSourceIndex] = useState<number | null>(null);
 
   // --------------- Current time tracking ---------------
   const [now, setNow] = useState(() => new Date());
@@ -422,19 +481,136 @@ export default function ScheduleSheet() {
     return false;
   }, [importedSchedule, matchLookup]);
 
+  // --------------- 種目ごとの総ラウンド数（スコア入力のルール解決に使用） ---------------
+  const totalRoundsByEvent = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of draws) {
+      if (d.drawSize > 0) map.set(d.eventId, Math.log2(d.drawSize));
+    }
+    // ドローが無い種目は試合の最大ラウンドで代替
+    for (const m of allMatches) {
+      if (!map.has(m.eventId)) {
+        map.set(m.eventId, Math.max(map.get(m.eventId) || 0, m.round));
+      }
+    }
+    return map;
+  }, [draws, allMatches]);
+
+  // --------------- スコア入力対象の ScoreInputMatch を構築 ---------------
+  const scoreInputMatch: ScoreInputMatch | null = useMemo(() => {
+    if (scoreIndex == null) return null;
+    const m = matchLookup.get(scoreIndex);
+    if (!m || m.id == null) return null;
+    const evt = events.find(e => e.eventId === m.eventId);
+    return {
+      matchId: m.matchId, dbId: m.id, round: m.round, position: m.position,
+      matchOrder: m.matchOrder, player1Name: m.player1Name, player2Name: m.player2Name,
+      player1Affiliation: m.player1Affiliation, player2Affiliation: m.player2Affiliation,
+      player1EntryId: m.player1EntryId, player2EntryId: m.player2EntryId,
+      score: m.score, winnerEntryId: m.winnerEntryId, courtId: m.courtId,
+      status: m.status, scheduledTime: m.scheduledTime,
+      eventName: evt?.name || m.eventId, updatedAt: m.updatedAt,
+    };
+  }, [scoreIndex, matchLookup, events]);
+
+  const scoreInputContext = useMemo(() => {
+    if (scoreIndex == null) return null;
+    const m = matchLookup.get(scoreIndex);
+    if (!m) return null;
+    const evt = events.find(e => e.eventId === m.eventId);
+    const draw = draws.find(d => d.eventId === m.eventId);
+    const totalRounds = totalRoundsByEvent.get(m.eventId) || m.round;
+    const ruleText = getGameRuleText(evt, m.round, totalRounds);
+    return {
+      evt,
+      totalRounds,
+      isLeague: draw?.drawType === 'roundRobin',
+      gameRuleText: ruleText,
+      requiredGames: resolveRequiredGames(ruleText, m.round, totalRounds),
+      matchFormat: getMatchFormat(evt, m.round, totalRounds),
+    };
+  }, [scoreIndex, matchLookup, events, draws, totalRoundsByEvent]);
+
   // --------------- Handlers ---------------
+
+  /** 2件のスケジュールの コート・時刻 を入れ替える（DBにも反映） */
+  const performSwap = useCallback(async (sourceIndex: number, targetIndex: number) => {
+    const src = importedSchedule[sourceIndex];
+    const tgt = importedSchedule[targetIndex];
+    if (!src || !tgt) return;
+    const newSchedule = [...importedSchedule];
+    newSchedule[sourceIndex] = { ...src, courtName: tgt.courtName, startTime: tgt.startTime };
+    newSchedule[targetIndex] = { ...tgt, courtName: src.courtName, startTime: src.startTime };
+    setImportedSchedule(newSchedule);
+
+    const courtNameToId = new Map(allCourts.map(c => [c.name, c.courtId]));
+    const now = Date.now();
+    const srcMatch = matchLookup.get(sourceIndex);
+    const tgtMatch = matchLookup.get(targetIndex);
+    if (srcMatch?.id) {
+      await db.matches.update(srcMatch.id, {
+        courtId: courtNameToId.get(tgt.courtName) || null,
+        scheduledTime: tgt.startTime, updatedAt: now,
+      });
+    }
+    if (tgtMatch?.id) {
+      await db.matches.update(tgtMatch.id, {
+        courtId: courtNameToId.get(src.courtName) || null,
+        scheduledTime: src.startTime, updatedAt: now,
+      });
+    }
+    setStatusMessage(`「${src.eventName}」と「${tgt.eventName}」の時間・コートを入れ替えました。`);
+  }, [importedSchedule, allCourts, matchLookup, setImportedSchedule]);
+
+  /** 1件のスケジュールを空きコマ（コート・時刻）へ移動する（DBにも反映） */
+  const performMoveToEmpty = useCallback(async (sourceIndex: number, courtName: string, startTime: string) => {
+    const src = importedSchedule[sourceIndex];
+    if (!src) return;
+    const newSchedule = [...importedSchedule];
+    newSchedule[sourceIndex] = { ...src, courtName, startTime };
+    setImportedSchedule(newSchedule);
+    const srcMatch = matchLookup.get(sourceIndex);
+    if (srcMatch?.id) {
+      const courtNameToId = new Map(allCourts.map(c => [c.name, c.courtId]));
+      await db.matches.update(srcMatch.id, {
+        courtId: courtNameToId.get(courtName) || null,
+        scheduledTime: startTime, updatedAt: Date.now(),
+      });
+    }
+    setStatusMessage(`「${src.eventName}」を ${courtName}番コート ${startTime} に移動しました。`);
+  }, [importedSchedule, allCourts, matchLookup, setImportedSchedule]);
 
   const handleCellClick = useCallback(
     (scheduleIndex: number) => {
+      // 入れ替えモード中: このカードを入れ替え先として扱う
+      if (swapSourceIndex != null) {
+        if (scheduleIndex === swapSourceIndex) { setSwapSourceIndex(null); return; }
+        const tgtMatch = matchLookup.get(scheduleIndex);
+        // 「試合に入っていない」カードのみ入れ替え可（試合中・終了は不可）
+        if (tgtMatch && (tgtMatch.status === 'playing' || tgtMatch.status === 'finished' || tgtMatch.status === 'walkover')) {
+          setStatusMessage('試合中・終了した試合とは入れ替えできません。');
+          return;
+        }
+        performSwap(swapSourceIndex, scheduleIndex);
+        setSwapSourceIndex(null);
+        return;
+      }
+      // 通常: アクション選択ポップアップを開く
       const item = importedSchedule[scheduleIndex];
       if (!item) return;
-      setEditingCell({
-        scheduleIndex,
-        courtName: item.courtName,
-        startTime: item.startTime,
-      });
+      setActionIndex(scheduleIndex);
     },
-    [importedSchedule],
+    [importedSchedule, swapSourceIndex, matchLookup, performSwap],
+  );
+
+  /** 空きコマのクリック（入れ替えモード中のみ有効: そこへ移動） */
+  const handleEmptyCellClick = useCallback(
+    (courtName: string, startTime: string) => {
+      if (swapSourceIndex == null) return;
+      performMoveToEmpty(swapSourceIndex, courtName, startTime);
+      setSwapSourceIndex(null);
+    },
+    [swapSourceIndex, performMoveToEmpty],
   );
 
   const handleEditSave = useCallback(async () => {
@@ -807,6 +983,25 @@ export default function ScheduleSheet() {
             {statusMessage}
           </div>
         )}
+
+        {/* 入れ替えモードのガイドバナー */}
+        {swapSourceIndex != null && (() => {
+          const src = importedSchedule[swapSourceIndex];
+          return (
+            <div className="mt-3 p-3 rounded-md text-sm bg-primary-50 border border-primary-300 text-primary-800 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <ArrowRightLeft className="w-4 h-4 shrink-0" />
+                入れ替えモード:「{src?.eventName} {roundLabelToJapanese(src?.roundLabel || '')}」の入れ替え先（他の試合カードまたは空きコマ）をタップしてください。
+              </span>
+              <button
+                onClick={() => setSwapSourceIndex(null)}
+                className="shrink-0 px-2.5 py-1 text-xs font-medium text-primary-700 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          );
+        })()}
       </header>
 
       {/* Timetable Grid */}
@@ -935,10 +1130,15 @@ export default function ScheduleSheet() {
                       const entry = gridData.get(cn)?.get(time);
 
                       if (!entry) {
+                        const swapping = swapSourceIndex != null;
                         return (
                           <td
                             key={slotIdx}
+                            onClick={swapping ? () => handleEmptyCellClick(cn, time) : undefined}
+                            title={swapping ? `${cn}番コート ${time} へ移動` : undefined}
                             className={`border border-gray-200 min-w-[80px] h-12 transition-colors ${
+                              swapping ? 'cursor-pointer bg-primary-50/40 hover:bg-primary-100 hover:ring-2 hover:ring-inset hover:ring-primary-400' : ''
+                            } ${
                               isNowSlot ? 'bg-red-50/50 time-now-line' : isPastSlot ? 'bg-gray-50/80' : ''
                             }`}
                           />
@@ -990,12 +1190,16 @@ export default function ScheduleSheet() {
                       if (dbMatch?.player1Name) tooltipParts.push(`${dbMatch.player1Name} vs ${dbMatch.player2Name}`);
                       if (dbMatch?.score) tooltipParts.push(dbMatch.score);
 
+                      const isSwapSource = swapSourceIndex === index;
+                      const isSwapMode = swapSourceIndex != null;
+                      const isSwapTargetable = isSwapMode && !isSwapSource && !isPlaying && !isFinished;
+
                       return (
                         <td
                           key={slotIdx}
                           onClick={() => handleCellClick(index)}
                           title={tooltipParts.join(' | ')}
-                          className={`border border-gray-300 min-w-[80px] h-12 cursor-pointer text-center transition-all duration-300 px-0.5 ${statusBg} ${color?.text || 'text-gray-800'} hover:brightness-90 hover:scale-[1.02] ${cellStatusClass} ${isNowSlot && !isFinished && !isPlaying ? 'time-now-line' : ''}`}
+                          className={`border border-gray-300 min-w-[80px] h-12 cursor-pointer text-center transition-all duration-300 px-0.5 ${statusBg} ${color?.text || 'text-gray-800'} hover:brightness-90 hover:scale-[1.02] ${cellStatusClass} ${isNowSlot && !isFinished && !isPlaying ? 'time-now-line' : ''} ${isSwapSource ? 'ring-2 ring-inset ring-primary-500 ring-offset-0 z-[3]' : ''} ${isSwapTargetable ? 'ring-2 ring-inset ring-primary-300' : ''}`}
                         >
                           <div className="flex items-center justify-center gap-0.5 relative z-[2]">
                             <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
@@ -1094,6 +1298,95 @@ export default function ScheduleSheet() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* アクション選択ポップアップ（スコア入力 / 入れ替え / 時間変更） */}
+      {actionIndex != null && createPortal(
+        (() => {
+          const item = importedSchedule[actionIndex];
+          if (!item) return null;
+          const dbMatch = matchLookup.get(actionIndex);
+          const p1 = dbMatch?.player1Name || item.player1Hint || '';
+          const p2 = dbMatch?.player2Name || item.player2Hint || '';
+          const canScore = !!dbMatch?.id;
+          return (
+            <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setActionIndex(null)}>
+              <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-gray-900">試合メニュー</h3>
+                  <button onClick={() => setActionIndex(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
+                  <div>
+                    <span className="font-medium">{item.eventName}</span>
+                    <span className="ml-2 text-gray-500">{roundLabelToJapanese(item.roundLabel)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">{item.courtName}番コート・{item.startTime}</div>
+                  {(p1 || p2) && (
+                    <div className="text-gray-900 font-semibold">
+                      {p1} <span className="text-gray-400 font-normal mx-0.5">vs</span> {p2}
+                    </div>
+                  )}
+                  {dbMatch?.score && (
+                    <div className="text-xs text-gray-500">スコア: {dbMatch.score}</div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => { if (!canScore) return; setScoreIndex(actionIndex); setActionIndex(null); }}
+                    disabled={!canScore}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    スコア入力
+                  </button>
+                  <button
+                    onClick={() => { setSwapSourceIndex(actionIndex); setActionIndex(null); }}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 transition-colors"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                    入れ替え
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCell({ scheduleIndex: actionIndex, courtName: item.courtName, startTime: item.startTime });
+                      setActionIndex(null);
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <Clock className="w-4 h-4" />
+                    時間変更
+                  </button>
+                </div>
+                {!canScore && (
+                  <p className="text-[11px] text-gray-400 text-center">
+                    この枠にはまだ対戦カードが確定していないため、スコア入力はできません。
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })(),
+        document.body,
+      )}
+
+      {/* スコア入力ダイアログ */}
+      {scoreInputMatch && scoreInputContext && (
+        <ScoreInputDialog
+          match={scoreInputMatch}
+          courts={allCourts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
+          onClose={() => setScoreIndex(null)}
+          onMatchUpdate={() => {}}
+          getRoundName={(round) => getRoundNameJp(round, scoreInputContext.totalRounds)}
+          isLeague={scoreInputContext.isLeague}
+          gameRuleText={scoreInputContext.gameRuleText}
+          requiredGames={scoreInputContext.requiredGames}
+          matchFormat={scoreInputContext.matchFormat}
+        />
       )}
 
       {/* Edit Cell Modal */}
