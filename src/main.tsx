@@ -67,6 +67,7 @@ import PublicLeagueView from './features/view/PublicLeagueView';
 import PublicBracketView from './features/view/PublicBracketView';
 import PublicLiveView from './features/view/PublicLiveView';
 import PublicDrawView from './features/view/PublicDrawView';
+import PublicMatchOrderView from './features/view/PublicMatchOrderView';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -81,6 +82,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="league" element={<PublicLeagueView />} />
           <Route path="bracket" element={<PublicBracketView />} />
           <Route path="draw" element={<PublicDrawView />} />
+          <Route path="order" element={<PublicMatchOrderView />} />
           <Route path="live" element={<PublicLiveView />} />
         </Route>
 
