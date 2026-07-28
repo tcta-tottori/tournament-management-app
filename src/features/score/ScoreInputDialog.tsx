@@ -7,6 +7,7 @@ import { useGeminiTts } from '../broadcast/useGeminiTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
+import { extractGamesFromText } from './gameRules';
 import {
   X,
   Trophy,
@@ -59,6 +60,11 @@ interface ScoreInputDialogProps {
   isLeague?: boolean; // リーグ戦の場合は次ラウンド進出を行わない
   /** 現在の試合に適用されるゲームルール文字列 */
   gameRuleText?: string;
+  /**
+   * 対象回戦に適用される規定ゲーム数。呼び出し側が回戦別ルールを解決して渡す。
+   * 省略時は gameRuleText から抽出（全角数字は正規化）してフォールバックする。
+   */
+  requiredGames?: number | null;
   /** 試合方式（省略時='game'） */
   matchFormat?: MatchFormatType;
 }
@@ -90,6 +96,7 @@ export default function ScoreInputDialog({
   bestOf = 1,
   isLeague = false,
   gameRuleText,
+  requiredGames: requiredGamesProp,
   matchFormat = 'game',
 }: ScoreInputDialogProps) {
   // twoSetsSuper10 の場合: 2セット + ファイナルSTB（計3入力欄）
@@ -277,9 +284,9 @@ export default function ScoreInputDialog({
     if (!match || retPlayer) return null; // W.O時はバリデーション不要
     if (match.status !== 'playing') return null;
 
-    // gameRuleText からゲーム数を抽出（例: "6ゲームマッチ（6-6タイブレーク）"）
-    const gamesMatch = gameRuleText?.match(/(\d+)ゲームマッチ/);
-    const requiredGames = gamesMatch ? parseInt(gamesMatch[1]) : null;
+    // 規定ゲーム数: 呼び出し側が解決した値を優先。無ければ gameRuleText から抽出
+    // （全角数字も拾えるよう正規化）。回戦別ルールの誤判定・全角入力対策。
+    const requiredGames = requiredGamesProp ?? extractGamesFromText(gameRuleText);
 
     if (!requiredGames) return null; // ルール不明の場合はスキップ
 
@@ -316,7 +323,7 @@ export default function ScoreInputDialog({
     }
 
     return errors.length > 0 ? errors : null;
-  }, [sets, tiebreaks, gameRuleText, match, retPlayer, isTwoSetFormat, maxSets]);
+  }, [sets, tiebreaks, gameRuleText, requiredGamesProp, match, retPlayer, isTwoSetFormat, maxSets]);
 
   // スコア文字列を構築
   const buildScoreString = useCallback(() => {
@@ -347,10 +354,11 @@ export default function ScoreInputDialog({
   }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB, match?.status]);
 
   // 規定ゲーム数（例: "8ゲームマッチ" → 8）。団体戦と同じ自動補完に使う。
-  const requiredGames = useMemo(() => {
-    const m = gameRuleText?.match(/(\d+)ゲームマッチ/);
-    return m ? parseInt(m[1]) : null;
-  }, [gameRuleText]);
+  // 呼び出し側の解決値を優先し、無ければ gameRuleText から抽出（全角数字も正規化）。
+  const requiredGames = useMemo(
+    () => requiredGamesProp ?? extractGamesFromText(gameRuleText),
+    [requiredGamesProp, gameRuleText],
+  );
 
   // セットスコア入力ハンドラ
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
