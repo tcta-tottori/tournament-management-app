@@ -9,6 +9,7 @@ import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
+import { resolveRequiredGames } from '../score/gameRules';
 import { useStandbyMap } from '../referee/standbyRanking';
 
 function getGameRulesText(evt: Event | undefined): string {
@@ -423,6 +424,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           getRoundName={(round) => getRoundName(round, totalRounds)}
           isLeague={isRoundRobin}
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
+          requiredGames={resolveRequiredGames(getGameRuleText(selectedEvent, selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
         />
       )}

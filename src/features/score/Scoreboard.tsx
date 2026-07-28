@@ -8,6 +8,7 @@ import ScoreboardBracket from './ScoreboardBracket';
 import ScoreboardLeague from './ScoreboardLeague';
 import ScoreInputDialog from './ScoreInputDialog';
 import type { ScoreInputMatch } from './ScoreInputDialog';
+import { resolveRequiredGames } from './gameRules';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
 import {
   MonitorPlay,
@@ -963,6 +964,10 @@ function NormalScoreboard() {
                 const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
                 return evtData ? getGameRuleText(evtData.event, selectedAllMatch.round, evtData.totalRounds) : '';
               })()}
+              requiredGames={(() => {
+                const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
+                return evtData ? resolveRequiredGames(getGameRuleText(evtData.event, selectedAllMatch.round, evtData.totalRounds), selectedAllMatch.round, evtData.totalRounds) : null;
+              })()}
               matchFormat={(() => {
                 const evtData = perEventData.find(d => d.event.eventId === selectedAllEventId);
                 return evtData ? getMatchFormat(evtData.event, selectedAllMatch.round, evtData.totalRounds) : 'game';
@@ -1026,6 +1031,7 @@ function NormalScoreboard() {
               getRoundName={makeRoundName}
               isLeague={isRoundRobin}
               gameRuleText={getGameRuleText(events[selectedEventIdx], selectedMatch.round, totalRounds)}
+              requiredGames={resolveRequiredGames(getGameRuleText(events[selectedEventIdx], selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
               matchFormat={getMatchFormat(events[selectedEventIdx], selectedMatch.round, totalRounds)}
             />
           )}

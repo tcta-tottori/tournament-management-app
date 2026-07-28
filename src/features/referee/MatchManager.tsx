@@ -13,6 +13,7 @@ import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
+import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder } from './standbyRanking';
 
@@ -2584,6 +2585,7 @@ ${printableMatches.map(m => {
             getRoundName={(round) => getRoundName(round, evTotalRounds)}
             isLeague={false}
             gameRuleText={getMatchGameRuleText(evt, sm.round, evTotalRounds)}
+            requiredGames={resolveRequiredGames(getMatchGameRuleText(evt, sm.round, evTotalRounds), sm.round, evTotalRounds)}
             matchFormat={getMatchFormatForRound(evt, sm.round, evTotalRounds)}
           />
         );
