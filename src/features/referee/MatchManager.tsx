@@ -1799,13 +1799,14 @@ ${printableMatches.map(m => {
 
                     // 中央上のコートバッジ:
                     // - 試合中/終了 → コート番号
-                    // - 空きコートが出て入れる状態 → オレンジの「コートに入る」（タップで入れる）
-                    // - それ以外の待機 → 「控え1〜5」（試合が終わるたびに自動で繰り上がる）
+                    // - コート確定後は控えの上から「控え1〜5」を必ず表示（自動で上から振り分け）。
+                    //   空きコートが出て入れる状態のものはオレンジ表示（タップで入れる）。
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {
                       centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
                     } else if (hasPlayers && enterCourtName) {
-                      centerBadge = { text: '▶ コートに入る', color: 'bg-orange-500 text-white' };
+                      // 空きコートに入れる（控え番号があれば併記）
+                      centerBadge = { text: sb?.standbyLabel ? `${sb.standbyLabel}・入る` : '▶ コートに入る', color: 'bg-orange-500 text-white' };
                     } else if (hasPlayers && sb?.standbyLabel) {
                       centerBadge = { text: sb.standbyLabel, color: 'bg-amber-500 text-white' };
                     }
