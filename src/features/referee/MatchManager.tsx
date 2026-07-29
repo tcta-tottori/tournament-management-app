@@ -829,6 +829,37 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     }
   }, [courts, globalSortedMatches]);
 
+  // 現在試合中のコート名（空きコート判定用）
+  const playingCourtNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of allMatchesFlat) {
+      if (m.status === 'playing' && m.courtId) {
+        const n = courtIdToName.get(m.courtId);
+        if (n) set.add(n);
+      }
+    }
+    return set;
+  }, [allMatchesFlat, courtIdToName]);
+
+  // 空きコート（使用可能で試合中でない）を番号順に
+  const emptyCourts = useMemo(() => {
+    return courts
+      .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
+      .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+  }, [courts, playingCourtNames]);
+
+  // 待機試合を指定コートに入れる（試合開始）
+  const handleEnterCourt = useCallback(async (matchId: string, courtId: string) => {
+    const m = allMatchesFlat.find(mm => mm.matchId === matchId);
+    if (!m?.id) return;
+    await db.matches.update(m.id, {
+      courtId,
+      status: 'playing',
+      updatedAt: Date.now(),
+    });
+    setCourtPickMatchId(null);
+  }, [allMatchesFlat]);
+
   const bulkCallStart = useBulkCallStore(s => s.start);
   const bulkCallActive = useBulkCallStore(s => s.isActive);
 
@@ -920,6 +951,10 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   // 対戦順カードのタップで開くスコア入力ポップアップの対象
   const [scoreDialogMatchId, setScoreDialogMatchId] = useState<string | null>(null);
+  // 対戦順（グローバル）タブ: 進行中 / 終了 の切替
+  const [globalTab, setGlobalTab] = useState<'active' | 'finished'>('active');
+  // 待機カードのタップで開く「コートに入れる」ポップアップの対象
+  const [courtPickMatchId, setCourtPickMatchId] = useState<string | null>(null);
   const [editScore1, setEditScore1] = useState('');
   const [editScore2, setEditScore2] = useState('');
   const [editTiebreak, setEditTiebreak] = useState('');
@@ -1056,34 +1091,9 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
       }
     }
 
-    // 試合終了時のコートプロモーション: 空いたコートに次の待機試合を自動割当
-    if (winnerEntryId && m.courtId) {
-      const freedCourtId = m.courtId;
-      // 現在の全試合を取得して待機順で次の試合を見つける
-      const tid = useAppStore.getState().currentTournamentId;
-      if (tid) {
-        const allEvts = await db.events.where('tournamentId').equals(tid).toArray();
-        const allEvtIds = allEvts.map(e => e.eventId);
-        const allMs = await db.matches.where('eventId').anyOf(allEvtIds).toArray();
-        const sortedMs = allMs
-          .filter(mm => mm.status !== 'walkover')
-          .sort((a, b) => (a.matchOrder || 9999) - (b.matchOrder || 9999));
-
-        // 次の待機試合（対戦相手確定済み、waiting/ready）を見つける
-        const nextWaiting = sortedMs.find(mm =>
-          (mm.status === 'waiting' || mm.status === 'ready')
-          && mm.player1Name && mm.player2Name
-          && mm.player1Name !== 'BYE' && mm.player2Name !== 'BYE'
-        );
-        if (nextWaiting?.id) {
-          await db.matches.update(nextWaiting.id, {
-            courtId: freedCourtId,
-            status: 'playing',
-            updatedAt: Date.now(),
-          });
-        }
-      }
-    }
+    // 試合終了時は空いたコートを自動では埋めず、空きコートとして残す。
+    // 空きが出た次の控え（控え1）はオレンジ点滅で「入れる」状態になり、
+    // 審判/運営がタップして手動でコートに入れる運用にする。
 
     cancelEdit();
   }, [editScore1, editScore2, editTiebreak, isTiebreakScore, selectedEventId, cancelEdit]);
@@ -1719,12 +1729,30 @@ ${printableMatches.map(m => {
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
             <div className="space-y-2">
+                {/* 進行中 / 終了 タブ（終了した試合は別タブで管理） */}
+                <div className="flex rounded-lg border border-border-main overflow-hidden text-sm w-full sticky top-0 z-10">
+                  <button onClick={() => setGlobalTab('active')}
+                    className={`flex-1 px-3 py-1.5 font-bold transition-colors ${globalTab === 'active' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    進行中（{globalSortedMatches.filter(m => m.status !== 'finished').length}）
+                  </button>
+                  <button onClick={() => setGlobalTab('finished')}
+                    className={`flex-1 px-3 py-1.5 font-bold transition-colors ${globalTab === 'finished' ? 'bg-gray-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    終了（{globalSortedMatches.filter(m => m.status === 'finished').length}）
+                  </button>
+                </div>
                 {(() => {
-                  // 終了試合は末尾へ移動しグレー表示（次の控えを分かりやすくする）
                   const activeMatches = globalSortedMatches.filter(m => m.status !== 'finished');
                   const finishedMatches = globalSortedMatches.filter(m => m.status === 'finished');
-                  const ordered = [...activeMatches, ...finishedMatches];
-                  const firstFinishedId = finishedMatches[0]?.matchId;
+                  // 進行中タブ=未終了、終了タブ=終了した試合のみ（混在させない）
+                  const shown = globalTab === 'finished' ? finishedMatches : activeMatches;
+
+                  if (shown.length === 0) {
+                    return (
+                      <div className="text-center text-sm text-gray-400 py-10">
+                        {globalTab === 'finished' ? '終了した試合はまだありません。' : '進行中・待機中の試合はありません。'}
+                      </div>
+                    );
+                  }
 
                   const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
                     <div className="min-w-0 flex-1 text-center">
@@ -1740,7 +1768,7 @@ ${printableMatches.map(m => {
                     </div>
                   );
 
-                  return ordered.map((m) => {
+                  return shown.map((m) => {
                     const st = statusLabels[m.status] || statusLabels.waiting;
                     const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
                     const eventDraw = allDraws.get(m.eventId);
@@ -1769,21 +1797,22 @@ ${printableMatches.map(m => {
                       statusDisplay = st;
                     }
 
-                    // 中央のコートバッジ: 試合中/終了=コート番号、待機中=入るコート/控え番号。
-                    // コート確定後は、控えの上位から「◯番コートへ」「控え1〜5」を
-                    // コートバッジ風に表示する（試合が終わるたびに自動更新）。
+                    // 中央上のコートバッジ:
+                    // - 試合中/終了 → コート番号
+                    // - 空きコートが出て入れる状態 → オレンジの「コートに入る」（タップで入れる）
+                    // - それ以外の待機 → 「控え1〜5」（試合が終わるたびに自動で繰り上がる）
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {
                       centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
                     } else if (hasPlayers && enterCourtName) {
-                      centerBadge = { text: `${enterCourtName}番コートへ`, color: 'bg-blue-600 text-white' };
+                      centerBadge = { text: '▶ コートに入る', color: 'bg-orange-500 text-white' };
                     } else if (hasPlayers && sb?.standbyLabel) {
                       centerBadge = { text: sb.standbyLabel, color: 'bg-amber-500 text-white' };
                     }
 
                     // カード枠の配色:
                     // - 試合中: 緑枠点滅
-                    // - 空きコートに入れる（対戦順で若い順）: 青枠のみ点滅 + 入るコート表示
+                    // - 空きコートに入れる（コート確定後・空き発生）: オレンジ枠点滅（タップで入れる）
                     // - 控え1〜5: 青ベースのカード
                     // - それ以外の待機: 通常カード
                     const cardClass = isFinished
@@ -1793,7 +1822,7 @@ ${printableMatches.map(m => {
                         : !hasPlayers
                           ? 'bg-white border-gray-200 opacity-50'
                           : enterCourtName
-                            ? 'bg-blue-50 border-2 border-blue-500 enter-card-blink'
+                            ? 'bg-orange-50 border-2 border-orange-400 enter-court-orange-blink'
                             : sb?.standbyLabel
                               ? 'bg-blue-50 border-2 border-blue-300'
                               : `${evColor.bg} border-gray-200`;
@@ -1812,18 +1841,25 @@ ${printableMatches.map(m => {
                       elapsedLabel = h > 0 ? `${h}時間${mm}分` : `${mm}分`;
                     }
 
+                    // タップ動作:
+                    // - 試合中/終了(編集可) → スコア入力
+                    // - 待機中(コートに入っていない) → コートに入れる/控え変更ポップアップ
+                    const isWaitingEnterable = !readOnly && hasPlayers && !isPlaying && !isFinished && m.status !== 'walkover';
+                    const onCardClick = () => {
+                      if (readOnly) return;
+                      if (isPlaying || isFinished) {
+                        if (canEditResult) setScoreDialogMatchId(m.matchId);
+                      } else if (isWaitingEnterable) {
+                        setCourtPickMatchId(m.matchId);
+                      }
+                    };
+                    const clickable = !readOnly && ((isPlaying || isFinished) ? canEditResult : isWaitingEnterable);
+
                     return (
                       <React.Fragment key={m.matchId}>
-                        {m.matchId === firstFinishedId && (
-                          <div className="flex items-center gap-2 pt-1">
-                            <div className="flex-1 h-px bg-gray-200" />
-                            <span className="text-[10px] font-bold text-gray-400">終了した試合</span>
-                            <div className="flex-1 h-px bg-gray-200" />
-                          </div>
-                        )}
                         <div
-                          onClick={() => { if (!readOnly && canEditResult) setScoreDialogMatchId(m.matchId); }}
-                          className={`rounded-lg border p-2 transition-all ${cardClass} ${!readOnly && canEditResult ? 'cursor-pointer' : ''}`}
+                          onClick={onCardClick}
+                          className={`rounded-lg border p-2 transition-all ${cardClass} ${clickable ? 'cursor-pointer' : ''}`}
                         >
                           {/* ヘッダー行: クラス(左)・コート(中央)・状態(右) */}
                           <div className="relative flex items-center gap-1.5 mb-1.5 min-h-[20px]">
@@ -2601,6 +2637,62 @@ ${printableMatches.map(m => {
             requiredGames={resolveRequiredGames(getMatchGameRuleText(evt, sm.round, evTotalRounds), sm.round, evTotalRounds)}
             matchFormat={getMatchFormatForRound(evt, sm.round, evTotalRounds)}
           />
+        );
+      })()}
+
+      {/* 待機カードのタップで開く「コートに入れる」ポップアップ */}
+      {courtPickMatchId && (() => {
+        const pm = allMatchesFlat.find(mm => mm.matchId === courtPickMatchId);
+        if (!pm) return null;
+        const evt = events.find(e => e.eventId === pm.eventId);
+        const evDraw = allDraws.get(pm.eventId);
+        const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : Math.max(1, eventMaxRound.get(pm.eventId) || 1);
+        const suggested = standbyInfo.get(pm.matchId)?.enterCourtName || null;
+        return (
+          <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setCourtPickMatchId(null)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900">コートに入れる</h3>
+                <button onClick={() => setCourtPickMatchId(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
+                <div>
+                  <span className="font-medium">{shortEventName(evt?.name || pm.eventId)}</span>
+                  <span className="ml-2 text-gray-500">{getRoundName(pm.round, evTotalRounds)}</span>
+                </div>
+                <div className="text-gray-900 font-semibold">
+                  {pm.player1Name} <span className="text-gray-400 font-normal mx-0.5">vs</span> {pm.player2Name}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-2">入れる空きコートを選択</label>
+                {emptyCourts.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2 text-center">現在、空きコートがありません。</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {emptyCourts.map(c => (
+                      <button
+                        key={c.courtId}
+                        onClick={() => handleEnterCourt(pm.matchId, c.courtId)}
+                        className={`px-2 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
+                          suggested === c.name
+                            ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-primary-50 hover:border-primary-300'
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {suggested && emptyCourts.length > 0 && (
+                  <p className="text-[11px] text-orange-600 mt-2">オレンジ = 対戦順で次に入るコート（{suggested}番）</p>
+                )}
+              </div>
+            </div>
+          </div>
         );
       })()}
 
