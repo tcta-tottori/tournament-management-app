@@ -777,32 +777,37 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
       return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
     };
 
-    // 時間割でコート・時刻が割り当てられている試合（現存コートのみ）
-    const courtIds = new Set(availableCourts.map(c => c.courtId));
-    const scheduled = globalSortedMatches.filter(m =>
-      isReal(m) && !!m.courtId && courtIds.has(m.courtId) && !!m.scheduledTime,
-    );
+    // ドロー開始時刻を最優先で「初回」を決める。
+    // globalSortedMatches は (開始時刻→対戦順) でソート済み。
+    const realWaiting = globalSortedMatches.filter(isReal);
+    // 記載された開始時刻のうち最も早い時刻（=初回に始めるべき試合の時刻）
+    const finiteTimes = realWaiting.map(m => toMin(m.scheduledTime)).filter(t => Number.isFinite(t));
+    const earliest = finiteTimes.length > 0 ? Math.min(...finiteTimes) : null;
+    // 初回に起動する対象:
+    // - 開始時刻あり: 最早時刻の試合のみ（例: 9:00の試合だけ。9:40はまだ起動しない）
+    // - 開始時刻なし（時間割未生成）: 対戦順の上からコート数分
+    const candidates = earliest != null
+      ? realWaiting.filter(m => toMin(m.scheduledTime) === earliest)
+      : realWaiting;
 
-    let assignments: { match: Match & { eventName: string }; court: Court }[] = [];
-    if (scheduled.length > 0) {
-      // 時間割どおり: 最早時刻の試合を、それぞれ割り当てられたコートで開始する。
-      // これにより「A級で埋めるべき初回コートにB級が混ざる」ことを防ぐ。
-      const earliest = Math.min(...scheduled.map(m => toMin(m.scheduledTime)));
-      const firstSlot = scheduled.filter(m => toMin(m.scheduledTime) === earliest);
-      for (const court of availableCourts) {
-        const cm = firstSlot
-          .filter(m => m.courtId === court.courtId)
-          .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0));
-        if (cm.length > 0) assignments.push({ match: cm[0], court });
+    // コート割当: 各試合は自分の割当コート(courtId)を優先し、無ければ番号の若い空きコートへ。
+    // 対戦順の若い順に割り当てるため、最早時刻の試合が確実にコートを確保できる。
+    const nameById = new Map(courts.map(c => [c.courtId, c.name]));
+    const courtByName = new Map(availableCourts.map(c => [c.name, c]));
+    const freeCourtNames = new Set(availableCourts.map(c => c.name));
+    const nextFreeCourtName = () =>
+      [...freeCourtNames].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))[0];
+
+    const assignments: { match: Match & { eventName: string }; court: Court }[] = [];
+    for (const m of candidates) {
+      if (freeCourtNames.size === 0) break;
+      const ownName = m.courtId ? nameById.get(m.courtId) : undefined;
+      const name = (ownName && freeCourtNames.has(ownName)) ? ownName : nextFreeCourtName();
+      const court = courtByName.get(name);
+      if (court) {
+        assignments.push({ match: m, court });
+        freeCourtNames.delete(name);
       }
-    } else {
-      // フォールバック（時間割未生成時）: 対戦順の上からコート数分
-      const waitingMatches = globalSortedMatches.filter(isReal);
-      const assignCount = Math.min(waitingMatches.length, availableCourts.length);
-      assignments = waitingMatches.slice(0, assignCount).map((m, i) => ({
-        match: m,
-        court: availableCourts[i],
-      }));
     }
 
     if (assignments.length === 0) { alert('割り当てる試合がありません。'); return; }
@@ -1758,14 +1763,22 @@ ${printableMatches.map(m => {
                       statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
                     } else if (isFinished) {
                       statusDisplay = st;
-                    } else if (enterCourtName) {
-                      statusDisplay = { text: `${enterCourtName}番コートへ`, color: 'bg-blue-600 text-white' };
-                    } else if (sb?.standbyLabel) {
-                      statusDisplay = { text: sb.standbyLabel, color: 'bg-blue-100 text-blue-700 border border-blue-300' };
                     } else if (!hasPlayers) {
                       statusDisplay = { text: '未定', color: 'bg-gray-50 text-gray-400' };
                     } else {
                       statusDisplay = st;
+                    }
+
+                    // 中央のコートバッジ: 試合中/終了=コート番号、待機中=入るコート/控え番号。
+                    // コート確定後は、控えの上位から「◯番コートへ」「控え1〜5」を
+                    // コートバッジ風に表示する（試合が終わるたびに自動更新）。
+                    let centerBadge: { text: string; color: string } | null = null;
+                    if ((isPlaying || isFinished) && courtObj?.name) {
+                      centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
+                    } else if (hasPlayers && enterCourtName) {
+                      centerBadge = { text: `${enterCourtName}番コートへ`, color: 'bg-blue-600 text-white' };
+                    } else if (hasPlayers && sb?.standbyLabel) {
+                      centerBadge = { text: sb.standbyLabel, color: 'bg-amber-500 text-white' };
                     }
 
                     // カード枠の配色:
@@ -1816,9 +1829,9 @@ ${printableMatches.map(m => {
                           <div className="relative flex items-center gap-1.5 mb-1.5 min-h-[20px]">
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
                             <div className="flex-1" />
-                            {(isPlaying || isFinished) && courtObj?.name && (
-                              <span className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                                {courtObj.name}番コート
+                            {centerBadge && (
+                              <span className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${centerBadge.color}`}>
+                                {centerBadge.text}
                               </span>
                             )}
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
