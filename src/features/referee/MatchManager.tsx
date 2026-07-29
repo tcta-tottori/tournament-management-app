@@ -1724,7 +1724,7 @@ ${printableMatches.map(m => {
       )}
 
       {/* RIGHT: メインコンテンツ */}
-      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full pb-8">
+      <div ref={matchContentRef} className="flex-1 min-w-0 order-2 lg:order-2 overflow-auto space-y-3 lg:h-full pb-28 [padding-bottom:calc(7rem_+_env(safe-area-inset-bottom))]">
         {/* === 対戦順（グローバル）表示 === */}
         {viewMode === 'global' && (
           globalSortedMatches.length > 0 ? (
@@ -1799,7 +1799,7 @@ ${printableMatches.map(m => {
 
                     // 中央上のコートバッジ:
                     // - 試合中/終了 → コート番号
-                    // - コート確定後は控えの上から「控え1〜5」を必ず表示（自動で上から振り分け）。
+                    // - コート確定後はコートごとに「控え1〜5」を表示（各コートの次に入る試合から採番）。
                     //   空きコートが出て入れる状態のものはオレンジ表示（タップで入れる）。
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {

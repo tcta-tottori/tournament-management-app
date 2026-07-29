@@ -206,7 +206,7 @@ export default function PublicLayout() {
             </div>
           </div>
         ) : (
-          <div key={location.pathname} className="page-enter min-h-full">
+          <div key={location.pathname} className="page-enter min-h-full pb-24 [padding-bottom:calc(6rem_+_env(safe-area-inset-bottom))]">
             <Outlet />
           </div>
         )}

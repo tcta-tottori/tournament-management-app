@@ -6,11 +6,11 @@ import { db, type Match, type Court } from '../../db/database';
 export interface StandbyEntry {
   /** 空きコートに割り当てられた場合の入るコート名（対戦順で若い順） */
   enterCourtName: string | null;
-  /** 控え番号ラベル（控え1〜控え5）。6番目以降・入るコート割当時は null */
+  /** 控え番号ラベル（控え1〜控え5）。コートごとに採番し、6番目以降は null */
   standbyLabel: string | null;
 }
 
-/** 最大何番目まで「控え」として番号表示するか */
+/** 各コートで最大何番目まで「控え」として番号表示するか */
 export const MAX_STANDBY = 5;
 
 const toMin = (t?: string | null) => {
@@ -73,16 +73,25 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
     }
   }
 
-  // 控え番号は待機試合を対戦順で上から1..MAX_STANDBY で採番する（「上から振り分け」）。
-  // 空きコートに入れる試合(enterCourtName付き)にも控え番号を併記し、番号が飛ばないようにする。
+  // 控え番号は「コートごと」に採番する。各待機試合の割当先コート
+  //   = 入るコート(enterCourtName)があればそれ、無ければ自コート(courtId のコート名)
+  // をキーに、対戦順で上から 控え1〜控え5 を振る。
+  // これにより「そのコートの次に入る試合」が 控え1、その次が 控え2 … と各コートで見え、
+  // 全種目を通して常に各コートの控えが表示される（従来の全体通し番号だと大会全体で
+  // 5試合しか控え表示されず、多くの待機試合が無表示になっていた）。
+  // コート未割当(courtId なし・入るコートなし)の待機試合はまとめて 1 グループとして採番する。
+  const UNASSIGNED = '__unassigned__';
   const map = new Map<string, StandbyEntry>();
-  let idx = 0;
+  const perCourtCount = new Map<string, number>();
   for (const m of waiting) {
-    idx++;
     const enter = enterByMatch.get(m.matchId) || null;
+    const ownName = m.courtId ? (courtNameById.get(m.courtId) || null) : null;
+    const courtKey = enter || ownName || UNASSIGNED;
+    const n = (perCourtCount.get(courtKey) || 0) + 1;
+    perCourtCount.set(courtKey, n);
     map.set(m.matchId, {
       enterCourtName: enter,
-      standbyLabel: idx <= MAX_STANDBY ? `控え${idx}` : null,
+      standbyLabel: n <= MAX_STANDBY ? `控え${n}` : null,
     });
   }
   return map;
