@@ -117,6 +117,11 @@ export interface Draw {
    * ドロー表(Excel)に記載された時刻。時間割自動生成でそのまま配置に使う。
    */
   matchTimes?: Record<number, string>;
+  /**
+   * 2回戦以降の各試合の開始時刻（'HH:MM'）。キーは "R{round}-{matchNumInRound}"。
+   * ドロー表(Excel)に記載された後続ラウンドの時刻。時間割自動生成で優先配置する。
+   */
+  roundMatchTimes?: Record<string, string>;
   updatedAt: number;
 }
 

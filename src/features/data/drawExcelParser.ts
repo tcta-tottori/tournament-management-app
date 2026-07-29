@@ -44,6 +44,13 @@ export interface ParsedDrawEvent {
    * ブラケット位置。ドロー表に記載された時刻をそのまま配置に使う。
    */
   matchTimes: Record<number, string>;
+  /**
+   * 2回戦以降の各試合の開始時刻（'HH:MM'）。キーは "R{round}-{matchNumInRound}"
+   * （round・matchNumInRound は extractMatchesFromDraw と同じ採番＝左山→右山、上→下）。
+   * ドロー表に後続ラウンドの開始時刻が明記されている場合に抽出する。時間割の
+   * 自動生成時にこの時刻を優先配置する。
+   */
+  roundMatchTimes: Record<string, string>;
 }
 
 export interface ParsedDrawFile {
@@ -253,6 +260,185 @@ function extractR1MatchTimes(
     }
     if (time) result[a] = time;
   }
+  return result;
+}
+
+/** 'HH:MM' → 分。不正なら null。 */
+function hmToMinutes(hm: string): number | null {
+  const m = hm.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/**
+ * 2回戦以降の各試合の開始時刻をドロー表から抽出する。
+ *
+ * ドロー表には後続ラウンドの開始時刻も記載されることがある（例: 2回戦を11:00開始）。
+ * これらはトーナメントツリー上、より中央寄りの列に、その試合が束ねる範囲の中央の
+ * 行付近に書かれる。各試合の「担当行帯（構成選手の行範囲）」の中央に最も近い時刻セルを
+ * 割り当てる。誤取得を防ぐため、以下を満たすもののみ採用する:
+ *   1. セル行がその試合の行帯内
+ *   2. セル列が同じ山の1回戦列より中央寄り
+ *   3. 直前ラウンド（フィーダー）の時刻より後
+ *   4. その種目の下位ラウンド時刻すべてより後（階段状の単調増加）
+ *
+ * @returns "R{round}-{matchNumInRound}"（round≥2）をキーとした 'HH:MM' の辞書
+ */
+function extractLaterRoundMatchTimes(
+  rows: unknown[][],
+  players: ParsedDrawPlayer[],
+  drawSize: number,
+  matchTimes: Record<number, string>,
+  leftLayout: ColumnLayout,
+  rightLayout: ColumnLayout,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (drawSize < 4) return result;
+  const totalRounds = Math.log2(drawSize);
+  if (!Number.isInteger(totalRounds)) return result;
+
+  const real = players.filter((p) => !p.isBye && p.row != null);
+  if (real.length === 0) return result;
+  const rowByPos = new Map<number, number>();
+  for (const p of real) rowByPos.set(p.position, p.row!);
+
+  const half = drawSize / 2;
+  const leftNameCol = leftLayout.nameCol >= 0 ? leftLayout.nameCol : 1;
+  const rightNumCol = rightLayout.numCol >= 0 ? rightLayout.numCol : leftNameCol + 18;
+  const centerCol = Math.round((leftNameCol + rightNumCol) / 2);
+
+  // ドロー領域内の全時刻セルを収集
+  const rowVals = real.map((p) => p.row!);
+  const minRow = Math.min(...rowVals) - 2;
+  const maxRow = Math.max(...rowVals) + 3;
+  interface Cell { r: number; c: number; hm: string; used: boolean; }
+  const cells: Cell[] = [];
+  for (let r = Math.max(0, minRow); r <= maxRow; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const hm = timeValueToHM(row[c]);
+      if (hm) cells.push({ r, c, hm, used: false });
+    }
+  }
+  if (cells.length === 0) return result;
+
+  // 全ラウンドの試合を構築（担当行帯・中央行・フィーダー）
+  interface MatchNode {
+    round: number; mnr: number; side: 'L' | 'R';
+    bandMin: number; bandMax: number; center: number;
+    feeders: string[]; id: string; time?: string;
+  }
+  const matches: MatchNode[] = [];
+  for (let round = 1; round <= totalRounds; round++) {
+    const matchesInRound = drawSize / Math.pow(2, round);
+    const blockSize = Math.pow(2, round);
+    for (let j = 0; j < matchesInRound; j++) {
+      const lo = j * blockSize + 1;
+      const hi = (j + 1) * blockSize;
+      const prows: number[] = [];
+      for (let p = lo; p <= hi; p++) {
+        const rr = rowByPos.get(p);
+        if (rr != null) prows.push(rr);
+      }
+      if (prows.length === 0) continue; // 全員BYE → 試合なし
+      const bandMin = Math.min(...prows);
+      const bandMax = Math.max(...prows);
+      matches.push({
+        round, mnr: j + 1, side: lo <= half ? 'L' : 'R',
+        bandMin, bandMax, center: (bandMin + bandMax) / 2,
+        feeders: round === 1 ? [] : [`R${round - 1}-${2 * j + 1}`, `R${round - 1}-${2 * j + 2}`],
+        id: `R${round}-${j + 1}`,
+      });
+    }
+  }
+  const byId = new Map(matches.map((m) => [m.id, m]));
+
+  // 1回戦の時刻を matchTimes から反映（キー = ペア上側位置 = 2*mnr-1）
+  for (const m of matches) {
+    if (m.round === 1) {
+      const t = matchTimes[2 * m.mnr - 1];
+      if (t) m.time = t;
+    }
+  }
+
+  // 各山の1回戦列を推定（1回戦の中央行に最も近い、同時刻のセルの列の中央値）
+  const r1ColBySide: { L?: number; R?: number } = {};
+  for (const side of ['L', 'R'] as const) {
+    const inHalf = (c: number) => (side === 'L' ? c < centerCol : c >= centerCol);
+    const cols: number[] = [];
+    for (const m of matches) {
+      if (m.round !== 1 || m.side !== side || !m.time) continue;
+      let bestIdx = -1, bestDist = Infinity;
+      cells.forEach((cell, i) => {
+        if (cell.hm !== m.time || !inHalf(cell.c)) return;
+        const d = Math.abs(cell.r - m.center);
+        if (d < bestDist && d <= 6) { bestDist = d; bestIdx = i; }
+      });
+      if (bestIdx >= 0) cols.push(cells[bestIdx].c);
+    }
+    if (cols.length > 0) {
+      cols.sort((a, b) => a - b);
+      r1ColBySide[side] = cols[Math.floor(cols.length / 2)];
+    }
+  }
+
+  // 1回戦に割り当てたセルを消費（後続ラウンドで再利用しない）
+  for (const m of matches) {
+    if (m.round !== 1 || !m.time) continue;
+    let bestIdx = -1, bestDist = Infinity;
+    cells.forEach((cell, i) => {
+      if (cell.used || cell.hm !== m.time) return;
+      const d = Math.abs(cell.r - m.center);
+      if (d < bestDist && d <= 6) { bestDist = d; bestIdx = i; }
+    });
+    if (bestIdx >= 0) cells[bestIdx].used = true;
+  }
+
+  // 2回戦以降を、ラウンド昇順で割り当てる
+  const later = matches.filter((m) => m.round >= 2).sort((a, b) => a.round - b.round);
+  for (const m of later) {
+    const r1col = r1ColBySide[m.side];
+    let bestIdx = -1, bestDist = Infinity;
+    cells.forEach((cell, i) => {
+      if (cell.used) return;
+      if (cell.r < m.bandMin - 1 || cell.r > m.bandMax + 1) return;
+      // 1回戦列より中央寄りのセルのみ（同列/外側の1回戦時刻の誤取得を防ぐ）
+      if (r1col != null) {
+        if (m.side === 'L' && !(cell.c > r1col)) return;
+        if (m.side === 'R' && !(cell.c < r1col)) return;
+      }
+      const d = Math.abs(cell.r - m.center);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    if (bestIdx < 0) continue;
+    const cand = cells[bestIdx];
+    const candMin = hmToMinutes(cand.hm);
+    if (candMin == null) continue;
+    // フィーダー（直前ラウンド）の時刻より後
+    let feederMax = 0;
+    for (const f of m.feeders) {
+      const fm = byId.get(f);
+      if (fm?.time) {
+        const t = hmToMinutes(fm.time);
+        if (t != null) feederMax = Math.max(feederMax, t);
+      }
+    }
+    // 種目内の全下位ラウンド時刻より後（階段状の単調増加）
+    let lowerMax = 0;
+    for (const mm of matches) {
+      if (mm.time && mm.round < m.round) {
+        const t = hmToMinutes(mm.time);
+        if (t != null) lowerMax = Math.max(lowerMax, t);
+      }
+    }
+    if (candMin > feederMax && candMin > lowerMax) {
+      m.time = cand.hm;
+      cand.used = true;
+      result[m.id] = cand.hm;
+    }
+  }
+
   return result;
 }
 
@@ -994,6 +1180,10 @@ export function parseDrawExcel(
 
     // 1回戦の各試合の開始時刻をドロー表から抽出
     const matchTimes = extractR1MatchTimes(rows, allPlayers, drawSize, leftLayout, rightLayout);
+    // 2回戦以降の開始時刻も抽出（ドロー表に記載がある場合）
+    const roundMatchTimes = isRoundRobin
+      ? {}
+      : extractLaterRoundMatchTimes(rows, allPlayers, drawSize, matchTimes, leftLayout, rightLayout);
 
     events.push({
       eventName: section.eventName,
@@ -1004,6 +1194,7 @@ export function parseDrawExcel(
       isRoundRobin,
       roundGameRules,
       matchTimes,
+      roundMatchTimes,
     });
   }
 

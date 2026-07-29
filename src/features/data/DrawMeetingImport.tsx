@@ -1413,6 +1413,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             drawType: ev.isRoundRobin ? 'roundRobin' : 'tournament',
             slots,
             matchTimes: ev.matchTimes && Object.keys(ev.matchTimes).length > 0 ? ev.matchTimes : undefined,
+            roundMatchTimes: ev.roundMatchTimes && Object.keys(ev.roundMatchTimes).length > 0 ? ev.roundMatchTimes : undefined,
             updatedAt: now,
           });
           totalDrawCount++;

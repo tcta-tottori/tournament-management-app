@@ -846,6 +846,8 @@ function NormalEntryRegistration() {
       for (let round = 2; round <= totalRounds; round++) {
         const matchesInRound = draw.drawSize / Math.pow(2, round);
         for (let m = 0; m < matchesInRound; m++) {
+          // ドロー表に記載された後続ラウンドの開始時刻を予定時刻として設定
+          const drawRoundTime = draw.roundMatchTimes?.[`R${round}-${m + 1}`] ?? null;
           newMatches.push({
             eventId, matchId: `M-R${round}-${m + 1}`, round, matchOrder: matchOrder++,
             position: m + 1,
@@ -853,7 +855,7 @@ function NormalEntryRegistration() {
             player1Name: '', player2Name: '',
             player1Affiliation: '', player2Affiliation: '',
             score: '', winnerEntryId: null,
-            courtId: null, scheduledTime: null, status: 'waiting',
+            courtId: null, scheduledTime: drawRoundTime, status: 'waiting',
             refereeId: null, refereeName: '', updatedAt: Date.now()
           });
         }

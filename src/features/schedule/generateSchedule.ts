@@ -118,23 +118,29 @@ export async function generateScheduleFromDraws(
     const extracted = extractMatchesFromDraw(drawData, entryList, playersList, eventInfo);
 
     // 目標スロット（開始時刻）の決定。ドローの時刻を最優先する。
-    // 1) 最優先: DBに保存済みの1回戦の予定時刻。エントリー確定時にドロー表の時刻を
-    //    設定済み（手修正も反映）なので、これを第一の情報源にする。
-    //    round1 の position は matchNumInRound と一致する。
+    // 1) 最優先: DBに保存済みの予定時刻。エントリー確定時にドロー表の時刻を
+    //    設定済み（1回戦・後続ラウンドとも。手修正も反映）なので第一の情報源にする。
+    //    position は matchNumInRound と一致する。
     const dbEventMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
-    const timeByPos = new Map<number, string>();
+    const timeByRoundPos = new Map<string, string>();
     for (const dm of dbEventMatches) {
-      if (dm.round === 1 && dm.scheduledTime) timeByPos.set(dm.position, dm.scheduledTime);
+      if (dm.scheduledTime) timeByRoundPos.set(`${dm.round}|${dm.position}`, dm.scheduledTime);
     }
-    // 2) フォールバック: ドロー表(matchTimes)から直接抽出した時刻。
+    // 2) フォールバック: ドロー表から直接抽出した時刻。
+    //    1回戦は matchTimes（ペア上側位置キー）、2回戦以降は roundMatchTimes。
     const matchTimes = draw.matchTimes;
+    const roundMatchTimes = draw.roundMatchTimes;
     for (const m of extracted) {
-      if (m.round !== 1) continue;
-      // まずDBの予定時刻、無ければドロー表の記載時刻
-      let hm = timeByPos.get(m.matchNumInRound) || null;
-      if (!hm && matchTimes) {
-        // 1回戦の試合のペア上側位置 = 2*matchNumInRound - 1
-        hm = matchTimes[2 * m.matchNumInRound - 1] || null;
+      // まずDBの予定時刻
+      let hm = timeByRoundPos.get(`${m.round}|${m.matchNumInRound}`) || null;
+      // 無ければドロー表の記載時刻
+      if (!hm) {
+        if (m.round === 1 && matchTimes) {
+          // 1回戦の試合のペア上側位置 = 2*matchNumInRound - 1
+          hm = matchTimes[2 * m.matchNumInRound - 1] || null;
+        } else if (m.round >= 2 && roundMatchTimes) {
+          hm = roundMatchTimes[`R${m.round}-${m.matchNumInRound}`] || null;
+        }
       }
       if (!hm) continue;
       const slot = timeToSlot(hm);
