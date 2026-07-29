@@ -1799,7 +1799,7 @@ ${printableMatches.map(m => {
 
                     // 中央上のコートバッジ:
                     // - 試合中/終了 → コート番号
-                    // - コート確定後はコートごとに「控え1〜5」を表示（各コートの次に入る試合から採番）。
+                    // - コート確定後は大会全体で対戦順の上から「控え1〜5」を表示（全体で5試合）。
                     //   空きコートが出て入れる状態のものはオレンジ表示（タップで入れる）。
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {
