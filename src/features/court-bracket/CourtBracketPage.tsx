@@ -254,6 +254,22 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     };
   }, [enableScoreInput, selectedMatchKey, matches, selectedEvent]);
 
+  // 空きコートに入れる（enterCourtName付きの待機試合をタップ）→ そのコートで試合開始
+  const handleEnterCourt = useCallback(async (round: number, position: number) => {
+    const m = matches.find(mt => mt.round === round && mt.position === position);
+    if (!m || m.id == null) return;
+    const sb = standbyMap.get(m.matchId);
+    const courtName = sb?.enterCourtName;
+    if (!courtName) return;
+    const court = (courts || []).find(c => c.name === courtName && c.isAvailable);
+    if (!court) return;
+    await db.matches.update(m.id, {
+      courtId: court.courtId,
+      status: 'playing',
+      updatedAt: Date.now(),
+    });
+  }, [matches, standbyMap, courts]);
+
   if (!currentTournamentId) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -348,6 +364,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             eventType={selectedEvent?.type as 'Singles' | 'Doubles' | 'Team'}
             totalRounds={totalRounds}
             onMatchSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
+            onEnterCourt={enableScoreInput ? handleEnterCourt : undefined}
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">

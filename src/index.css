@@ -808,6 +808,21 @@
   animation: enter-card-blink 1.1s ease-in-out infinite;
 }
 
+/* 空きコートに入れる（コート確定後・空き発生）カードはオレンジ枠で点滅 */
+@keyframes enter-court-orange-blink {
+  0%, 100% {
+    border-color: #fb923c;
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
+  50% {
+    border-color: #ea580c;
+    box-shadow: 0 0 13px 2px rgba(249, 115, 22, 0.6);
+  }
+}
+.enter-court-orange-blink {
+  animation: enter-court-orange-blink 1s ease-in-out infinite;
+}
+
 /* ティッカーアイテム */
 .info-ticker-item {
   display: inline-flex;

@@ -25,6 +25,8 @@ interface CourtBracketViewProps {
   totalRounds: number;
   /** 試合ノードのクリックでスコア入力を開く（指定時のみクリック可能） */
   onMatchSelect?: (round: number, position: number) => void;
+  /** 空きコートに入れる（enterCourtName付きの待機試合）ノードのクリックでコート投入 */
+  onEnterCourt?: (round: number, position: number) => void;
 }
 
 const SLOT_HEIGHT = 36;
@@ -53,6 +55,7 @@ export default function CourtBracketView({
   eventType,
   totalRounds,
   onMatchSelect,
+  onEnterCourt,
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
@@ -345,10 +348,11 @@ export default function CourtBracketView({
   };
 
   // 控え状況／入るコートを左端に表示（対戦順シートと共通の控え番号）
+  // enter（空きコートに入れる）はオレンジで強調。
   const standbyColumn = (label: string, tone: 'enter' | 'standby') => {
     const num = label.match(/(\d+)/)?.[1] ?? '';
     return (
-      <div className={`flex flex-col items-center justify-center shrink-0 text-white ${tone === 'enter' ? 'bg-blue-600' : 'bg-blue-400'}`} style={{ width: 42 }}>
+      <div className={`flex flex-col items-center justify-center shrink-0 text-white ${tone === 'enter' ? 'bg-orange-500' : 'bg-blue-400'}`} style={{ width: 42 }}>
         {tone === 'standby' ? (
           <>
             <span className="text-[8px] font-bold leading-none opacity-85">控え</span>
@@ -384,23 +388,31 @@ export default function CourtBracketView({
       const cardH = isVs ? CARD_H_VS : SLOT_HEIGHT;
       const top = y + (SLOT_HEIGHT - cardH) / 2;
 
-      // このノードがクリックでスコア入力できるか（両選手が確定している場合のみ）
-      const clickable = !!(onMatchSelect && bothPlayers);
-      const clickProps = clickable
-        ? { onClick: () => onMatchSelect!(matchResult!.round, matchResult!.position), role: 'button' as const }
-        : {};
-      const clickCls = clickable ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : '';
+      // 空きコートに入れる状態（enterCourtName付き・未試合）は、タップでコート投入。
+      const isEnterable = !!(matchResult?.enterCourtName && bothPlayers && !isPlaying && !isFinished);
+      // クリック動作: 入れる状態なら onEnterCourt、それ以外は onMatchSelect（スコア入力）
+      const clickHandler = isEnterable && onEnterCourt
+        ? () => onEnterCourt(matchResult!.round, matchResult!.position)
+        : (onMatchSelect && bothPlayers)
+          ? () => onMatchSelect(matchResult!.round, matchResult!.position)
+          : null;
+      const clickProps = clickHandler ? { onClick: clickHandler, role: 'button' as const } : {};
+      const clickCls = clickHandler
+        ? (isEnterable && onEnterCourt ? ' cursor-pointer hover:ring-2 hover:ring-orange-400' : ' cursor-pointer hover:ring-2 hover:ring-emerald-400')
+        : '';
 
       // 枠の配色（点滅は枠のみ・カード内はそのまま = bracket-card-blink）
       const cardClass = isFinished
         ? (isFinal ? 'border-2 border-amber-500 bg-amber-50' : 'border border-gray-400 bg-white')
         : isPlaying
           ? 'border-2 border-green-500 bg-green-50 bracket-card-blink'
-          : isReady
-            ? 'border border-blue-400 bg-blue-50'
-            : isVs
-              ? 'border border-gray-300 bg-white'
-              : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
+          : isEnterable
+            ? 'border-2 border-orange-400 bg-orange-50 enter-court-orange-blink'
+            : isReady
+              ? 'border border-blue-400 bg-blue-50'
+              : isVs
+                ? 'border border-gray-300 bg-white'
+                : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
 
       let content: React.ReactNode;
       if (isFinished) {
