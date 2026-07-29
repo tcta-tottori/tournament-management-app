@@ -1814,7 +1814,7 @@ ${printableMatches.map(m => {
                     // カード枠の配色:
                     // - 試合中: 緑枠点滅
                     // - 空きコートに入れる（コート確定後・空き発生）: オレンジ枠点滅（タップで入れる）
-                    // - 控え1〜5: 青ベースのカード
+                    // - 控え1〜5: 背景は白のまま、オレンジの枠のみ点滅
                     // - それ以外の待機: 通常カード
                     const cardClass = isFinished
                       ? 'bg-gray-50 border-gray-200 opacity-60'
@@ -1825,7 +1825,7 @@ ${printableMatches.map(m => {
                           : enterCourtName
                             ? 'bg-orange-50 border-2 border-orange-400 enter-court-orange-blink'
                             : sb?.standbyLabel
-                              ? 'bg-blue-50 border-2 border-blue-300'
+                              ? 'bg-white border-2 border-orange-400 enter-court-orange-blink'
                               : `${evColor.bg} border-gray-200`;
 
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
