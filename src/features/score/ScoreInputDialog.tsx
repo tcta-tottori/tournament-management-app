@@ -508,14 +508,16 @@ export default function ScoreInputDialog({
     return map;
   }, [courts, courtNumberOf]);
 
-  // 他の試合が現在使用中のコートID（空きコート判定用）
+  // 現在使用中（試合中）のコートID（空きコート判定用）。
+  // 自分の試合が入っているコートも「使用中」に含め、埋まっているコートを
+  // 誤って空きコートとして表示しないようにする。
   const occupiedCourtIds = useLiveQuery(async () => {
     const all = await db.matches.toArray();
     return new Set(
-      all.filter(m => m.status === 'playing' && m.courtId && m.matchId !== match?.matchId)
+      all.filter(m => m.status === 'playing' && m.courtId)
         .map(m => m.courtId as string),
     );
-  }, [match?.matchId]) || new Set<string>();
+  }, []) || new Set<string>();
 
   // W.O/リタイアモードでは、コート・開始時刻はコール文に含めない
   const isWoRet = !!retPlayer;
@@ -742,11 +744,12 @@ export default function ScoreInputDialog({
               <div className="flex items-center gap-2 sm:gap-3">
                 <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
                 {(() => {
-                  // 空きコート = 使用可能 かつ 他の試合が使用中でない（現在このコートは常に含む）
+                  // 空きコート = 使用可能 かつ 試合中でない（埋まっているコートは常に「その他」へ）。
+                  // 現在割り当てられているコートも、試合中で埋まっていれば「使用中」として表示する。
                   const emptyCourts = courts.filter(c =>
-                    c.courtId === match.courtId || (c.isAvailable && !occupiedCourtIds.has(c.courtId)));
+                    c.isAvailable && !occupiedCourtIds.has(c.courtId));
                   const otherCourts = courts.filter(c =>
-                    c.courtId !== match.courtId && !(c.isAvailable && !occupiedCourtIds.has(c.courtId)));
+                    !(c.isAvailable && !occupiedCourtIds.has(c.courtId)));
                   return (
                     <select
                       value={match.courtId ?? ''}
