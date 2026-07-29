@@ -494,6 +494,7 @@ function NormalDrawBoard() {
                 <RoundRobinRenderer
                   slots={editedSlots}
                   matchResults={matchResults}
+                  onCellSelect={handleMatchClick}
                 />
               ) : (
                 <DrawRenderer

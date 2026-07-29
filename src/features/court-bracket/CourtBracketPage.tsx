@@ -368,8 +368,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">
-            {/* リーグ表（星取表） */}
-            <RoundRobinRenderer slots={slots} matchResults={matchResults} />
+            {/* リーグ表（星取表・セルタップで直接スコア入力） */}
+            <RoundRobinRenderer
+              slots={slots}
+              matchResults={matchResults}
+              onCellSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
+            />
             {/* 対戦カード（タップでスコア入力） */}
             {rrMatches.length > 0 && (
               <div className="space-y-2">
