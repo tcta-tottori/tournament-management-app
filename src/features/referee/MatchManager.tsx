@@ -1805,8 +1805,8 @@ ${printableMatches.map(m => {
                     if ((isPlaying || isFinished) && courtObj?.name) {
                       centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
                     } else if (hasPlayers && enterCourtName) {
-                      // 空きコートに入れる（控え番号があれば併記）
-                      centerBadge = { text: sb?.standbyLabel ? `${sb.standbyLabel}・入る` : '▶ コートに入る', color: 'bg-orange-500 text-white' };
+                      // 空きコートに入れる（入るコート番号を表示。控えとは別扱い）
+                      centerBadge = { text: `▶ ${enterCourtName}番コートへ`, color: 'bg-orange-500 text-white' };
                     } else if (hasPlayers && sb?.standbyLabel) {
                       centerBadge = { text: sb.standbyLabel, color: 'bg-amber-500 text-white' };
                     }
