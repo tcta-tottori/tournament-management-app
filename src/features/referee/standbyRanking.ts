@@ -71,17 +71,17 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
     }
   }
 
-  // 控え番号は「入れない」試合を対戦順で1から採番
+  // 控え番号は待機試合を対戦順で上から1..MAX_STANDBY で採番する（「上から振り分け」）。
+  // 空きコートに入れる試合(enterCourtName付き)にも控え番号を併記し、番号が飛ばないようにする。
   const map = new Map<string, StandbyEntry>();
-  let standbyIdx = 0;
+  let idx = 0;
   for (const m of waiting) {
-    const enter = enterByMatch.get(m.matchId);
-    if (enter) {
-      map.set(m.matchId, { enterCourtName: enter, standbyLabel: null });
-    } else {
-      standbyIdx++;
-      map.set(m.matchId, { enterCourtName: null, standbyLabel: standbyIdx <= MAX_STANDBY ? `控え${standbyIdx}` : null });
-    }
+    idx++;
+    const enter = enterByMatch.get(m.matchId) || null;
+    map.set(m.matchId, {
+      enterCourtName: enter,
+      standbyLabel: idx <= MAX_STANDBY ? `控え${idx}` : null,
+    });
   }
   return map;
 }
