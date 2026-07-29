@@ -74,15 +74,22 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
   }
 
   // 控え番号は大会全体で待機試合を対戦順に上から1..MAX_STANDBY で採番する（全体で控え1〜5）。
-  // 空きコートに入れる試合(enterCourtName付き)にも控え番号を併記し、番号が飛ばないようにする。
+  // ただし「空きコートに今すぐ入れる試合(enterCourtName付き)」は控えではなく“入る”側なので
+  // 採番対象から除外する。これにより、コート（1〜16面）へ入る試合と、その後ろで待つ
+  // 控え（1〜5）が混ざらず、実際に入るコートが違っても対戦順の上から順に控え1・2・3…と
+  // 割り振られる（例: 9:00 の試合が各コートに入り、9:40 の上位5試合が控え1〜5になる）。
   const map = new Map<string, StandbyEntry>();
   let idx = 0;
   for (const m of waiting) {
-    idx++;
     const enter = enterByMatch.get(m.matchId) || null;
+    let standbyLabel: string | null = null;
+    if (!enter) {
+      idx++;
+      standbyLabel = idx <= MAX_STANDBY ? `控え${idx}` : null;
+    }
     map.set(m.matchId, {
       enterCourtName: enter,
-      standbyLabel: idx <= MAX_STANDBY ? `控え${idx}` : null,
+      standbyLabel,
     });
   }
   return map;
