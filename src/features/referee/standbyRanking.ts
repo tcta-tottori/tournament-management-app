@@ -42,9 +42,11 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
   );
   const emptyCourtsSorted = [...availableCourts].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
 
-  // 入れる（対戦相手が決まった待機）試合を対戦順のまま抽出（再ソートしない）
+  // 入れる（対戦相手が決まった待機）試合を対戦順のまま抽出（再ソートしない）。
+  // status は「試合中・終了・不戦勝以外」を待機とみなす（waiting/ready のほか、
+  // 同期・復元で status が欠落したケースも控えに含めるため、除外リスト方式にする）。
   const waiting = orderedMatches.filter(m =>
-    (m.status === 'waiting' || m.status === 'ready')
+    m.status !== 'playing' && m.status !== 'finished' && m.status !== 'walkover'
     && !!m.player1Name && !!m.player2Name
     && m.player1Name !== 'BYE' && m.player2Name !== 'BYE');
 
