@@ -13,6 +13,17 @@ export interface StandbyEntry {
 /** 大会全体で最大何番目まで「控え」として番号表示するか */
 export const MAX_STANDBY = 5;
 
+/**
+ * 大会全体で一意な試合キー。
+ *
+ * matchId は `M-R1-2` のように「種目内での連番」でしか採番されておらず、
+ * 種目が違えば同じ matchId が普通に重複する（例: 男子B級と女子A級の両方に M-R1-2 がある）。
+ * そのため matchId だけを Map のキーにすると、後から書き込んだ別種目の試合で
+ * 値が上書きされ、控え番号が消える等の不具合になる。
+ * 種目をまたいで試合を識別する場合は必ずこのキーを使うこと。
+ */
+export const matchKey = (m: { eventId: string; matchId: string }) => `${m.eventId}::${m.matchId}`;
+
 const toMin = (t?: string | null) => {
   if (!t) return Number.POSITIVE_INFINITY;
   const mm = t.match(/^(\d{1,2}):(\d{2})$/);
@@ -22,6 +33,9 @@ const toMin = (t?: string | null) => {
 /**
  * 「対戦順に並んだ試合リスト」からコート割当と控え番号を算出する。
  * orderedMatches は表示と同じ対戦順で渡すこと（採番＝表示順にするため再ソートしない）。
+ *
+ * 戻り値の Map のキーは matchKey(試合)（= `eventId::matchId`）。
+ * matchId は種目内でしか一意でないため、matchId 単独をキーにしてはいけない。
  */
 export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): Map<string, StandbyEntry> {
   const courtNameById = new Map(courts.map(c => [c.courtId, c.name]));
@@ -68,7 +82,7 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
       court = emptyCourtsSorted.find(n => remaining.has(n));
     }
     if (court) {
-      enterByMatch.set(m.matchId, court);
+      enterByMatch.set(matchKey(m), court);
       remaining.delete(court);
     }
   }
@@ -81,13 +95,13 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
   const map = new Map<string, StandbyEntry>();
   let idx = 0;
   for (const m of waiting) {
-    const enter = enterByMatch.get(m.matchId) || null;
+    const enter = enterByMatch.get(matchKey(m)) || null;
     let standbyLabel: string | null = null;
     if (!enter) {
       idx++;
       standbyLabel = idx <= MAX_STANDBY ? `控え${idx}` : null;
     }
-    map.set(m.matchId, {
+    map.set(matchKey(m), {
       enterCourtName: enter,
       standbyLabel,
     });
