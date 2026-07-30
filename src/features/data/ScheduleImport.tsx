@@ -201,11 +201,15 @@ export default function ScheduleImport() {
         if (candidates.length > 0) {
           // 最初にマッチしたものを更新
           const match = candidates[0];
-          await db.matches.where('matchId').equals(match.matchId).modify({
-            courtId,
-            scheduledTime: row.scheduledTime,
-            updatedAt: Date.now(),
-          });
+          // matchId は種目内でしか一意でない（別種目にも同じ M-R1-2 がある）。
+          // where('matchId') で更新すると他種目の試合まで書き換わるため、主キー(id)で更新する。
+          if (match.id != null) {
+            await db.matches.update(match.id, {
+              courtId,
+              scheduledTime: row.scheduledTime,
+              updatedAt: Date.now(),
+            });
+          }
           matchedCount++;
         } else {
           notFoundCount++;

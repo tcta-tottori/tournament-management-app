@@ -15,7 +15,7 @@ import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
-import { assignStandbyInOrder } from './standbyRanking';
+import { assignStandbyInOrder, matchKey } from './standbyRanking';
 
 /** 回戦に応じたゲームルール（試合方式）を解決する */
 function resolveRoundRule(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
@@ -363,15 +363,15 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
           if (!isLg) continue;
         }
 
-        orderMap.set(nextMatch.matchId, i);
+        orderMap.set(matchKey(nextMatch), i);
         pool.consumed++;
         break;
       }
     }
 
     return arr.sort((a, b) => {
-      const oa = orderMap.get(a.matchId) ?? 9999;
-      const ob = orderMap.get(b.matchId) ?? 9999;
+      const oa = orderMap.get(matchKey(a)) ?? 9999;
+      const ob = orderMap.get(matchKey(b)) ?? 9999;
       if (oa !== ob) return oa - ob;
       return (a.matchOrder || 0) - (b.matchOrder || 0);
     });
@@ -646,7 +646,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     const text = (textOverride && textOverride.trim())
       ? textOverride.trim()
       : buildCallText(matchCall, courtNum, startTime, affiliationFuriganaMap);
-    setSpeakingMatchId(m.matchId);
+    setSpeakingMatchId(matchKey(m));
 
     // 実際の読み上げは「漢字（かな）」→かな へ変換したテキストを使う
     speak(toSpeechText(text), voiceSettings, () => {
@@ -663,7 +663,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   // コール設定ポップアップを開く（どの導線から押しても必ずポップアップを表示）
   // 既にコートが決まっていればそのコートを初期選択し、開始時刻も引き継ぐ（どちらも修正可）。
   const openCallModal = useCallback((m: Match) => {
-    setCallTargetMatchId(m.matchId);
+    setCallTargetMatchId(matchKey(m));
     setCallCourtNumber(m.courtId ? (courtIdToName.get(m.courtId) || '') : '');
     // 開始時刻の標準は「指定なし」（空欄）。9:00等の既定値は入れない。
     setCallStartTime('');
@@ -849,8 +849,9 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   }, [courts, playingCourtNames]);
 
   // 待機試合を指定コートに入れる（試合開始）
-  const handleEnterCourt = useCallback(async (matchId: string, courtId: string) => {
-    const m = allMatchesFlat.find(mm => mm.matchId === matchId);
+  // matchId は種目内でしか一意でないため、種目をまたぐ検索では matchKey（eventId::matchId）で照合する。
+  const handleEnterCourt = useCallback(async (key: string, courtId: string) => {
+    const m = allMatchesFlat.find(mm => matchKey(mm) === key);
     if (!m?.id) return;
     await db.matches.update(m.id, {
       courtId,
@@ -964,8 +965,8 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     if (currentEvent?.gameRules?.games) return currentEvent.gameRules.games;
     // グローバル表示: 編集中の試合のeventIdからゲーム数を取得
     if (editingMatchId) {
-      const editingMatch = globalSortedMatches.find(m => m.matchId === editingMatchId)
-        || Array.from(allMatchesByEvent.values()).flat().find(m => m.matchId === editingMatchId);
+      const editingMatch = globalSortedMatches.find(m => matchKey(m) === editingMatchId)
+        || Array.from(allMatchesByEvent.values()).flat().find(m => matchKey(m) === editingMatchId);
       if (editingMatch) {
         const evt = events.find(e => e.eventId === editingMatch.eventId);
         if (evt?.gameRules?.games) return evt.gameRules.games;
@@ -999,7 +1000,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   }, [isTiebreakScore, autoWinner]);
 
   const startEdit = useCallback((m: Match) => {
-    setEditingMatchId(m.matchId);
+    setEditingMatchId(matchKey(m));
     // 既存スコアをパース ("8-6" or "7-6(4)")
     const scoreMatch = (m.score || '').match(/^(\d+)\s*[-–―]\s*(\d+)(?:\((\d+)\))?$/);
     if (scoreMatch) {
@@ -1778,7 +1779,7 @@ ${printableMatches.map(m => {
                       && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
                     const evLabel = `${shortEventName(m.eventName)} ${rName}`;
                     const schedTime = m.scheduledTime || '';
-                    const sb = standbyInfo.get(m.matchId);
+                    const sb = standbyInfo.get(matchKey(m));
                     const evColor = getEventColor(m.eventName);
                     const isPlaying = m.status === 'playing';
                     const isFinished = m.status === 'finished';
@@ -1849,15 +1850,15 @@ ${printableMatches.map(m => {
                     const onCardClick = () => {
                       if (readOnly) return;
                       if (isPlaying || isFinished) {
-                        if (canEditResult) setScoreDialogMatchId(m.matchId);
+                        if (canEditResult) setScoreDialogMatchId(matchKey(m));
                       } else if (isWaitingEnterable) {
-                        setCourtPickMatchId(m.matchId);
+                        setCourtPickMatchId(matchKey(m));
                       }
                     };
                     const clickable = !readOnly && ((isPlaying || isFinished) ? canEditResult : isWaitingEnterable);
 
                     return (
-                      <React.Fragment key={m.matchId}>
+                      <React.Fragment key={matchKey(m)}>
                         <div
                           onClick={onCardClick}
                           className={`rounded-lg border p-2 transition-all ${cardClass} ${clickable ? 'cursor-pointer' : ''}`}
@@ -1914,7 +1915,7 @@ ${printableMatches.map(m => {
                                 <button
                                   onClick={() => openCallModal(m)}
                                   className={`p-1.5 rounded-lg border transition-all ${
-                                    callTargetMatchId === m.matchId
+                                    callTargetMatchId === matchKey(m)
                                       ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
                                       : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
                                   }`}
@@ -2084,7 +2085,7 @@ ${printableMatches.map(m => {
                         </tr>
                         {roundMatches.map((m, idx) => {
                               const st = statusLabels[m.status] || statusLabels.waiting;
-                              const isEditing = editingMatchId === m.matchId && isActive;
+                              const isEditing = editingMatchId === matchKey(m) && isActive;
                               const isWinner1 = m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
                               const isWinner2 = m.winnerEntryId && m.winnerEntryId === m.player2EntryId;
                               const hasPlayers = !!m.player1Name && !!m.player2Name;
@@ -2092,7 +2093,7 @@ ${printableMatches.map(m => {
 
                               if (isEditing) {
                                 return (
-                                  <tr key={m.matchId} className="border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                                  <tr key={matchKey(m)} className="border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <td className="py-2.5 px-2 text-center font-mono text-blue-400 text-xs font-bold">{m.matchOrder}</td>
                                     <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
@@ -2216,11 +2217,11 @@ ${printableMatches.map(m => {
                                 );
                               }
 
-                              const isCallTarget = callTargetMatchId === m.matchId;
-                              const isThisSpeaking = speakingMatchId === m.matchId;
+                              const isCallTarget = callTargetMatchId === matchKey(m);
+                              const isThisSpeaking = speakingMatchId === matchKey(m);
 
                               return (
-                                <React.Fragment key={m.matchId}>
+                                <React.Fragment key={matchKey(m)}>
                                   <tr className={`border-b border-slate-100 transition-colors group ${
                                     isThisSpeaking
                                       ? 'bg-gradient-to-r from-amber-50 to-orange-50'
@@ -2356,7 +2357,7 @@ ${printableMatches.map(m => {
 
       {/* コール中の固定ポップアップ（画面下部・点滅表示） */}
       {speakingMatchId && (() => {
-        const sm = allMatchesFlat.find(mm => mm.matchId === speakingMatchId);
+        const sm = allMatchesFlat.find(mm => matchKey(mm) === speakingMatchId);
         if (!sm) return null;
         const evt = events.find(e => e.eventId === sm.eventId);
         const evDraw = allDraws.get(sm.eventId);
@@ -2601,7 +2602,7 @@ ${printableMatches.map(m => {
 
       {/* 対戦順カードのタップで開くスコア入力ポップアップ（ドローシートと同じダイアログ） */}
       {scoreDialogMatchId && (() => {
-        const sm = allMatchesFlat.find(mm => mm.matchId === scoreDialogMatchId);
+        const sm = allMatchesFlat.find(mm => matchKey(mm) === scoreDialogMatchId);
         if (!sm) return null;
         const evt = events.find(e => e.eventId === sm.eventId);
         const evDraw = allDraws.get(sm.eventId);
@@ -2643,12 +2644,12 @@ ${printableMatches.map(m => {
 
       {/* 待機カードのタップで開く「コートに入れる」ポップアップ */}
       {courtPickMatchId && (() => {
-        const pm = allMatchesFlat.find(mm => mm.matchId === courtPickMatchId);
+        const pm = allMatchesFlat.find(mm => matchKey(mm) === courtPickMatchId);
         if (!pm) return null;
         const evt = events.find(e => e.eventId === pm.eventId);
         const evDraw = allDraws.get(pm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : Math.max(1, eventMaxRound.get(pm.eventId) || 1);
-        const suggested = standbyInfo.get(pm.matchId)?.enterCourtName || null;
+        const suggested = standbyInfo.get(matchKey(pm))?.enterCourtName || null;
         return (
           <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setCourtPickMatchId(null)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
@@ -2676,7 +2677,7 @@ ${printableMatches.map(m => {
                     {emptyCourts.map(c => (
                       <button
                         key={c.courtId}
-                        onClick={() => handleEnterCourt(pm.matchId, c.courtId)}
+                        onClick={() => handleEnterCourt(matchKey(pm), c.courtId)}
                         className={`px-2 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
                           suggested === c.name
                             ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
@@ -2699,7 +2700,7 @@ ${printableMatches.map(m => {
 
       {/* コール設定ポップアップ（どの導線からでも表示。ビューポート中央に表示） */}
       {callTargetMatchId && (() => {
-        const cm = allMatchesFlat.find(mm => mm.matchId === callTargetMatchId);
+        const cm = allMatchesFlat.find(mm => matchKey(mm) === callTargetMatchId);
         if (!cm) return null;
         const evt = events.find(e => e.eventId === cm.eventId);
         const availCourts = courts.filter(c => c.isAvailable);

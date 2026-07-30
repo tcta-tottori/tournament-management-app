@@ -10,7 +10,7 @@ import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
-import { useStandbyMap } from '../referee/standbyRanking';
+import { useStandbyMap, matchKey } from '../referee/standbyRanking';
 
 function getGameRulesText(evt: Event | undefined): string {
   if (!evt) return '';
@@ -192,7 +192,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const matchResults: MatchResult[] = useMemo(() =>
     matches.map(m => {
       const court = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
-      const sb = standbyMap.get(m.matchId);
+      const sb = standbyMap.get(matchKey(m));
       return {
         round: m.round, position: m.position,
         player1Name: m.player1Name, player2Name: m.player2Name,
@@ -258,7 +258,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const handleEnterCourt = useCallback(async (round: number, position: number) => {
     const m = matches.find(mt => mt.round === round && mt.position === position);
     if (!m || m.id == null) return;
-    const sb = standbyMap.get(m.matchId);
+    const sb = standbyMap.get(matchKey(m));
     const courtName = sb?.enterCourtName;
     if (!courtName) return;
     const court = (courts || []).find(c => c.name === courtName && c.isAvailable);
