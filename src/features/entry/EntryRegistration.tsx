@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Entry, type Match, type Draw } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import HeatRulePatternInput, { applyHeatToRules } from '../data/HeatRulePatternInput';
-import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock, X, Check } from 'lucide-react';
+import { CheckSquare, UserCheck, UserPlus, Search, Eye, List, AlertCircle, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Lock, Ban, Unlock, X, Check, Clock } from 'lucide-react';
 import ProcessingModal, { type ProcessingStep } from '../../components/ui/ProcessingModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
@@ -12,6 +12,13 @@ import { useMixedStore } from '../mixed/mixedStore';
 import MixedEntryView from '../mixed/MixedEntryView';
 import { useTeamStore } from '../team/teamStore';
 import TeamEntryView from '../team/TeamEntryView';
+
+/** 'HH:MM' → 分。不正な値は Infinity（比較時に最後に来る）。 */
+function toMinutes(hm: string): number {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm || '');
+  if (!m) return Infinity;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
 
 // 略称→正式名マッピング（時間割の略称がストアに残っている場合のフォールバック用）
 const SCHEDULE_CODE_TO_NAME: Record<string, string> = {
@@ -1023,14 +1030,30 @@ function NormalEntryRegistration() {
       return <div className="py-8 text-center text-gray-400 text-sm">リーグデータがありません</div>;
     }
 
+    // 開始時刻: 確定済みなら試合の予定時刻、無ければドロー表記載の開始時刻
+    const leagueStartTime = (() => {
+      const times = allMatches
+        .filter(m => m.eventId === eventId && m.scheduledTime)
+        .map(m => m.scheduledTime as string)
+        .filter(t => /^\d{1,2}:\d{2}$/.test(t));
+      if (times.length > 0) return times.reduce((a, b) => (toMinutes(a) <= toMinutes(b) ? a : b));
+      return draw?.eventStartTime || '';
+    })();
+
     return (
       <div>
         {draw && (
-          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
+          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1.5 text-gray-600">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
               リーグ <strong className="text-gray-800">{playerSlots.length}人</strong>
             </span>
+            {leagueStartTime && (
+              <span className="flex items-center gap-1 text-primary-700 font-medium">
+                <Clock className="w-3.5 h-3.5" />
+                開始 <strong>{leagueStartTime}</strong>〜
+              </span>
+            )}
           </div>
         )}
         <div className="p-4 space-y-1.5">
@@ -1118,6 +1141,48 @@ function NormalEntryRegistration() {
     const displaySlots = slots.slice().sort((a, b) => a.drawPosition - b.drawPosition);
     const halfSize = drawSize / 2;
 
+    // === 試合開始時刻 ===
+    // 確定済みなら試合(matches)の予定時刻を、未確定ならドロー表記載の時刻を表示する。
+    // matches.position は各ラウンド内の通し番号（左山→右山、上から下）。
+    const scheduledByRoundPos = new Map<string, string>();
+    for (const m of allMatches) {
+      if (m.eventId !== eventId || !m.scheduledTime) continue;
+      scheduledByRoundPos.set(`${m.round}|${m.position}`, m.scheduledTime);
+    }
+    /**
+     * 試合の開始時刻を取得する。
+     * @param round 1始まりの回戦
+     * @param matchNumInRound 回戦内の通し番号（1始まり・左山→右山）
+     * @param upperPosition 1回戦の場合のペア上側ブラケット位置
+     */
+    const getMatchTime = (round: number, matchNumInRound: number, upperPosition: number): string => {
+      const scheduled = scheduledByRoundPos.get(`${round}|${matchNumInRound}`);
+      if (scheduled) return scheduled;
+      if (round === 1) return draw?.matchTimes?.[upperPosition] || '';
+      return draw?.roundMatchTimes?.[`R${round}-${matchNumInRound}`] || '';
+    };
+    /** 種目内の最も早い開始時刻（ヘッダー表示用） */
+    const earliestMatchTime = (() => {
+      const all = [
+        ...scheduledByRoundPos.values(),
+        ...Object.values(draw?.matchTimes || {}),
+        ...Object.values(draw?.roundMatchTimes || {}),
+      ].filter(t => /^\d{1,2}:\d{2}$/.test(t));
+      if (all.length === 0) return '';
+      return all.reduce((a, b) => (toMinutes(a) <= toMinutes(b) ? a : b));
+    })();
+
+    /** 開始時刻ラベル（ブラケット線の上に表示） */
+    const timeLabel = (
+      key: string, x: number, y: number, time: string, size: 'sm' | 'md',
+    ): React.ReactNode => (
+      <div key={key}
+        className={`absolute ${size === 'sm' ? 'text-[9px]' : 'text-[10px]'} font-bold font-mono text-primary-700 bg-white/95 border border-primary-200 rounded-full px-1 py-[1px] leading-none whitespace-nowrap shadow-sm pointer-events-none`}
+        style={{ left: x, top: y, transform: 'translate(-50%, -115%)' }}>
+        {time}
+      </div>
+    );
+
     const LINE_ONLY_W = 40;
     const getX = (r: number): number => {
       if (r === 0) return OFFSET_X;
@@ -1131,7 +1196,9 @@ function NormalEntryRegistration() {
       sectionDrawSize: number,
       globalVisibleOffset: number,
       keyPrefix: string,
-      label?: { text: string; colorClass: string; borderClass: string; bgClass: string }
+      label?: { text: string; colorClass: string; borderClass: string; bgClass: string },
+      /** このセクション先頭のブラケット位置オフセット（右山なら halfSize） */
+      positionOffset = 0,
     ) => {
       const sectionRoundsCount = Math.log2(sectionDrawSize);
       const isBye = (i: number): boolean => {
@@ -1167,6 +1234,8 @@ function NormalEntryRegistration() {
 
       // SVG ブラケット線
       const paths: React.ReactNode[] = [];
+      // 試合開始時刻ラベル（線の上に重ねて表示）
+      const timeLabels: React.ReactNode[] = [];
       for (let r = 0; r < sectionRoundsCount; r++) {
         const nm = sectionDrawSize / Math.pow(2, r + 1);
         for (let m = 0; m < nm; m++) {
@@ -1180,6 +1249,15 @@ function NormalEntryRegistration() {
           const yT = getY(r, m * 2) + SLOT_HEIGHT / 2;
           const yB = getY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
           const yM = getY(r + 1, m) + SLOT_HEIGHT / 2;
+
+          // この試合の開始時刻（両者が揃う＝実際に試合が行われる枠のみ表示）
+          if (!topEmpty && !botEmpty) {
+            const round = r + 1;
+            const mnr = positionOffset / Math.pow(2, round) + m + 1;
+            const upperPos = positionOffset + m * Math.pow(2, round) + 1;
+            const t = getMatchTime(round, mnr, upperPos);
+            if (t) timeLabels.push(timeLabel(`${keyPrefix}-t-r${r}-m${m}`, xM, yM, t, 'sm'));
+          }
 
           if (topEmpty || botEmpty) {
             // 片方が全BYEサブツリー → 次ラウンドのY位置まで接続
@@ -1263,6 +1341,7 @@ function NormalEntryRegistration() {
           <div className="relative" style={{ width: secWidth, height: secHeight, minWidth: secWidth }}>
             {labelEl}
             <svg className="absolute inset-0 pointer-events-none" width={secWidth} height={secHeight}>{paths}</svg>
+            {timeLabels}
             {elems}
           </div>
         </div>
@@ -1336,6 +1415,8 @@ function NormalEntryRegistration() {
       const rightYOff = (maxHeight - rightCalc.height) / 2;
 
       const paths: React.ReactNode[] = [];
+      // 試合開始時刻ラベル（線の上に重ねて表示）
+      const timeLabels: React.ReactNode[] = [];
 
       // --- 左半分のブラケット線 ---
       for (let r = 0; r < halfRounds; r++) {
@@ -1351,6 +1432,12 @@ function NormalEntryRegistration() {
           const yT = leftCalc.getY(r, m * 2) + PC_SLOT_H / 2 + leftYOff;
           const yB = leftCalc.getY(r, m * 2 + 1) + PC_SLOT_H / 2 + leftYOff;
           const yM = leftCalc.getY(r + 1, m) + PC_SLOT_H / 2 + leftYOff;
+
+          if (!topEmpty && !botEmpty) {
+            const round = r + 1;
+            const t = getMatchTime(round, m + 1, m * Math.pow(2, round) + 1);
+            if (t) timeLabels.push(timeLabel(`UL-t-r${r}-m${m}`, xM, yM, t, 'md'));
+          }
 
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
@@ -1383,6 +1470,13 @@ function NormalEntryRegistration() {
           const yB = rightCalc.getY(r, m * 2 + 1) + PC_SLOT_H / 2 + rightYOff;
           const yM = rightCalc.getY(r + 1, m) + PC_SLOT_H / 2 + rightYOff;
 
+          if (!topEmpty && !botEmpty) {
+            const round = r + 1;
+            const mnr = halfSize / Math.pow(2, round) + m + 1;
+            const t = getMatchTime(round, mnr, halfSize + m * Math.pow(2, round) + 1);
+            if (t) timeLabels.push(timeLabel(`UR-t-r${r}-m${m}`, xM, yM, t, 'md'));
+          }
+
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
             if (Math.abs(pY - yM) < 1) {
@@ -1411,6 +1505,14 @@ function NormalEntryRegistration() {
       } else {
         // 左から水平 → 中央で縦 → 右へ水平
         paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${centerX} ${leftFinalY} L ${centerX} ${rightFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+      }
+      // 決勝の開始時刻
+      {
+        const finalRound = Math.log2(drawSize);
+        const finalTime = getMatchTime(finalRound, 1, 1);
+        if (finalTime) {
+          timeLabels.push(timeLabel('UF-t', centerX, Math.min(leftFinalY, rightFinalY), finalTime, 'md'));
+        }
       }
 
       // --- スロット描画ヘルパー ---
@@ -1479,6 +1581,7 @@ function NormalEntryRegistration() {
       return (
         <div className="relative" style={{ width: totalW, height: maxHeight, minWidth: totalW }}>
           <svg className="absolute inset-0 pointer-events-none" width={totalW} height={maxHeight}>{paths}</svg>
+          {timeLabels}
           {elems}
         </div>
       );
@@ -1486,7 +1589,7 @@ function NormalEntryRegistration() {
 
     // 統計ヘッダー
     const statsHeader = draw ? (
-      <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex items-center gap-4 text-xs">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <span className="flex items-center gap-1.5 text-gray-600">
           <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
           ドロー <strong className="text-gray-800">{draw.drawSize}</strong>
@@ -1499,6 +1602,12 @@ function NormalEntryRegistration() {
           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
           DEF <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
         </span>
+        {earliestMatchTime && (
+          <span className="flex items-center gap-1 text-primary-700 font-medium">
+            <Clock className="w-3.5 h-3.5" />
+            開始 <strong>{earliestMatchTime}</strong>〜
+          </span>
+        )}
       </div>
     ) : null;
 
@@ -1532,7 +1641,8 @@ function NormalEntryRegistration() {
           {renderBracketSection(leftSlots, halfSize, 0, 'left',
             { text: 'Left side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
           {renderBracketSection(rightSlots, halfSize, leftVisCount, 'right',
-            { text: 'Right side', colorClass: 'text-orange-600', borderClass: 'border-orange-500', bgClass: 'bg-orange-500/10' })}
+            { text: 'Right side', colorClass: 'text-orange-600', borderClass: 'border-orange-500', bgClass: 'bg-orange-500/10' },
+            halfSize)}
         </div>
       </div>
     );

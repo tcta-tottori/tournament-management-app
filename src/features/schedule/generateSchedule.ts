@@ -5,7 +5,7 @@
  * autoSchedule でコート×時間枠に配置する。
  */
 
-import { db } from '../../db/database';
+import { db, type Draw } from '../../db/database';
 import type { ImportedScheduleItem } from '../../stores/appStore';
 import {
   extractMatchesFromDraw,
@@ -38,6 +38,96 @@ export interface GenerateScheduleResult {
   courtNames: string[];
   matchCount: number;
   usedCourtCount: number;
+  /** 実際に使用した開始時刻（'HH:MM'） */
+  startTime: string;
+  /** 実際に使用した1試合の所要時間（分） */
+  matchDuration: number;
+}
+
+/** 'HH:MM' → 分。不正なら null。 */
+function hmToMinutes(hm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm || '');
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/** 最大公約数 */
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/** ドロー（1件）に記載された全ての開始時刻を集める */
+function collectDrawTimes(draw: {
+  matchTimes?: Record<number, string>;
+  roundMatchTimes?: Record<string, string>;
+  eventStartTime?: string;
+}): string[] {
+  return [
+    ...Object.values(draw.matchTimes || {}),
+    ...Object.values(draw.roundMatchTimes || {}),
+    ...(draw.eventStartTime ? [draw.eventStartTime] : []),
+  ].filter((t) => hmToMinutes(t) != null);
+}
+
+/**
+ * ドロー表に記載された開始時刻から、時間割生成の基準を推定する。
+ * - 開始時刻: 記載時刻のうち最も早いもの
+ * - 1試合の所要時間: 記載時刻の間隔の最大公約数（例: 9:00/9:40/10:20 → 40分）
+ *
+ * ドロー表の時刻をそのままの位置に配置するには、時間枠の刻みが記載時刻の間隔と
+ * 一致している必要があるため、間隔も併せて推定する。
+ */
+export function inferScheduleBaseFromDraws(
+  draws: {
+    matchTimes?: Record<number, string>;
+    roundMatchTimes?: Record<string, string>;
+    eventStartTime?: string;
+  }[],
+): { startTime: string; matchDuration: number | null } {
+  const minutes = new Set<number>();
+  for (const d of draws) {
+    for (const t of collectDrawTimes(d)) {
+      const mm = hmToMinutes(t);
+      if (mm != null) minutes.add(mm);
+    }
+  }
+  if (minutes.size === 0) return { startTime: '', matchDuration: null };
+
+  const sorted = [...minutes].sort((a, b) => a - b);
+  const first = sorted[0];
+  const startTime = `${String(Math.floor(first / 60)).padStart(2, '0')}:${String(first % 60).padStart(2, '0')}`;
+
+  let step = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    step = gcd(step, sorted[i] - sorted[i - 1]);
+  }
+  // 極端に短い/長い刻みは誤検出とみなして採用しない
+  const matchDuration = step >= 20 && step <= 120 ? step : null;
+  return { startTime, matchDuration };
+}
+
+/**
+ * 試合の開始時刻を解決する。
+ * 1) DBに保存済みの予定時刻（エントリー確定時にドロー表の時刻を反映済み。手修正も反映）
+ * 2) ドロー表から抽出した時刻（1回戦=matchTimes、2回戦以降=roundMatchTimes）
+ *
+ * @param scheduledByRoundPos `${round}|${position}` → 'HH:MM'
+ */
+export function resolveDrawMatchTime(
+  match: { round: number; matchNumInRound: number },
+  draw: {
+    matchTimes?: Record<number, string>;
+    roundMatchTimes?: Record<string, string>;
+  },
+  scheduledByRoundPos?: Map<string, string>,
+): string | null {
+  const scheduled = scheduledByRoundPos?.get(`${match.round}|${match.matchNumInRound}`);
+  if (scheduled) return scheduled;
+  if (match.round === 1) {
+    // 1回戦の試合のペア上側位置 = 2*matchNumInRound - 1
+    return draw.matchTimes?.[2 * match.matchNumInRound - 1] || null;
+  }
+  return draw.roundMatchTimes?.[`R${match.round}-${match.matchNumInRound}`] || null;
 }
 
 /**
@@ -48,9 +138,6 @@ export async function generateScheduleFromDraws(
   tournamentId: string,
   options: GenerateScheduleOptions = {},
 ): Promise<GenerateScheduleResult> {
-  const matchDuration = options.matchDuration ?? 40;
-  const startTime = options.startTime || '09:00';
-
   // コート名を決定（明示指定 > コート数から自動割当 > 既定6面）
   const courtNames =
     options.courtNames && options.courtNames.length > 0
@@ -58,14 +145,31 @@ export async function generateScheduleFromDraws(
       : assignVenueCourtNames(options.courtCount && options.courtCount > 0 ? options.courtCount : 6);
 
   if (courtNames.length === 0) {
-    return { items: [], courtNames: [], matchCount: 0, usedCourtCount: 0 };
+    return {
+      items: [], courtNames: [], matchCount: 0, usedCourtCount: 0,
+      startTime: options.startTime || '09:00', matchDuration: options.matchDuration ?? 40,
+    };
   }
 
   // 種目・選手を読み込み
   const allEvents = await db.events.where('tournamentId').equals(tournamentId).toArray();
   if (allEvents.length === 0) {
-    return { items: [], courtNames, matchCount: 0, usedCourtCount: 0 };
+    return {
+      items: [], courtNames, matchCount: 0, usedCourtCount: 0,
+      startTime: options.startTime || '09:00', matchDuration: options.matchDuration ?? 40,
+    };
   }
+
+  // ドローを先に読み込み、記載された開始時刻から時間割の基準（開始時刻・試合間隔）を推定する
+  const drawByEvent = new Map<string, Draw>();
+  for (const evt of allEvents) {
+    const d = await db.draws.where('eventId').equals(evt.eventId).first();
+    if (d) drawByEvent.set(evt.eventId, d);
+  }
+  const base = inferScheduleBaseFromDraws([...drawByEvent.values()]);
+  // 明示指定 > ドロー表からの推定 > 既定値
+  const matchDuration = options.matchDuration ?? base.matchDuration ?? 40;
+  const startTime = options.startTime || base.startTime || '09:00';
 
   const allPlayers = await db.players.toArray();
   const playersList: SchedulePlayer[] = allPlayers.map((p) => ({
@@ -92,7 +196,7 @@ export async function generateScheduleFromDraws(
   const targetSlotByMatchId = new Map<string, number>();
   for (let idx = 0; idx < allEvents.length; idx++) {
     const evt = allEvents[idx];
-    const draw = await db.draws.where('eventId').equals(evt.eventId).first();
+    const draw = drawByEvent.get(evt.eventId);
     if (!draw) continue;
     // ラウンドロビン（決勝リーグ等）はトーナメント抽出の対象外
     if (draw.drawType === 'roundRobin') continue;
@@ -128,20 +232,8 @@ export async function generateScheduleFromDraws(
     }
     // 2) フォールバック: ドロー表から直接抽出した時刻。
     //    1回戦は matchTimes（ペア上側位置キー）、2回戦以降は roundMatchTimes。
-    const matchTimes = draw.matchTimes;
-    const roundMatchTimes = draw.roundMatchTimes;
     for (const m of extracted) {
-      // まずDBの予定時刻
-      let hm = timeByRoundPos.get(`${m.round}|${m.matchNumInRound}`) || null;
-      // 無ければドロー表の記載時刻
-      if (!hm) {
-        if (m.round === 1 && matchTimes) {
-          // 1回戦の試合のペア上側位置 = 2*matchNumInRound - 1
-          hm = matchTimes[2 * m.matchNumInRound - 1] || null;
-        } else if (m.round >= 2 && roundMatchTimes) {
-          hm = roundMatchTimes[`R${m.round}-${m.matchNumInRound}`] || null;
-        }
-      }
+      const hm = resolveDrawMatchTime(m, draw, timeByRoundPos);
       if (!hm) continue;
       const slot = timeToSlot(hm);
       if (slot != null) targetSlotByMatchId.set(m.matchId, slot);
@@ -151,7 +243,7 @@ export async function generateScheduleFromDraws(
   }
 
   if (allScheduleMatches.length === 0) {
-    return { items: [], courtNames, matchCount: 0, usedCourtCount: 0 };
+    return { items: [], courtNames, matchCount: 0, usedCourtCount: 0, startTime, matchDuration };
   }
 
   // 自動スケジューリング（ドロー表の記載時刻を優先）
@@ -262,5 +354,7 @@ export async function generateScheduleFromDraws(
     courtNames,
     matchCount: items.length,
     usedCourtCount: usedCourts.size,
+    startTime,
+    matchDuration,
   };
 }

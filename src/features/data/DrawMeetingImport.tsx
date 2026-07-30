@@ -1414,6 +1414,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             slots,
             matchTimes: ev.matchTimes && Object.keys(ev.matchTimes).length > 0 ? ev.matchTimes : undefined,
             roundMatchTimes: ev.roundMatchTimes && Object.keys(ev.roundMatchTimes).length > 0 ? ev.roundMatchTimes : undefined,
+            eventStartTime: ev.eventStartTime || undefined,
             updatedAt: now,
           });
           totalDrawCount++;

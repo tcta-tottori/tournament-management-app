@@ -122,6 +122,11 @@ export interface Draw {
    * ドロー表(Excel)に記載された後続ラウンドの時刻。時間割自動生成で優先配置する。
    */
   roundMatchTimes?: Record<string, string>;
+  /**
+   * 種目全体の開始時刻（'HH:MM'）。ドロー表に「決勝リーグ 11：00開始予定」のように
+   * 文章で記載されている場合に保持する（主にリーグ戦）。
+   */
+  eventStartTime?: string;
   updatedAt: number;
 }
 

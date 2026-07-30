@@ -51,6 +51,11 @@ export interface ParsedDrawEvent {
    * 自動生成時にこの時刻を優先配置する。
    */
   roundMatchTimes: Record<string, string>;
+  /**
+   * 種目全体の開始時刻（'HH:MM'）。ドロー表に「決勝リーグ 11：00開始予定」のように
+   * 文章で開始時刻が書かれている場合に抽出する（主にリーグ戦）。
+   */
+  eventStartTime?: string;
 }
 
 export interface ParsedDrawFile {
@@ -395,18 +400,53 @@ function extractLaterRoundMatchTimes(
     if (bestIdx >= 0) cells[bestIdx].used = true;
   }
 
+  // 実際に対戦が発生する1回戦の中央行（＝1回戦の時刻が書かれうる行）。
+  // 1回戦と同じ列に書かれた後続ラウンドの時刻（BYE不戦勝側の次戦など）を拾う際に、
+  // 1回戦の時刻セルを誤って奪わないためのガードに使う。
+  const r1CenterRowsBySide: { L: number[]; R: number[] } = { L: [], R: [] };
+  for (const m of matches) {
+    if (m.round !== 1) continue;
+    const lo = 2 * m.mnr - 1;
+    if (rowByPos.has(lo) && rowByPos.has(lo + 1)) {
+      r1CenterRowsBySide[m.side].push(m.center);
+    }
+  }
+
+  // 左右の山を分ける列の境界。1回戦列が両側とも分かればその中点、
+  // 分からなければ氏名列とドロー番号列から求めた中央列を使う。
+  // （左右の山は同じ行帯を共有するため、列で分けないと反対側の時刻を拾ってしまう）
+  const sideBoundary =
+    r1ColBySide.L != null && r1ColBySide.R != null
+      ? (r1ColBySide.L + r1ColBySide.R) / 2
+      : centerCol;
+
   // 2回戦以降を、ラウンド昇順で割り当てる
   const later = matches.filter((m) => m.round >= 2).sort((a, b) => a.round - b.round);
   for (const m of later) {
     const r1col = r1ColBySide[m.side];
+    // 決勝は左右の山の中央に書かれるため、山による列の絞り込みを行わない
+    const isFinal = m.round === totalRounds;
     let bestIdx = -1, bestDist = Infinity;
     cells.forEach((cell, i) => {
       if (cell.used) return;
       if (cell.r < m.bandMin - 1 || cell.r > m.bandMax + 1) return;
-      // 1回戦列より中央寄りのセルのみ（同列/外側の1回戦時刻の誤取得を防ぐ）
-      if (r1col != null) {
-        if (m.side === 'L' && !(cell.c > r1col)) return;
-        if (m.side === 'R' && !(cell.c < r1col)) return;
+      if (!isFinal) {
+        // 自分の山（列の左右）のセルのみ
+        if (m.side === 'L' && cell.c > sideBoundary) return;
+        if (m.side === 'R' && cell.c < sideBoundary) return;
+      } else {
+        // 決勝は両山の1回戦列より内側のセルのみ
+        if (r1ColBySide.L != null && cell.c < r1ColBySide.L) return;
+        if (r1ColBySide.R != null && cell.c > r1ColBySide.R) return;
+      }
+      // 1回戦列より中央寄りのセルのみ（外側の1回戦時刻の誤取得を防ぐ）
+      if (!isFinal && r1col != null) {
+        if (m.side === 'L' && cell.c < r1col) return;
+        if (m.side === 'R' && cell.c > r1col) return;
+        // 1回戦と同じ列のセルは、1回戦の対戦行から離れている場合のみ採用する。
+        // BYEで不戦勝になった側の次戦時刻は1回戦列に書かれることがあるため。
+        if (cell.c === r1col &&
+            r1CenterRowsBySide[m.side].some((cr) => Math.abs(cr - cell.r) <= 1)) return;
       }
       const d = Math.abs(cell.r - m.center);
       if (d < bestDist) { bestDist = d; bestIdx = i; }
@@ -440,6 +480,37 @@ function extractLaterRoundMatchTimes(
   }
 
   return result;
+}
+
+/**
+ * 種目区間の文章から開始時刻を抽出する。
+ * 例: 「決勝リーグ 11：00開始予定」「10:30開始」→ '11:00' / '10:30'
+ * リーグ戦のようにブラケット線が無く、時刻がテキストで書かれる種目に使う。
+ */
+function extractEventStartTimeText(
+  rows: unknown[][],
+  startRow: number,
+  endRow: number,
+): string {
+  for (let r = startRow; r < endRow; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (let c = 0; c < Math.min(row.length, 30); c++) {
+      const raw = row[c];
+      if (raw == null || raw instanceof Date) continue;
+      const val = String(raw);
+      if (!val.includes('開始')) continue;
+      const norm = normalizeDigits(val).replace(/[：]/g, ':');
+      const m = norm.match(/(\d{1,2}):(\d{2})/);
+      if (m) return `${m[1].padStart(2, '0')}:${m[2]}`;
+      // 「11時開始」形式
+      const hOnly = norm.match(/(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分)?/);
+      if (hOnly) {
+        return `${hOnly[1].padStart(2, '0')}:${(hOnly[2] ?? '0').padStart(2, '0')}`;
+      }
+    }
+  }
+  return '';
 }
 
 /**
@@ -1185,6 +1256,9 @@ export function parseDrawExcel(
       ? {}
       : extractLaterRoundMatchTimes(rows, allPlayers, drawSize, matchTimes, leftLayout, rightLayout);
 
+    // 「決勝リーグ 11：00開始予定」のような文章記載の開始時刻（主にリーグ戦）
+    const eventStartTime = extractEventStartTimeText(rows, section.headerRow, endRow);
+
     events.push({
       eventName: section.eventName,
       matchFormat: section.matchFormat,
@@ -1195,6 +1269,7 @@ export function parseDrawExcel(
       roundGameRules,
       matchTimes,
       roundMatchTimes,
+      eventStartTime: eventStartTime || undefined,
     });
   }
 

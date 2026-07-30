@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
-import { Zap, AlertTriangle } from 'lucide-react';
+import { Zap, AlertTriangle, Clock } from 'lucide-react';
 import {
   extractMatchesFromDraw,
   autoSchedule,
@@ -12,6 +12,10 @@ import {
   type Draw as ScheduleDraw,
   type ScheduleMatch,
 } from '../schedule/scheduleEngine';
+import {
+  inferScheduleBaseFromDraws,
+  resolveDrawMatchTime,
+} from '../schedule/generateSchedule';
 
 export default function ScheduleGenerator() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
@@ -19,6 +23,8 @@ export default function ScheduleGenerator() {
   const [courtNamesInput, setCourtNamesInput] = useState('1,2,3,4,5,6');
   const [matchDuration, setMatchDuration] = useState(40);
   const [startTime, setStartTime] = useState('09:00');
+  // ドロー表に開始時刻が記載されているか（記載時刻を基準に生成する旨の表示用）
+  const [drawTimeHint, setDrawTimeHint] = useState<{ startTime: string; matchDuration: number | null } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [hasExistingSchedule, setHasExistingSchedule] = useState(false);
@@ -27,6 +33,20 @@ export default function ScheduleGenerator() {
   const checkExisting = useCallback(async () => {
     if (!currentTournamentId) return;
     const events = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+
+    // ドロー表に記載された開始時刻を初期値に反映する
+    const draws = [];
+    for (const evt of events) {
+      const d = await db.draws.where('eventId').equals(evt.eventId).first();
+      if (d) draws.push(d);
+    }
+    const base = inferScheduleBaseFromDraws(draws);
+    if (base.startTime) {
+      setDrawTimeHint(base);
+      setStartTime(base.startTime);
+      if (base.matchDuration) setMatchDuration(base.matchDuration);
+    }
+
     for (const evt of events) {
       const m = await db.matches.where('eventId').equals(evt.eventId).filter(m => !!m.scheduledTime && !!m.courtId).first();
       if (m) {
@@ -98,6 +118,19 @@ export default function ScheduleGenerator() {
 
       // Extract matches from all events
       let allScheduleMatches: ScheduleMatch[] = [];
+      // ドロー表に記載された開始時刻から算出した、試合ごとの目標スロット
+      const targetSlotByMatchId = new Map<string, number>();
+      const startMinutes = (() => {
+        const [h, m] = startTime.split(':').map(s => parseInt(s, 10));
+        return (h || 0) * 60 + (m || 0);
+      })();
+      const timeToSlot = (hm: string): number | null => {
+        const mt = /^(\d{1,2}):(\d{2})$/.exec(hm);
+        if (!mt) return null;
+        const mins = parseInt(mt[1], 10) * 60 + parseInt(mt[2], 10);
+        const slot = Math.round((mins - startMinutes) / matchDuration);
+        return slot >= 0 ? slot : 0;
+      };
 
       for (let idx = 0; idx < allEvents.length; idx++) {
         const evt = allEvents[idx];
@@ -125,6 +158,20 @@ export default function ScheduleGenerator() {
         }));
 
         const extracted = extractMatchesFromDraw(drawData, entryList, playersList, eventInfo);
+
+        // ドロー表に記載された開始時刻（＋確定済みの予定時刻）をその時刻の枠に配置する
+        const dbEventMatches = await db.matches.where('eventId').equals(evt.eventId).toArray();
+        const timeByRoundPos = new Map<string, string>();
+        for (const dm of dbEventMatches) {
+          if (dm.scheduledTime) timeByRoundPos.set(`${dm.round}|${dm.position}`, dm.scheduledTime);
+        }
+        for (const m of extracted) {
+          const hm = resolveDrawMatchTime(m, draw, timeByRoundPos);
+          if (!hm) continue;
+          const slot = timeToSlot(hm);
+          if (slot != null) targetSlotByMatchId.set(m.matchId, slot);
+        }
+
         allScheduleMatches = allScheduleMatches.concat(extracted);
       }
 
@@ -140,6 +187,7 @@ export default function ScheduleGenerator() {
         courtNames,
         matchDuration,
         startTime,
+        targetSlotByMatchId: targetSlotByMatchId.size > 0 ? targetSlotByMatchId : undefined,
       };
 
       const slots = autoSchedule(allScheduleMatches, config);
@@ -241,6 +289,17 @@ export default function ScheduleGenerator() {
       <p className="text-xs text-gray-500">
         ドローデータから全種目の試合スケジュールを自動生成します。コートが未登録の場合は自動作成されます。
       </p>
+
+      {drawTimeHint?.startTime && (
+        <div className="flex items-start gap-2 p-3 bg-primary-50 border border-primary-200 rounded-md">
+          <Clock className="w-4 h-4 text-primary-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-primary-700 font-medium">
+            ドロー表に試合開始時刻の記載があります（最早 {drawTimeHint.startTime}
+            {drawTimeHint.matchDuration ? ` / ${drawTimeHint.matchDuration}分間隔` : ''}）。
+            記載のある試合はその時刻に配置します。
+          </p>
+        </div>
+      )}
 
       {hasExistingSchedule && (
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
