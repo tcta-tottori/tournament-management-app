@@ -9,7 +9,7 @@ import TeamLiveCourtView from '../team/TeamLiveCourtView';
 import type { Match, Court } from '../../db/database';
 import {
   BarChart2, Play, CheckCircle, Clock, Trophy, Users, MapPin,
-  AlertCircle, Timer,
+  AlertCircle, Timer, Settings, X,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +43,73 @@ function minutesToDisplay(mins: number): string {
   const m = Math.abs(mins) % 60;
   const sign = mins < 0 ? '-' : '+';
   return `${sign}${h}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * コートマップのブロック使用終了時刻を保存する会場キー。
+ * ダッシュボードのブロックはコート4面ごとの自動分割なので、
+ * 会場プリセット（CourtMap）とは別枠で保持する。
+ */
+const DASHBOARD_VENUE_KEY = 'dashboard';
+
+/** ブロック使用終了までの残り時間（分）。未設定・書式不正・終了済みは null。 */
+function minutesUntilBlockEnd(endTime: string | undefined, now: Date): number | null {
+  if (!endTime) return null;
+  const mt = /^(\d{1,2}):(\d{2})$/.exec(endTime);
+  if (!mt) return null;
+  const h = Number(mt[1]);
+  const m = Number(mt[2]);
+  if (Number.isNaN(h) || Number.isNaN(m) || h > 23 || m > 59) return null;
+  const diff = (h * 60 + m) - (now.getHours() * 60 + now.getMinutes());
+  return diff > 0 ? diff : null;
+}
+
+/**
+ * ブロックごとの使用終了時刻から警告レベルを算出する。
+ * - 残り2時間以内（1時間超）: 'yellow' … ブロック枠が黄色点滅
+ * - 残り1時間以内           : 'red'    … ブロック枠が赤点滅
+ * - 未設定・書式不正・終了時刻経過後: null（点滅なし）
+ */
+function getBlockWarningLevel(endTime: string | undefined, now: Date): 'yellow' | 'red' | null {
+  const remain = minutesUntilBlockEnd(endTime, now);
+  if (remain == null) return null;
+  if (remain <= 60) return 'red';
+  if (remain <= 120) return 'yellow';
+  return null;
+}
+
+/** 残り時間の表示（例: 45分 / 1時間40分 / 5時間） */
+function remainLabel(mins: number): string {
+  if (mins < 60) return `${mins}分`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}時間${m}分` : `${h}時間`;
+}
+
+/** 残り時間バッジ（ブロック見出しの「〜17:00 あと45分」表示） */
+function BlockEndBadge({
+  endTime,
+  remainMinutes,
+  warning,
+}: {
+  endTime: string;
+  remainMinutes: number | null;
+  warning: 'yellow' | 'red' | null;
+}) {
+  const cls =
+    warning === 'red'
+      ? 'bg-red-600 text-white border-red-700'
+      : warning === 'yellow'
+        ? 'bg-yellow-400 text-yellow-900 border-yellow-600'
+        : 'bg-white/70 text-emerald-700 border-emerald-300';
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-bold border rounded px-1.5 py-0.5 leading-none whitespace-nowrap ${cls}`}>
+      〜{endTime}
+      {remainMinutes != null && (
+        <span className="font-mono">あと{remainLabel(remainMinutes)}</span>
+      )}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -383,8 +450,12 @@ export default function LiveDashboard() {
 function LiveDashboardInner() {
   const currentTournamentId = useAppStore(state => state.currentTournamentId);
   const matchDuration = useAppStore(state => state.scheduleConfig.matchDuration);
+  const blockEndTimes = useAppStore(state => state.blockEndTimes);
+  const setBlockEndTime = useAppStore(state => state.setBlockEndTime);
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  // ブロック使用終了時刻の設定ダイアログ
+  const [blockTimeEditorOpen, setBlockTimeEditorOpen] = useState(false);
 
 
   // Tick clock every second (for elapsed time display)
@@ -558,6 +629,43 @@ function LiveDashboardInner() {
   // HQ position: after block index 1 (between courts 5-8 and 9-12) for 16-court venues
   const hqAfterBlock = courtBlocks.length >= 4 ? 1 : -1;
 
+  // -- ブロックごとの使用終了時刻とアラート --
+  const venueBlockEndTimes = useMemo(
+    () => blockEndTimes[DASHBOARD_VENUE_KEY] || {},
+    [blockEndTimes],
+  );
+
+  /** ブロックのコート番号レンジ表示（例: 1〜4） */
+  const blockRangeLabel = useCallback((block: CourtStatus[], blockIdx: number) => {
+    const first = block[0]?.court.name.replace(/[^\d]/g, '') || String(blockIdx * 4 + 1);
+    const last = block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || String(blockIdx * 4 + block.length);
+    return `${first}〜${last}`;
+  }, []);
+
+  /**
+   * ブロックごとの使用終了時刻・残り時間・警告レベル。
+   * currentTime（毎秒更新）に依存させることで、2時間前・1時間前をまたいだ時点で
+   * 自動的に黄色→赤へ切り替わる。
+   */
+  const blockAlerts = useMemo(() => {
+    return courtBlocks.map((_, idx) => {
+      const endTime = venueBlockEndTimes[String(idx)] || '';
+      return {
+        endTime,
+        remainMinutes: minutesUntilBlockEnd(endTime, currentTime),
+        warning: getBlockWarningLevel(endTime, currentTime),
+      };
+    });
+  }, [courtBlocks, venueBlockEndTimes, currentTime]);
+
+  /** ブロック枠に付ける点滅クラス（点滅はブロックの枠内のみに適用する） */
+  const blockWarningClass = (blockIdx: number) => {
+    const level = blockAlerts[blockIdx]?.warning;
+    if (level === 'red') return 'block-warning-red';
+    if (level === 'yellow') return 'block-warning-yellow';
+    return '';
+  };
+
   // -- Event progress --
   const eventProgress = useMemo(() => {
     return events.map(e => {
@@ -697,6 +805,14 @@ function LiveDashboardInner() {
             <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary-500" />
               コートマップ
+              <button
+                onClick={() => setBlockTimeEditorOpen(true)}
+                className="ml-1 inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition-colors"
+                title="ブロックごとの使用終了時刻を設定"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                終了時刻
+              </button>
             </h2>
             <div className="flex gap-4 text-xs flex-wrap">
               <span className="flex items-center gap-1">
@@ -724,10 +840,20 @@ function LiveDashboardInner() {
           <div className="hidden md:flex items-start gap-0 justify-center w-full">
             {courtBlocks.map((block, blockIdx) => (
               <div key={blockIdx} className="flex items-start">
-                {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
-                <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm">
-                  <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1 text-center">
-                    {block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}〜{block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}
+                {/* ブロック: コートを縦に並べる（番号降順：上が大きい）
+                    使用終了時刻が近づくとこの枠内だけが黄色→赤に点滅する */}
+                <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm ${blockWarningClass(blockIdx)}`}>
+                  <div className="mb-2 px-1 flex flex-col items-center gap-1">
+                    <div className="text-[10px] text-emerald-600 font-bold">
+                      {block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}〜{block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}
+                    </div>
+                    {blockAlerts[blockIdx]?.endTime && (
+                      <BlockEndBadge
+                        endTime={blockAlerts[blockIdx].endTime}
+                        remainMinutes={blockAlerts[blockIdx].remainMinutes}
+                        warning={blockAlerts[blockIdx].warning}
+                      />
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     {[...block].reverse().map(cs => {
@@ -776,11 +902,18 @@ function LiveDashboardInner() {
           <div className="md:hidden flex flex-col gap-2 items-center">
             {courtBlocks.map((block, blockIdx) => (
               <div key={blockIdx} className="contents">
-                <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
+                <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg ${blockWarningClass(blockIdx)}`}>
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
                       {block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}〜{block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}
                     </span>
+                    {blockAlerts[blockIdx]?.endTime && (
+                      <BlockEndBadge
+                        endTime={blockAlerts[blockIdx].endTime}
+                        remainMinutes={blockAlerts[blockIdx].remainMinutes}
+                        warning={blockAlerts[blockIdx].warning}
+                      />
+                    )}
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     {block.map(cs => {
@@ -821,6 +954,85 @@ function LiveDashboardInner() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===== ブロック使用終了時刻の設定ダイアログ ===== */}
+      {blockTimeEditorOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+          onClick={() => setBlockTimeEditorOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-main">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Timer className="w-4 h-4 text-primary-500" />
+                ブロックの使用終了時刻
+              </h3>
+              <button
+                onClick={() => setBlockTimeEditorOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="閉じる"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <p className="px-5 pt-3 text-[11px] text-gray-500 leading-relaxed">
+              終了時刻の2時間前になるとブロックの枠が黄色、1時間前になると赤で点滅します。
+              空欄にすると点滅しません。
+            </p>
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {courtBlocks.map((block, blockIdx) => {
+                const alert = blockAlerts[blockIdx];
+                return (
+                  <div
+                    key={blockIdx}
+                    className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
+                      alert?.warning === 'red'
+                        ? 'bg-red-50 border-red-300'
+                        : alert?.warning === 'yellow'
+                          ? 'bg-yellow-50 border-yellow-300'
+                          : 'bg-emerald-50/50 border-emerald-200'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-gray-900">ブロック {blockIdx + 1}</div>
+                      <div className="text-xs text-gray-500">
+                        コート {blockRangeLabel(block, blockIdx)}番
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <input
+                        type="time"
+                        value={alert?.endTime || ''}
+                        onChange={e => setBlockEndTime(DASHBOARD_VENUE_KEY, blockIdx, e.target.value)}
+                        className="text-sm font-mono px-2 py-1.5 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      {alert?.endTime && (
+                        <button
+                          onClick={() => setBlockEndTime(DASHBOARD_VENUE_KEY, blockIdx, '')}
+                          className="text-[11px] text-gray-500 hover:text-red-600 underline"
+                        >
+                          クリア
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-border-main px-5 py-3">
+              <button
+                onClick={() => setBlockTimeEditorOpen(false)}
+                className="w-full py-2.5 text-sm font-bold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                閉じる
+              </button>
+            </div>
           </div>
         </div>
       )}

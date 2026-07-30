@@ -1006,7 +1006,7 @@ export default function ScheduleSheet() {
 
       {/* Timetable Grid */}
       {hasData ? (
-        <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden flex-1 flex flex-col">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden flex-1 min-h-0 flex flex-col">
           <style>{`
             @keyframes shimmer {
               0% { background-position: -200% 0; }
@@ -1091,7 +1091,7 @@ export default function ScheduleSheet() {
               z-index: 5;
             }
           `}</style>
-          <div className="overflow-auto flex-1 relative">
+          <div className="overflow-auto flex-1 min-h-0 relative">
             <table className="border-collapse min-w-full">
               <thead className="sticky top-0 z-20">
                 <tr>
@@ -1227,6 +1227,17 @@ export default function ScheduleSheet() {
                 ))}
               </tbody>
             </table>
+            {/*
+              最下部のコート行が画面下端（Android のジェスチャーバー等）に隠れて
+              スクロールしても見えなくなるのを防ぐための余白。
+              表の直後・スクロール領域の内側に置くことで、ページ全体がスクロールする場合も
+              この領域自体がスクロールする場合も、最終行を必ず画面内まで送れるようにする。
+            */}
+            <div
+              className="shrink-0"
+              style={{ height: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+              aria-hidden="true"
+            />
           </div>
         </div>
       ) : (
