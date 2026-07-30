@@ -11,7 +11,7 @@ import {
   type GoogleDriveFile,
 } from '../backup/googleDriveApi';
 import { assignVenueCourtNames } from './scheduleEngine';
-import { generateScheduleFromDraws } from './generateSchedule';
+import { generateScheduleFromDraws, inferScheduleBaseFromDraws } from './generateSchedule';
 import ScoreInputDialog, { type ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 
@@ -245,6 +245,22 @@ export default function ScheduleSheet() {
     return db.draws.where('eventId').anyOf(eventIds).toArray();
   }, [tid]) || [];
 
+  // --------------- 時間割 自動生成: ドロー表の記載時刻で初期値をプリフィル ---------------
+  // ドロー表に試合開始時刻が書かれている場合、その最早時刻を開始時刻に、
+  // 記載時刻の間隔（例: 9:00/9:40/10:20 → 40分）を1試合の所要時間に採用する。
+  // 刻みが記載時刻と一致していないと、記載時刻どおりの枠に配置できないため。
+  const genDrawBaseInitRef = useRef(false);
+  const [genDrawBase, setGenDrawBase] = useState<{ startTime: string; matchDuration: number | null } | null>(null);
+  useEffect(() => {
+    if (genDrawBaseInitRef.current || draws.length === 0) return;
+    const base = inferScheduleBaseFromDraws(draws);
+    if (!base.startTime) return;
+    genDrawBaseInitRef.current = true;
+    setGenDrawBase(base);
+    setGenStartTime(base.startTime);
+    if (base.matchDuration) setGenDuration(base.matchDuration);
+  }, [draws]);
+
   // --------------- 時間割 自動生成: 大会のドロー検出値で初期値をプリフィル ---------------
   useEffect(() => {
     if (genInitialized || !tid) return;
@@ -253,7 +269,7 @@ export default function ScheduleSheet() {
       const count = t.suggestedCourtCount && t.suggestedCourtCount > 0 ? t.suggestedCourtCount : 0;
       setDetectedCourtCount(count > 0 ? count : null);
       setGenCourtNames(assignVenueCourtNames(count > 0 ? count : 6).join(','));
-      if (t.drawStartTime) setGenStartTime(t.drawStartTime);
+      if (t.drawStartTime && !genDrawBaseInitRef.current) setGenStartTime(t.drawStartTime);
       setGenInitialized(true);
     });
   }, [tid, genInitialized]);
@@ -1251,6 +1267,12 @@ export default function ScheduleSheet() {
               {detectedCourtCount != null && (
                 <span className="block mt-1 text-primary-700 font-medium">
                   検出: {genStartTime}開始の試合が{detectedCourtCount}件 → {detectedCourtCount}面（{assignVenueCourtNames(detectedCourtCount).join('・')}番コート）
+                </span>
+              )}
+              {genDrawBase?.startTime && (
+                <span className="block mt-1 text-primary-700 font-medium">
+                  ドロー表の記載時刻（最早 {genDrawBase.startTime}
+                  {genDrawBase.matchDuration ? ` / ${genDrawBase.matchDuration}分間隔` : ''}）を基準に配置します。
                 </span>
               )}
             </p>
