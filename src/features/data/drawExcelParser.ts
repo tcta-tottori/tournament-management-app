@@ -149,8 +149,11 @@ function isTimeValue(v: unknown): boolean {
 function timeValueToHM(v: unknown): string | null {
   if (v == null) return null;
   if (v instanceof Date) {
-    // cellDates:true の時刻セルはUTC基準で格納される
-    return `${String(v.getUTCHours()).padStart(2, '0')}:${String(v.getUTCMinutes()).padStart(2, '0')}`;
+    // SheetJS(xlsx 0.18.x) の cellDates:true は「ローカル時刻の各要素がセルの表示値に
+    // 一致する」Dateを返す（例: 9:00 → Sat Dec 30 1899 09:00:00 GMT+0900）。
+    // ここで getUTCHours() を使うと日本時間(UTC+9)のブラウザでは9時間ずれ、
+    // 9:00 が 0:00 として取り込まれてしまうため、必ずローカル時刻で読む。
+    return `${String(v.getHours()).padStart(2, '0')}:${String(v.getMinutes()).padStart(2, '0')}`;
   }
   if (typeof v === 'number' && v > 0 && v < 1) {
     const total = Math.round(v * 24 * 60);

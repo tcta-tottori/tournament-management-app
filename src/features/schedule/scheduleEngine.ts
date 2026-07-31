@@ -56,8 +56,19 @@ export interface ScheduleMatch {
 export interface ScheduleConfig {
   courtCount: number;
   courtNames: string[];
+  /** 1試合の所要時間（分）。同じコートの次の試合はこの時間だけ後になる。 */
   matchDuration: number;
   startTime: string; // 'HH:MM'
+  /**
+   * 配置グリッドの刻み（分）。未指定なら matchDuration と同じ。
+   *
+   * ドロー表の記載時刻をそのままの位置に置くには、刻みが記載時刻の間隔の
+   * 公約数である必要がある（例: 9:00と9:20が混在 → 20分刻み）。
+   * ただし刻み＝1試合の所要時間ではないので、1試合は
+   * ceil(matchDuration / slotMinutes) 個の枠を占有する。
+   * （これを分けないと、20分刻みのときに同じコートへ20分おきに試合が入る）
+   */
+  slotMinutes?: number;
   /**
    * 試合ごとの目標タイムスロット（matchId → スロットindex）。
    * ドロー表に記載された開始時刻から算出した値。指定された試合はその時刻以降に
@@ -176,16 +187,23 @@ function calcTotalMinutes(
   return startHour * 60 + startMin + slotIndex * durationMinutes;
 }
 
+/**
+ * 試合が占有する枠（slot〜slot+span-1）のいずれかに、同じ選手の試合が入っているか。
+ * 1試合が複数枠にまたがるため、開始枠だけでなく占有範囲全体を見る。
+ */
 function hasPlayerConflict(
   match: ScheduleMatch,
   slot: number,
+  span: number,
   slotPlayers: Map<number, Set<string>>,
 ): boolean {
-  const playersInSlot = slotPlayers.get(slot);
-  if (!playersInSlot) return false;
-  for (const player of match.players) {
-    if (player && playersInSlot.has(player)) {
-      return true;
+  for (let s = slot; s < slot + span; s++) {
+    const playersInSlot = slotPlayers.get(s);
+    if (!playersInSlot) continue;
+    for (const player of match.players) {
+      if (player && playersInSlot.has(player)) {
+        return true;
+      }
     }
   }
   return false;
@@ -424,6 +442,12 @@ export function autoSchedule(
   const { courtCount, courtNames, matchDuration, startTime, targetSlotByMatchId } = config;
   const targetOf = (m: ScheduleMatch): number | undefined => targetSlotByMatchId?.get(m.matchId);
 
+  // 配置グリッドの刻みと、1試合が占有する枠数。
+  // 刻みが所要時間より細かい場合（ドロー表に9:00と9:20が混在するなど）、
+  // 1試合は複数枠を占有する。これをしないと同じコートに刻み間隔で試合が入る。
+  const slotMinutes = config.slotMinutes && config.slotMinutes > 0 ? config.slotMinutes : matchDuration;
+  const span = Math.max(1, Math.ceil(matchDuration / slotMinutes));
+
   // ソート: ラウンド昇順 → 記載時刻(目標スロット)昇順 → 種目順(eventOrder)
   //        → ドローサイズ降順 → 左山(L)→右山(R) → 上から下(matchNumInRound)
   // ドロー表に記載された開始時刻がある試合は、その時刻が早い順に先にコートを埋める。
@@ -451,7 +475,8 @@ export function autoSchedule(
   const maxRound = Math.max(...sorted.map((m) => m.round), 1);
 
   // グリッドとスケジュール管理
-  const maxSlots = 200;
+  // 刻みが細かいほど同じ時間幅に必要な枠数が増えるため、枠数も刻みに合わせて確保する
+  const maxSlots = Math.max(200, Math.ceil((16 * 60) / slotMinutes) + span);
   const grid: (string | null)[][] = [];
   for (let c = 0; c < courtCount; c++) {
     grid.push(new Array<string | null>(maxSlots).fill(null));
@@ -463,7 +488,7 @@ export function autoSchedule(
 
   // 照明制約チェック
   const isCourtAvailable = (courtNum: number, slotIdx: number): boolean => {
-    const totalMinutes = calcTotalMinutes(startTime, slotIdx, matchDuration);
+    const totalMinutes = calcTotalMinutes(startTime, slotIdx, slotMinutes);
     const hour = totalMinutes / 60;
     if (courtNum >= 1 && courtNum <= 8) {
       return hour < 18;
@@ -507,7 +532,8 @@ export function autoSchedule(
   // 試合配置ループ
   for (const match of sorted) {
     let minSlot = 0;
-    // 依存（前ラウンド）の完了後にしか始められない
+    // 依存（前ラウンド）の完了後にしか始められない。
+    // completionSlot には「前ラウンドが終わる枠」を入れてあるので、その次の枠から。
     for (const depId of match.dependsOn) {
       const depSlot = completionSlot.get(depId);
       if (depSlot !== undefined) {
@@ -523,8 +549,8 @@ export function autoSchedule(
     let assigned = false;
     const courtOrder = getCourtOrder(match);
 
-    for (let slot = minSlot; slot < maxSlots; slot++) {
-      if (hasPlayerConflict(match, slot, slotPlayers)) {
+    for (let slot = minSlot; slot + span <= maxSlots; slot++) {
+      if (hasPlayerConflict(match, slot, span, slotPlayers)) {
         continue;
       }
 
@@ -535,17 +561,27 @@ export function autoSchedule(
           continue;
         }
 
-        if (grid[courtIdx][slot] === null) {
-          grid[courtIdx][slot] = match.matchId;
-          completionSlot.set(match.matchId, slot);
-
-          let playersSet = slotPlayers.get(slot);
-          if (!playersSet) {
-            playersSet = new Set<string>();
-            slotPlayers.set(slot, playersSet);
+        // 所要時間ぶんの枠（span個）が全て空いているコートにだけ入れる
+        let free = true;
+        for (let s = slot; s < slot + span; s++) {
+          if (grid[courtIdx][s] !== null) { free = false; break; }
+        }
+        if (free) {
+          for (let s = slot; s < slot + span; s++) {
+            grid[courtIdx][s] = match.matchId;
           }
-          for (const player of match.players) {
-            if (player) playersSet.add(player);
+          // 「この試合が終わる枠」を記録（次ラウンドはこの次の枠から）
+          completionSlot.set(match.matchId, slot + span - 1);
+
+          for (let s = slot; s < slot + span; s++) {
+            let playersSet = slotPlayers.get(s);
+            if (!playersSet) {
+              playersSet = new Set<string>();
+              slotPlayers.set(s, playersSet);
+            }
+            for (const player of match.players) {
+              if (player) playersSet.add(player);
+            }
           }
 
           result.push({
@@ -553,7 +589,7 @@ export function autoSchedule(
             courtIndex: courtIdx,
             courtName: courtNames[courtIdx] || String(courtIdx + 1),
             timeSlotIndex: slot,
-            startTime: calcTimeString(startTime, slot, matchDuration),
+            startTime: calcTimeString(startTime, slot, slotMinutes),
             eventCode: match.eventCode,
             roundLabel: match.roundLabel,
           });

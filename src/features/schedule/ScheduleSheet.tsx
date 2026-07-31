@@ -248,10 +248,12 @@ export default function ScheduleSheet() {
 
   // --------------- 時間割 自動生成: ドロー表の記載時刻で初期値をプリフィル ---------------
   // ドロー表に試合開始時刻が書かれている場合、その最早時刻を開始時刻に、
-  // 記載時刻の間隔（例: 9:00/9:40/10:20 → 40分）を1試合の所要時間に採用する。
-  // 刻みが記載時刻と一致していないと、記載時刻どおりの枠に配置できないため。
+  // ラウンド間の時間差（例: 1回戦9:00 → 2回戦9:40 なら40分）を1試合の所要時間に採用する。
+  // 配置グリッドの刻み（slotStep）は記載時刻の公約数で別に決まる（表示のみ）。
   const genDrawBaseInitRef = useRef(false);
-  const [genDrawBase, setGenDrawBase] = useState<{ startTime: string; matchDuration: number | null } | null>(null);
+  const [genDrawBase, setGenDrawBase] = useState<
+    { startTime: string; matchDuration: number | null; slotStep: number | null } | null
+  >(null);
   useEffect(() => {
     if (genDrawBaseInitRef.current || draws.length === 0) return;
     const base = inferScheduleBaseFromDraws(draws);
@@ -309,7 +311,10 @@ export default function ScheduleSheet() {
         `時間割を自動生成しました: ${res.matchCount}試合を${res.usedCourtCount}コート（${courtNames.join('・')}番）に配置しました。`
         + (res.drawTimeCount > 0
             ? `（うち${res.drawTimeCount}試合はドロー表の記載時刻どおりに配置）`
-            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）'),
+            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）')
+        + (res.repairedTimeCount > 0
+            ? ` ※取込済みの時刻が${res.repairedTimeCount}件ずれていたため補正しました。`
+            : ''),
       );
     } catch (err) {
       setStatusMessage(`自動生成に失敗しました: ${(err as Error).message}`);
@@ -336,7 +341,7 @@ export default function ScheduleSheet() {
     setIsGenerating(true);
     setStatusMessage('');
     try {
-      const res = await generateScheduleFromDraws(tid, { courtNames });
+      const res = await generateScheduleFromDraws(tid, { courtNames, preferDrawBase: true });
       if (res.items.length === 0) {
         setStatusMessage('自動生成対象の試合がありません。先にドローを確定してください。');
         return;
@@ -347,10 +352,14 @@ export default function ScheduleSheet() {
       setGenStartTime(res.startTime);
       setGenDuration(res.matchDuration);
       setStatusMessage(
-        `ドロー表の時刻で作り直しました: ${res.matchCount}試合 / ${res.usedCourtCount}コート・${res.matchDuration}分間隔`
+        `ドロー表の時刻で作り直しました: ${res.matchCount}試合 / ${res.usedCourtCount}コート`
+        + `・${res.startTime}開始・1試合${res.matchDuration}分`
         + (res.drawTimeCount > 0
             ? `（うち${res.drawTimeCount}試合はドロー表の記載時刻どおり）`
-            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）'),
+            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）')
+        + (res.repairedTimeCount > 0
+            ? ` ※取込済みの時刻が${res.repairedTimeCount}件ずれていたため補正しました。`
+            : ''),
       );
     } catch (err) {
       setStatusMessage(`作り直しに失敗しました: ${(err as Error).message}`);
@@ -1336,7 +1345,11 @@ export default function ScheduleSheet() {
               {genDrawBase?.startTime && (
                 <span className="block mt-1 text-primary-700 font-medium">
                   ドロー表の記載時刻（最早 {genDrawBase.startTime}
-                  {genDrawBase.matchDuration ? ` / ${genDrawBase.matchDuration}分間隔` : ''}）を基準に配置します。
+                  {genDrawBase.matchDuration ? ` / 1試合${genDrawBase.matchDuration}分` : ''}）を基準に配置します。
+                  {genDrawBase.slotStep != null && genDrawBase.matchDuration != null
+                    && genDrawBase.slotStep < genDrawBase.matchDuration
+                    ? `（記載時刻に${genDrawBase.slotStep}分刻みが混ざるため、配置は${genDrawBase.slotStep}分刻みで判定します）`
+                    : ''}
                 </span>
               )}
             </p>
