@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users, Eraser } from 'lucide-react';
+import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users, Eraser, FlaskConical } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -14,6 +14,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedExcelViewer from '../mixed/MixedExcelViewer';
 import { useTeamStore } from '../team/teamStore';
+import { fillTestScores } from '../score/testScoreFiller';
 
 /** 予備日を含む文字列から選択肢を生成 */
 function parseReserveDayOptions(value: string, type: 'date' | 'venue'): string[] {
@@ -362,6 +363,33 @@ export default function DataManagement() {
   const matchCount = useLiveQuery(() => db.matches.count(), [], 0);
   const hasDrawData = (drawCount ?? 0) > 0 || (matchCount ?? 0) > 0;
 
+  // テスト用スコア一括入力（運営画面のみ・観戦用ページには出さない）
+  const currentTournamentId = useAppStore(state => state.currentTournamentId);
+  const [showTestScoreConfirm, setShowTestScoreConfirm] = useState(false);
+  const [testScoreRunning, setTestScoreRunning] = useState(false);
+  const [testScoreResult, setTestScoreResult] = useState<string | null>(null);
+  const hasIndividualMatches = (matchCount ?? 0) > 0 && !isTeamImported && !isMixedImported;
+
+  const handleFillTestScores = useCallback(async () => {
+    setShowTestScoreConfirm(false);
+    if (!currentTournamentId) return;
+    setTestScoreRunning(true);
+    setTestScoreResult(null);
+    try {
+      const res = await fillTestScores(currentTournamentId);
+      setTestScoreResult(
+        res.filledCount === 0
+          ? 'スコアを入力できる試合がありませんでした。エントリーを確定してからお試しください。'
+          : `${res.eventCount}種目・${res.filledCount}試合にテストスコアを入力しました（${res.details.map(d => `${d.eventName} ${d.filled}`).join(' / ')}）`,
+      );
+    } catch (err) {
+      console.error('テストスコア入力に失敗:', err);
+      setTestScoreResult(`テストスコアの入力に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setTestScoreRunning(false);
+    }
+  }, [currentTournamentId]);
+
   const runPendingClear = useCallback(async () => {
     if (!pendingClear) return;
     const label = pendingClear.title;
@@ -569,6 +597,39 @@ export default function DataManagement() {
         )}
       </section>
 
+      {/* テスト用スコア一括入力（動作確認用・観戦用ページには表示しない） */}
+      {hasIndividualMatches && (
+        <section className="rounded-xl overflow-hidden border border-indigo-200/70 bg-gradient-to-r from-indigo-50/70 to-sky-50/40">
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 shadow-sm flex items-center justify-center shrink-0">
+              <FlaskConical className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-800">テスト用スコア一括入力</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                全種目（トーナメント・リーグ）の試合に 8-4 / 6-4 のスコアを決勝まで入力します。動作確認用で、既存のスコアは上書きされます。
+              </p>
+            </div>
+            <button
+              onClick={() => setShowTestScoreConfirm(true)}
+              disabled={testScoreRunning || !currentTournamentId}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-indigo-600 bg-white border border-indigo-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              {testScoreRunning ? '入力中...' : 'テストスコア入力'}
+            </button>
+          </div>
+          {testScoreResult && (
+            <div className="px-5 pb-3 -mt-1">
+              <div className="flex items-start gap-2 px-3 py-2 bg-white rounded-lg border border-indigo-200">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0 mt-1.5" />
+                <p className="text-xs text-indigo-700 font-medium leading-relaxed">{testScoreResult}</p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* シート別データクリア */}
       {clearItems.length > 0 && (
         <section className="rounded-xl overflow-hidden border border-amber-200/70 bg-gradient-to-r from-amber-50/70 to-orange-50/40">
@@ -646,6 +707,17 @@ export default function DataManagement() {
         confirmLabel="リセット実行"
         onConfirm={handleResetAll}
         onCancel={() => setShowResetConfirm(false)}
+      />
+
+      {/* テストスコア入力の確認ダイアログ */}
+      <ConfirmDialog
+        open={showTestScoreConfirm}
+        title="テスト用スコアを入力"
+        message={"全種目（トーナメント・リーグ）の試合に、決勝までテスト用のスコアを入力します。\n\n・スコアは 8-4 / 6-4（種目のゲーム数に応じて）\n・トーナメントは勝者を次の回戦へ繰り上げます\n・既存のスコア・勝敗はすべて上書きされます\n\n動作確認用の機能です。実際の大会データがある場合は実行しないでください。"}
+        danger
+        confirmLabel="入力する"
+        onConfirm={handleFillTestScores}
+        onCancel={() => setShowTestScoreConfirm(false)}
       />
 
       {/* シート別クリア確認ダイアログ */}

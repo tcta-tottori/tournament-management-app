@@ -1018,7 +1018,11 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       }
       useAppStore.getState().setImportedSchedule(result.items);
       useAppStore.getState().setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
-      setWizardDetails([`時間割を自動生成しました（${result.matchCount}試合 / ${result.usedCourtCount}コート）`]);
+      useAppStore.getState().setScheduleConfig({ startTime: result.startTime, matchDuration: result.matchDuration });
+      setWizardDetails([
+        `時間割を自動生成しました（${result.matchCount}試合 / ${result.usedCourtCount}コート / ${result.matchDuration}分間隔）`
+        + (result.drawTimeCount > 0 ? `（うち${result.drawTimeCount}試合はドロー表の記載時刻どおり）` : ''),
+      ]);
       setWizardResult({ success: true, message: '一括読込が完了しました' });
       setWizardPhase('done');
     } catch (err) {

@@ -11,7 +11,7 @@ import {
   type GoogleDriveFile,
 } from '../backup/googleDriveApi';
 import { assignVenueCourtNames } from './scheduleEngine';
-import { generateScheduleFromDraws, inferScheduleBaseFromDraws } from './generateSchedule';
+import { generateScheduleFromDraws, inferScheduleBaseFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from './generateSchedule';
 import ScoreInputDialog, { type ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 
@@ -176,6 +176,7 @@ export default function ScheduleSheet() {
 
   const [statusMessage, setStatusMessage] = useState('');
   const setScheduleFileName = useAppStore(state => state.setScheduleFileName);
+  const setScheduleConfig = useAppStore(state => state.setScheduleConfig);
 
   // --------------- 時間割 自動生成（時間割Excel未取込時） ---------------
   const [genCourtNames, setGenCourtNames] = useState('');
@@ -299,16 +300,64 @@ export default function ScheduleSheet() {
         return;
       }
       setImportedSchedule(res.items);
-      setScheduleFileName('自動生成');
+      // 「ドローから自動生成した時間割」であることを示す共通ラベル。
+      // エントリー確定時に、実際の対戦に合わせて作り直す判定にも使われる。
+      setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      // 確定時の再生成で同じ条件（開始時刻・試合間隔）を引き継げるよう保存する
+      setScheduleConfig({ startTime: res.startTime, matchDuration: res.matchDuration });
       setStatusMessage(
-        `時間割を自動生成しました: ${res.matchCount}試合を${res.usedCourtCount}コート（${courtNames.join('・')}番）に配置しました。`,
+        `時間割を自動生成しました: ${res.matchCount}試合を${res.usedCourtCount}コート（${courtNames.join('・')}番）に配置しました。`
+        + (res.drawTimeCount > 0
+            ? `（うち${res.drawTimeCount}試合はドロー表の記載時刻どおりに配置）`
+            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）'),
       );
     } catch (err) {
       setStatusMessage(`自動生成に失敗しました: ${(err as Error).message}`);
     } finally {
       setIsGenerating(false);
     }
-  }, [tid, genCourtNames, genDuration, genStartTime, setImportedSchedule, setScheduleFileName]);
+  }, [tid, genCourtNames, genDuration, genStartTime, setImportedSchedule, setScheduleFileName, setScheduleConfig]);
+
+  /**
+   * 既に時間割がある状態から、ドロー表の記載時刻を基準に作り直す。
+   * 使用コートは現在の時間割に出ているコートを引き継ぐ（無ければ生成欄の指定）。
+   */
+  const handleRegenerate = useCallback(async () => {
+    if (!tid) return;
+    const fromSchedule = [...new Set(importedSchedule.map(i => i.courtName).filter(Boolean))]
+      .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    const courtNames = fromSchedule.length > 0
+      ? fromSchedule
+      : genCourtNames.split(/[,、\s]+/).map(s => s.trim()).filter(Boolean);
+    if (courtNames.length === 0) {
+      setStatusMessage('使用コートが判定できませんでした。');
+      return;
+    }
+    setIsGenerating(true);
+    setStatusMessage('');
+    try {
+      const res = await generateScheduleFromDraws(tid, { courtNames });
+      if (res.items.length === 0) {
+        setStatusMessage('自動生成対象の試合がありません。先にドローを確定してください。');
+        return;
+      }
+      setImportedSchedule(res.items);
+      setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      setScheduleConfig({ startTime: res.startTime, matchDuration: res.matchDuration });
+      setGenStartTime(res.startTime);
+      setGenDuration(res.matchDuration);
+      setStatusMessage(
+        `ドロー表の時刻で作り直しました: ${res.matchCount}試合 / ${res.usedCourtCount}コート・${res.matchDuration}分間隔`
+        + (res.drawTimeCount > 0
+            ? `（うち${res.drawTimeCount}試合はドロー表の記載時刻どおり）`
+            : '（ドロー表に開始時刻の記載が無いため、上から順に配置しました）'),
+      );
+    } catch (err) {
+      setStatusMessage(`作り直しに失敗しました: ${(err as Error).message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [tid, importedSchedule, genCourtNames, setImportedSchedule, setScheduleFileName, setScheduleConfig]);
 
   // --------------- Derived: grid structure from importedSchedule ---------------
 
@@ -976,6 +1025,21 @@ export default function ScheduleSheet() {
             <p className="text-sm text-gray-500 mt-1 hidden sm:block">
               リアルタイム試合進行状況
             </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* 時間割がある状態でも、ドロー表の記載時刻で作り直せるようにする */}
+            {hasData && (
+              <button
+                onClick={handleRegenerate}
+                disabled={isGenerating || !currentTournamentId}
+                title="ドロー表に書かれた開始時刻を基準に、時間割を作り直します"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                {isGenerating ? '作成中...' : 'ドロー表の時刻で作り直す'}
+              </button>
+            )}
           </div>
 
           <input
