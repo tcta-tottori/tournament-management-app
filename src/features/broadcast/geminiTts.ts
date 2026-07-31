@@ -15,6 +15,27 @@ const SILENT_WAV =
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/**
+ * 生成の揺らぎを抑えるための温度。
+ * 既定（1.0前後）のままだと同じ音声・同じ指示でもコールごとに声色や口調が
+ * 変わってしまうため、低めに固定して毎回同じ読み上げになるようにする。
+ * モデルが temperature を受け付けない場合は自動でリトライする（下記 400 フォールバック）。
+ */
+export const TTS_TEMPERATURE = 0.15;
+
+/**
+ * 繰り返しを含む読み上げテキストを1つにまとめる。
+ * 1回の生成にまとめることで、繰り返しの前後で声色が変わるのを防ぎ、
+ * API 呼び出し回数も減らせる。
+ */
+export function buildRepeatedText(text: string, repeatCount = 1): string {
+  const repeats = Math.min(Math.max(1, repeatCount), 3);
+  if (repeats === 1) return text;
+  const parts = [text];
+  for (let i = 1; i < repeats; i++) parts.push(`繰り返します。${text}`);
+  return parts.join('\n');
+}
+
 export interface GeminiTtsState {
   /** 音声取得〜再生終了までの間 true */
   isSpeaking: boolean;
@@ -79,6 +100,19 @@ class GeminiTtsService {
     }
   }
 
+  /** 生成中カウンタ（一斉コールの事前生成では複数が並行するため数える） */
+  private loadingCount = 0;
+
+  private beginLoading() {
+    this.loadingCount++;
+    this.setLoading(true);
+  }
+
+  private endLoading() {
+    this.loadingCount = Math.max(0, this.loadingCount - 1);
+    if (this.loadingCount === 0) this.setLoading(false);
+  }
+
   /**
    * ブラウザの自動再生制約をアンロックする。
    * 初回ユーザー操作（click/touch）から同期的に呼ばれる必要がある。
@@ -120,15 +154,8 @@ class GeminiTtsService {
     this.setSpeaking(true);
 
     try {
-      const repeats = Math.min(Math.max(1, options.repeatCount ?? 1), 3);
-      for (let i = 0; i < repeats; i++) {
-        if (this.abortCtrl.signal.aborted) break;
-        const t = i === 0 ? text : `繰り返します。${text}`;
-        await this.synthesizeAndPlay(t);
-        if (i < repeats - 1 && !this.abortCtrl.signal.aborted) {
-          await this.delay(1000);
-        }
-      }
+      // 繰り返しも含めて1回の生成にまとめる（声色が途中で変わらないようにするため）
+      await this.synthesizeAndPlay(buildRepeatedText(text, options.repeatCount ?? 1));
       if (!this.abortCtrl.signal.aborted) options.onComplete?.();
     } catch (err) {
       if (!(err instanceof Error) || err.name !== 'AbortError') {
@@ -143,6 +170,7 @@ class GeminiTtsService {
 
   stop(): void {
     this.stopInternal();
+    this.loadingCount = 0;
     this.setLoading(false);
     this.setSpeaking(false);
   }
@@ -161,18 +189,55 @@ class GeminiTtsService {
     }
   }
 
+  /**
+   * 音声データだけを生成して返す（再生しない）。
+   * 一斉コールのように、先に全部の音声を用意してから続けて再生したい場合に使う。
+   */
+  async synthesize(
+    text: string,
+    options: { repeatCount?: number; signal?: AbortSignal } = {},
+  ): Promise<Blob> {
+    const cfg = getVoiceSettings();
+    const t = buildRepeatedText(text, options.repeatCount ?? 1);
+    this.beginLoading();
+    try {
+      return cfg.mode === 'direct'
+        ? await this.synthesizeDirect(t, cfg, options.signal)
+        : await this.synthesizeViaProxy(t, cfg, options.signal);
+    } finally {
+      this.endLoading();
+    }
+  }
+
+  /** `synthesize()` で先に生成しておいた音声を再生する */
+  async playBlob(blob: Blob): Promise<void> {
+    this.stopInternal();
+    this.unlockAudio();
+    this.abortCtrl = new AbortController();
+    this.setSpeaking(true);
+    try {
+      await this.playAudioBlob(blob);
+    } finally {
+      this.abortCtrl = null;
+      this.setSpeaking(false);
+    }
+  }
+
   private async synthesizeAndPlay(text: string): Promise<void> {
     const cfg = getVoiceSettings();
-    this.setLoading(true);
+    this.beginLoading();
     let audioBlob: Blob;
     try {
       audioBlob = cfg.mode === 'direct'
         ? await this.synthesizeDirect(text, cfg)
         : await this.synthesizeViaProxy(text, cfg);
     } finally {
-      this.setLoading(false);
+      this.endLoading();
     }
+    await this.playAudioBlob(audioBlob);
+  }
 
+  private playAudioBlob(audioBlob: Blob): Promise<void> {
     const objectUrl = URL.createObjectURL(audioBlob);
     if (this.currentUrl) URL.revokeObjectURL(this.currentUrl);
     this.currentUrl = objectUrl;
@@ -199,6 +264,7 @@ class GeminiTtsService {
   private async synthesizeViaProxy(
     text: string,
     cfg: ReturnType<typeof getVoiceSettings>,
+    signal?: AbortSignal,
   ): Promise<Blob> {
     if (!cfg.serverUrl) throw new Error('中継サーバーURLが未設定です');
     const url = `${cfg.serverUrl.replace(/\/$/, '')}/api/gemini-tts`;
@@ -209,8 +275,10 @@ class GeminiTtsService {
         text,
         voiceName: cfg.voiceName,
         styleInstruction: cfg.styleInstruction || undefined,
+        // 毎回同じ声・同じ口調にするため温度を固定して渡す
+        temperature: TTS_TEMPERATURE,
       }),
-      signal: this.abortCtrl?.signal,
+      signal: signal ?? this.abortCtrl?.signal,
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -222,25 +290,34 @@ class GeminiTtsService {
   private async synthesizeDirect(
     text: string,
     cfg: ReturnType<typeof getVoiceSettings>,
+    signal?: AbortSignal,
   ): Promise<Blob> {
     if (!cfg.apiKey) throw new Error('Gemini API キーが未設定です');
     const url = `${GEMINI_API_BASE}/${encodeURIComponent(cfg.model)}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
     const prompt = cfg.styleInstruction ? `${cfg.styleInstruction}: ${text}` : text;
-    const payload = {
+    const buildPayload = (withTemperature: boolean) => ({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ['AUDIO'],
+        // 生成ごとの声色・口調の揺れを抑える
+        ...(withTemperature ? { temperature: TTS_TEMPERATURE } : {}),
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voiceName } },
         },
       },
-    };
-    const res = await fetch(url, {
+    });
+    const post = (withTemperature: boolean) => fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: this.abortCtrl?.signal,
+      body: JSON.stringify(buildPayload(withTemperature)),
+      signal: signal ?? this.abortCtrl?.signal,
     });
+
+    let res = await post(true);
+    // temperature を受け付けないモデルでは 400 になるため、その場合のみ外して再試行
+    if (!res.ok && res.status === 400) {
+      res = await post(false);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(`Gemini API HTTP ${res.status}: ${body.slice(0, 200)}`);
@@ -297,16 +374,6 @@ class GeminiTtsService {
 
   private writeAscii(view: DataView, offset: number, s: string) {
     for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      const t = setTimeout(resolve, ms);
-      this.abortCtrl?.signal.addEventListener('abort', () => {
-        clearTimeout(t);
-        resolve();
-      }, { once: true });
-    });
   }
 
   /**

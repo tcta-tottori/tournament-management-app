@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../db/database';
+import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -406,6 +407,13 @@ export default function ScoreInputDialog({
 
   const handleStartMatch = async () => {
     if (isProcessing || !match) return;
+    // 同じコートで別の試合が進行中なら開始しない（1コート2試合を防ぐ）
+    const occupied = await findOccupyingMatch(match.courtId, match.dbId);
+    if (occupied) {
+      const courtName = courts.find(c => c.courtId === match.courtId)?.name ?? '';
+      alert(occupiedMessage(courtName, occupied));
+      return;
+    }
     setIsProcessing(true);
     try {
       await db.matches.update(match.dbId, { status: 'playing', updatedAt: Date.now() });
