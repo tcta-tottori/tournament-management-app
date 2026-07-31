@@ -141,23 +141,32 @@ async function handleGeminiTts(req, res) {
   const styleInstruction = body.styleInstruction ? String(body.styleInstruction) : '';
   const promptText = styleInstruction ? `${styleInstruction}: ${text}` : text;
 
+  // 生成ごとに声色・口調が変わらないよう温度を固定する（クライアントから指定可）
+  const temperature = Number.isFinite(Number(body.temperature)) ? Number(body.temperature) : 0.15;
+
   const url = `${GEMINI_API_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-  const payload = {
+  const buildPayload = (withTemperature) => ({
     contents: [{ parts: [{ text: promptText }] }],
     generationConfig: {
       responseModalities: ['AUDIO'],
+      ...(withTemperature ? { temperature } : {}),
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName } },
       },
     },
-  };
+  });
 
   try {
-    const apiRes = await fetch(url, {
+    const post = (withTemperature) => fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(buildPayload(withTemperature)),
     });
+    let apiRes = await post(true);
+    // temperature を受け付けないモデルでは 400 になるため、その場合のみ外して再試行
+    if (!apiRes.ok && apiRes.status === 400) {
+      apiRes = await post(false);
+    }
     if (!apiRes.ok) {
       const errText = await apiRes.text();
       console.error('[Gemini TTS] API error', apiRes.status, errText.slice(0, 500));

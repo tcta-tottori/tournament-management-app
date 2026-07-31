@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -129,6 +130,13 @@ export default function MatchActionPanel({
 
   const handleStartMatch = async () => {
     if (isProcessing || !match) return;
+    // 同じコートで別の試合が進行中なら開始しない（1コート2試合を防ぐ）
+    const occupied = await findOccupyingMatch(match.courtId, match.dbId);
+    if (occupied) {
+      const courtName = courts.find((c) => c.courtId === match.courtId)?.name ?? '';
+      alert(occupiedMessage(courtName, occupied));
+      return;
+    }
     setIsProcessing(true);
     try {
       await updateMatch({ status: 'playing' });

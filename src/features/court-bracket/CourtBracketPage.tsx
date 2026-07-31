@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { useAppStore } from '../../stores/appStore';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
@@ -263,6 +264,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     if (!courtName) return;
     const court = (courts || []).find(c => c.name === courtName && c.isAvailable);
     if (!court) return;
+    // 他種目を含め、そのコートで進行中の試合があれば投入しない（1コート2試合を防ぐ）
+    const occupied = await findOccupyingMatch(court.courtId, m.id);
+    if (occupied) {
+      alert(occupiedMessage(court.name, occupied));
+      return;
+    }
     await db.matches.update(m.id, {
       courtId: court.courtId,
       status: 'playing',

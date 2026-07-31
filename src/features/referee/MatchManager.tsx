@@ -792,9 +792,19 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
 
     // コート割当: 各試合は自分の割当コート(courtId)を優先し、無ければ番号の若い空きコートへ。
     // 対戦順の若い順に割り当てるため、最早時刻の試合が確実にコートを確保できる。
+    // 既に試合中のコートは埋まっているため対象外にする（1コートに2試合入るのを防ぐ）。
     const nameById = new Map(courts.map(c => [c.courtId, c.name]));
+    const busyCourtNames = new Set<string>();
+    for (const m of allMatchesFlat) {
+      if (m.status !== 'playing' || !m.courtId) continue;
+      const n = nameById.get(m.courtId);
+      if (n) busyCourtNames.add(n);
+    }
     const courtByName = new Map(availableCourts.map(c => [c.name, c]));
-    const freeCourtNames = new Set(availableCourts.map(c => c.name));
+    const freeCourtNames = new Set(
+      availableCourts.map(c => c.name).filter(n => !busyCourtNames.has(n)),
+    );
+    if (freeCourtNames.size === 0) { alert('空いているコートがありません。'); return; }
     const nextFreeCourtName = () =>
       [...freeCourtNames].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0))[0];
 
@@ -827,7 +837,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
         });
       }
     }
-  }, [courts, globalSortedMatches]);
+  }, [courts, globalSortedMatches, allMatchesFlat]);
 
   // 現在試合中のコート名（空きコート判定用）
   const playingCourtNames = useMemo(() => {
@@ -853,13 +863,23 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   const handleEnterCourt = useCallback(async (key: string, courtId: string) => {
     const m = allMatchesFlat.find(mm => matchKey(mm) === key);
     if (!m?.id) return;
+    // 同じコートで別の試合が進行中なら投入しない（1コート2試合を防ぐ）
+    const occupied = allMatchesFlat.find(
+      mm => mm.courtId === courtId && mm.status === 'playing' && mm.id !== m.id,
+    );
+    if (occupied) {
+      const courtName = courtIdToName.get(courtId) || '';
+      alert(`${courtName}番コートは「${occupied.player1Name} vs ${occupied.player2Name}」が試合中です。\n終了してから投入してください。`);
+      setCourtPickMatchId(null);
+      return;
+    }
     await db.matches.update(m.id, {
       courtId,
       status: 'playing',
       updatedAt: Date.now(),
     });
     setCourtPickMatchId(null);
-  }, [allMatchesFlat]);
+  }, [allMatchesFlat, courtIdToName]);
 
   const bulkCallStart = useBulkCallStore(s => s.start);
   const bulkCallActive = useBulkCallStore(s => s.isActive);
@@ -868,14 +888,26 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     if (!currentTournamentId || courts.length === 0) return;
     if (bulkCallActive) { alert('現在コール中です。'); return; }
 
+    // 各コートのコール対象を1試合だけ選ぶ。
+    // 既に試合中の試合があるコートはその試合をコールする（次の試合を先に始めてしまうと
+    // 同じコートに2試合入ってしまうため）。空きコートは待機中の先頭の試合をコールする。
+    const isCallable = (m: Match) =>
+      !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE';
     const firstMatches: { match: Match; court: Court }[] = [];
     for (const court of courts) {
       if (!court.isAvailable) continue;
-      const courtMatches = allMatchesFlat
-        .filter(m => m.courtId === court.courtId && (m.status === 'waiting' || m.status === 'ready')
-          && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE')
+      const courtMatches = allMatchesFlat.filter(m => m.courtId === court.courtId);
+      const playing = courtMatches.find(m => m.status === 'playing' && isCallable(m));
+      if (playing) {
+        firstMatches.push({ match: playing, court });
+        continue;
+      }
+      // 試合中が無いコートのみ、待機中の先頭を対象にする
+      if (courtMatches.some(m => m.status === 'playing')) continue;
+      const waiting = courtMatches
+        .filter(m => (m.status === 'waiting' || m.status === 'ready') && isCallable(m))
         .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0));
-      if (courtMatches.length > 0) firstMatches.push({ match: courtMatches[0], court });
+      if (waiting.length > 0) firstMatches.push({ match: waiting[0], court });
     }
 
     if (firstMatches.length === 0) { alert('コールする試合がありません。'); return; }
