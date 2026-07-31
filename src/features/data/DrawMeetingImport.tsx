@@ -900,6 +900,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
       useAppStore.getState().setImportedSchedule(result.items);
       useAppStore.getState().setScheduleFileName(AUTO_GENERATED_SCHEDULE_LABEL);
+      // 確定時の再生成でも同じ条件（開始時刻・試合間隔）を引き継げるよう保存する
+      useAppStore.getState().setScheduleConfig({ startTime: result.startTime, matchDuration: result.matchDuration });
       setScheduleOpen(true);
     } catch (err) {
       setScheduleError(`時間割の自動生成に失敗しました: ${(err as Error).message}`);
