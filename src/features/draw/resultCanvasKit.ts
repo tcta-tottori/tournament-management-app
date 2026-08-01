@@ -163,6 +163,27 @@ export async function loadResultLogos(): Promise<ResultLogos> {
   return { tcta, venue, tottori };
 }
 
+/** 協会ロゴを結果画像に入れるかどうかの保存キー */
+const ASSOCIATION_LOGO_KEY = 'resultImage.associationLogo';
+
+/** 協会ロゴを入れる設定か（既定: 入れる） */
+export function getAssociationLogoEnabled(): boolean {
+  try {
+    return localStorage.getItem(ASSOCIATION_LOGO_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+/** 協会ロゴを入れるかどうかを保存する */
+export function setAssociationLogoEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(ASSOCIATION_LOGO_KEY, enabled ? '1' : '0');
+  } catch {
+    // localStorage が使えない環境では保存しない
+  }
+}
+
 /** 画像を maxW × maxH に収まるサイズへ縮小した寸法を返す */
 export function fitLogo(
   img: HTMLImageElement | null,

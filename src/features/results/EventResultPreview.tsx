@@ -6,6 +6,7 @@ import {
   buildEventResultFileName,
 } from '../draw/DrawResultExporter';
 import type { ResultExportOptions } from '../draw/DrawResultExporter';
+import { getAssociationLogoEnabled, setAssociationLogoEnabled } from '../draw/resultCanvasKit';
 
 interface Props {
   /** 描画に必要な大会・種目・ドロー・試合データ */
@@ -26,6 +27,13 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 協会ロゴを入れるかどうか（設定は次回以降も保持する）
+  const [showLogo, setShowLogo] = useState(getAssociationLogoEnabled);
+
+  const toggleLogo = (next: boolean) => {
+    setShowLogo(next);
+    setAssociationLogoEnabled(next);
+  };
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -40,7 +48,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     // （ロゴ画像の読み込みを待つため非同期）
     const timer = setTimeout(async () => {
       try {
-        const url = await generateEventResultDataUrl(opts);
+        const url = await generateEventResultDataUrl({ ...opts, showAssociationLogo: showLogo });
         if (!isMounted) return;
         if (url) setDataUrl(url);
         else setError('結果画像を生成できませんでした。');
@@ -52,7 +60,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
       }
     }, 30);
     return () => { isMounted = false; clearTimeout(timer); };
-  }, [isOpen, opts]);
+  }, [isOpen, opts, showLogo]);
 
   const handleDownload = () => {
     if (!dataUrl) return;
@@ -132,7 +140,15 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
             </div>
 
             <div className="px-4 py-2.5 border-t border-sky-100 bg-sky-50/50 text-[11px] text-sky-700 flex items-center justify-between gap-2 shrink-0">
-              <span className="truncate">画像を確認してから保存できます</span>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 font-medium">
+                <input
+                  type="checkbox"
+                  checked={showLogo}
+                  onChange={e => toggleLogo(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-sky-600 cursor-pointer"
+                />
+                協会ロゴを入れる
+              </label>
               {dataUrl && (
                 <button
                   onClick={handleDownload}

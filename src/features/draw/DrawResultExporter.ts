@@ -20,6 +20,7 @@ import {
   drawTopAccentBar,
   fitLogo,
   fontOf,
+  getAssociationLogoEnabled,
   loadResultLogos,
   roundRect,
   wrapItems,
@@ -32,6 +33,11 @@ export interface ResultExportOptions {
   matches: Match[];
   entries: Entry[];
   players: Player[];
+  /**
+   * 協会ロゴを結果画像に入れるかどうか。
+   * 未指定なら保存済みの設定（getAssociationLogoEnabled）に従う。
+   */
+  showAssociationLogo?: boolean;
 }
 
 // ===== 共通ヘルパー =====
@@ -138,7 +144,7 @@ export async function exportTournamentResultAsJpeg(opts: ResultExportOptions): P
 type Side = 'L' | 'R';
 
 /** 線分（勝ち上がりかどうかで色分けする） */
-interface Seg { x1: number; y1: number; x2: number; y2: number; win: boolean; dim?: boolean }
+interface Seg { x1: number; y1: number; x2: number; y2: number; win: boolean }
 
 /** スコアなどのラベル */
 interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win: boolean }
@@ -149,10 +155,14 @@ interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win:
  * ドローを上半分（左の山）と下半分（右の山）に分け、中央で決勝を突き合わせる
  * 「左右2山」のレイアウトで描画する。縦長になりすぎず、紙のトーナメント表と
  * 同じ感覚で結果を追える。
+ *
+ * BYE（不戦勝）のスロットは紙のトーナメント表と同じく表示せず、
+ * 相手選手のラインをそのまま次のラウンドへ通す。
  */
 export async function renderTournamentResultCanvas(opts: ResultExportOptions): Promise<HTMLCanvasElement> {
   const { tournament, event, draw, entries, players, matches } = opts;
   const logos = await loadResultLogos();
+  const showLogo = (opts.showAssociationLogo ?? getAssociationLogoEnabled()) && !!logos.tcta;
 
   const slotMap = buildSlotMap(draw, entries, players);
   const matchMap = buildMatchMap(matches);
@@ -165,14 +175,27 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const isDoubles = event.type === 'Doubles';
 
   // ---- 各ノードの進出者（BYE自動進出も解決する） ----
-  type Node = { name: string; entryId: string | null; isBye: boolean } | null;
-  const winnerCache = new Map<string, Node>();
-  const resolve = (round: number, index: number): Node => {
+  type BracketNode = { name: string; entryId: string | null; isBye: boolean } | null;
+  const winnerCache = new Map<string, BracketNode>();
+  const resolve = (round: number, index: number): BracketNode => {
     const key = `${round}-${index}`;
     if (!winnerCache.has(key)) {
       winnerCache.set(key, getWinnerAtRound(round, index, slotMap, matchMap, totalRounds));
     }
     return winnerCache.get(key)!;
+  };
+
+  /** 配下がすべて BYE のノード（＝線を引かない枝）か */
+  const emptyCache = new Map<string, boolean>();
+  const isEmptyNode = (round: number, index: number): boolean => {
+    const key = `${round}-${index}`;
+    const hit = emptyCache.get(key);
+    if (hit !== undefined) return hit;
+    const v = round === 0
+      ? (slotMap.get(index + 1)?.isBye ?? true)
+      : isEmptyNode(round - 1, index * 2) && isEmptyNode(round - 1, index * 2 + 1);
+    emptyCache.set(key, v);
+    return v;
   };
 
   // entryId → 所属 の逆引き（優勝者の所属表示用）
@@ -181,7 +204,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     if (s.entryId) affById.set(s.entryId, s.affiliation);
   }
 
-  const hasSeed = draw.slots.some(s => s.seed > 0);
+  const hasSeed = draw.slots.some(s => s.seed > 0 && !s.isBye);
 
   // ---- 事前計測（選手名の最大幅からネーム列の幅を決める） ----
   const meas = document.createElement('canvas').getContext('2d')!;
@@ -190,10 +213,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   let maxNameW = 0;
   for (let p = 1; p <= drawSize; p++) {
     const s = slotMap.get(p);
-    if (!s) continue;
+    if (!s || s.isBye) continue;
     meas.font = fontOf('bold', NAME_PX);
-    let w = meas.measureText(s.isBye ? 'bye' : s.name).width;
-    if (!s.isBye && s.affiliation) {
+    let w = meas.measureText(s.name).width;
+    if (s.affiliation) {
       meas.font = fontOf('normal', AFF_PX);
       w += 5 + meas.measureText(`（${s.affiliation}）`).width;
     }
@@ -203,23 +226,80 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const NAME_W = clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380);
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
-  const ROW_H = halfSlots >= 24 ? 34 : halfSlots >= 16 ? 38 : 44;
+  const ROW_H = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
   const COL_W = 74;        // 1ラウンド分の横幅
-  const CENTER_GAP = 16;   // 優勝カードとブラケットの隙間
 
-  // ---- 優勝カードのサイズ ----
+  // ---- 各ノードのY座標（rowsTopY からの相対値） ----
+  // BYE だけの枝は「無いもの」として扱い、相手のラインをまっすぐ通す。
+  const yCache = new Map<string, number>();
+  const nodeYRel = (round: number, index: number): number => {
+    const key = `${round}-${index}`;
+    const hit = yCache.get(key);
+    if (hit !== undefined) return hit;
+    let v: number;
+    if (round === 0) {
+      const row = index < halfSlots ? index : index - halfSlots;
+      v = row * ROW_H + ROW_H / 2;
+    } else {
+      const a = nodeYRel(round - 1, index * 2);
+      const b = nodeYRel(round - 1, index * 2 + 1);
+      const ea = isEmptyNode(round - 1, index * 2);
+      const eb = isEmptyNode(round - 1, index * 2 + 1);
+      v = ea && !eb ? b : eb && !ea ? a : (a + b) / 2;
+    }
+    yCache.set(key, v);
+    return v;
+  };
+
+  // 決勝（左右の山の合流点）
   const champNode = resolve(totalRounds, 0);
+  const champEntryId = champNode?.entryId ?? null;
   const finalMatch = matchMap.get(`${totalRounds}-1`);
-  const champAff = champNode?.entryId ? (affById.get(champNode.entryId) || '') : '';
-  const champName = champNode && !champNode.isBye ? champNode.name : '—';
-  meas.font = fontOf('black', 17);
+  const finL = resolve(totalRounds - 1, 0);
+  const finR = resolve(totalRounds - 1, 1);
+  const yLRel = nodeYRel(totalRounds - 1, 0);
+  const yRRel = nodeYRel(totalRounds - 1, 1);
+  const apexRel = Math.min(yLRel, yRRel);
+
+  // ---- 中央の優勝表示（カードではなく、中央から立ち上がる線＋テキスト） ----
+  const champName = champNode && !champNode.isBye ? champNode.name : '';
+  const champAff = champEntryId ? (affById.get(champEntryId) || '') : '';
+  const CHAMP_NAME_PX = 20;
+  const CHAMP_SCORE_PX = 15;
+
+  // 決勝スコアは「右山の獲得ゲーム − 左山の獲得ゲーム」の並びで表示する
+  // （例: 左山の選手が 8-4 で勝った場合は「4-8」）
+  const finalScoreText = (() => {
+    if (!finalMatch) return '';
+    if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
+    const parts = finalMatch.score.split('-');
+    if (parts.length !== 2) return finalMatch.score;
+    const a = parts[0].trim();
+    const b = parts[1].trim();
+    // player1 が左山とは限らないので entryId で判定する
+    const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
+    const leftScore = p1IsLeft ? a : b;
+    const rightScore = p1IsLeft ? b : a;
+    return `${rightScore}-${leftScore}`;
+  })();
+
+  meas.font = fontOf('black', CHAMP_NAME_PX);
   let champTextW = meas.measureText(champName).width;
   if (champAff) {
-    meas.font = fontOf('normal', AFF_PX);
+    meas.font = fontOf('normal', 12);
     champTextW = Math.max(champTextW, meas.measureText(`（${champAff}）`).width);
   }
-  const CARD_W = clamp(champTextW + 46, 200, 360);
-  const CARD_H = 100;
+  const CENTER_W = clamp(champTextW + 56, 264, 430);
+
+  // 優勝表示ブロックの高さ（合流点から「優勝」バッジ上端まで／描画側と同じ積み上げ）
+  const CHAMP_TICK = 12;
+  const CHAMP_CHIP_H = 21;
+  const champBlockH = champName
+    ? CHAMP_TICK + 4
+      + (finalScoreText ? CHAMP_SCORE_PX + 6 : 0)
+      + (champAff ? 17 : 0)
+      + CHAMP_NAME_PX + 8 + CHAMP_CHIP_H
+    : 0;
 
   // ---- 全体レイアウト ----
   const paddingX = 30;
@@ -227,26 +307,32 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const headerH = 110;
   const sidePad = 22;
 
-  const contentW = NAME_W * 2 + halfRounds * COL_W * 2 + CENTER_GAP * 2 + CARD_W;
+  const contentW = NAME_W * 2 + halfRounds * COL_W * 2 + CENTER_W;
   const tableW = Math.max(contentW + sidePad * 2, 820);
 
-  const bracketTopPad = 52;    // ラウンドラベル用
-  const bracketBottomPad = 16;
+  // ラウンドラベル（枠上端から 37px）と優勝表示が重ならないだけの上部余白を確保する
+  const bracketTopPad = champBlockH > 0
+    ? Math.max(52, Math.ceil(champBlockH + 48 - apexRel))
+    : 52;
   const bracketBodyH = halfSlots * ROW_H;
+
+  // 中央下部（枠内）に置く協会ロゴ
+  const centerLogo = showLogo
+    ? fitLogo(logos.tcta, Math.min(CENTER_W - 24, 300), 76)
+    : { w: 0, h: 0 };
+  const spaceBelowApex = bracketBodyH - apexRel;
+  const bracketBottomPad = Math.max(16, Math.ceil(centerLogo.h + 24 - spaceBelowApex));
   const bracketH = bracketTopPad + bracketBodyH + bracketBottomPad;
 
-  // ---- フッター（左: シード一覧 / 右: 協会ロゴ） ----
+  // ---- フッター（シード一覧） ----
   const seedItems = draw.slots
-    .filter(s => s.seed > 0)
+    .filter(s => s.seed > 0 && !s.isBye)
     .sort((a, b) => a.seed - b.seed)
     .map(s => `${s.seed}.${slotMap.get(s.position)?.name ?? ''}`)
     .filter(t => !t.endsWith('.'));
-  const tcta = fitLogo(logos.tcta, Math.min(360, tableW * 0.4), 80);
   const seedPx = 12;
-  const seedMaxW = tableW - tcta.w - 34;
-  const seedLines = wrapItems(meas, 'シード　', seedItems, seedMaxW, seedPx, 2);
-  const seedBlockH = seedLines.length * (seedPx + 6);
-  const footerH = Math.max(tcta.h, seedBlockH) + 10;
+  const seedLines = wrapItems(meas, 'シード　', seedItems, tableW - 24, seedPx, 2);
+  const footerH = seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + bracketH + footerH + 14;
@@ -289,20 +375,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const contentX = paddingX + (tableW - contentW) / 2;
   const leftNameX = contentX;
   const leftNameEndX = leftNameX + NAME_W;
-  const cardLeftX = leftNameEndX + halfRounds * COL_W + CENTER_GAP;
-  const cardRightX = cardLeftX + CARD_W;
-  const rightNameEndX = cardRightX + CENTER_GAP + halfRounds * COL_W;
+  const apexLX = leftNameEndX + halfRounds * COL_W;
+  const apexRX = apexLX + CENTER_W;
+  const rightNameEndX = apexRX + halfRounds * COL_W;
+  const centerX = (apexLX + apexRX) / 2;
 
   const rowsTopY = bracketAreaY + bracketTopPad;
-  /** ラウンド r（片側基準）・インデックス m のノード中心 Y */
-  const nodeY = (r: number, m: number): number => {
-    const span = 2 ** r;
-    return rowsTopY + (m * span + (span - 1) / 2) * ROW_H + ROW_H / 2;
-  };
+  const nodeY = (round: number, index: number) => rowsTopY + nodeYRel(round, index);
   /** ラウンド r の合流点 X（r=0 はネーム列の端） */
   const joinX = (side: Side, r: number): number =>
     side === 'L' ? leftNameEndX + r * COL_W : rightNameEndX - r * COL_W;
-  const finalY = rowsTopY + bracketBodyH / 2;
+  const apexY = rowsTopY + apexRel;
 
   // ---- ラウンドラベル ----
   const roundName = (r: number): string => {
@@ -335,15 +418,15 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       drawRoundLabel(cx, roundName(r), false);
     }
   }
-  drawRoundLabel((cardLeftX + cardRightX) / 2, '決勝', true);
+  drawRoundLabel(centerX, '決勝', true);
 
   // ---- 選手行の背景（縞）----
   for (let i = 0; i < halfSlots; i++) {
     if (i % 2 === 0) continue;
     const y = nodeY(0, i) - ROW_H / 2;
     ctx.fillStyle = COL.slate50;
-    ctx.fillRect(leftNameX, y, NAME_W, ROW_H);
-    ctx.fillRect(rightNameEndX, y, NAME_W, ROW_H);
+    if (!slotMap.get(i + 1)?.isBye) ctx.fillRect(leftNameX, y, NAME_W, ROW_H);
+    if (!slotMap.get(halfSlots + i + 1)?.isBye) ctx.fillRect(rightNameEndX, y, NAME_W, ROW_H);
   }
 
   // ---- ブラケット線・スコアの組み立て ----
@@ -373,11 +456,15 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       const half = halfSlots / 2 ** r;           // 片側のこのラウンドの試合数
       for (let m = 0; m < half; m++) {
         const gIdx = side === 'L' ? m : half + m; // ドロー全体でのインデックス
+        if (isEmptyNode(r, gIdx)) continue;       // 中身が BYE だけの枝は描かない
+
         const xChild = joinX(side, r - 1);
         const xJoin = joinX(side, r);
-        const yTop = nodeY(r - 1, 2 * m);
-        const yBot = nodeY(r - 1, 2 * m + 1);
-        const yMid = nodeY(r, m);
+        const emptyTop = isEmptyNode(r - 1, 2 * gIdx);
+        const emptyBot = isEmptyNode(r - 1, 2 * gIdx + 1);
+        const yTop = nodeY(r - 1, 2 * gIdx);
+        const yBot = nodeY(r - 1, 2 * gIdx + 1);
+        const yMid = nodeY(r, gIdx);
 
         const parent = resolve(r, gIdx);
         const top = resolve(r - 1, 2 * gIdx);
@@ -385,42 +472,51 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         const winTop = !!parent?.entryId && parent.entryId === top?.entryId;
         const winBot = !!parent?.entryId && parent.entryId === bot?.entryId;
 
-        // BYE（不戦）側の枝は薄くしてブラケットの流れを読みやすくする
-        const dimTop = !top || top.isBye;
-        const dimBot = !bot || bot.isBye;
-        segs.push({ x1: xChild, y1: yTop, x2: xJoin, y2: yTop, win: winTop, dim: dimTop });
-        segs.push({ x1: xChild, y1: yBot, x2: xJoin, y2: yBot, win: winBot, dim: dimBot });
-        segs.push({ x1: xJoin, y1: yTop, x2: xJoin, y2: yMid, win: winTop, dim: dimTop });
-        segs.push({ x1: xJoin, y1: yMid, x2: xJoin, y2: yBot, win: winBot, dim: dimBot });
+        // BYE 側の枝は線を引かず、相手のラインをそのまま通す
+        if (!emptyTop) segs.push({ x1: xChild, y1: yTop, x2: xJoin, y2: yTop, win: winTop });
+        if (!emptyBot) segs.push({ x1: xChild, y1: yBot, x2: xJoin, y2: yBot, win: winBot });
+        if (!emptyTop && !emptyBot) {
+          segs.push({ x1: xJoin, y1: yTop, x2: xJoin, y2: yMid, win: winTop });
+          segs.push({ x1: xJoin, y1: yMid, x2: xJoin, y2: yBot, win: winBot });
+        }
 
-        // スコア
+        // 実際に対戦があった試合だけスコアを表示する（BYE の W.O は出さない）
+        if (emptyTop || emptyBot) continue;
         const match = matchMap.get(`${r}-${gIdx + 1}`);
         const align: CanvasTextAlign = side === 'L' ? 'left' : 'right';
-        const sx = side === 'L' ? xJoin + 5 : xJoin - 5;
+        const sx = side === 'L' ? xJoin + 6 : xJoin - 6;
+        // 上下のスコアはブラケットの内側に、それぞれの線から等距離に置く
+        const inset = clamp((yBot - yTop) / 2 - 8, 7, 13);
         const sc = parseScore(match, top?.entryId ?? null, bot?.entryId ?? null);
         if (sc) {
-          if (sc.top) tags.push({ x: sx, y: yTop - 8, text: sc.top, align, win: winTop });
-          if (sc.bot) tags.push({ x: sx, y: yBot - 8, text: sc.bot, align, win: winBot });
+          if (sc.top) tags.push({ x: sx, y: yTop + inset, text: sc.top, align, win: winTop });
+          if (sc.bot) tags.push({ x: sx, y: yBot - inset, text: sc.bot, align, win: winBot });
         } else if (match?.status === 'walkover') {
-          tags.push({ x: sx, y: yMid - 9, text: 'W.O', align, win: false });
+          // 棄権した側に W.O を表示する
+          const y = winTop ? yBot - inset : yTop + inset;
+          tags.push({ x: sx, y, text: 'W.O', align, win: false });
         }
       }
     }
   }
 
-  // 決勝への接続（左右の山 → 中央の優勝カード）
-  const finL = resolve(totalRounds - 1, 0);
-  const finR = resolve(totalRounds - 1, 1);
-  const winL = !!champNode?.entryId && champNode.entryId === finL?.entryId;
-  const winR = !!champNode?.entryId && champNode.entryId === finR?.entryId;
-  segs.push({ x1: joinX('L', halfRounds), y1: finalY, x2: cardLeftX, y2: finalY, win: winL });
-  segs.push({ x1: joinX('R', halfRounds), y1: finalY, x2: cardRightX, y2: finalY, win: winR });
+  // ---- 決勝（中央で左右の山が合流し、上に立ち上がる） ----
+  const winL = !!champEntryId && champEntryId === finL?.entryId;
+  const winR = !!champEntryId && champEntryId === finR?.entryId;
+  const yL = rowsTopY + yLRel;
+  const yR = rowsTopY + yRRel;
+  segs.push({ x1: joinX('L', halfRounds), y1: yL, x2: centerX, y2: yL, win: winL });
+  segs.push({ x1: joinX('R', halfRounds), y1: yR, x2: centerX, y2: yR, win: winR });
+  if (yL !== apexY) segs.push({ x1: centerX, y1: yL, x2: centerX, y2: apexY, win: winL });
+  if (yR !== apexY) segs.push({ x1: centerX, y1: yR, x2: centerX, y2: apexY, win: winR });
+  // 優勝者へ立ち上がる縦線
+  segs.push({ x1: centerX, y1: apexY, x2: centerX, y2: apexY - CHAMP_TICK, win: !!champEntryId });
 
   // 通常線 → 勝ち上がり線 の順に描画して、赤いラインが必ず前面に出るようにする
   ctx.lineCap = 'round';
   for (const s of segs) {
     if (s.win) continue;
-    drawLine(ctx, s.x1, s.y1, s.x2, s.y2, s.dim ? COL.slate200 : COL.slate300, s.dim ? 1 : 1.4);
+    drawLine(ctx, s.x1, s.y1, s.x2, s.y2, COL.slate300, 1.4);
   }
   for (const s of segs) {
     if (!s.win) continue;
@@ -430,21 +526,21 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // スコア
   for (const t of tags) {
-    drawText(ctx, t.text, t.x, t.y, t.win ? 12 : 11, t.align, t.win ? COL.win : COL.slate400, t.win ? 'bold' : 'medium');
+    drawText(ctx, t.text, t.x, t.y, 13, t.align, t.win ? COL.win : COL.slate500, t.win ? 'black' : 'bold');
   }
 
   // ---- 選手行 ----
-  const champEntryId = champNode?.entryId ?? null;
   const drawSlotRow = (side: Side, i: number) => {
     const pos = side === 'L' ? i + 1 : halfSlots + i + 1;
     const slot = slotMap.get(pos);
-    const cy = nodeY(0, i);
+    // BYE は表示しない
+    if (!slot || slot.isBye) return;
+
+    const cy = nodeY(0, side === 'L' ? i : halfSlots + i);
     const x0 = side === 'L' ? leftNameX : rightNameEndX;
 
     // 番号
     drawText(ctx, String(pos), x0 + 20, cy, 11, 'right', COL.slate400, 'medium');
-
-    if (!slot) return;
 
     // シードバッジ
     if (hasSeed && slot.seed > 0) {
@@ -460,12 +556,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
     const nameX = x0 + NUM_W;
     const nameMaxW = NAME_W - NUM_W - 12;
-
-    if (slot.isBye) {
-      drawText(ctx, 'bye', nameX, cy, 12.5, 'left', COL.slate300, 'medium', nameMaxW);
-      return;
-    }
-
     const isChamp = !!champEntryId && slot.entryId === champEntryId;
     ctx.font = fontOf(isChamp ? 'black' : 'bold', NAME_PX);
     const nameW = Math.min(ctx.measureText(slot.name).width, nameMaxW);
@@ -484,75 +574,54 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     drawSlotRow('R', i);
   }
 
-  // ---- 中央: 優勝カード ----
-  const cardY = finalY - CARD_H / 2;
-  const hasChamp = !!champEntryId;
-  ctx.save();
-  ctx.shadowColor = hasChamp ? 'rgba(180, 83, 9, 0.26)' : 'rgba(15, 23, 42, 0.10)';
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 6;
-  roundRect(ctx, cardLeftX, cardY, CARD_W, CARD_H, 14, COL.white);
-  ctx.restore();
-  const cardGrad = ctx.createLinearGradient(cardLeftX, cardY, cardLeftX, cardY + CARD_H);
-  if (hasChamp) {
-    cardGrad.addColorStop(0, '#fffbeb');
-    cardGrad.addColorStop(1, '#fff7ed');
-  } else {
-    cardGrad.addColorStop(0, COL.slate50);
-    cardGrad.addColorStop(1, COL.white);
-  }
-  roundRect(ctx, cardLeftX, cardY, CARD_W, CARD_H, 14, cardGrad, hasChamp ? COL.gold2 : COL.slate200, 1.8);
+  // ---- 中央上部: 優勝者名とスコア ----
+  if (champName) {
+    let cursor = apexY - CHAMP_TICK - 4;
+    const scoreY = cursor - CHAMP_SCORE_PX / 2;
+    if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 6;
+    const affY = champAff ? cursor - 6 : cursor;
+    if (champAff) cursor = affY - 6 - 5;
+    const nameY = cursor - CHAMP_NAME_PX / 2;
+    cursor = nameY - CHAMP_NAME_PX / 2 - 8;
 
-  // 「優勝」ピル
-  const pillW = 64;
-  const pillH = 22;
-  const pillX = cardLeftX + (CARD_W - pillW) / 2;
-  const pillY = cardY + 11;
-  const pillGrad = ctx.createLinearGradient(pillX, pillY, pillX, pillY + pillH);
-  if (hasChamp) {
-    pillGrad.addColorStop(0, COL.gold1);
-    pillGrad.addColorStop(1, COL.gold3);
-  } else {
-    pillGrad.addColorStop(0, COL.slate300);
-    pillGrad.addColorStop(1, COL.slate400);
-  }
-  roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2, pillGrad);
-  drawText(ctx, '優勝', pillX + pillW / 2, pillY + pillH / 2 + 0.5, 12, 'center', COL.white, 'black');
+    // 「優勝」バッジ
+    const chipW = 60;
+    const chipH = CHAMP_CHIP_H;
+    const chipX = centerX - chipW / 2;
+    const chipY = cursor - chipH;
+    const chipGrad = ctx.createLinearGradient(chipX, chipY, chipX, chipY + chipH);
+    chipGrad.addColorStop(0, COL.gold1);
+    chipGrad.addColorStop(1, COL.gold3);
+    roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2, chipGrad);
+    drawText(ctx, '優勝', centerX, chipY + chipH / 2 + 0.5, 11.5, 'center', COL.white, 'black');
 
-  const champNameY = champAff ? cardY + 55 : cardY + 60;
-  drawText(ctx, champName, cardLeftX + CARD_W / 2, champNameY, 17, 'center',
-    hasChamp ? COL.goldText : COL.slate400, 'black', CARD_W - 20);
-  if (champAff) {
-    drawText(ctx, `（${champAff}）`, cardLeftX + CARD_W / 2, cardY + 73, AFF_PX, 'center', COL.slate500, 'normal', CARD_W - 20);
-  }
-  // 決勝スコアは優勝者から見た向き（例:「8-2」）に揃える
-  const finalScoreText = (() => {
-    if (!finalMatch) return '';
-    if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
-    const parts = finalMatch.score.split('-');
-    const loserIsP1 = !!champEntryId
-      && !!finalMatch.player1EntryId
-      && finalMatch.player1EntryId !== champEntryId;
-    if (loserIsP1 && parts.length === 2) {
-      return `${parts[1].trim()}-${parts[0].trim()}`;
+    drawText(ctx, champName, centerX, nameY, CHAMP_NAME_PX, 'center', COL.slate900, 'black', CENTER_W - 16);
+    if (champAff) {
+      drawText(ctx, `（${champAff}）`, centerX, affY, 12, 'center', COL.slate500, 'normal', CENTER_W - 16);
     }
-    return finalMatch.score;
-  })();
-  if (finalScoreText) {
-    drawText(ctx, finalScoreText, cardLeftX + CARD_W / 2, cardY + CARD_H - 13, 13, 'center', COL.win, 'bold', CARD_W - 20);
+    if (finalScoreText) {
+      drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
+    }
   }
 
-  // ---- フッター（左: シード一覧 / 右: 協会ロゴ） ----
-  const footerY = bracketAreaY + bracketH + 8;
+  // ---- 協会ロゴ: 左右2山の中央下部（枠内）----
+  if (showLogo && centerLogo.w > 0) {
+    ctx.drawImage(
+      logos.tcta!,
+      centerX - centerLogo.w / 2,
+      bracketAreaY + bracketH - centerLogo.h - 12,
+      centerLogo.w,
+      centerLogo.h,
+    );
+  }
+
+  // ---- フッター（シード一覧） ----
   if (seedLines.length > 0) {
-    let y = footerY + seedPx / 2 + 4;
+    let y = bracketAreaY + bracketH + 8 + seedPx / 2 + 4;
     for (const line of seedLines) {
       drawText(ctx, line, paddingX + 4, y, seedPx, 'left', COL.slate500, 'medium');
       y += seedPx + 6;
     }
-  }
-  if (logos.tcta && tcta.w > 0) {
-    ctx.drawImage(logos.tcta, paddingX + tableW - tcta.w, footerY, tcta.w, tcta.h);
   }
 
   return canvas;
@@ -582,6 +651,7 @@ export async function generateEventResultDataUrl(opts: ResultExportOptions): Pro
 export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): Promise<HTMLCanvasElement | null> {
   const { tournament, event, draw, matches, entries, players } = opts;
   const logos = await loadResultLogos();
+  const showLogo = (opts.showAssociationLogo ?? getAssociationLogoEnabled()) && !!logos.tcta;
   const slotMap = buildSlotMap(draw, entries, players);
 
   // BYE以外の選手
@@ -676,8 +746,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   const cardBottomPad = 18;
   const cardH = gridH + cardTopPad + cardBottomPad;
 
-  const tcta = fitLogo(logos.tcta, Math.min(360, tableW * 0.4), 80);
-  const footerH = tcta.h + 10;
+  const tcta = showLogo ? fitLogo(logos.tcta, Math.min(360, tableW * 0.4), 80) : { w: 0, h: 0 };
+  const footerH = tcta.h > 0 ? tcta.h + 10 : 4;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + cardH + footerH + 14;
@@ -830,8 +900,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   }
 
   // ---- フッター（右下に協会ロゴ） ----
-  if (logos.tcta && tcta.w > 0) {
-    ctx.drawImage(logos.tcta, paddingX + tableW - tcta.w, cardY + cardH + 8, tcta.w, tcta.h);
+  if (showLogo && tcta.w > 0) {
+    ctx.drawImage(logos.tcta!, paddingX + tableW - tcta.w, cardY + cardH + 8, tcta.w, tcta.h);
   }
 
   return canvas;
