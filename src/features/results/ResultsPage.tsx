@@ -295,16 +295,20 @@ export default function ResultsPage() {
   };
 
   // ---------- batch export: all events JPEG ----------
-  const handleBatchJpeg = () => {
+  const handleBatchJpeg = async () => {
     for (const event of events) {
       const opts = buildExportOpts(event);
       if (!opts) continue;
       const draw = opts.draw;
       const isRR = draw.drawType === 'roundRobin';
-      if (isRR) {
-        exportRoundRobinResultAsJpeg(opts);
-      } else {
-        exportTournamentResultAsJpeg(opts);
+      try {
+        if (isRR) {
+          await exportRoundRobinResultAsJpeg(opts);
+        } else {
+          await exportTournamentResultAsJpeg(opts);
+        }
+      } catch (e) {
+        console.error('結果JPEG出力エラー:', e);
       }
     }
   };
@@ -326,14 +330,18 @@ export default function ResultsPage() {
     }
   };
 
-  const handleEventJpeg = (event: Event) => {
+  const handleEventJpeg = async (event: Event) => {
     const opts = buildExportOpts(event);
     if (!opts) return;
     const draw = opts.draw;
-    if (draw.drawType === 'roundRobin') {
-      exportRoundRobinResultAsJpeg(opts);
-    } else {
-      exportTournamentResultAsJpeg(opts);
+    try {
+      if (draw.drawType === 'roundRobin') {
+        await exportRoundRobinResultAsJpeg(opts);
+      } else {
+        await exportTournamentResultAsJpeg(opts);
+      }
+    } catch (e) {
+      console.error('結果JPEG出力エラー:', e);
     }
   };
 

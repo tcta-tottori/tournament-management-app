@@ -37,9 +37,10 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     let isMounted = true;
     setIsLoading(true);
     // Canvas 描画は同期的に重くなることがあるので、モーダル描画後に実行する
-    const timer = setTimeout(() => {
+    // （ロゴ画像の読み込みを待つため非同期）
+    const timer = setTimeout(async () => {
       try {
-        const url = generateEventResultDataUrl(opts);
+        const url = await generateEventResultDataUrl(opts);
         if (!isMounted) return;
         if (url) setDataUrl(url);
         else setError('結果画像を生成できませんでした。');
