@@ -270,22 +270,29 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     return all.filter(m => m.status === 'playing');
   }, [currentTournamentId]) || [];
 
-  /** 空きコート（使用可能かつ進行中の試合が無い）を番号順に。同名コートは1つにまとめる。 */
-  const emptyCourts = useMemo(() => {
+  /**
+   * コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+   * 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
+   */
+  const courtPickList = useMemo(() => {
     const idToName = new Map(courts.map(c => [c.courtId, c.name]));
     const usedNames = new Set<string>();
     for (const m of playingMatches) {
       const n = m.courtId ? idToName.get(m.courtId) : undefined;
       if (n) usedNames.add(n);
     }
+    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
     const seen = new Set<string>();
-    const result: typeof courts = [];
-    for (const c of courts) {
-      if (c.isAvailable === false || usedNames.has(c.name) || seen.has(c.name)) continue;
+    const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
+    for (const c of sorted) {
+      if (seen.has(c.name)) continue;
       seen.add(c.name);
-      result.push(c);
+      const status = c.isAvailable === false
+        ? 'unavailable'
+        : usedNames.has(c.name) ? 'playing' : 'empty';
+      list.push({ courtId: c.courtId, name: c.name, status });
     }
-    return result.sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+    return list;
   }, [courts, playingMatches]);
 
   /** コート選択ダイアログの対象試合 */
@@ -511,8 +518,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           roundName={getRoundName(courtPickMatch.round, totalRounds)}
           player1Name={courtPickMatch.player1Name}
           player2Name={courtPickMatch.player2Name}
-          courts={emptyCourts.map(c => ({ courtId: c.courtId, name: c.name }))}
-          suggestedCourtName={standbyMap.get(matchKey(courtPickMatch))?.enterCourtName || null}
+          courts={courtPickList}
           onSelect={enterSelectedCourt}
           onClose={() => setCourtPickKey(null)}
         />

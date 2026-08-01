@@ -853,11 +853,21 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return set;
   }, [allMatchesFlat, courtIdToName]);
 
-  // 空きコート（使用可能で試合中でない）を番号順に
-  const emptyCourts = useMemo(() => {
-    return courts
-      .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
-      .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+  // コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+  // 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
+  const courtPickList = useMemo(() => {
+    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+    const seen = new Set<string>();
+    const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
+    for (const c of sorted) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      const status = c.isAvailable === false
+        ? 'unavailable'
+        : playingCourtNames.has(c.name) ? 'playing' : 'empty';
+      list.push({ courtId: c.courtId, name: c.name, status });
+    }
+    return list;
   }, [courts, playingCourtNames]);
 
   // 待機試合を指定コートに入れる（試合開始）
@@ -2731,15 +2741,13 @@ ${printableMatches.map(m => {
         const evt = events.find(e => e.eventId === pm.eventId);
         const evDraw = allDraws.get(pm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : Math.max(1, eventMaxRound.get(pm.eventId) || 1);
-        const suggested = standbyInfo.get(matchKey(pm))?.enterCourtName || null;
         return (
           <CourtPickDialog
             eventName={shortEventName(evt?.name || pm.eventId)}
             roundName={getRoundName(pm.round, evTotalRounds)}
             player1Name={pm.player1Name}
             player2Name={pm.player2Name}
-            courts={emptyCourts.map(c => ({ courtId: c.courtId, name: c.name }))}
-            suggestedCourtName={suggested}
+            courts={courtPickList}
             onSelect={(courtId) => handleEnterCourt(matchKey(pm), courtId)}
             onClose={() => setCourtPickMatchId(null)}
           />
