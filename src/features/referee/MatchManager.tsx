@@ -16,6 +16,8 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder, matchKey } from './standbyRanking';
+import CourtPickDialog from '../../components/ui/CourtPickDialog';
+import { fillTestScores } from '../score/testScoreFiller';
 
 /** 回戦に応じたゲームルール（試合方式）を解決する */
 function resolveRoundRule(evt: Event | undefined, round: number, totalRounds: number): RoundGameRule | null {
@@ -851,11 +853,21 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return set;
   }, [allMatchesFlat, courtIdToName]);
 
-  // 空きコート（使用可能で試合中でない）を番号順に
-  const emptyCourts = useMemo(() => {
-    return courts
-      .filter(c => c.isAvailable && !playingCourtNames.has(c.name))
-      .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+  // コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+  // 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
+  const courtPickList = useMemo(() => {
+    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+    const seen = new Set<string>();
+    const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
+    for (const c of sorted) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      const status = c.isAvailable === false
+        ? 'unavailable'
+        : playingCourtNames.has(c.name) ? 'playing' : 'empty';
+      list.push({ courtId: c.courtId, name: c.name, status });
+    }
+    return list;
   }, [courts, playingCourtNames]);
 
   // 待機試合を指定コートに入れる（試合開始）
@@ -880,6 +892,31 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     });
     setCourtPickMatchId(null);
   }, [allMatchesFlat, courtIdToName]);
+
+  // --- テスト用: 全試合を 8-4 / 6-4 で終了させる（動作確認用・運営画面のみ） ---
+  const [testScoreRunning, setTestScoreRunning] = useState(false);
+  const handleFillTestScores = useCallback(async () => {
+    if (!currentTournamentId) return;
+    const ok = confirm(
+      'テスト用に、全種目の全試合へ 8-4 / 6-4 のスコアを入れて決勝まで終了させます。\n'
+      + '入力済みのスコアは上書きされます。よろしいですか？',
+    );
+    if (!ok) return;
+    setTestScoreRunning(true);
+    try {
+      const res = await fillTestScores(currentTournamentId);
+      alert(
+        res.filledCount === 0
+          ? 'スコアを入力できる試合がありませんでした。エントリーを確定してからお試しください。'
+          : `${res.eventCount}種目・${res.filledCount}試合にテストスコアを入力しました。`,
+      );
+    } catch (err) {
+      console.error('テストスコア入力に失敗:', err);
+      alert(`テストスコアの入力に失敗しました: ${(err as Error).message}`);
+    } finally {
+      setTestScoreRunning(false);
+    }
+  }, [currentTournamentId]);
 
   const bulkCallStart = useBulkCallStore(s => s.start);
   const bulkCallActive = useBulkCallStore(s => s.isActive);
@@ -1750,6 +1787,15 @@ ${printableMatches.map(m => {
                 全コート初戦一斉コール
               </button>
             )}
+            {/* テスト用: 全試合を 8-4 / 6-4 で終了（動作確認用） */}
+            <button
+              onClick={handleFillTestScores}
+              disabled={testScoreRunning}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-dashed border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {testScoreRunning ? '入力中...' : 'テスト: 全試合を8-4/6-4で終了'}
+            </button>
             {/* コール中の停止操作は画面下部の固定ポップアップから行う */}
           </div>
         </div>
@@ -1830,24 +1876,28 @@ ${printableMatches.map(m => {
                       statusDisplay = st;
                     }
 
-                    // 中央上のコートバッジ:
+                    // 中央上のバッジ:
                     // - 試合中/終了 → コート番号
-                    // - コート確定後は大会全体で対戦順の上から「控え1〜5」を表示（全体で5試合）。
-                    //   空きコートが出て入れる状態のものはオレンジ表示（タップで入れる）。
+                    // - 空きコートが出て入れる状態 → 緑のボタン（タップでコートを選ぶ）。
+                    //   どのコートに入るかは運営がダイアログで選ぶので、番号は出さない。
+                    // - それ以外の待機 → 大会全体で対戦順の上から「控え1〜5」（青）
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {
                       centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
                     } else if (hasPlayers && enterCourtName) {
-                      // 空きコートに入れる（入るコート番号を表示。控えとは別扱い）
-                      centerBadge = { text: `▶ ${enterCourtName}番コートへ`, color: 'bg-orange-500 text-white' };
+                      // 空きコートに入れる。運営はタップでコートを選ぶ緑ボタン、
+                      // 観戦用（読み取り専用）はコートが未確定なので番号を出さない。
+                      centerBadge = readOnly
+                        ? { text: '次に入ります', color: 'bg-orange-500 text-white' }
+                        : { text: '▶ コートを選ぶ', color: 'bg-green-600 text-white' };
                     } else if (hasPlayers && sb?.standbyLabel) {
-                      centerBadge = { text: sb.standbyLabel, color: 'bg-amber-500 text-white' };
+                      centerBadge = { text: sb.standbyLabel, color: 'bg-blue-500 text-white' };
                     }
 
                     // カード枠の配色:
                     // - 試合中: 緑枠点滅
-                    // - 空きコートに入れる（コート確定後・空き発生）: オレンジ枠点滅（タップで入れる）
-                    // - 控え1〜5: 背景は白のまま、オレンジの枠のみ点滅
+                    // - 空きコートが出て入れる: オレンジ枠点滅（タップでコートを選んで投入）
+                    // - 控え1〜5: 背景は白のまま、青の枠のみ点滅（まだ入れない＝順番待ち）
                     // - それ以外の待機: 通常カード
                     const cardClass = isFinished
                       ? 'bg-gray-50 border-gray-200 opacity-60'
@@ -1858,7 +1908,7 @@ ${printableMatches.map(m => {
                           : enterCourtName
                             ? 'bg-orange-50 border-2 border-orange-400 enter-court-orange-blink'
                             : sb?.standbyLabel
-                              ? 'bg-white border-2 border-orange-400 enter-court-orange-blink'
+                              ? 'bg-white border-2 border-blue-400 enter-card-blink'
                               : `${evColor.bg} border-gray-200`;
 
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
@@ -1900,9 +1950,19 @@ ${printableMatches.map(m => {
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
                             <div className="flex-1" />
                             {centerBadge && (
-                              <span className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${centerBadge.color}`}>
-                                {centerBadge.text}
-                              </span>
+                              // 入れる状態の緑バッジはボタン（タップでコート選択ダイアログを開く）
+                              enterCourtName && isWaitingEnterable ? (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setCourtPickMatchId(matchKey(m)); }}
+                                  className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm transition-colors hover:bg-green-700 ${centerBadge.color}`}
+                                >
+                                  {centerBadge.text}
+                                </button>
+                              ) : (
+                                <span className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shadow-sm ${centerBadge.color}`}>
+                                  {centerBadge.text}
+                                </span>
+                              )
                             )}
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
                           </div>
@@ -2681,52 +2741,16 @@ ${printableMatches.map(m => {
         const evt = events.find(e => e.eventId === pm.eventId);
         const evDraw = allDraws.get(pm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : Math.max(1, eventMaxRound.get(pm.eventId) || 1);
-        const suggested = standbyInfo.get(matchKey(pm))?.enterCourtName || null;
         return (
-          <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setCourtPickMatchId(null)}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-gray-900">コートに入れる</h3>
-                <button onClick={() => setCourtPickMatchId(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
-                <div>
-                  <span className="font-medium">{shortEventName(evt?.name || pm.eventId)}</span>
-                  <span className="ml-2 text-gray-500">{getRoundName(pm.round, evTotalRounds)}</span>
-                </div>
-                <div className="text-gray-900 font-semibold">
-                  {pm.player1Name} <span className="text-gray-400 font-normal mx-0.5">vs</span> {pm.player2Name}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-2">入れる空きコートを選択</label>
-                {emptyCourts.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-2 text-center">現在、空きコートがありません。</p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {emptyCourts.map(c => (
-                      <button
-                        key={c.courtId}
-                        onClick={() => handleEnterCourt(matchKey(pm), c.courtId)}
-                        className={`px-2 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
-                          suggested === c.name
-                            ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-primary-50 hover:border-primary-300'
-                        }`}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {suggested && emptyCourts.length > 0 && (
-                  <p className="text-[11px] text-orange-600 mt-2">オレンジ = 対戦順で次に入るコート（{suggested}番）</p>
-                )}
-              </div>
-            </div>
-          </div>
+          <CourtPickDialog
+            eventName={shortEventName(evt?.name || pm.eventId)}
+            roundName={getRoundName(pm.round, evTotalRounds)}
+            player1Name={pm.player1Name}
+            player2Name={pm.player2Name}
+            courts={courtPickList}
+            onSelect={(courtId) => handleEnterCourt(matchKey(pm), courtId)}
+            onClose={() => setCourtPickMatchId(null)}
+          />
         );
       })()}
 

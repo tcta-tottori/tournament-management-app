@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy } from 'lucide-react';
+import { Trophy, Play } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 
 /** 経過時間を H:MM 形式 */
@@ -347,26 +347,38 @@ export default function CourtBracketView({
     );
   };
 
-  // 控え状況／入るコートを左端に表示（対戦順シートと共通の控え番号）
-  // enter（空きコートに入れる）はオレンジで強調。
-  const standbyColumn = (label: string, tone: 'enter' | 'standby') => {
+  // 控え（順番待ち）を左端に青で表示（対戦順シートと共通の控え番号）
+  const standbyColumn = (label: string) => {
     const num = label.match(/(\d+)/)?.[1] ?? '';
     return (
-      <div className={`flex flex-col items-center justify-center shrink-0 text-white ${tone === 'enter' ? 'bg-orange-500' : 'bg-blue-400'}`} style={{ width: 42 }}>
-        {tone === 'standby' ? (
-          <>
-            <span className="text-[8px] font-bold leading-none opacity-85">控え</span>
-            <span className="text-xl font-black leading-none mt-0.5">{num}</span>
-          </>
-        ) : (
-          <>
-            <span className="text-2xl font-black leading-none">{num}</span>
-            <span className="text-[8px] font-bold leading-none opacity-85 mt-0.5">番へ</span>
-          </>
-        )}
+      <div className="flex flex-col items-center justify-center shrink-0 text-white bg-blue-400" style={{ width: 42 }}>
+        <span className="text-[8px] font-bold leading-none opacity-85">控え</span>
+        <span className="text-xl font-black leading-none mt-0.5">{num}</span>
       </div>
     );
   };
+
+  // 空きコートが出て入れる状態の左端。どのコートに入れるかはタップ後に選ぶので、
+  // コート番号は表示しない（運営＝緑でタップしてコート選択、観戦用＝オレンジの案内）。
+  const enterColumn = (interactive: boolean) => (
+    <div
+      className={`flex flex-col items-center justify-center shrink-0 text-white ${interactive ? 'bg-green-600' : 'bg-orange-500'}`}
+      style={{ width: 42 }}
+    >
+      {interactive ? (
+        <>
+          <Play className="w-4 h-4" />
+          <span className="text-[8px] font-bold leading-none opacity-90 mt-0.5">コート</span>
+          <span className="text-[8px] font-bold leading-none opacity-90">選択</span>
+        </>
+      ) : (
+        <>
+          <span className="text-[9px] font-bold leading-none opacity-90">次に</span>
+          <span className="text-[9px] font-bold leading-none opacity-90 mt-0.5">入ります</span>
+        </>
+      )}
+    </div>
+  );
 
   // --- 2回戦以降のマッチノード ---
   const matchElements: React.ReactNode[] = [];
@@ -402,17 +414,21 @@ export default function CourtBracketView({
         : '';
 
       // 枠の配色（点滅は枠のみ・カード内はそのまま = bracket-card-blink）
+      // 控え1〜5は青枠点滅（順番待ち）、空きコートが出て入れる状態はオレンジ枠点滅。
+      const isStandby = !!(matchResult?.standbyLabel && bothPlayers && !isPlaying && !isFinished);
       const cardClass = isFinished
         ? (isFinal ? 'border-2 border-amber-500 bg-amber-50' : 'border border-gray-400 bg-white')
         : isPlaying
           ? 'border-2 border-green-500 bg-green-50 bracket-card-blink'
           : isEnterable
             ? 'border-2 border-orange-400 bg-orange-50 enter-court-orange-blink'
-            : isReady
-              ? 'border border-blue-400 bg-blue-50'
-              : isVs
-                ? 'border border-gray-300 bg-white'
-                : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
+            : isStandby
+              ? 'border-2 border-blue-400 bg-white enter-card-blink'
+              : isReady
+                ? 'border border-blue-400 bg-blue-50'
+                : isVs
+                  ? 'border border-gray-300 bg-white'
+                  : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
 
       let content: React.ReactNode;
       if (isFinished) {
@@ -438,9 +454,9 @@ export default function CourtBracketView({
             {isPlaying
               ? courtColumn(matchResult!.courtName, 'playing')
               : matchResult!.enterCourtName
-                ? standbyColumn(matchResult!.enterCourtName, 'enter')
+                ? enterColumn(!!onEnterCourt)
                 : matchResult!.standbyLabel
-                  ? standbyColumn(matchResult!.standbyLabel, 'standby')
+                  ? standbyColumn(matchResult!.standbyLabel)
                   : null}
             <div className="flex-1 flex flex-col justify-center min-w-0 px-2 gap-0.5">
               {playerRow(matchResult!.player1EntryId, matchResult!.player1Name, 'p1', dim)}

@@ -12,6 +12,7 @@ import ScoreInputDialog from '../score/ScoreInputDialog';
 import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import { useStandbyMap, matchKey } from '../referee/standbyRanking';
+import CourtPickDialog from '../../components/ui/CourtPickDialog';
 
 function getGameRulesText(evt: Event | undefined): string {
   if (!evt) return '';
@@ -255,27 +256,80 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     };
   }, [enableScoreInput, selectedMatchKey, matches, selectedEvent]);
 
-  // 空きコートに入れる（enterCourtName付きの待機試合をタップ）→ そのコートで試合開始
-  const handleEnterCourt = useCallback(async (round: number, position: number) => {
-    const m = matches.find(mt => mt.round === round && mt.position === position);
-    if (!m || m.id == null) return;
-    const sb = standbyMap.get(matchKey(m));
-    const courtName = sb?.enterCourtName;
-    if (!courtName) return;
-    const court = (courts || []).find(c => c.name === courtName && c.isAvailable);
+  // --- コート選択（タップした試合をどのコートに入れるか運営が選ぶ）---
+  /** コート選択ダイアログの対象 "round-position" */
+  const [courtPickKey, setCourtPickKey] = useState<string | null>(null);
+
+  // 大会全体の進行中試合（他種目のコート使用も見て空きコートを判定する）
+  const playingMatches = useLiveQuery(async () => {
+    if (!currentTournamentId) return [];
+    const evs = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+    const ids = evs.map(e => e.eventId);
+    if (ids.length === 0) return [];
+    const all = await db.matches.where('eventId').anyOf(ids).toArray();
+    return all.filter(m => m.status === 'playing');
+  }, [currentTournamentId]) || [];
+
+  /**
+   * コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+   * 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
+   */
+  const courtPickList = useMemo(() => {
+    const idToName = new Map(courts.map(c => [c.courtId, c.name]));
+    const usedNames = new Set<string>();
+    for (const m of playingMatches) {
+      const n = m.courtId ? idToName.get(m.courtId) : undefined;
+      if (n) usedNames.add(n);
+    }
+    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+    const seen = new Set<string>();
+    const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
+    for (const c of sorted) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      const status = c.isAvailable === false
+        ? 'unavailable'
+        : usedNames.has(c.name) ? 'playing' : 'empty';
+      list.push({ courtId: c.courtId, name: c.name, status });
+    }
+    return list;
+  }, [courts, playingMatches]);
+
+  /** コート選択ダイアログの対象試合 */
+  const courtPickMatch = useMemo(() => {
+    if (!courtPickKey) return null;
+    const [rs, ps] = courtPickKey.split('-');
+    const round = parseInt(rs), position = parseInt(ps);
+    if (isNaN(round) || isNaN(position)) return null;
+    return matches.find(mt => mt.round === round && mt.position === position) || null;
+  }, [courtPickKey, matches]);
+
+  // 空きコートに入れる（enterCourtName付きの待機試合をタップ）→ コート選択ダイアログを開く。
+  // 以前はここで対戦順の「次に入るコート」を自動で決めてしまい、運営がコートを
+  // 選べなかったため、対戦順シートと同じ選択ダイアログを経由するようにした。
+  const handleEnterCourt = (round: number, position: number) => {
+    setCourtPickKey(`${round}-${position}`);
+  };
+
+  // 選んだコートへ実際に投入する
+  const enterSelectedCourt = async (courtId: string) => {
+    const target = courtPickMatch;
+    setCourtPickKey(null);
+    if (!target?.id) return;
+    const court = (courts || []).find(c => c.courtId === courtId);
     if (!court) return;
     // 他種目を含め、そのコートで進行中の試合があれば投入しない（1コート2試合を防ぐ）
-    const occupied = await findOccupyingMatch(court.courtId, m.id);
+    const occupied = await findOccupyingMatch(court.courtId, target.id);
     if (occupied) {
       alert(occupiedMessage(court.name, occupied));
       return;
     }
-    await db.matches.update(m.id, {
+    await db.matches.update(target.id, {
       courtId: court.courtId,
       status: 'playing',
       updatedAt: Date.now(),
     });
-  }, [matches, standbyMap, courts]);
+  };
 
   if (!currentTournamentId) {
     return (
@@ -454,6 +508,19 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
           requiredGames={resolveRequiredGames(getGameRuleText(selectedEvent, selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
+        />
+      )}
+
+      {/* コート選択（ドロー上のカードをタップしたとき。自動で決めずに運営が選ぶ） */}
+      {courtPickMatch && (
+        <CourtPickDialog
+          eventName={selectedEvent?.name || ''}
+          roundName={getRoundName(courtPickMatch.round, totalRounds)}
+          player1Name={courtPickMatch.player1Name}
+          player2Name={courtPickMatch.player2Name}
+          courts={courtPickList}
+          onSelect={enterSelectedCourt}
+          onClose={() => setCourtPickKey(null)}
         />
       )}
     </div>
