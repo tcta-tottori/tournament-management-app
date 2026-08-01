@@ -23,6 +23,12 @@ import type {
 /** リモートから適用中の変更を再ブロードキャストしないためのフラグ */
 let isApplyingRemote = false;
 
+/**
+ * サーバーキャッシュ登録の最大待ち時間。
+ * ライブスコアのように変更が続く間もこの間隔では必ず登録する。
+ */
+const MAX_CACHE_PUSH_WAIT_MS = 60000;
+
 /** 同期エンジンのシングルトン */
 class SyncEngine {
   private broadcastTransport: BroadcastTransport;
@@ -42,6 +48,8 @@ class SyncEngine {
   private appDebounce: ReturnType<typeof setTimeout> | null = null;
   /** サーバーキャッシュへの完全スナップショット送信デバウンスタイマー */
   private cachePushDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** 直近にサーバーキャッシュへ登録した時刻（デバウンスが延び続けるのを防ぐ） */
+  private lastCachePushAt = 0;
   /** 観戦モードでデータが届くまでスナップショットを要求し続けるタイマー */
   private viewerRetryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -82,6 +90,11 @@ class SyncEngine {
     // 未送信キューの件数をストアへ反映（切断中の警告表示に使う）
     this.wsTransport.onQueueChange((count) => {
       useSyncStore.getState().setPendingChanges(count);
+    });
+
+    // 中継サーバーとの往復時間をストアへ反映（ライブスコアの遅延表示用）
+    this.wsTransport.onLatency((ms) => {
+      useSyncStore.getState().setLatencyMs(ms);
     });
   }
 
@@ -238,6 +251,7 @@ class SyncEngine {
     store.clearPeers();
     store.setRoomCode('');
     store.resetPending();
+    store.setLatencyMs(null);
   }
 
   /** アクティブかどうか */
@@ -302,8 +316,11 @@ class SyncEngine {
       timestamp: Date.now(),
       payload,
     });
-    // 変更後の最新状態をサーバーキャッシュへ反映（後発の観戦端末向け）
-    this.schedulePushSnapshotToCache();
+    // 変更後の最新状態をサーバーキャッシュへ反映（後発の観戦端末向け）。
+    // ライブスコアは1ポイント毎に更新されるため、毎回フルスナップショットを
+    // 作り直すと重い。配信自体は上のブロードキャストで即時に届くので、
+    // キャッシュの更新間隔だけ長めに取る。
+    this.schedulePushSnapshotToCache(payload.table === 'liveScores' ? 20000 : 3000);
   }
 
   /** Zustand のスナップショットをブロードキャスト */
@@ -402,6 +419,7 @@ class SyncEngine {
     const tables = [
       'tournaments', 'players', 'furiganaDict', 'events',
       'entries', 'draws', 'matches', 'courts', 'affiliationFurigana',
+      'liveScores',
     ] as const;
 
     for (const tableName of tables) {
@@ -552,6 +570,8 @@ class SyncEngine {
       courts: 'courtId',
       furiganaDict: 'name',
       affiliationFurigana: 'name',
+      // ライブスコアも matchId が種目間で重複しうるため eventId で絞り込む
+      liveScores: 'matchId',
     };
     return map[table] || null;
   }
@@ -681,11 +701,23 @@ class SyncEngine {
     }
   }
 
-  /** 最新の完全スナップショットをサーバーキャッシュへ登録（デバウンス） */
+  /**
+   * 最新の完全スナップショットをサーバーキャッシュへ登録（デバウンス）。
+   * 変更が途切れずに続くとデバウンスが延び続けてしまうため、
+   * 前回の登録から一定時間（MAX_CACHE_PUSH_WAIT_MS）が過ぎていれば必ず登録する。
+   */
   private schedulePushSnapshotToCache(delayMs = 3000): void {
     if (this.viewerMode || !this.active) return;
+    const since = Date.now() - this.lastCachePushAt;
+    if (this.lastCachePushAt > 0 && since >= MAX_CACHE_PUSH_WAIT_MS) {
+      if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
+      this.cachePushDebounce = null;
+      void this.pushSnapshotToCache();
+      return;
+    }
     if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
     this.cachePushDebounce = setTimeout(() => {
+      this.cachePushDebounce = null;
       void this.pushSnapshotToCache();
     }, delayMs);
   }
@@ -712,6 +744,7 @@ class SyncEngine {
     }
     if (!hasData) return;
     try {
+      this.lastCachePushAt = Date.now();
       this.wsTransport.sendCache(await this.buildSnapshotMessage());
     } catch (err) {
       console.warn('[Sync] スナップショットキャッシュ登録エラー:', err);
@@ -721,7 +754,7 @@ class SyncEngine {
   private async exportDexieData() {
     const tables = [
       'tournaments', 'players', 'events', 'entries',
-      'draws', 'matches', 'courts',
+      'draws', 'matches', 'courts', 'liveScores',
     ];
     const result: { table: string; rows: Record<string, unknown>[] }[] = [];
     for (const t of tables) {

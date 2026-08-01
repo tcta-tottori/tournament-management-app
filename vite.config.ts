@@ -22,6 +22,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        // 既定の2MiBではメインバンドルがプリキャッシュ対象から外れ、
+        // オフライン起動できなくなるため上限を引き上げる。
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,

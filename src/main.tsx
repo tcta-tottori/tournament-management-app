@@ -68,6 +68,8 @@ import PublicBracketView from './features/view/PublicBracketView';
 import PublicLiveView from './features/view/PublicLiveView';
 import PublicDrawView from './features/view/PublicDrawView';
 import PublicMatchOrderView from './features/view/PublicMatchOrderView';
+import PublicLiveScoreView from './features/view/PublicLiveScoreView';
+import LiveScorePage from './features/livescore/LiveScorePage';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -76,6 +78,9 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/live" element={<LiveDashboard />} />
 
+        {/* ライブスコア入力（コートサイド用の専用画面・運営メニュー無し） */}
+        <Route path="/live-score" element={<LiveScorePage />} />
+
         {/* 参加者・HP向け公開ビュー（運営メニューなし・読み取り専用） */}
         <Route path="/view" element={<PublicLayout />}>
           <Route index element={<Navigate to="/view/league" replace />} />
@@ -83,6 +88,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="bracket" element={<PublicBracketView />} />
           <Route path="draw" element={<PublicDrawView />} />
           <Route path="order" element={<PublicMatchOrderView />} />
+          <Route path="livescore" element={<PublicLiveScoreView />} />
           <Route path="live" element={<PublicLiveView />} />
         </Route>
 

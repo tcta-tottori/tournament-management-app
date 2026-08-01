@@ -184,6 +184,70 @@ export interface AffiliationFurigana {
 }
 
 // ---------------------------
+// 10. ライブスコア (LiveScore)
+// 1ポイントごとの進行状況を保持し、観戦ページへリアルタイム配信する。
+// 論理キーは matchId（種目間で重複しうるため eventId と併せて特定する）。
+// ---------------------------
+
+/** 1セット分のゲーム数（タイブレークで決着した場合は内訳も保持） */
+export interface LiveScoreSet {
+  p1: number;
+  p2: number;
+  /** タイブレーク（またはファイナル10ポイントSTB）の得点内訳 */
+  tb?: { p1: number; p2: number };
+}
+
+/** ライブスコアの進行ルール */
+export interface LiveScoreConfig {
+  /** 試合方式 */
+  format: MatchFormatType;
+  /** 1セットの必要ゲーム数（8ゲームマッチなら8） */
+  targetGames: number;
+  /** ノーアド（デュースなし）方式か */
+  noAd: boolean;
+  /** 通常タイブレークの目標点（既定7・2点差） */
+  tiebreakTo: number;
+  /** ファイナルセットのスーパータイブレーク目標点（既定10・2点差） */
+  superTiebreakTo: number;
+}
+
+export interface LiveScore {
+  id?: number;
+  matchId: string;         // 論理キー（Match.matchId）
+  eventId: string;
+  tournamentId: string;
+  eventName: string;
+  roundName: string;
+  matchOrder: number;
+  courtId: string | null;
+  courtName: string;
+  player1Name: string;
+  player2Name: string;
+  player1Affiliation: string;
+  player2Affiliation: string;
+  player1EntryId: string | null;
+  player2EntryId: string | null;
+  player1Seed?: number;
+  player2Seed?: number;
+  config: LiveScoreConfig;
+  /** セットごとのゲーム数（末尾が進行中のセット） */
+  sets: LiveScoreSet[];
+  /** 現在のゲームのポイント（0,1,2,3=40, 4=AD / タイブレーク中は実点数） */
+  p1Points: number;
+  p2Points: number;
+  isTiebreak: boolean;
+  isSuperTiebreak: boolean;
+  /** サーブ側 */
+  server: 1 | 2;
+  status: 'live' | 'finished';
+  winner: 1 | 2 | null;
+  /** 直近のポイント取得者（表示のハイライト用） */
+  lastPointBy: 1 | 2 | null;
+  startedAt: number;
+  updatedAt: number;
+}
+
+// ---------------------------
 // データベースクラス定義
 // ---------------------------
 const db = new Dexie('TennisTournamentDB') as Dexie & {
@@ -196,6 +260,7 @@ const db = new Dexie('TennisTournamentDB') as Dexie & {
   matches: EntityTable<Match, 'id'>;
   courts: EntityTable<Court, 'id'>;
   affiliationFurigana: EntityTable<AffiliationFurigana, 'id'>;
+  liveScores: EntityTable<LiveScore, 'id'>;
 };
 
 // スキーマのバージョン定義
@@ -218,6 +283,12 @@ db.version(3).stores({
 
 db.version(4).stores({
   affiliationFurigana: '++id, &name'
+});
+
+// ライブスコア（1ポイントごとの実況配信用）
+// matchId は種目間で重複しうるため一意制約は付けない（eventId と併せて特定する）
+db.version(5).stores({
+  liveScores: '++id, matchId, eventId, status'
 });
 
 export { db };

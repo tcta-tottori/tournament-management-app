@@ -46,6 +46,11 @@ export class WebSocketTransport implements SyncTransport {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   /** 復帰トリガ（画面復帰・オンライン復帰）の解除関数 */
   private wakeUnsubscribe: (() => void) | null = null;
+  /** 直近の ping 送信時刻（往復時間の計測用） */
+  private pingSentAt = 0;
+  /** 中継サーバーとの往復時間(ms)。ライブスコアの配信遅延の目安 */
+  private latencyMs: number | null = null;
+  private latencyHandlers: ((ms: number) => void)[] = [];
 
   constructor(serverUrl?: string) {
     if (serverUrl) this.serverUrl = serverUrl;
@@ -187,6 +192,16 @@ export class WebSocketTransport implements SyncTransport {
     return this.state;
   }
 
+  /** 中継サーバーとの往復時間(ms)の変化を購読 */
+  onLatency(handler: (ms: number) => void): void {
+    this.latencyHandlers.push(handler);
+  }
+
+  /** 直近に計測した往復時間(ms)。未計測なら null */
+  getLatencyMs(): number | null {
+    return this.latencyMs;
+  }
+
   /** 切断していれば即座に再接続を試みる（画面復帰時などに使う） */
   reconnectNow(): void {
     if (this.intentionalClose || !this.serverUrl || !this.roomCode) return;
@@ -284,6 +299,15 @@ export class WebSocketTransport implements SyncTransport {
       if (!isCurrent()) return;
       try {
         const data = JSON.parse(event.data as string);
+        // ping への応答。往復時間を計測してライブスコアの遅延表示に使う
+        if (data && data.action === 'pong') {
+          if (this.pingSentAt > 0) {
+            this.latencyMs = Math.max(0, Date.now() - this.pingSentAt);
+            this.pingSentAt = 0;
+            for (const h of this.latencyHandlers) h(this.latencyMs);
+          }
+          return;
+        }
         // サーバーからのブロードキャストメッセージ
         if (data && data.type && data.deviceId) {
           const msg = data as SyncMessage;
@@ -336,13 +360,17 @@ export class WebSocketTransport implements SyncTransport {
 
   private startPing(): void {
     this.stopPing();
-    this.pingTimer = setInterval(() => {
+    const ping = () => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
+          this.pingSentAt = Date.now();
           this.ws.send(JSON.stringify({ action: 'ping' }));
         } catch { /* ignore */ }
       }
-    }, 30000);
+    };
+    // 接続直後に1回計測し、以降は定期的に更新する
+    ping();
+    this.pingTimer = setInterval(ping, 15000);
   }
 
   private stopPing(): void {
