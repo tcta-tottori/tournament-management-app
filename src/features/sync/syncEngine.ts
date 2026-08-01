@@ -42,6 +42,8 @@ class SyncEngine {
   private appDebounce: ReturnType<typeof setTimeout> | null = null;
   /** サーバーキャッシュへの完全スナップショット送信デバウンスタイマー */
   private cachePushDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** 観戦モードでデータが届くまでスナップショットを要求し続けるタイマー */
+  private viewerRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.broadcastTransport = new BroadcastTransport();
@@ -61,6 +63,17 @@ class SyncEngine {
       if (state === 'connected' && this.active && !this.viewerMode) {
         this.schedulePushSnapshotToCache(1500);
       }
+    });
+
+    // WebSocket が開いた直後に握手をやり直す。
+    // start() 時点ではソケットがまだ開いておらず、device-hello /
+    // request-snapshot は送信キューからも捨てられるため、中継サーバー経由の
+    // 他端末には届かない（同一端末の別タブは BroadcastChannel で届くため、
+    // 「別端末だけ観戦できない」状態になっていた）。
+    this.wsTransport.onOpen(() => {
+      if (!this.active) return;
+      this.sendHandshake();
+      if (this.viewerMode) this.startViewerRetry();
     });
     this.broadcastTransport.onStateChange(() => {
       this.updateConnectionState();
@@ -113,25 +126,69 @@ class SyncEngine {
       this.schedulePushSnapshotToCache(2000);
     }
 
-    // 自分の参加を通知
-    this.broadcast({
-      type: 'device-hello',
-      deviceId: store.deviceId,
-      deviceName: store.deviceName,
-      roomCode,
-      timestamp: Date.now(),
-      payload: null,
-    });
+    // 参加通知＋スナップショット要求（同一端末の別タブ向け。
+    // 中継サーバー経由の分は接続完了時 onOpen で改めて送る）
+    this.sendHandshake();
+  }
 
-    // 既存デバイスにスナップショットを要求
-    this.broadcast({
-      type: 'request-snapshot',
+  /** 参加通知とスナップショット要求をまとめて送る */
+  private sendHandshake(): void {
+    const store = useSyncStore.getState();
+    const base = {
       deviceId: store.deviceId,
       deviceName: store.deviceName,
-      roomCode,
-      timestamp: Date.now(),
+      roomCode: this.roomCode,
       payload: null,
-    });
+    };
+    this.broadcast({ ...base, type: 'device-hello', timestamp: Date.now() });
+    this.broadcast({ ...base, type: 'request-snapshot', timestamp: Date.now() });
+  }
+
+  /**
+   * 観戦モードでデータが届くまでスナップショット要求を繰り返す。
+   * 運営端末が後から接続した場合や、中継サーバーのキャッシュが
+   * まだ無い場合でも、放置せず自動的に追いつけるようにする。
+   */
+  private startViewerRetry(): void {
+    this.stopViewerRetry();
+    let attempts = 0;
+    this.viewerRetryTimer = setInterval(() => {
+      if (!this.active || !this.viewerMode) {
+        this.stopViewerRetry();
+        return;
+      }
+      // 既にデータを受信済みなら要求を止める
+      if (useSyncStore.getState().lastSyncAt) {
+        this.stopViewerRetry();
+        return;
+      }
+      attempts++;
+      // 応答が無いまま要求し続けても無駄なので、約2分半で打ち切る
+      // （以降は運営端末の device-hello 受信か「再読み込み」で再開する）
+      if (attempts > 30) {
+        this.stopViewerRetry();
+        return;
+      }
+      this.requestLatestFromPeers();
+    }, 5000);
+  }
+
+  private stopViewerRetry(): void {
+    if (this.viewerRetryTimer) {
+      clearInterval(this.viewerRetryTimer);
+      this.viewerRetryTimer = null;
+    }
+  }
+
+  /**
+   * 観戦端末から手動でデータを取り直す（「再読み込み」ボタン用）。
+   * 切断していれば接続からやり直す。
+   */
+  refreshViewer(): void {
+    if (!this.active) return;
+    this.wsTransport.reconnectNow();
+    this.sendHandshake();
+    if (this.viewerMode) this.startViewerRetry();
   }
 
   /** 観戦モードかどうか */
@@ -174,6 +231,7 @@ class SyncEngine {
     if (this.teamDebounce) clearTimeout(this.teamDebounce);
     if (this.appDebounce) clearTimeout(this.appDebounce);
     if (this.cachePushDebounce) clearTimeout(this.cachePushDebounce);
+    this.stopViewerRetry();
 
     store.setSyncEnabled(false);
     store.setConnectionState('disconnected');
@@ -307,9 +365,9 @@ class SyncEngine {
           joinedAt: Date.now(),
           lastSeen: Date.now(),
         });
-        // 観戦端末が先に接続し、後から運営端末が現れた場合に備えて
-        // 新しい端末を検知したらスナップショットを再要求する。
         if (this.viewerMode) {
+          // 観戦端末が先に接続し、後から運営端末が現れた場合に備えて
+          // 新しい端末を検知したらスナップショットを再要求する。
           this.broadcast({
             type: 'request-snapshot',
             deviceId: store.deviceId,
@@ -318,6 +376,11 @@ class SyncEngine {
             timestamp: Date.now(),
             payload: null,
           });
+        } else {
+          // 運営端末側: 新しい端末（観戦端末を含む）が来たら
+          // サーバーキャッシュを最新化しておく。以降に参加する
+          // 観戦端末が運営端末の応答を待たずに閲覧できる。
+          this.schedulePushSnapshotToCache(1000);
         }
         break;
 
@@ -635,11 +698,18 @@ class SyncEngine {
   private async pushSnapshotToCache(): Promise<void> {
     if (this.viewerMode || !this.active) return;
     if (!this.wsTransport.isOpen()) return; // 中継サーバー未接続なら送らない
-    // 共有すべきデータが無ければ送らない（個人戦は選択中大会IDの有無で判定）
-    const hasData =
+    // 共有すべきデータが無ければ送らない。
+    // 個人戦は大会が選択されていなくても、DBに大会があれば観戦側で表示できる
+    // （観戦ページは選択中大会が無ければ最新の大会にフォールバックする）。
+    let hasData =
       useMixedStore.getState().isImported ||
       useTeamStore.getState().isImported ||
       !!useAppStore.getState().currentTournamentId;
+    if (!hasData) {
+      try {
+        hasData = (await db.tournaments.count()) > 0;
+      } catch { /* DB未初期化などは無視 */ }
+    }
     if (!hasData) return;
     try {
       this.wsTransport.sendCache(await this.buildSnapshotMessage());
@@ -681,14 +751,23 @@ class SyncEngine {
   private async applyFullSnapshot(payload: SnapshotResponsePayload): Promise<void> {
     isApplyingRemote = true;
     try {
-      // Dexie データのインポート
+      // Dexie データのインポート。
+      // clear() + bulkAdd() だと、画面表示中（liveQuery 購読中）の観戦端末で
+      // Dexie のキャッシュ層が壊れて描画エラーになることがあるため、
+      // 1トランザクション内で「差分削除 + bulkPut」に置き換えている。
       if (payload.dexie) {
         for (const tableData of payload.dexie) {
           if (tableData.rows.length === 0) continue;
           const table = db.table(tableData.table);
-          // 既存データをクリアして上書き
-          await table.clear();
-          await table.bulkAdd(tableData.rows);
+          const incomingIds = new Set<unknown>(
+            tableData.rows.map(r => r.id).filter(v => v != null)
+          );
+          await db.transaction('rw', table, async () => {
+            const localIds: unknown[] = await table.toCollection().primaryKeys();
+            const stale = localIds.filter(id => !incomingIds.has(id));
+            if (stale.length > 0) await table.bulkDelete(stale);
+            await table.bulkPut(tableData.rows);
+          });
         }
       }
       // Zustand データのインポート

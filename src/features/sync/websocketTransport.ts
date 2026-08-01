@@ -7,8 +7,13 @@ import type { SyncMessage, SyncTransport, SyncConnectionState } from './types';
 
 /** 再接続の指数バックオフ設定 */
 const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30000;
-const RECONNECT_MAX_ATTEMPTS = 20;
+const RECONNECT_MAX_MS = 15000;
+/**
+ * 再接続の指数バックオフの上限段数。
+ * 試行そのものは打ち切らない（観戦端末は一日中開きっぱなしになるため、
+ * 一定回数で諦めると復帰できなくなる）。待ち時間だけ RECONNECT_MAX_MS で頭打ちにする。
+ */
+const RECONNECT_BACKOFF_STEPS = 6;
 
 /** WebSocket 中継サーバー宛のメッセージラッパー */
 interface WsEnvelope {
@@ -29,6 +34,8 @@ export class WebSocketTransport implements SyncTransport {
   private viewer = false;
   private messageHandlers: ((msg: SyncMessage) => void)[] = [];
   private stateHandlers: ((state: SyncConnectionState) => void)[] = [];
+  /** 接続が開いた（join 送信済み）タイミングの通知先 */
+  private openHandlers: (() => void)[] = [];
   /** 切断中に送れなかった変更を保持し、再接続時に送信するキュー */
   private outboundQueue: SyncMessage[] = [];
   private queueHandlers: ((count: number) => void)[] = [];
@@ -37,6 +44,8 @@ export class WebSocketTransport implements SyncTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalClose = false;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  /** 復帰トリガ（画面復帰・オンライン復帰）の解除関数 */
+  private wakeUnsubscribe: (() => void) | null = null;
 
   constructor(serverUrl?: string) {
     if (serverUrl) this.serverUrl = serverUrl;
@@ -56,17 +65,18 @@ export class WebSocketTransport implements SyncTransport {
     this.roomCode = roomCode;
     this.intentionalClose = false;
     this.reconnectAttempt = 0;
+    this.setupWakeTriggers();
     this.doConnect();
   }
 
   disconnect(): void {
     this.intentionalClose = true;
     this.clearTimers();
+    this.teardownWakeTriggers();
     if (this.ws) {
       // leave メッセージを送信
       this.sendEnvelope({ action: 'leave', roomCode: this.roomCode });
-      this.ws.close();
-      this.ws = null;
+      this.closeSocket();
     }
     // 意図的な切断（同期停止）ではキューを破棄する
     if (this.outboundQueue.length > 0) {
@@ -164,27 +174,100 @@ export class WebSocketTransport implements SyncTransport {
     this.stateHandlers.push(handler);
   }
 
+  /**
+   * 接続が確立して join を送り終えたタイミングを購読する。
+   * device-hello / request-snapshot などの制御メッセージは
+   * ソケットが開く前に送っても捨てられるため、ここで送り直す必要がある。
+   */
+  onOpen(handler: () => void): void {
+    this.openHandlers.push(handler);
+  }
+
   getState(): SyncConnectionState {
     return this.state;
   }
 
+  /** 切断していれば即座に再接続を試みる（画面復帰時などに使う） */
+  reconnectNow(): void {
+    if (this.intentionalClose || !this.serverUrl || !this.roomCode) return;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempt = 0;
+    this.doConnect();
+  }
+
   // === 内部実装 ===
 
-  private doConnect(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+  /**
+   * スマホでは画面を閉じている間に WebSocket が切られることが多く、
+   * バックオフ待ちのまま復帰が遅れて「観戦ページが止まって見える」原因になる。
+   * 画面復帰・オンライン復帰を検知して即座に張り直す。
+   */
+  private setupWakeTriggers(): void {
+    if (this.wakeUnsubscribe || typeof window === 'undefined') return;
+    const onWake = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      this.reconnectNow();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('online', onWake);
+    window.addEventListener('focus', onWake);
+    window.addEventListener('pageshow', onWake);
+    this.wakeUnsubscribe = () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('online', onWake);
+      window.removeEventListener('focus', onWake);
+      window.removeEventListener('pageshow', onWake);
+    };
+  }
+
+  /** 現在のソケットのハンドラを外して閉じる（再接続の連鎖を断ち切る） */
+  private closeSocket(): void {
+    const ws = this.ws;
+    if (!ws) return;
+    this.ws = null;
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onclose = null;
+    ws.onerror = null;
+    try {
+      ws.close();
+    } catch {
+      // 既に閉じている場合は無視
     }
+  }
+
+  private teardownWakeTriggers(): void {
+    if (this.wakeUnsubscribe) {
+      this.wakeUnsubscribe();
+      this.wakeUnsubscribe = null;
+    }
+  }
+
+  private doConnect(): void {
+    // 既存ソケットを閉じるときはハンドラを外してから閉じる。
+    // 外さないと、閉じた古いソケットの onclose が再接続を予約し、
+    // その再接続が今のソケットをまた閉じる…という無限ループになり、
+    // 観戦端末の接続が1秒おきに切れ続けて配信を取りこぼしていた。
+    this.closeSocket();
     this.setState(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
 
+    let ws: WebSocket;
     try {
-      this.ws = new WebSocket(this.serverUrl);
+      ws = new WebSocket(this.serverUrl);
     } catch {
       this.scheduleReconnect();
       return;
     }
+    this.ws = ws;
+    // 古いソケットのイベントで状態を動かさないよう、常に現行ソケットか確認する
+    const isCurrent = () => this.ws === ws;
 
     this.ws.onopen = () => {
+      if (!isCurrent()) return;
       this.reconnectAttempt = 0;
       this.setState('connected');
       // ルームに参加
@@ -193,9 +276,12 @@ export class WebSocketTransport implements SyncTransport {
       this.flushQueue();
       // 定期 ping
       this.startPing();
+      // 制御メッセージ（hello / スナップショット要求）はここで初めて送れる
+      for (const h of this.openHandlers) h();
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
+      if (!isCurrent()) return;
       try {
         const data = JSON.parse(event.data as string);
         // サーバーからのブロードキャストメッセージ
@@ -211,6 +297,8 @@ export class WebSocketTransport implements SyncTransport {
     };
 
     this.ws.onclose = () => {
+      if (!isCurrent()) return;
+      this.ws = null;
       this.stopPing();
       if (!this.intentionalClose) {
         this.scheduleReconnect();
@@ -236,13 +324,10 @@ export class WebSocketTransport implements SyncTransport {
 
   private scheduleReconnect(): void {
     if (this.intentionalClose) return;
-    if (this.reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
-      this.setState('disconnected');
-      return;
-    }
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.setState('reconnecting');
     const delay = Math.min(
-      RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempt),
+      RECONNECT_BASE_MS * Math.pow(2, Math.min(this.reconnectAttempt, RECONNECT_BACKOFF_STEPS)),
       RECONNECT_MAX_MS
     );
     this.reconnectAttempt++;

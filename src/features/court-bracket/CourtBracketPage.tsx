@@ -5,7 +5,7 @@ import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { useAppStore } from '../../stores/appStore';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -13,6 +13,8 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import { useStandbyMap, matchKey } from '../referee/standbyRanking';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
+import EventResultPreview from '../results/EventResultPreview';
+import { isEventComplete } from '../results/eventCompletion';
 
 function getGameRulesText(evt: Event | undefined): string {
   if (!evt) return '';
@@ -228,6 +230,44 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     return { total, finished, playing, pct };
   }, [matches]);
 
+  // クラスの全試合が終わっていれば、結果画像のプレビュー→JPEG保存を出す
+  const tournament = useLiveQuery(
+    () => (currentTournamentId
+      ? db.tournaments.where('tournamentId').equals(currentTournamentId).first()
+      : undefined),
+    [currentTournamentId]
+  );
+  const resultPreviewOpts = useMemo(() => {
+    if (!tournament || !selectedEvent || !drawData) return null;
+    if (!isEventComplete(drawData, matches)) return null;
+    return { tournament, event: selectedEvent, draw: drawData, matches, entries, players };
+  }, [tournament, selectedEvent, drawData, matches, entries, players]);
+
+  // ---- 表示回戦の絞り込み ----
+  // 回戦が進むほどトーナメント表は対戦相手同士が上下に離れて見にくくなる。
+  // 決着済みの前半の回戦を隠して、残りを詰めて表示できるようにする。
+  // null = 自動（決着済みの回戦を自動で省略）
+  // 種目を切り替えたら自動に戻したいので、対象の種目IDも一緒に保持する。
+  const [roundOverride, setRoundOverride] = useState<{ eventId: string; value: number } | null>(null);
+
+  /** その回戦の試合がすべて決着しているか（BYE等の片側だけの枠は無視） */
+  const isRoundSettled = useCallback((round: number) => {
+    const rm = matches.filter(m => m.round === round);
+    if (rm.length === 0) return false;
+    return rm.every(m => {
+      if (!m.player1EntryId || !m.player2EntryId) return true;
+      return m.status === 'finished' || m.status === 'walkover';
+    });
+  }, [matches]);
+
+  /** 自動省略: 先頭から連続して決着済みの回戦数（最低2列は残す） */
+  const autoStartRound = useMemo(() => {
+    if (totalRounds < 2) return 0;
+    let r = 0;
+    while (r < totalRounds - 1 && isRoundSettled(r + 1)) r++;
+    return r;
+  }, [totalRounds, isRoundSettled]);
+
   // ラウンドロビン判定
   const isRoundRobin = useMemo(() => {
     if (!drawData) return false;
@@ -236,6 +276,16 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     const realPlayers = slots.filter(s => !s.isBye);
     return realPlayers.length >= 2 && realPlayers.length <= 5 && drawData.drawSize <= 8;
   }, [drawData, slots]);
+
+  const maxStartRound = Math.max(0, totalRounds - 1);
+  const manualStartRound = roundOverride?.eventId === selectedEventId ? roundOverride.value : null;
+  const startRound = Math.min(manualStartRound ?? autoStartRound, maxStartRound);
+  const canAdjustRounds = !isRoundRobin && drawSize > 0 && maxStartRound >= 1;
+  const startRoundLabel = startRound === 0
+    ? '全回戦表示'
+    : `${getRoundName(startRound + 1, totalRounds)}以降`;
+  const setStartRound = (value: number | null) =>
+    setRoundOverride(value == null ? null : { eventId: selectedEventId, value });
 
   // スコア入力対象の試合（"round-position" キーから解決）
   const selectedMatch: ScoreInputMatch | null = useMemo(() => {
@@ -396,6 +446,45 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           )}
         </div>
 
+        {/* 表示回戦の絞り込み + 結果画像プレビュー */}
+        {(canAdjustRounds || resultPreviewOpts) && (
+          <div className="flex items-center justify-between gap-2 mt-1.5">
+            {canAdjustRounds ? (
+              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-1 py-0.5">
+                <button
+                  onClick={() => setStartRound(Math.max(0, startRound - 1))}
+                  disabled={startRound === 0}
+                  className="p-0.5 rounded-full text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="前の回戦を表示する"
+                  aria-label="前の回戦を表示する"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setStartRound(null)}
+                  className="flex items-center gap-1 px-1.5 text-[10px] font-bold text-gray-600 whitespace-nowrap"
+                  title="タップで自動（決着済みの回戦を省略）に戻す"
+                >
+                  {startRound === 0
+                    ? <Eye className="w-3 h-3 text-gray-400" />
+                    : <EyeOff className="w-3 h-3 text-primary-500" />}
+                  {startRoundLabel}
+                </button>
+                <button
+                  onClick={() => setStartRound(Math.min(maxStartRound, startRound + 1))}
+                  disabled={startRound >= maxStartRound}
+                  className="p-0.5 rounded-full text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="終わった回戦を隠す"
+                  aria-label="終わった回戦を隠す"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : <span />}
+            {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} size="sm" />}
+          </div>
+        )}
+
         {/* 種目タブ（小さいドット） */}
         {events.length > 1 && (
           <div className="flex items-center justify-center gap-1 mt-1.5">
@@ -426,6 +515,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             totalRounds={totalRounds}
             onMatchSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
             onEnterCourt={enableScoreInput ? handleEnterCourt : undefined}
+            startRound={startRound}
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">

@@ -93,7 +93,30 @@ function getSlotRow(round: number, index: number): number {
 
 // ===== Canvas トーナメント描画 (JPEG) =====
 
+/** Canvas を JPEG としてダウンロードさせる */
+function downloadCanvasAsJpeg(canvas: HTMLCanvasElement, fileName: string): void {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/jpeg', 0.95);
+}
+
+/** 結果画像のファイル名（ダウンロード用） */
+export function buildEventResultFileName(opts: ResultExportOptions): string {
+  return `${opts.tournament.name}_${opts.event.name}_結果.jpg`;
+}
+
 export function exportTournamentResultAsJpeg(opts: ResultExportOptions): void {
+  downloadCanvasAsJpeg(renderTournamentResultCanvas(opts), buildEventResultFileName(opts));
+}
+
+/** トーナメント表の結果を Canvas に描画して返す */
+export function renderTournamentResultCanvas(opts: ResultExportOptions): HTMLCanvasElement {
   const { tournament, event, draw, matches, entries, players } = opts;
   const slotMap = buildSlotMap(draw, entries, players);
   const matchMap = buildMatchMap(matches);
@@ -279,21 +302,31 @@ export function exportTournamentResultAsJpeg(opts: ResultExportOptions): void {
     }
   }
 
-  // JPEGダウンロード
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${tournament.name}_${event.name}_結果.jpg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, 'image/jpeg', 0.95);
+  return canvas;
 }
 
 // ===== Canvas リーグ表描画 (JPEG) =====
 
 export function exportRoundRobinResultAsJpeg(opts: ResultExportOptions): void {
+  const canvas = renderRoundRobinResultCanvas(opts);
+  if (!canvas) return;
+  downloadCanvasAsJpeg(canvas, buildEventResultFileName(opts));
+}
+
+/**
+ * 種目の結果画像をデータURLとして生成する（プレビュー用）。
+ * ドロー形式に応じてトーナメント表／リーグ表を描き分ける。
+ */
+export function generateEventResultDataUrl(opts: ResultExportOptions): string | null {
+  const canvas = opts.draw.drawType === 'roundRobin'
+    ? renderRoundRobinResultCanvas(opts)
+    : renderTournamentResultCanvas(opts);
+  if (!canvas) return null;
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
+
+/** リーグ表の結果を Canvas に描画して返す（選手が2人未満なら null） */
+export function renderRoundRobinResultCanvas(opts: ResultExportOptions): HTMLCanvasElement | null {
   const { tournament, event, draw, matches, entries, players } = opts;
   const slotMap = buildSlotMap(draw, entries, players);
 
@@ -304,7 +337,7 @@ export function exportRoundRobinResultAsJpeg(opts: ResultExportOptions): void {
     .map(s => slotMap.get(s.position)!)
     .filter(Boolean);
   const n = playerSlots.length;
-  if (n < 2) return;
+  if (n < 2) return null;
 
   // 対戦結果マトリクス
   const findMatch = (p1: SlotInfo, p2: SlotInfo): Match | undefined => {
@@ -513,16 +546,7 @@ export function exportRoundRobinResultAsJpeg(opts: ResultExportOptions): void {
   ctx.lineTo(tableX + NAME_W, tableY + tableH);
   ctx.stroke();
 
-  // JPEG出力
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${tournament.name}_${event.name}_結果.jpg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, 'image/jpeg', 0.95);
+  return canvas;
 }
 
 // ===== Excel トーナメント結果出力 =====

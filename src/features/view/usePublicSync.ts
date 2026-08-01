@@ -4,7 +4,7 @@
 // syncEngine を観戦モードで起動する
 // =============================================
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { syncEngine } from '../sync/syncEngine';
 import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../sync/syncStore';
@@ -22,6 +22,8 @@ export interface PublicSyncStatus {
   lastSyncAt: number | null;
   /** エラー */
   error: string | null;
+  /** 手動でデータを取り直す */
+  refresh: () => void;
 }
 
 /**
@@ -73,6 +75,16 @@ export function usePublicSync(): PublicSyncStatus {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, server]);
 
+  const refresh = useCallback(() => {
+    if (!room) return;
+    if (syncEngine.isActive()) {
+      syncEngine.refreshViewer();
+    } else {
+      syncEngine.start(room, server || undefined, true);
+      setStarted(true);
+    }
+  }, [room, server]);
+
   return {
     hasRoom: !!room,
     roomCode: started ? roomCode : room,
@@ -80,5 +92,6 @@ export function usePublicSync(): PublicSyncStatus {
     connectionState,
     lastSyncAt,
     error,
+    refresh,
   };
 }

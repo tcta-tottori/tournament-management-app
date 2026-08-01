@@ -27,6 +27,12 @@ interface CourtBracketViewProps {
   onMatchSelect?: (round: number, position: number) => void;
   /** 空きコートに入れる（enterCourtName付きの待機試合）ノードのクリックでコート投入 */
   onEnterCourt?: (round: number, position: number) => void;
+  /**
+   * 表示を開始する回戦（0 = 1回戦の選手一覧から表示）。
+   * 1以上を指定すると、それより前の回戦を隠して残りを詰めて描画する。
+   * 回戦が進むほど対戦相手同士が上下に離れて見にくくなるのを防ぐ。
+   */
+  startRound?: number;
 }
 
 const SLOT_HEIGHT = 36;
@@ -56,6 +62,7 @@ export default function CourtBracketView({
   totalRounds,
   onMatchSelect,
   onEnterCourt,
+  startRound = 0,
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
@@ -81,44 +88,63 @@ export default function CourtBracketView({
     return !s || s.isBye || !s.entryId;
   };
 
+  // 表示の起点となる回戦（最低でも2列は残す）
+  const leafRound = Math.min(Math.max(Math.floor(startRound), 0), Math.max(0, roundsCount - 1));
+
   // --- コンパクトY位置 ---
-  const r0Y: number[] = new Array(drawSize).fill(0);
+  // leafRound の列を「葉」として詰め、それ以降は子の中点に配置する。
+  const leafCount = drawSize / Math.pow(2, leafRound);
+  const leafY: number[] = new Array(leafCount).fill(0);
   let nextCompactY = OFFSET_Y;
-  for (let matchIdx = 0; matchIdx < drawSize / 2; matchIdx++) {
-    const topIdx = matchIdx * 2;
-    const botIdx = matchIdx * 2 + 1;
-    const topBye = isSlotBye(topIdx);
-    const botBye = isSlotBye(botIdx);
 
-    if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
-      nextCompactY += Y_SPACING * 0.8;
+  if (leafRound === 0) {
+    for (let matchIdx = 0; matchIdx < drawSize / 2; matchIdx++) {
+      const topIdx = matchIdx * 2;
+      const botIdx = matchIdx * 2 + 1;
+      const topBye = isSlotBye(topIdx);
+      const botBye = isSlotBye(botIdx);
+
+      if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
+        nextCompactY += Y_SPACING * 0.8;
+      }
+
+      if (topBye && botBye) {
+        leafY[topIdx] = nextCompactY;
+        leafY[botIdx] = nextCompactY;
+      } else if (topBye) {
+        leafY[topIdx] = nextCompactY;
+        leafY[botIdx] = nextCompactY;
+        nextCompactY += Y_SPACING;
+      } else if (botBye) {
+        leafY[topIdx] = nextCompactY;
+        leafY[botIdx] = nextCompactY;
+        nextCompactY += Y_SPACING;
+      } else {
+        leafY[topIdx] = nextCompactY;
+        leafY[botIdx] = nextCompactY + Y_SPACING;
+        nextCompactY += Y_SPACING * 2;
+      }
     }
-
-    if (topBye && botBye) {
-      r0Y[topIdx] = nextCompactY;
-      r0Y[botIdx] = nextCompactY;
-    } else if (topBye) {
-      r0Y[topIdx] = nextCompactY;
-      r0Y[botIdx] = nextCompactY;
-      nextCompactY += Y_SPACING;
-    } else if (botBye) {
-      r0Y[topIdx] = nextCompactY;
-      r0Y[botIdx] = nextCompactY;
-      nextCompactY += Y_SPACING;
-    } else {
-      r0Y[topIdx] = nextCompactY;
-      r0Y[botIdx] = nextCompactY + Y_SPACING;
-      nextCompactY += Y_SPACING * 2;
+  } else {
+    // 隠した回戦の分だけ縦に詰める。先頭列は対戦カード（背の高いvs表示）に
+    // なりうるので、カード高さ分の間隔を確保する。
+    const LEAF_SPACING = CARD_H_VS + 16;
+    for (let i = 0; i < leafCount; i++) {
+      // 上半分と下半分の間に軽い区切りを入れる
+      if (i > 0 && i === leafCount / 2) nextCompactY += LEAF_SPACING * 0.4;
+      leafY[i] = nextCompactY;
+      nextCompactY += LEAF_SPACING;
     }
   }
 
   const getCompactY = (r: number, i: number): number => {
-    if (r === 0) return r0Y[i];
+    if (r <= leafRound) return leafY[i] ?? OFFSET_Y;
     return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
   };
-  const getX = (r: number) => offsetX + r * (slotW + xSpacing);
+  const getX = (r: number) => offsetX + (r - leafRound) * (slotW + xSpacing);
 
-  const containerWidth = offsetX * 2 + roundsCount * (slotW + xSpacing) + slotW;
+  const visibleColumns = roundsCount - leafRound;
+  const containerWidth = offsetX * 2 + visibleColumns * (slotW + xSpacing) + slotW;
   const containerHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
 
   // entryId → ドロー情報（番号・氏名・所属）。全選手は1回戦スロットに存在するので
@@ -147,7 +173,7 @@ export default function CourtBracketView({
 
   // --- 回戦ヘッダー ---
   const roundHeaders: React.ReactNode[] = [];
-  for (let r = 0; r <= roundsCount; r++) {
+  for (let r = leafRound; r <= roundsCount; r++) {
     const x = getX(r);
     // 決勝の次の列（優勝者列）は「N回戦」ではなく「優勝」にする
     const displayLabel = r === 0 ? '1回戦' : r === roundsCount ? '優勝' : getRoundName(r + 1, totalRounds);
@@ -164,7 +190,7 @@ export default function CourtBracketView({
 
   // --- SVGパス ---
   const paths: React.ReactNode[] = [];
-  for (let r = 0; r < roundsCount; r++) {
+  for (let r = leafRound; r < roundsCount; r++) {
     const numMatches = drawSize / Math.pow(2, r + 1);
     for (let m = 0; m < numMatches; m++) {
       const x = getX(r) + slotW;
@@ -285,15 +311,15 @@ export default function CourtBracketView({
     }
   }
 
-  // --- 1回戦スロット ---
+  // --- 1回戦スロット（回戦を隠しているときは表示しない）---
   const slotElements: React.ReactNode[] = [];
   let visibleIndex = 0;
-  for (let i = 0; i < drawSize; i++) {
+  for (let i = 0; leafRound === 0 && i < drawSize; i++) {
     const slot = slots[i];
     if (!slot || (slot.isBye && !slot.entryId)) continue;
     visibleIndex++;
     const x = getX(0);
-    const y = r0Y[i];
+    const y = leafY[i];
 
     slotElements.push(
       <div key={`s-${slot.position}`}
@@ -382,7 +408,7 @@ export default function CourtBracketView({
 
   // --- 2回戦以降のマッチノード ---
   const matchElements: React.ReactNode[] = [];
-  for (let r = 1; r <= roundsCount; r++) {
+  for (let r = Math.max(1, leafRound); r <= roundsCount; r++) {
     const numNodes = drawSize / Math.pow(2, r);
     for (let m = 0; m < numNodes; m++) {
       const x = getX(r);

@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedResultsExport from '../mixed/MixedResultsExport';
+import EventResultPreview from './EventResultPreview';
+import { isEventComplete } from './eventCompletion';
 
 // ---------- helpers ----------
 
@@ -419,10 +421,13 @@ export default function ResultsPage() {
         const eventEntries = allEntries.filter(e => e.eventId === event.eventId);
         const isRR = draw.drawType === 'roundRobin';
 
+        // クラスの試合がすべて終わっていれば、結果画像のプレビュー→JPEG保存を出す
+        const previewOpts = isEventComplete(draw, eventMatches) ? buildExportOpts(event) : null;
+
         if (isRR) {
-          return <RoundRobinCard key={event.eventId} event={event} draw={draw} matches={eventMatches} entries={eventEntries} players={players} onExcel={() => handleEventExcel(event)} onJpeg={() => handleEventJpeg(event)} />;
+          return <RoundRobinCard key={event.eventId} event={event} draw={draw} matches={eventMatches} entries={eventEntries} players={players} previewOpts={previewOpts} onExcel={() => handleEventExcel(event)} onJpeg={() => handleEventJpeg(event)} />;
         } else {
-          return <TournamentCard key={event.eventId} event={event} draw={draw} matches={eventMatches} onExcel={() => handleEventExcel(event)} onJpeg={() => handleEventJpeg(event)} />;
+          return <TournamentCard key={event.eventId} event={event} draw={draw} matches={eventMatches} previewOpts={previewOpts} onExcel={() => handleEventExcel(event)} onJpeg={() => handleEventJpeg(event)} />;
         }
       })}
     </div>
@@ -431,10 +436,12 @@ export default function ResultsPage() {
 
 // ---------- Tournament result card ----------
 
-function TournamentCard({ event, draw, matches, onExcel, onJpeg }: {
+function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: {
   event: Event;
   draw: Draw;
   matches: Match[];
+  /** 全試合終了時のみ渡される（結果画像プレビュー用） */
+  previewOpts: ResultExportOptions | null;
   onExcel: () => void;
   onJpeg: () => void;
 }) {
@@ -455,6 +462,7 @@ function TournamentCard({ event, draw, matches, onExcel, onJpeg }: {
           </span>
         </div>
         <div className="flex items-center gap-2 print:hidden">
+          {previewOpts && <EventResultPreview opts={previewOpts} />}
           <button
             onClick={onExcel}
             className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-teal-700 shadow-sm transition-colors"
@@ -557,12 +565,14 @@ function TournamentCard({ event, draw, matches, onExcel, onJpeg }: {
 
 // ---------- Round-robin result card ----------
 
-function RoundRobinCard({ event, draw, matches, entries, players, onExcel, onJpeg }: {
+function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, onExcel, onJpeg }: {
   event: Event;
   draw: Draw;
   matches: Match[];
   entries: Entry[];
   players: Player[];
+  /** 全試合終了時のみ渡される（結果画像プレビュー用） */
+  previewOpts: ResultExportOptions | null;
   onExcel: () => void;
   onJpeg: () => void;
 }) {
@@ -600,6 +610,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, onExcel, onJpe
           </span>
         </div>
         <div className="flex items-center gap-2 print:hidden">
+          {previewOpts && <EventResultPreview opts={previewOpts} />}
           <button
             onClick={onExcel}
             className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-teal-700 shadow-sm transition-colors"

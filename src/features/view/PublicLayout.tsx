@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList } from 'lucide-react';
+import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList, RefreshCw } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -36,17 +36,27 @@ export default function PublicLayout() {
   // ルート変更時にメニューを閉じる
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
-  const individualTournament = useLiveQuery(
-    () => (!isGroup && currentTournamentId
-      ? db.tournaments.where('tournamentId').equals(currentTournamentId).first()
-      : undefined),
-    [isGroup, currentTournamentId]
-  );
+  // 運営端末が大会を選択していない状態でスナップショットが届くこともあるため、
+  // 選択中大会が無ければ DB にある最新の大会にフォールバックする。
+  // （これが無いとデータを受信済みでも「受信を待っています」のままになる）
+  const individualTournament = useLiveQuery(async () => {
+    if (isGroup) return undefined;
+    if (currentTournamentId) {
+      return db.tournaments.where('tournamentId').equals(currentTournamentId).first();
+    }
+    // 大会が選ばれていなければ DB 内の最新の大会を採用する
+    const all = await db.tournaments.toArray();
+    if (all.length === 0) return undefined;
+    return all.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  }, [isGroup, currentTournamentId]);
+
+  const activeTournamentId = individualTournament?.tournamentId || '';
+
   const events = useLiveQuery(
-    () => (!isGroup && currentTournamentId
-      ? db.events.where('tournamentId').equals(currentTournamentId).toArray()
+    () => (!isGroup && activeTournamentId
+      ? db.events.where('tournamentId').equals(activeTournamentId).toArray()
       : []),
-    [isGroup, currentTournamentId]
+    [isGroup, activeTournamentId]
   ) || [];
   const eventIds = useMemo(() => events.map(e => e.eventId).sort().join(','), [events]);
   const allMatches = useLiveQuery(async () => {
@@ -55,11 +65,19 @@ export default function PublicLayout() {
     return db.matches.where('eventId').anyOf(ids).toArray();
   }, [eventIds]) || [];
   const courts = useLiveQuery(
-    () => (!isGroup && currentTournamentId
-      ? db.courts.where('tournamentId').equals(currentTournamentId).toArray()
+    () => (!isGroup && activeTournamentId
+      ? db.courts.where('tournamentId').equals(activeTournamentId).toArray()
       : []),
-    [isGroup, currentTournamentId]
+    [isGroup, activeTournamentId]
   ) || [];
+
+  // 観戦端末では appStore の選択中大会が未設定のことがある。
+  // 実際に表示している大会に合わせておくと、配下のページ
+  // （ドロー・対戦順・ダッシュボード）も同じ大会を参照できる。
+  useEffect(() => {
+    if (isGroup || currentTournamentId || !activeTournamentId) return;
+    useAppStore.setState({ currentTournamentId: activeTournamentId });
+  }, [isGroup, activeTournamentId, currentTournamentId]);
 
   // 個人戦なのに団体戦用ルート(league/bracket)に居る場合はドローへ寄せる
   useEffect(() => {
@@ -188,22 +206,7 @@ export default function PublicLayout() {
       <main className="flex-1 overflow-y-auto relative bg-bg-main">
         {!info ? (
           <div className="max-w-2xl mx-auto p-4">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center mt-6">
-              <Info className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              {sync.hasRoom ? (
-                <>
-                  <p className="text-gray-500 text-sm">
-                    {sync.connectionState === 'connected' ? '運営端末からのデータ受信を待っています...' : '運営端末のルームに接続しています...'}
-                  </p>
-                  <p className="text-gray-400 text-xs mt-1">ルーム: <span className="font-mono font-bold">{sync.roomCode}</span></p>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-500 text-sm">大会データが読み込まれていません。</p>
-                  <p className="text-gray-400 text-xs mt-1">運営端末で発行された観戦用URLからアクセスしてください。</p>
-                </>
-              )}
-            </div>
+            <WaitingCard sync={sync} />
           </div>
         ) : (
           <div key={location.pathname} className="page-enter min-h-full pb-24 [padding-bottom:calc(6rem_+_env(safe-area-inset-bottom))]">
@@ -211,6 +214,55 @@ export default function PublicLayout() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/**
+ * データ待ち画面。
+ * 待つだけだと復帰できないことがあるため、手動の再読み込みを用意する。
+ */
+function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
+  const [retrying, setRetrying] = useState(false);
+  const handleRetry = () => {
+    setRetrying(true);
+    sync.refresh();
+    setTimeout(() => setRetrying(false), 1500);
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center mt-6">
+      <Info className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+      {sync.hasRoom ? (
+        <>
+          <p className="text-gray-500 text-sm">
+            {sync.connectionState === 'connected'
+              ? '運営端末からのデータ受信を待っています...'
+              : sync.connectionState === 'disconnected'
+                ? '中継サーバーに接続できていません。'
+                : '運営端末のルームに接続しています...'}
+          </p>
+          <p className="text-gray-400 text-xs mt-1">
+            ルーム: <span className="font-mono font-bold">{sync.roomCode}</span>
+          </p>
+          <p className="text-gray-400 text-xs mt-3 leading-relaxed">
+            運営端末で大会データが読み込まれ、同期が開始されると自動で表示されます。
+          </p>
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
+            再読み込み
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-gray-500 text-sm">大会データが読み込まれていません。</p>
+          <p className="text-gray-400 text-xs mt-1">運営端末で発行された観戦用URLからアクセスしてください。</p>
+        </>
+      )}
     </div>
   );
 }
