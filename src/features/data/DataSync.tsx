@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { db } from '../../db/database';
@@ -8,9 +8,12 @@ import {
   RefreshCw, CheckCircle2, AlertCircle, Clock,
   Download, Upload, FolderOpen, FileSpreadsheet, LogIn, LogOut, Users, Building2, Layers,
   X, Loader2, CalendarClock, ChevronRight, ChevronDown, Trophy, Dices, Calendar, MapPin, Sparkles,
+  ListChecks, Search,
 } from 'lucide-react';
 import { parseDrawExcel } from './drawExcelParser';
 import type { ParsedDrawFile } from './drawExcelParser';
+import { isTournamentListFileName, parseTournamentListExcel } from './tournamentListParser';
+import type { OfficialTournament } from './tournamentListParser';
 import CourtSelector, { STANDARD_COURTS } from './CourtSelector';
 import { generateScheduleFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from '../schedule/generateSchedule';
 import { parseMixedExcel, extractExcelSheets } from '../mixed/mixedExcelParser';
@@ -367,6 +370,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   const [wizardScheduleListLoading, setWizardScheduleListLoading] = useState(false);
   const [wizardScheduleListError, setWizardScheduleListError] = useState('');
 
+  // 大会日程表（大会一覧フォルダに置かれた年間日程）から正式な大会名を選ぶ
+  const [officialList, setOfficialList] = useState<OfficialTournament[]>([]);
+  const [officialListLoaded, setOfficialListLoaded] = useState(false);
+  const [officialListLoading, setOfficialListLoading] = useState(false);
+  const [officialListError, setOfficialListError] = useState('');
+  const [officialPickerOpen, setOfficialPickerOpen] = useState(false);
+  const [officialFilter, setOfficialFilter] = useState('');
+
   // DB counts
   const furiganaDictCount = useLiveQuery(() => db.furiganaDict.count()) ?? 0;
   const affiliationCount = useLiveQuery(() => db.affiliationFurigana.count()) ?? 0;
@@ -649,6 +660,12 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
     setWizardScheduleListLoading(false);
     setWizardScheduleListError('');
     setWizardAutoGenPending(false);
+    // 大会日程表は読込のたびに取り直す（Drive側で更新されている可能性があるため）
+    setOfficialPickerOpen(false);
+    setOfficialFilter('');
+    setOfficialList([]);
+    setOfficialListLoaded(false);
+    setOfficialListError('');
     setIsProcessing(true);
     setProcessingLabel('一括読込中...');
     setResult(null);
@@ -722,13 +739,16 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setWizardScheduleFiles(scheduleFiles);
       if (!hasError) onDataLoaded?.();
 
-      if (hasError || (tournamentFiles.length === 0 && scheduleFiles.length === 0)) {
+      // 大会日程表（年間日程）はドローファイルではないので選択肢から外す
+      const drawFiles = tournamentFiles.filter(f => !isTournamentListFileName(f.name));
+
+      if (hasError || (drawFiles.length === 0 && scheduleFiles.length === 0)) {
         const msg = hasError ? '一部の読込に失敗しました' : 'ふりがな・所属の読込が完了しました（大会・時間割ファイルなし）';
         setWizardResult({ success: !hasError, message: msg });
         setWizardPhase('done');
       } else {
         // 成功 → 大会ファイル選択ステップへ
-        if (tournamentFiles.length > 0) {
+        if (drawFiles.length > 0) {
           setWizardPhase('select-tournament');
         } else if (scheduleFiles.length > 0) {
           setWizardPhase('select-schedule');
@@ -745,6 +765,78 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
       setProcessingLabel('');
     }
   }, [updateLastSync, onDataLoaded]);
+
+  // 大会一覧フォルダのファイルを「ドロー等の大会ファイル」と「大会日程表」に振り分ける
+  const wizardListDocFiles = useMemo(
+    () => wizardTournamentFiles.filter(f => isTournamentListFileName(f.name)),
+    [wizardTournamentFiles],
+  );
+  const wizardDrawFiles = useMemo(
+    () => wizardTournamentFiles.filter(f => !isTournamentListFileName(f.name)),
+    [wizardTournamentFiles],
+  );
+  const gdriveDrawFiles = useMemo(
+    () => gdriveFileList.filter(f => !isTournamentListFileName(f.name)),
+    [gdriveFileList],
+  );
+
+  // 大会日程表を読み込んで正式な大会名の一覧を作る（初回だけダウンロードする）
+  const handleToggleOfficialPicker = useCallback(async () => {
+    if (officialPickerOpen) { setOfficialPickerOpen(false); return; }
+    setOfficialPickerOpen(true);
+    if (officialListLoaded || officialListLoading) return;
+    setOfficialListError('');
+    setOfficialListLoading(true);
+    try {
+      const token = gdriveGetSavedToken();
+      if (!token) throw new Error('Googleドライブに接続されていません。');
+      let files = [...wizardTournamentFiles, ...gdriveFileList].filter(f => isTournamentListFileName(f.name));
+      if (files.length === 0) {
+        files = (await listTournamentExcelFiles(token)).filter(f => isTournamentListFileName(f.name));
+      }
+      if (files.length === 0) {
+        throw new Error('大会一覧フォルダに大会日程表（例:「令和8年度…大会日程.xlsx」）が見つかりません。');
+      }
+      // 同じファイルが両方の一覧に入るので重複を除き、更新が新しい順に読む
+      const uniq = [...new Map(files.map(f => [f.id, f])).values()]
+        .sort((a, b) => new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime());
+      const all: OfficialTournament[] = [];
+      for (const f of uniq) {
+        try {
+          const buffer = await downloadTournamentExcel(token, f.id, f.mimeType);
+          all.push(...parseTournamentListExcel(buffer));
+        } catch { /* 読めないファイルは飛ばす */ }
+      }
+      if (all.length === 0) throw new Error('大会日程表から大会名を読み取れませんでした。');
+      setOfficialList(all);
+      setOfficialListLoaded(true);
+    } catch (err) {
+      setOfficialListError((err as Error).message);
+    } finally {
+      setOfficialListLoading(false);
+    }
+  }, [officialPickerOpen, officialListLoaded, officialListLoading, wizardTournamentFiles, gdriveFileList]);
+
+  /** 一覧から選んだ正式名称を反映する（日程・会場はファイル側の値を優先） */
+  const applyOfficialTournament = useCallback((t: OfficialTournament) => {
+    setWizardEditName(t.name);
+    setWizardSourceDate(prev => prev || t.date);
+    setWizardSourceReserveDate(prev => prev || t.reserveDate);
+    setWizardSourceVenue(prev => prev || t.venue);
+    setWizardSourceReserveVenue(prev => prev || t.reserveVenue);
+    setWizardEditDate(prev => prev || t.date);
+    setWizardEditReserveDate(prev => prev || t.reserveDate);
+    setWizardEditVenue(prev => prev || t.venue);
+    setOfficialPickerOpen(false);
+    setOfficialFilter('');
+  }, []);
+
+  // 検索語での絞り込み（空白は無視して部分一致）
+  const filteredOfficialList = useMemo(() => {
+    const q = officialFilter.replace(/[\s\u3000]+/g, '');
+    if (!q) return officialList;
+    return officialList.filter(t => `${t.name}${t.category}${t.date}`.replace(/[\s\u3000]+/g, '').includes(q));
+  }, [officialList, officialFilter]);
 
   // ウィザード内: 大会ファイル選択→ダウンロード→確認画面へ
   const handleWizardSelectTournament = useCallback(async (file: GoogleDriveFile) => {
@@ -1055,6 +1147,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
   // ウィザード閉じる
   const handleWizardClose = useCallback(() => {
     setWizardOpen(false);
+    setOfficialPickerOpen(false);
+    setOfficialFilter('');
   }, []);
 
   // 一括読込（大会取込）が完了したら、すぐにエントリーページへ移動する。
@@ -1228,7 +1322,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-gray-800">大会ファイルを選択</h3>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{gdriveFileList.length}件のファイル</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{gdriveDrawFiles.length}件のファイル</p>
                   </div>
                 </div>
                 <button onClick={() => setShowFileList(false)} className="w-8 h-8 rounded-full bg-white/60 hover:bg-white flex items-center justify-center transition-colors">
@@ -1238,14 +1332,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
             </div>
             {/* ファイルリスト */}
             <div className="flex-1 overflow-y-auto px-3 py-2">
-              {gdriveFileList.length === 0 ? (
+              {gdriveDrawFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                   <FolderOpen className="w-10 h-10 mb-2 opacity-50" />
                   <p className="text-sm">ファイルがありません</p>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {gdriveFileList.map(f => {
+                  {gdriveDrawFiles.map(f => {
                     const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
                     const modDate = new Date(f.modifiedTime);
                     const isLoading = loadingFileId === f.id;
@@ -1459,10 +1553,24 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       <Trophy className="w-4 h-4 text-[#1a73e8]" />
                       大会ファイルを選択
                     </h4>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{wizardTournamentFiles.length}件のファイル</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{wizardDrawFiles.length}件のファイル</p>
                   </div>
+                  {wizardListDocFiles.length > 0 && (
+                    <div className="mx-2 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
+                      <ListChecks className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>
+                        大会日程表を検出しました（{wizardListDocFiles.map(f => f.name.replace(/\.(xlsx?|xls)$/i, '')).join('、')}）。
+                        次の確認画面で正式な大会名を選べます。
+                      </span>
+                    </div>
+                  )}
                   <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {wizardTournamentFiles.map(f => {
+                    {wizardDrawFiles.length === 0 && (
+                      <p className="text-[12px] text-gray-500 text-center py-6">
+                        大会一覧フォルダに大会（ドロー）ファイルがありません。
+                      </p>
+                    )}
+                    {wizardDrawFiles.map(f => {
                       const displayName = f.name.replace(/\.(xlsx?|xls)$/i, '');
                       const modDate = new Date(f.modifiedTime);
                       const isLoading = wizardLoadingFileId === f.id;
@@ -1629,6 +1737,17 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         <input type="text" value={wizardEditName} onChange={e => setWizardEditName(e.target.value)}
                           placeholder="大会名を入力"
                           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                        <button type="button" onClick={handleToggleOfficialPicker}
+                          className={`shrink-0 px-2.5 py-2 text-[11px] font-semibold border rounded-lg transition-all ${
+                            officialPickerOpen
+                              ? 'text-white bg-emerald-600 border-emerald-600'
+                              : 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                          title="大会日程表から正式名称を選ぶ">
+                          {officialListLoading
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <ListChecks className="w-3.5 h-3.5" />}
+                        </button>
                         <button type="button" onClick={() => {
                           const raw = wizardTournamentFileName.replace(/\.(xlsx?|xls)$/i, '');
                           setWizardEditName(cleanTournamentName(raw));
@@ -1636,6 +1755,58 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           <Sparkles className="w-3.5 h-3.5" />
                         </button>
                       </div>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        <ListChecks className="w-3 h-3 inline -mt-0.5 mr-0.5" />
+                        大会一覧フォルダの大会日程表から正式名称を選べます。
+                      </p>
+
+                      {/* 正式名称の選択パネル */}
+                      {officialPickerOpen && (
+                        <div className="mt-2 border border-emerald-200 rounded-xl bg-emerald-50/40 overflow-hidden">
+                          {officialListLoading ? (
+                            <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-gray-500">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              大会日程表を読み込んでいます...
+                            </div>
+                          ) : officialListError ? (
+                            <div className="flex items-start gap-2 px-3 py-3 text-[11px] text-amber-700 bg-amber-50">
+                              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                              <span>{officialListError}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="px-2 pt-2">
+                                <div className="relative">
+                                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                  <input type="text" value={officialFilter} onChange={e => setOfficialFilter(e.target.value)}
+                                    placeholder="大会名で絞り込み"
+                                    className="w-full border border-emerald-200 rounded-lg pl-8 pr-3 py-1.5 text-[12px] bg-white focus:border-emerald-400 outline-none" />
+                                </div>
+                              </div>
+                              <div className="max-h-56 overflow-y-auto p-2 space-y-1">
+                                {filteredOfficialList.length === 0 ? (
+                                  <p className="text-[11px] text-gray-400 text-center py-4">該当する大会がありません</p>
+                                ) : filteredOfficialList.map((t, i) => (
+                                  <button
+                                    key={`${t.season}-${t.no}-${t.name}-${i}`}
+                                    type="button"
+                                    onClick={() => applyOfficialTournament(t)}
+                                    className="w-full text-left px-3 py-2 rounded-lg bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                                  >
+                                    <div className="text-[12px] font-bold text-gray-800">{t.name}</div>
+                                    <div className="text-[10px] text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                      {t.category && <span>{t.category}</span>}
+                                      {t.date && <span><Calendar className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.date}</span>}
+                                      {t.venue && <span><MapPin className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.venue}</span>}
+                                      {t.season && <span className="text-emerald-600">{t.season}</span>}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {(wizardMixedPending || wizardTeamPending) ? (
                       /* ミックス・団体戦: シンプルな日程・会場入力 */

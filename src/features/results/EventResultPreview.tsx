@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, ImageIcon, Loader2, X } from 'lucide-react';
+import { Check, Download, ImageIcon, Loader2, Save, X } from 'lucide-react';
 import {
   generateEventResultDataUrl,
   buildEventResultFileName,
 } from '../draw/DrawResultExporter';
 import type { ResultExportOptions } from '../draw/DrawResultExporter';
 import { getAssociationLogoEnabled, setAssociationLogoEnabled } from '../draw/resultCanvasKit';
+import { db } from '../../db/database';
 
 interface Props {
   /** 描画に必要な大会・種目・ドロー・試合データ */
@@ -29,11 +30,42 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
   const [error, setError] = useState<string | null>(null);
   // 協会ロゴを入れるかどうか（設定は次回以降も保持する）
   const [showLogo, setShowLogo] = useState(getAssociationLogoEnabled);
+  // 画像に印字する大会名（この場で修整できる）
+  const [nameDraft, setNameDraft] = useState(opts.tournament.name);
+  const [appliedName, setAppliedName] = useState(opts.tournament.name);
+  const [nameSaved, setNameSaved] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const toggleLogo = (next: boolean) => {
     setShowLogo(next);
     setAssociationLogoEnabled(next);
   };
+
+  // 開いた時点の大会名を初期値にする（保存後に入力欄が巻き戻らないよう1回だけ）
+  const nameInitRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) { nameInitRef.current = false; return; }
+    if (nameInitRef.current) return;
+    nameInitRef.current = true;
+    setNameDraft(opts.tournament.name);
+    setAppliedName(opts.tournament.name);
+    setNameSaved(false);
+    setNameError(null);
+  }, [isOpen, opts.tournament.name]);
+
+  // 入力が落ち着いたらプレビューへ反映する（1文字ごとの再描画を避ける）
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => setAppliedName(nameDraft), 400);
+    return () => clearTimeout(timer);
+  }, [nameDraft, isOpen]);
+
+  // 実際に描画へ渡すオプション（大会名は編集中の値で上書き）
+  const renderOpts = useMemo<ResultExportOptions>(() => ({
+    ...opts,
+    tournament: { ...opts.tournament, name: appliedName.trim() || opts.tournament.name },
+    showAssociationLogo: showLogo,
+  }), [opts, appliedName, showLogo]);
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -48,7 +80,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     // （ロゴ画像の読み込みを待つため非同期）
     const timer = setTimeout(async () => {
       try {
-        const url = await generateEventResultDataUrl({ ...opts, showAssociationLogo: showLogo });
+        const url = await generateEventResultDataUrl(renderOpts);
         if (!isMounted) return;
         if (url) setDataUrl(url);
         else setError('結果画像を生成できませんでした。');
@@ -60,13 +92,30 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
       }
     }, 30);
     return () => { isMounted = false; clearTimeout(timer); };
-  }, [isOpen, opts, showLogo]);
+  }, [isOpen, renderOpts]);
+
+  /** 修整した大会名を大会データにも保存する（他の出力にも反映される） */
+  const handleSaveName = async () => {
+    const next = nameDraft.trim();
+    if (!next || next === opts.tournament.name) return;
+    setAppliedName(next);
+    setNameError(null);
+    if (opts.tournament.id == null) return;
+    try {
+      await db.tournaments.update(opts.tournament.id, { name: next });
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+      setNameError('大会名の保存に失敗しました。');
+    }
+  };
 
   const handleDownload = () => {
     if (!dataUrl) return;
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = buildEventResultFileName(opts);
+    a.download = buildEventResultFileName(renderOpts);
     a.click();
   };
 
@@ -117,6 +166,40 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                   <X size={15} />
                 </button>
               </div>
+            </div>
+
+            {/* 大会名の修整（画像右上に印字される文字列） */}
+            <div className="px-4 py-2.5 border-b border-sky-100 bg-white shrink-0">
+              <label className="text-[10px] font-semibold text-sky-700/70 block mb-1">
+                大会名（画像に印字されます）
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onBlur={() => setAppliedName(nameDraft)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setAppliedName(nameDraft); } }}
+                  placeholder="大会名を入力"
+                  className="flex-1 min-w-0 border border-sky-200 rounded-lg px-3 py-1.5 text-[13px] font-medium bg-sky-50/40 focus:bg-white focus:border-sky-400 focus:ring-[3px] focus:ring-sky-500/10 outline-none transition-all"
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={!nameDraft.trim() || nameDraft.trim() === opts.tournament.name}
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-40 disabled:hover:bg-sky-600 transition-colors active:scale-95"
+                  title="大会データにも保存する"
+                >
+                  {nameSaved ? <Check size={13} /> : <Save size={13} />}
+                  {nameSaved ? '保存しました' : '保存'}
+                </button>
+              </div>
+              {nameError ? (
+                <p className="text-[10px] text-red-500 mt-1">{nameError}</p>
+              ) : (
+                <p className="text-[10px] text-gray-400 mt-1">
+                  入力するとプレビューに反映されます。「保存」で大会データにも反映され、他の出力でも同じ名称になります。
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
