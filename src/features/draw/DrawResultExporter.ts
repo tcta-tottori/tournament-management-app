@@ -229,6 +229,14 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const ROW_H = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
   const COL_W = 74;        // 1ラウンド分の横幅
 
+  // スコアは合流点（縦線の中央）を挟んで上下に置く。
+  // 2回戦以降は上下のラインが大きく離れるため、それぞれのラインに寄せると
+  // 上下のスコアが遠く離れて対戦結果として読み取りにくい。
+  // どのラウンドでも 1回戦と同じ間隔で並ぶように、合流点からの
+  // オフセットを固定する（1回戦のラインからの距離＝SCORE_LINE_GAP と一致する）。
+  const SCORE_LINE_GAP = clamp(ROW_H / 2 - 8, 7, 13);
+  const SCORE_OFFSET = Math.max(6, ROW_H / 2 - SCORE_LINE_GAP);
+
   // ---- 各ノードのY座標（rowsTopY からの相対値） ----
   // BYE だけの枝は「無いもの」として扱い、相手のラインをまっすぐ通す。
   const yCache = new Map<string, number>();
@@ -267,8 +275,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const CHAMP_NAME_PX = 20;
   const CHAMP_SCORE_PX = 15;
 
-  // 決勝スコアは「右山の獲得ゲーム − 左山の獲得ゲーム」の並びで表示する
-  // （例: 左山の選手が 8-4 で勝った場合は「4-8」）
+  // 決勝スコアは「左山の獲得ゲーム − 右山の獲得ゲーム」の並びで表示する
+  // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
   const finalScoreText = (() => {
     if (!finalMatch) return '';
     if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
@@ -280,7 +288,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
     const leftScore = p1IsLeft ? a : b;
     const rightScore = p1IsLeft ? b : a;
-    return `${rightScore}-${leftScore}`;
+    return `${leftScore}-${rightScore}`;
   })();
 
   meas.font = fontOf('black', CHAMP_NAME_PX);
@@ -485,16 +493,16 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         const match = matchMap.get(`${r}-${gIdx + 1}`);
         const align: CanvasTextAlign = side === 'L' ? 'left' : 'right';
         const sx = side === 'L' ? xJoin + 6 : xJoin - 6;
-        // 上下のスコアはブラケットの内側に、それぞれの線から等距離に置く
-        const inset = clamp((yBot - yTop) / 2 - 8, 7, 13);
+        // 上下のスコアは合流点をはさんで並べる（回戦が進んでも間隔は一定）
+        const scoreTopY = yMid - SCORE_OFFSET;
+        const scoreBotY = yMid + SCORE_OFFSET;
         const sc = parseScore(match, top?.entryId ?? null, bot?.entryId ?? null);
         if (sc) {
-          if (sc.top) tags.push({ x: sx, y: yTop + inset, text: sc.top, align, win: winTop });
-          if (sc.bot) tags.push({ x: sx, y: yBot - inset, text: sc.bot, align, win: winBot });
+          if (sc.top) tags.push({ x: sx, y: scoreTopY, text: sc.top, align, win: winTop });
+          if (sc.bot) tags.push({ x: sx, y: scoreBotY, text: sc.bot, align, win: winBot });
         } else if (match?.status === 'walkover') {
           // 棄権した側に W.O を表示する
-          const y = winTop ? yBot - inset : yTop + inset;
-          tags.push({ x: sx, y, text: 'W.O', align, win: false });
+          tags.push({ x: sx, y: winTop ? scoreBotY : scoreTopY, text: 'W.O', align, win: false });
         }
       }
     }
