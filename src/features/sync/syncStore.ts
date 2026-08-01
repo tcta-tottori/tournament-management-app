@@ -61,6 +61,8 @@ interface SyncState {
   pendingChanges: number;
   error: string | null;
   panelOpen: boolean;
+  /** 中継サーバーとの往復時間(ms)。ライブスコアの配信遅延の目安として表示する */
+  latencyMs: number | null;
 
   // === アクション ===
   setDeviceName: (name: string) => void;
@@ -81,6 +83,7 @@ interface SyncState {
   setPendingChanges: (n: number) => void;
   setError: (error: string | null) => void;
   setPanelOpen: (open: boolean) => void;
+  setLatencyMs: (ms: number | null) => void;
 }
 
 export const useSyncStore = create<SyncState>()(
@@ -102,6 +105,7 @@ export const useSyncStore = create<SyncState>()(
       pendingChanges: 0,
       error: null,
       panelOpen: false,
+      latencyMs: null,
 
       // アクション
       setDeviceName: (name) => set({ deviceName: name }),
@@ -135,6 +139,7 @@ export const useSyncStore = create<SyncState>()(
       setPendingChanges: (n) => set({ pendingChanges: Math.max(0, n) }),
       setError: (error) => set({ error }),
       setPanelOpen: (open) => set({ panelOpen: open }),
+      setLatencyMs: (ms) => set({ latencyMs: ms }),
     }),
     {
       name: 'sync-settings-storage',

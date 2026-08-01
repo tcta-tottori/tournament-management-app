@@ -22,7 +22,10 @@ import {
   BookOpen,
   UserX,
   AlertCircle,
+  Radio,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { startLiveScore } from '../livescore/liveScoreApi';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,6 +131,14 @@ export default function ScoreInputDialog({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { isSpeaking, speak, stop } = useGeminiTts();
+  const navigate = useNavigate();
+
+  // この試合のライブスコアが既に開始されているか（ボタン文言の出し分け用）
+  const hasLiveScore = useLiveQuery(async () => {
+    if (!match) return false;
+    const rows = await appDb.liveScores.where('matchId').equals(match.matchId).toArray();
+    return rows.some(r => r.status === 'live');
+  }, [match?.matchId]) ?? false;
 
   // 所属ふりがなマップ（音声コール用）
   const affiliationFuriganaMap = useLiveQuery(async () => {
@@ -458,6 +469,37 @@ export default function ScoreInputDialog({
       }
       onMatchUpdate();
     } finally { setIsProcessing(false); }
+  };
+
+  /**
+   * ライブスコア（1ポイント毎の実況配信）を開始し、専用画面へ移動する。
+   * 対戦順・タイムテーブル・ドローのいずれの画面からでも、このダイアログ経由で開始できる。
+   */
+  const handleOpenLiveScore = async () => {
+    if (isProcessing || !match) return;
+    setIsProcessing(true);
+    try {
+      const live = await startLiveScore({
+        dbId: match.dbId,
+        eventName: match.eventName,
+        roundName: getRoundName(match.round),
+        gameRuleText,
+        requiredGames,
+        matchFormat,
+      });
+      if (!live) {
+        alert('試合データが見つからないため、ライブスコアを開始できませんでした。');
+        return;
+      }
+      onMatchUpdate();
+      onClose();
+      navigate(`/live-score?match=${encodeURIComponent(live.matchId)}&event=${encodeURIComponent(live.eventId)}`);
+    } catch (err) {
+      console.error('[ライブスコア] 開始に失敗:', err);
+      alert('ライブスコアを開始できませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleResetMatch = async () => {
@@ -933,6 +975,24 @@ export default function ScoreInputDialog({
             )}
           </div>
         </div>
+
+        {/* ===== ライブスコア（1ポイント毎の実況配信）===== */}
+        {!isFinished && (
+          <div className="px-4 sm:px-6 pb-3">
+            <button
+              onClick={handleOpenLiveScore}
+              disabled={isProcessing || !match.player1Name || !match.player2Name}
+              className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-gradient-to-r from-[#153f96] to-[#0a2461] text-white hover:brightness-110 active:scale-[0.98] disabled:opacity-40 transition-all min-h-[48px] shadow-lg shadow-blue-900/20"
+            >
+              <Radio className="w-5 h-5" />
+              {hasLiveScore ? 'ライブスコアを再開' : 'ライブスコア開始'}
+              <span className="text-[10px] font-bold bg-white/20 rounded-full px-2 py-0.5">観戦ページへ配信</span>
+            </button>
+            <p className="mt-1.5 text-[10px] text-gray-400 text-center">
+              専用画面が開き、1タップ＝1ポイントで観戦ページへリアルタイム配信します
+            </p>
+          </div>
+        )}
 
         {/* ===== エントリー（結果入力）ボタン ===== */}
         <div className="px-4 sm:px-6 pb-3 space-y-2">
