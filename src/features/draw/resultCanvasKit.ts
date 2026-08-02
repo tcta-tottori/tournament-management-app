@@ -245,14 +245,31 @@ export interface ResultHeaderOptions {
 export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderOptions): void {
   const { title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos } = o;
 
+  // ---- 右側（大会名・会場）の基準位置 ----
+  // 種目名の高さをここに合わせるため、先に決めておく。
+  const NAME_PX = 22;
+  const nameY = paddingY + 34;        // 大会名（middle ベースライン）
+  const venueTopY = paddingY + 54;    // 会場ロゴ／会場名の上端
+  // 大会名の下端と会場の上端のちょうど中間＝左右の「分け目」
+  const dividerY = (nameY + NAME_PX / 2 + venueTopY) / 2;
+
   // ---- 左: 種目名（バッジ枠は付けず、グラデーションの文字だけで見せる） ----
   const cat = eventBadgeColors(title);
   const runs = splitBigSmall(title);
-  const bigPx = 34;
-  const smallPx = 25;
-  const titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  let bigPx = 46;
+  let smallPx = 34;
   const titleX = paddingX;
-  const baselineY = paddingY + headerH / 2 + bigPx * 0.30;
+  // 右側の大会名と重ならない範囲まで、はみ出す場合だけ縮める
+  const maxTitleW = Math.max(180, tableW * 0.46);
+  let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  if (titleW > maxTitleW) {
+    const k = maxTitleW / titleW;
+    bigPx = Math.floor(bigPx * k);
+    smallPx = Math.floor(smallPx * k);
+    titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  }
+  // 文字の高さの中心を「分け目」に合わせる（alphabetic ベースラインからの補正）
+  const baselineY = dividerY + bigPx * 0.34;
 
   ctx.save();
   // 文字そのものに横方向のグラデーションを乗せる
@@ -270,12 +287,12 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   const rightX = paddingX + tableW;
   if (tournamentName) {
     const nameMaxW = Math.max(200, tableW - titleW - 48);
-    drawText(ctx, tournamentName, rightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', nameMaxW);
+    drawText(ctx, tournamentName, rightX, nameY, NAME_PX, 'right', COL.slate800, 'bold', nameMaxW);
   }
   drawVenueBadge(ctx, {
     venue,
     rightX,
-    topY: paddingY + 54,
+    topY: venueTopY,
     venueLogo: logos.venue,
     tottoriLogo: logos.tottori,
   });
