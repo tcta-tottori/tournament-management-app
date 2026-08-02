@@ -128,3 +128,85 @@ export function removeGapAt<T extends SlotLike>(slots: T[], position: number): T
 export function blockStartOf(position: number): number {
   return Math.floor((position - 1) / 4) * 4 + 1;
 }
+
+// =============================================
+// 4枠のまとまりの「型」
+//
+// 手書きのドロー表は、4枠ずつのまとまりが次のどれかになっている。
+// まとまりの型を上から順に選んでいけば、ドロー表と同じ並びを作れる。
+// =============================================
+
+export type BlockPattern = 'four' | 'trioBottom' | 'trioTop' | 'two' | 'one' | 'none';
+
+/** 型ごとの枠の使い方（true = 選手が入る） */
+const BLOCK_MASKS: Record<BlockPattern, boolean[]> = {
+  four: [true, true, true, true],           // 2試合（それぞれの勝者が2回戦）
+  trioBottom: [true, true, true, false],    // 3人: 上2人が1回戦 → 勝者と3人目が2回戦
+  trioTop: [true, false, true, true],       // 3人: 下2人が1回戦 → 勝者と1人目が2回戦
+  two: [true, true, false, false],          // 1試合（勝者は次の回戦から）
+  one: [true, false, false, false],         // 1人（2回戦から登場）
+  none: [false, false, false, false],       // 空き
+};
+
+export const BLOCK_PATTERN_LABELS: Record<BlockPattern, string> = {
+  four: '4人（2試合）',
+  trioBottom: '3人（下が2回戦から）',
+  trioTop: '3人（上が2回戦から）',
+  two: '2人（1試合）',
+  one: '1人（2回戦から）',
+  none: '空き',
+};
+
+/** 並びから、そのまとまりが今どの型かを判定する（当てはまらなければ null） */
+export function blockPatternOf<T extends SlotLike>(slots: T[], blockStart: number): BlockPattern | null {
+  const i = slots.findIndex(s => s.position === blockStart);
+  if (i < 0) return null;
+  const mask = [0, 1, 2, 3].map(k => {
+    const s = slots[i + k];
+    return !!s && !isEmptySlot(s);
+  });
+  for (const [key, m] of Object.entries(BLOCK_MASKS)) {
+    if (m.every((v, k) => v === mask[k])) return key as BlockPattern;
+  }
+  return null;
+}
+
+export interface ApplyBlockResult<T extends SlotLike> {
+  slots: T[];
+  error: string | null;
+}
+
+/**
+ * まとまりの型を適用する。
+ *
+ * そのまとまり以降の選手を順番どおりに取り出し、選んだ型で並べ直す。
+ * 残った選手は以降の枠へ順に詰め直すので、上のまとまりから順に型を
+ * 選んでいけば、ドロー表と同じ並びになる。
+ */
+export function applyBlockPattern<T extends SlotLike>(
+  slots: T[], blockStart: number, pattern: BlockPattern,
+): ApplyBlockResult<T> {
+  const i = slots.findIndex(s => s.position === blockStart);
+  if (i < 0) return { slots, error: '対象のまとまりが見つかりません' };
+
+  const contents = contentsOf(slots);
+  const empty = emptyContent(slots[i]);
+  const isEmptyContent = (c: Content<T>) => {
+    const v = c as unknown as { entryId: string | null; isBye: boolean };
+    return v.isBye || !v.entryId;
+  };
+
+  const rest = contents.slice(i).filter(c => !isEmptyContent(c));
+  const next: Content<T>[] = contents.slice(0, i);
+  let p = 0;
+  for (const usePlayer of BLOCK_MASKS[pattern]) {
+    next.push(usePlayer && p < rest.length ? rest[p++] : { ...empty });
+  }
+  while (next.length < slots.length) {
+    next.push(p < rest.length ? rest[p++] : { ...empty });
+  }
+  if (p < rest.length) {
+    return { slots, error: 'この型にすると選手が入りきりません。' };
+  }
+  return { slots: applyContents(slots, next), error: null };
+}

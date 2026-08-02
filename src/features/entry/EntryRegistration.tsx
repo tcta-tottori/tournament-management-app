@@ -12,7 +12,10 @@ import { repairShiftedDrawTimes } from '../schedule/repairDrawTimes';
 import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
-import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
+import {
+  applyBlockPattern, blockPatternOf, BLOCK_PATTERN_LABELS, insertGapAt, isEmptySlot,
+  removeGapAt, swapSlotContents, type BlockPattern,
+} from '../draw/drawSlotOps';
 import { useMixedStore } from '../mixed/mixedStore';
 import MixedEntryView from '../mixed/MixedEntryView';
 import { useTeamStore } from '../team/teamStore';
@@ -1615,6 +1618,19 @@ function NormalEntryRegistration() {
     // 選択は残す（続けて詰められるように）
   }, [drawEdit, pushDrawEdit]);
 
+  /**
+   * まとまり（4枠）の型を適用する。
+   * そのまとまり以降の選手を順番どおりに並べ直すので、
+   * ドロー表を見ながら上から順に型を選べば同じ並びになる。
+   */
+  const handleBlockPattern = useCallback((blockStart: number, pattern: BlockPattern) => {
+    if (!drawEdit || !pattern) return;
+    const { slots: next, error } = applyBlockPattern(drawEdit.slots, blockStart, pattern);
+    if (error) { alert(error); return; }
+    pushDrawEdit(next);
+    setEditSelectedPos(null);
+  }, [drawEdit, pushDrawEdit]);
+
   /** あたり修正を保存し、対戦表を組み直す（入力済みスコアは可能な限り引き継ぐ） */
   const saveDrawEdit = useCallback(async () => {
     if (!drawEdit) return;
@@ -1707,15 +1723,33 @@ function NormalEntryRegistration() {
     };
 
     /** 4枠のまとまり（2回戦で当たる単位） */
-    const blockBox = (block: number[]) => (
-      <div key={block[0]} className="rounded-lg border border-gray-200 bg-gray-50/60 p-1 space-y-1">
-        {[0, 2].map(off => (
-          <div key={off} className="rounded border-l-2 border-primary-200 pl-1 space-y-0.5">
-            {block.slice(off, off + 2).map(pos => slotButton(pos))}
+    const blockBox = (block: number[]) => {
+      const start = block[0];
+      const current = blockPatternOf(drawEdit.slots, start);
+      return (
+        <div key={start} className="rounded-lg border border-gray-200 bg-gray-50/60 p-1 space-y-1">
+          {/* まとまりの型（ドロー表を見ながら上から順に選ぶと同じ並びになる） */}
+          <div className="flex items-center gap-1 px-0.5">
+            <span className="text-[9px] text-gray-400 font-mono shrink-0">{start}〜{start + 3}</span>
+            <select
+              value={current ?? ''}
+              onChange={e => handleBlockPattern(start, e.target.value as BlockPattern)}
+              className="flex-1 min-w-0 text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white text-gray-600"
+            >
+              {current === null && <option value="">（型を選ぶ）</option>}
+              {(Object.keys(BLOCK_PATTERN_LABELS) as BlockPattern[]).map(k => (
+                <option key={k} value={k}>{BLOCK_PATTERN_LABELS[k]}</option>
+              ))}
+            </select>
           </div>
-        ))}
-      </div>
-    );
+          {[0, 2].map(off => (
+            <div key={off} className="rounded border-l-2 border-primary-200 pl-1 space-y-0.5">
+              {block.slice(off, off + 2).map(pos => slotButton(pos))}
+            </div>
+          ))}
+        </div>
+      );
+    };
 
     /** 4枠のまとまり2つ＝次の回戦で合流する単位 */
     const blockColumn = (list: number[][]) => {
@@ -1790,9 +1824,11 @@ function NormalEntryRegistration() {
         </div>
 
         <p className="text-[10px] text-gray-500 leading-relaxed mb-2">
-          枠内の線は1回戦の対戦、四角の囲みは「2回戦で当たるまとまり」です。
-          「7・8の勝者と9が2回戦」の形にするには、その3人と空き枠を同じ囲みに入れてください。
-          下のドロー図は修正内容がそのまま反映されます。
+          四角の囲みが「2回戦で当たるまとまり（4枠）」です。ドロー表を見ながら、
+          上のまとまりから順に<strong className="text-gray-600">型</strong>を選ぶと同じ並びになります
+          （型を選ぶと、それ以降の選手は順番どおりに詰め直されます）。
+          個別に直したいときは枠をタップして入れ替え・ずらしもできます。
+          下のドロー図には修正内容がそのまま反映されます。
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">

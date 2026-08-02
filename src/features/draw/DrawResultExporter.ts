@@ -297,18 +297,23 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // 決勝スコアは「左山の獲得ゲーム − 右山の獲得ゲーム」の並びで表示する
   // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
+  // タイブレークの ( ) は負けた側のポイントなので、負けた側の数字に付ける
+  // （例: 8-7 で勝ち、タイブレークが 7-2 なら「7(2)-8」）
   const finalScoreText = (() => {
     if (!finalMatch) return '';
     if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
-    const parts = finalMatch.score.split('-');
-    if (parts.length !== 2) return finalMatch.score;
-    const a = parts[0].trim();
-    const b = parts[1].trim();
+    const m = finalMatch.score.trim().match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?$/);
+    if (!m) return finalMatch.score;
+    const [, p1Games, p2Games, tb] = m;
     // player1 が左山とは限らないので entryId で判定する
     const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
-    const leftScore = p1IsLeft ? a : b;
-    const rightScore = p1IsLeft ? b : a;
-    return `${leftScore}-${rightScore}`;
+    const leftGames = p1IsLeft ? p1Games : p2Games;
+    const rightGames = p1IsLeft ? p2Games : p1Games;
+    if (!tb) return `${leftGames}-${rightGames}`;
+    const leftLost = Number(leftGames) < Number(rightGames);
+    return leftLost
+      ? `${leftGames}(${tb})-${rightGames}`
+      : `${leftGames}-${rightGames}(${tb})`;
   })();
 
   meas.font = fontOf('black', CHAMP_NAME_PX);
