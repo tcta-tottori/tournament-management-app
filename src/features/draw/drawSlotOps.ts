@@ -90,10 +90,12 @@ export function insertGapAt<T extends SlotLike>(slots: T[], position: number): I
   const i = slots.findIndex(s => s.position === position);
   if (i < 0) return { slots, error: '対象の枠が見つかりません' };
 
+  // 指定位置から続いている空き枠は「すでに空けた分」なので飛ばし、
+  // その先にある空き枠を持ってくる（同じ位置で続けて実行すると空きが増えていく）
+  let k = i;
+  while (k < slots.length && isEmptySlot(slots[k])) k++;
   let j = -1;
-  for (let k = i; k < slots.length; k++) {
-    // 指定位置そのものが空き枠のときは、その次以降の空き枠を使う
-    if (k === i && isEmptySlot(slots[k])) continue;
+  for (; k < slots.length; k++) {
     if (isEmptySlot(slots[k])) { j = k; break; }
   }
   if (j < 0) {
