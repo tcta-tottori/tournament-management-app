@@ -12,14 +12,18 @@
 // ずらしに使う空き枠は必ずドロー内のどこかから持ってくる）。
 // =============================================
 
-/** 並べ替えの対象となる枠（DrawSlotData と互換） */
+/**
+ * 並べ替えの対象となる枠。
+ * ドローの保存形（position/entryId/seed/isBye）と、
+ * 表示用の DrawSlotData（氏名・所属つき）の両方をそのまま扱える。
+ */
 export interface SlotLike {
   position: number;
   entryId: string | null;
   seed: number;
   isBye: boolean;
-  name: string;
-  affiliation: string;
+  name?: string;
+  affiliation?: string;
 }
 
 /** 空き枠（BYE）か */
@@ -27,18 +31,33 @@ export function isEmptySlot(slot: SlotLike): boolean {
   return slot.isBye || !slot.entryId;
 }
 
-const EMPTY_CONTENT = { entryId: null, seed: 0, isBye: true, name: 'BYE', affiliation: '' };
+/** 枠の中身（position 以外のすべて） */
+type Content<T> = Omit<T, 'position'>;
 
 /** 枠の中身だけを取り出す（position は動かさない） */
-function contentsOf<T extends SlotLike>(slots: T[]) {
-  return slots.map(s => ({
-    entryId: s.entryId, seed: s.seed, isBye: s.isBye, name: s.name, affiliation: s.affiliation,
-  }));
+function contentsOf<T extends SlotLike>(slots: T[]): Content<T>[] {
+  return slots.map(s => {
+    const { position: _position, ...rest } = s;
+    return rest as Content<T>;
+  });
 }
 
-/** 中身の並びを枠へ戻す */
-function applyContents<T extends SlotLike>(slots: T[], contents: ReturnType<typeof contentsOf>): T[] {
-  return slots.map((s, i) => ({ ...s, ...contents[i] }));
+/** 中身の並びを枠へ戻す（position は元のまま） */
+function applyContents<T extends SlotLike>(slots: T[], contents: Content<T>[]): T[] {
+  return slots.map((s, i) => ({ ...contents[i], position: s.position } as T));
+}
+
+/** 空き枠の中身を作る（氏名などの表示用フィールドがある形にも合わせる） */
+function emptyContent<T extends SlotLike>(sample: T): Content<T> {
+  const { position: _position, ...rest } = sample;
+  return {
+    ...rest,
+    entryId: null,
+    seed: 0,
+    isBye: true,
+    ...('name' in rest ? { name: 'BYE' } : {}),
+    ...('affiliation' in rest ? { affiliation: '' } : {}),
+  } as Content<T>;
 }
 
 /** 2つの枠の中身を入れ替える */
@@ -83,7 +102,7 @@ export function insertGapAt<T extends SlotLike>(slots: T[], position: number): I
 
   const contents = contentsOf(slots);
   contents.splice(j, 1);
-  contents.splice(i, 0, { ...EMPTY_CONTENT });
+  contents.splice(i, 0, emptyContent(slots[i]));
   return { slots: applyContents(slots, contents), error: null };
 }
 
@@ -96,7 +115,7 @@ export function removeGapAt<T extends SlotLike>(slots: T[], position: number): T
   if (i < 0 || !isEmptySlot(slots[i])) return slots;
   const contents = contentsOf(slots);
   contents.splice(i, 1);
-  contents.push({ ...EMPTY_CONTENT });
+  contents.push(emptyContent(slots[i]));
   return applyContents(slots, contents);
 }
 
