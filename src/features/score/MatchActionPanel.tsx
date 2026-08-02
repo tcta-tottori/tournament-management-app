@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
+import { propagateByes } from '../draw/rebuildMatches';
 import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
@@ -167,15 +168,12 @@ export default function MatchActionPanel({
       });
 
       // Propagate winner to next round
+      const eventId = (await db.matches.get(match.dbId))?.eventId ?? '';
       const nextRound = match.round + 1;
       const nextPosition = Math.ceil(match.position / 2);
       const nextMatch = await db.matches
         .where('eventId')
-        .equals(
-          (
-            await db.matches.get(match.dbId)
-          )?.eventId ?? '',
-        )
+        .equals(eventId)
         .filter(
           (m) => m.round === nextRound && m.position === nextPosition,
         )
@@ -198,6 +196,9 @@ export default function MatchActionPanel({
           updatedAt: Date.now(),
         });
       }
+
+      // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
+      if (eventId) await propagateByes(eventId);
 
       onMatchUpdate();
     } finally {
@@ -251,6 +252,9 @@ export default function MatchActionPanel({
       });
 
       setScoreInput('');
+      // BYEで送っていた勝ち上がりも取り消す
+      if (dbMatch) await propagateByes(dbMatch.eventId);
+
       onMatchUpdate();
     } finally {
       setIsProcessing(false);

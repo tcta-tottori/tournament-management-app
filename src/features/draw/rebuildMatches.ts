@@ -262,6 +262,111 @@ export function findResetMatches(
   });
 }
 
+/**
+ * 相手が来ない試合（対戦相手側の枝が全て BYE）を不戦勝として次の回戦へ送る。
+ *
+ * 手書きのドロー表どおりに並べると「5・6の勝者は次の回戦が空き」のように、
+ * 2回戦以降にも相手のいない枠ができる。そのままだと勝った選手が
+ * いつまでも次へ進まないので、確定のたびにここで送り出す。
+ */
+export async function propagateByes(eventId: string): Promise<void> {
+  const draw = await db.draws.where('eventId').equals(eventId).first();
+  if (!draw) return;
+  if (await isLeagueEvent(eventId, draw)) return;
+
+  const totalRounds = Math.max(1, Math.round(Math.log2(Math.max(2, draw.drawSize))));
+  const byPosition = new Map(draw.slots.map(s => [s.position, s]));
+
+  /** 回戦 round・位置 position（1始まり）の配下が全て BYE か */
+  const emptyCache = new Map<string, boolean>();
+  const isEmptyNode = (round: number, position: number): boolean => {
+    if (round <= 0) {
+      const s = byPosition.get(position);
+      return !s || s.isBye || !s.entryId;
+    }
+    const key = `${round}-${position}`;
+    const hit = emptyCache.get(key);
+    if (hit !== undefined) return hit;
+    const v = isEmptyNode(round - 1, position * 2 - 1) && isEmptyNode(round - 1, position * 2);
+    emptyCache.set(key, v);
+    return v;
+  };
+
+  const matches = await db.matches.where('eventId').equals(eventId).toArray();
+  const byKey = new Map(matches.map(m => [`${m.round}-${m.position}`, m]));
+
+  // 結果を取り消したあとに残ってしまった不戦勝を先に片付ける
+  // （勝者だった選手がその枠から居なくなっている場合）
+  for (let round = totalRounds; round >= 1; round--) {
+    for (const m of matches.filter(x => x.round === round)) {
+      if (m.id == null || m.status !== 'walkover' || !m.winnerEntryId) continue;
+      if (m.winnerEntryId === m.player1EntryId || m.winnerEntryId === m.player2EntryId) continue;
+      const staleWinner = m.winnerEntryId;
+      await db.matches.update(m.id, { status: 'waiting', winnerEntryId: null, score: '', updatedAt: Date.now() });
+      m.status = 'waiting';
+      m.winnerEntryId = null;
+
+      const next = byKey.get(`${round + 1}-${Math.ceil(m.position / 2)}`);
+      if (!next?.id) continue;
+      const isUpper = m.position % 2 === 1;
+      const occupied = isUpper ? next.player1EntryId : next.player2EntryId;
+      if (occupied !== staleWinner) continue;
+      await db.matches.update(next.id, {
+        ...(isUpper
+          ? { player1EntryId: null, player1Name: '', player1Affiliation: '' }
+          : { player2EntryId: null, player2Name: '', player2Affiliation: '' }),
+        updatedAt: Date.now(),
+      });
+      if (isUpper) { next.player1EntryId = null; next.player1Name = ''; next.player1Affiliation = ''; }
+      else { next.player2EntryId = null; next.player2Name = ''; next.player2Affiliation = ''; }
+    }
+  }
+
+  // 回戦の若い順に見て、勝ち上がりを順に送る
+  for (let round = 1; round <= totalRounds; round++) {
+    for (const m of matches.filter(x => x.round === round)) {
+      if (m.id == null) continue;
+      if (m.winnerEntryId) continue;               // すでに結果がある
+      if (m.player1EntryId && m.player2EntryId) continue; // 対戦が成立している
+
+      const upperEmpty = isEmptyNode(round - 1, m.position * 2 - 1);
+      const lowerEmpty = isEmptyNode(round - 1, m.position * 2);
+      const winnerIsP1 = lowerEmpty && !upperEmpty && !!m.player1EntryId;
+      const winnerIsP2 = upperEmpty && !lowerEmpty && !!m.player2EntryId;
+      if (!winnerIsP1 && !winnerIsP2) continue;
+
+      const winnerEntryId = winnerIsP1 ? m.player1EntryId : m.player2EntryId;
+      const winnerName = winnerIsP1 ? m.player1Name : m.player2Name;
+      const winnerAff = winnerIsP1 ? m.player1Affiliation : m.player2Affiliation;
+      const now = Date.now();
+
+      await db.matches.update(m.id, { status: 'walkover', winnerEntryId, updatedAt: now });
+      m.status = 'walkover';
+      m.winnerEntryId = winnerEntryId;
+
+      // 次の回戦へ送る
+      const next = byKey.get(`${round + 1}-${Math.ceil(m.position / 2)}`);
+      if (!next?.id) continue;
+      const isUpper = m.position % 2 === 1;
+      await db.matches.update(next.id, {
+        ...(isUpper
+          ? { player1EntryId: winnerEntryId, player1Name: winnerName, player1Affiliation: winnerAff }
+          : { player2EntryId: winnerEntryId, player2Name: winnerName, player2Affiliation: winnerAff }),
+        updatedAt: now,
+      });
+      if (isUpper) {
+        next.player1EntryId = winnerEntryId;
+        next.player1Name = winnerName;
+        next.player1Affiliation = winnerAff;
+      } else {
+        next.player2EntryId = winnerEntryId;
+        next.player2Name = winnerName;
+        next.player2Affiliation = winnerAff;
+      }
+    }
+  }
+}
+
 export interface RebuildResult {
   /** 生成した試合数 */
   generated: number;
@@ -328,6 +433,9 @@ export async function rebuildEventMatches(eventId: string): Promise<RebuildResul
       }
     }
   }
+
+  // 2回戦以降で相手が来ない試合（相手側の枝が全て BYE）も次へ送る
+  if (!isLeague) await propagateByes(eventId);
 
   return { generated: mergedMatches.length, preserved, reset: resetCount };
 }
