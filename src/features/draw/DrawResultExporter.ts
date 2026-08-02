@@ -331,24 +331,33 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // 決勝スコアは「左山の獲得ゲーム − 右山の獲得ゲーム」の並びで表示する
   // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
-  // タイブレークの ( ) は負けた側のポイントなので、負けた側の数字に付ける
-  // （例: 8-7 で勝ち、タイブレークが 7-2 なら「7(2)-8」）
-  const finalScoreText = (() => {
-    if (!finalMatch) return '';
-    if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
-    const m = finalMatch.score.trim().match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?$/);
-    if (!m) return finalMatch.score;
-    const [, p1Games, p2Games, tb] = m;
+  // タイブレークの得点と Ret / W.O は負けた側のものなので、
+  // 負けた側の外側（スコアの左端／右端）に小さく添える。
+  const finalScore = (() => {
+    const empty = { main: '', note: '', noteLeft: false };
+    if (!finalMatch) return empty;
+    if (!finalMatch.score) {
+      return finalMatch.status === 'walkover' ? { ...empty, main: 'W.O' } : empty;
+    }
+    const raw = finalMatch.score.trim();
+    const m = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
+    if (!m) return { ...empty, main: raw };
+    const [, p1Games, p2Games, tb, note] = m;
     // player1 が左山とは限らないので entryId で判定する
     const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
     const leftGames = p1IsLeft ? p1Games : p2Games;
     const rightGames = p1IsLeft ? p2Games : p1Games;
-    if (!tb) return `${leftGames}-${rightGames}`;
-    const leftLost = Number(leftGames) < Number(rightGames);
-    return leftLost
-      ? `${leftGames}(${tb})-${rightGames}`
-      : `${leftGames}-${rightGames}(${tb})`;
+    const parts = [
+      tb ? `(${tb})` : '',
+      note ? note.toUpperCase().replace('RET', 'Ret') : '',
+    ].filter(Boolean);
+    return {
+      main: `${leftGames}-${rightGames}`,
+      note: parts.join(' '),
+      noteLeft: Number(leftGames) < Number(rightGames),  // 負けた側が左なら左端へ
+    };
   })();
+  const finalScoreText = finalScore.main;
 
   meas.font = fontOf('black', CHAMP_NAME_PX);
   let champTextW = meas.measureText(champName).width;
@@ -683,6 +692,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     if (finalScoreText) {
       drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
+      // タイブレークの得点・Ret / W.O は負けた側の外側へ小さく添える
+      if (finalScore.note) {
+        const NOTE_PX = 11;
+        meas.font = fontOf('black', CHAMP_SCORE_PX);
+        const mainW = meas.measureText(finalScoreText).width;
+        const nx = finalScore.noteLeft
+          ? centerX - mainW / 2 - 5
+          : centerX + mainW / 2 + 5;
+        drawText(ctx, finalScore.note, nx, scoreY, NOTE_PX,
+          finalScore.noteLeft ? 'right' : 'left', COL.slate500, 'medium');
+      }
     }
   }
 
