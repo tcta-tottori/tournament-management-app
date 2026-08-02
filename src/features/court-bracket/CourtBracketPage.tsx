@@ -7,8 +7,9 @@ import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
+import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2 } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -97,6 +98,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const [draftSlots, setDraftSlots] = useState<DrawSlotData[] | null>(null);
   const [selectedSlotPos, setSelectedSlotPos] = useState<number | null>(null);
   const [savingDraw, setSavingDraw] = useState(false);
+  /** 修正操作の履歴（「1つ戻す」用） */
+  const [draftHistory, setDraftHistory] = useState<DrawSlotData[][]>([]);
 
   const events = useLiveQuery(
     () => currentTournamentId
@@ -324,6 +327,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
   const startEdit = useCallback(() => {
     setDraftSlots(slots.map(s => ({ ...s })));
+    setDraftHistory([]);
     setSelectedSlotPos(null);
     setEditMode(true);
   }, [slots]);
@@ -331,29 +335,60 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const cancelEdit = useCallback(() => {
     setEditMode(false);
     setDraftSlots(null);
+    setDraftHistory([]);
     setSelectedSlotPos(null);
   }, []);
 
   /** 枠のタップ: 1つ目で選択、2つ目で入れ替え */
   const handleSlotSelect = useCallback((position: number) => {
-    setSelectedSlotPos(prev => {
-      if (prev === null) return position;
-      if (prev === position) return null;
-      setDraftSlots(cur => {
-        if (!cur) return cur;
-        const next = cur.map(s => ({ ...s }));
-        const a = next.findIndex(s => s.position === prev);
-        const b = next.findIndex(s => s.position === position);
-        if (a < 0 || b < 0) return cur;
-        // 位置はそのままに、中身（選手・シード・BYE）だけを入れ替える
-        const tmp = { ...next[a] };
-        next[a] = { ...next[b], position: next[a].position };
-        next[b] = { ...tmp, position: next[b].position };
-        return next;
-      });
-      return null;
-    });
-  }, []);
+    if (selectedSlotPos == null) { setSelectedSlotPos(position); return; }
+    if (selectedSlotPos === position) { setSelectedSlotPos(null); return; }
+    if (draftSlots) {
+      setDraftHistory(h => [...h, draftSlots]);
+      setDraftSlots(swapSlotContents(draftSlots, selectedSlotPos, position));
+    }
+    setSelectedSlotPos(null);
+  }, [selectedSlotPos, draftSlots]);
+
+  /** 直前の修正操作を取り消す */
+  const undoDraft = useCallback(() => {
+    if (draftHistory.length === 0) return;
+    setDraftSlots(draftHistory[draftHistory.length - 1]);
+    setDraftHistory(draftHistory.slice(0, -1));
+    setSelectedSlotPos(null);
+  }, [draftHistory]);
+
+  /**
+   * 枠を1つずつ下へずらして、指定位置に空き枠を作る。
+   *
+   * トーナメント表は「4枠ずつのブロック」で2回戦の相手が決まるため、
+   * 入れ替えだけでは手書きドロー特有の並び（例: 7・8の勝者と9が2回戦で当たる）
+   * を作れない。空き枠の挿入で全体を1つずつ下へずらせるようにする。
+   * ずれるのは「挿入位置から、その先にある最初の空き枠まで」に限る。
+   */
+  const handleInsertGap = useCallback((position: number) => {
+    if (!draftSlots) return;
+    const { slots: next, error } = insertGapAt(draftSlots, position);
+    if (error) { alert(error); return; }
+    setDraftHistory(h => [...h, draftSlots]);
+    setDraftSlots(next);
+    setSelectedSlotPos(null);
+  }, [draftSlots]);
+
+  /** 空き枠を詰めて、以降の枠を1つずつ上へ上げる（空き枠は末尾へ回す） */
+  const handleRemoveGap = useCallback((position: number) => {
+    if (!draftSlots) return;
+    setDraftHistory(h => [...h, draftSlots]);
+    setDraftSlots(removeGapAt(draftSlots, position));
+    setSelectedSlotPos(null);
+  }, [draftSlots]);
+
+  /** 選択中の枠が空き枠か */
+  const selectedSlotIsEmpty = useMemo(() => {
+    if (selectedSlotPos == null || !draftSlots) return false;
+    const s = draftSlots.find(x => x.position === selectedSlotPos);
+    return !!s && isEmptySlot(s);
+  }, [selectedSlotPos, draftSlots]);
 
   const drawDirty = useMemo(() => {
     if (!draftSlots) return false;
@@ -384,6 +419,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       await rebuildEventMatches(selectedEventId);
       setEditMode(false);
       setDraftSlots(null);
+      setDraftHistory([]);
       setSelectedSlotPos(null);
     } catch (e) {
       console.error('[あたり修正] 保存に失敗:', e);
@@ -397,6 +433,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   useEffect(() => {
     setEditMode(false);
     setDraftSlots(null);
+    setDraftHistory([]);
     setSelectedSlotPos(null);
   }, [selectedEventId]);
 
@@ -598,9 +635,16 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                   </span>
                   <span className="text-[10px] text-gray-600 flex-1 min-w-[150px]">
                     {selectedSlotPos == null
-                      ? '入れ替えたい枠をタップしてください（空き枠も選べます）'
-                      : `#${selectedSlotPos} を選択中 — 入れ替え先の枠をタップ`}
+                      ? '枠をタップして選ぶと、入れ替え・ずらしができます（空き枠も選べます）'
+                      : `#${selectedSlotPos} を選択中 — 入れ替え先の枠をタップ、または下のボタンでずらす`}
                   </span>
+                  <button
+                    onClick={undoDraft}
+                    disabled={savingDraw || draftHistory.length === 0}
+                    className="flex items-center gap-1 text-[10px] font-bold text-gray-600 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100 disabled:opacity-40"
+                  >
+                    <Undo2 className="w-3 h-3" />1つ戻す
+                  </button>
                   <button
                     onClick={cancelEdit}
                     disabled={savingDraw}
@@ -616,7 +660,37 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                     {savingDraw ? '保存中...' : '保存して対戦表に反映'}
                   </button>
                 </div>
+                {/* 枠のずらし操作。2回戦の相手は4枠ごとのブロックで決まるため、
+                    入れ替えだけでは作れない並びを「空き枠の挿入・詰め」で作れるようにする。 */}
+                {selectedSlotPos != null && (
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <button
+                      onClick={() => handleInsertGap(selectedSlotPos)}
+                      className="flex items-center gap-1 text-[10px] font-bold text-gray-700 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100"
+                      title="この位置に空き枠を作り、以降の選手を1つずつ下へずらします"
+                    >
+                      <ArrowDownToLine className="w-3 h-3" />ここに空きを入れて下へずらす
+                    </button>
+                    {selectedSlotIsEmpty && (
+                      <button
+                        onClick={() => handleRemoveGap(selectedSlotPos)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-gray-700 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100"
+                        title="この空き枠を詰めて、以降の選手を1つずつ上へ上げます"
+                      >
+                        <ArrowUpToLine className="w-3 h-3" />この空きを詰めて上へずらす
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedSlotPos(null)}
+                      className="text-[10px] text-gray-500 px-1.5 py-1 hover:text-gray-700"
+                    >
+                      選択解除
+                    </button>
+                  </div>
+                )}
                 <p className="text-[9px] text-gray-500 mt-1 leading-relaxed">
+                  2回戦の相手は4枠ずつのまとまりで決まります。「7・8の勝者と9が2回戦で当たる」形にするには、
+                  その3人が同じまとまりに入るよう空き枠でずらしてください。
                   入力済みのスコアは、対戦カードが変わらない試合はそのまま引き継がれます。
                 </p>
               </div>
