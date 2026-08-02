@@ -239,6 +239,12 @@ export interface LiveScore {
   isSuperTiebreak: boolean;
   /** サーブ側 */
   server: 1 | 2;
+  /**
+   * 進行中のタイブレークで最初にサーブした側。
+   * タイブレーク後のセットは「最初にサーブした側がレシーブ」から始まるため、
+   * 次セットの先サーブを決めるのに使う（タイブレーク中以外は null）。
+   */
+  tiebreakFirstServer?: 1 | 2 | null;
   status: 'live' | 'finished';
   winner: 1 | 2 | null;
   /** 直近のポイント取得者（表示のハイライト用） */

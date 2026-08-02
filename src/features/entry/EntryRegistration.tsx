@@ -789,7 +789,15 @@ function NormalEntryRegistration() {
     }
 
     if (!skipConfirm) {
-      const ok = await requestConfirm({ title: 'エントリー確定', message: 'エントリーを確定し対戦表を生成しますか？', confirmLabel: '確定する' });
+      const scored = (await db.matches.where('eventId').equals(eventId).toArray())
+        .filter(m => m.score || m.winnerEntryId).length;
+      const ok = await requestConfirm({
+        title: 'エントリー確定',
+        message: scored > 0
+          ? `エントリーを確定し対戦表を生成しますか？\n入力済みのスコア（${scored}試合）はそのまま引き継がれます。`
+          : 'エントリーを確定し対戦表を生成しますか？',
+        confirmLabel: '確定する',
+      });
       if (!ok) return;
     }
 
@@ -921,18 +929,88 @@ function NormalEntryRegistration() {
       }
     }
 
-    // 既存の試合を削除して新しく生成
+    // === 既存の試合と突き合わせ、入力済みのスコア・結果を引き継ぐ ===
+    // 「個別に確定 → スコア入力 → 全種目を一括確定」という流れでも
+    // それまでのスコアが消えないよう、対戦カードが同じ試合は削除せず更新する。
+    // （試合IDを保つことで、ライブスコアやコート状況の紐付けも維持される）
     const existingMatches = await db.matches.where('eventId').equals(eventId).toArray();
-    const existingIds = existingMatches.map(m => m.id).filter((id): id is number => id !== undefined);
+    const existingByMatchId = new Map(existingMatches.map(m => [m.matchId, m]));
+
+    // 現在のドローに残っているエントリー
+    // （欠場などでドローから外れた選手の勝ち上がりは引き継がない）
+    const liveEntryIds = new Set(
+      draw.slots.filter(s => s.entryId && !s.isBye).map(s => s.entryId as string)
+    );
+
+    /** 既存試合の進行情報（スコア・勝者・状態・コート・審判）を引き継ぐ */
+    const carryProgress = (base: Omit<Match, 'id'>, old: Match): Omit<Match, 'id'> => ({
+      ...base,
+      score: old.score,
+      winnerEntryId: old.winnerEntryId,
+      status: old.status,
+      gameRule: old.gameRule,
+      courtId: old.courtId ?? base.courtId,
+      scheduledTime: old.scheduledTime ?? base.scheduledTime,
+      refereeId: old.refereeId,
+      refereeName: old.refereeName,
+      matchOrder: old.matchOrder,
+    });
+
+    const mergedMatches = newMatches.map(nm => {
+      const old = existingByMatchId.get(nm.matchId);
+      if (!old) return nm;
+
+      // 1回戦（リーグ戦は全試合）: 対戦カードが同じときだけ結果を引き継ぐ
+      if (nm.round === 1) {
+        const samePair =
+          old.player1EntryId === nm.player1EntryId && old.player2EntryId === nm.player2EntryId;
+        if (!samePair) return nm;
+        // 不戦勝（BYE）は今回の生成結果を優先する
+        if (nm.status === 'walkover') return nm;
+        return carryProgress(nm, old);
+      }
+
+      // 2回戦以降: 勝ち上がった選手と結果を引き継ぐ
+      const keepP1 = !old.player1EntryId || liveEntryIds.has(old.player1EntryId);
+      const keepP2 = !old.player2EntryId || liveEntryIds.has(old.player2EntryId);
+      if (!keepP1 && !keepP2) return nm;
+      const advanced: Omit<Match, 'id'> = {
+        ...nm,
+        ...(keepP1 ? {
+          player1EntryId: old.player1EntryId,
+          player1Name: old.player1Name,
+          player1Affiliation: old.player1Affiliation,
+        } : {}),
+        ...(keepP2 ? {
+          player2EntryId: old.player2EntryId,
+          player2Name: old.player2Name,
+          player2Affiliation: old.player2Affiliation,
+        } : {}),
+      };
+      // 片方の勝ち上がりが無効になった試合はスコアを引き継がない
+      if (!keepP1 || !keepP2) return advanced;
+      return carryProgress(advanced, old);
+    });
 
     await db.transaction('rw', db.matches, async () => {
-      if (existingIds.length > 0) await db.matches.bulkDelete(existingIds);
-      await db.matches.bulkAdd(newMatches);
+      // 今回の生成に無い試合（ドロー変更で消えた分）だけ削除する
+      const nextMatchIds = new Set(mergedMatches.map(m => m.matchId));
+      const staleIds = existingMatches
+        .filter(m => !nextMatchIds.has(m.matchId))
+        .map(m => m.id)
+        .filter((id): id is number => id !== undefined);
+      if (staleIds.length > 0) await db.matches.bulkDelete(staleIds);
+
+      for (const m of mergedMatches) {
+        const old = existingByMatchId.get(m.matchId);
+        if (old?.id != null) await db.matches.update(old.id, m);
+        else await db.matches.add(m);
+      }
     });
 
     // トーナメント戦のみ: BYE勝ちの選手を次ラウンドに反映
     if (!isLeague) {
-      const walkoverMatches = newMatches.filter(m => m.status === 'walkover');
+      const walkoverMatches = mergedMatches.filter(m => m.status === 'walkover');
       for (const wm of walkoverMatches) {
         const nextRound = wm.round + 1;
         const nextPosition = Math.ceil(wm.position / 2);
@@ -996,7 +1074,15 @@ function NormalEntryRegistration() {
     const drawEventIds = new Set(currentDraws.map(d => d.eventId));
     const targets = events.filter(evt => drawEventIds.has(evt.eventId));
     if (targets.length === 0) return;
-    const ok = await requestConfirm({ title: '全種目一括確定', message: `全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`, confirmLabel: '確定する' });
+    const scoredAll = (await db.matches.where('eventId').anyOf(targets.map(t => t.eventId)).toArray())
+      .filter(m => m.score || m.winnerEntryId).length;
+    const ok = await requestConfirm({
+      title: '全種目一括確定',
+      message: scoredAll > 0
+        ? `全${targets.length}種目のエントリーを確定し対戦表を生成しますか？\n入力済みのスコア（${scoredAll}試合）はそのまま引き継がれます。`
+        : `全${targets.length}種目のエントリーを確定し対戦表を生成しますか？`,
+      confirmLabel: '確定する',
+    });
     if (!ok) return;
 
     setProcModalTitle('全種目 一括確定');

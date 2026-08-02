@@ -5,22 +5,24 @@
 // 1タップ＝1ポイントで進行し、更新はそのまま観戦ページへ配信される。
 // =============================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   ArrowLeft, Undo2, RefreshCw, Trophy, Wifi, WifiOff, Radio,
-  Minus, Plus, Repeat, Trash2, Gauge,
+  Minus, Plus, Repeat, Trash2, Gauge, SlidersHorizontal,
 } from 'lucide-react';
 import { db } from '../../db/database';
-import type { LiveScore } from '../../db/database';
+import type { LiveScore, LiveScoreConfig, MatchFormatType } from '../../db/database';
 import { useSyncStore } from '../sync/syncStore';
 import LiveScoreBoard from './LiveScoreBoard';
 import {
-  adjustGames, awardPoint, pointLabel, summarize, toggleServer, wonSets,
+  adjustGames, awardPoint, describeConfig, pointLabel, setServer, summarize, toggleServer, wonSets,
   type ScoreState,
 } from './liveScoreEngine';
-import { deleteLiveScore, finalizeLiveScore, revertLiveScoreResult, saveScoreState } from './liveScoreApi';
+import {
+  deleteLiveScore, finalizeLiveScore, revertLiveScoreResult, saveScoreState, updateLiveScoreConfig,
+} from './liveScoreApi';
 import { useNow } from './useNow';
 
 /** 状態から ScoreState 部分だけを取り出す */
@@ -35,8 +37,23 @@ function toState(live: LiveScore): ScoreState {
     status: live.status,
     winner: live.winner,
     lastPointBy: live.lastPointBy,
+    tiebreakFirstServer: live.tiebreakFirstServer ?? null,
   };
 }
+
+/**
+ * サイトカラー（テニスコートグリーン）に合わせた配色。
+ * 画面全体: #0f3326 / ヘッダー: #0a2419 / ボタン: #2d6a4f→#1b4d3e /
+ * アクセント（テニスボールの黄緑）: #d4e157
+ * ※ Tailwind の任意値クラスは静的な文字列でしか解決できないため、
+ *   クラス側は各所に直接記述し、ここでは背景色だけを共有する。
+ */
+const C = {
+  /** 画面背景 */
+  bg: '#0f3326',
+  /** ヘッダーの濃い緑 */
+  deep: '#0a2419',
+};
 
 export default function LiveScorePage() {
   const [params] = useSearchParams();
@@ -53,6 +70,7 @@ export default function LiveScorePage() {
   const [historyCount, setHistoryCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   /** 経過時間表示用の時計 */
   const now = useNow(1000);
 
@@ -126,6 +144,29 @@ export default function LiveScorePage() {
     await apply(toggleServer(toState(live)));
   }, [live, apply]);
 
+  /** サーブ側を指定した選手に直す（ゲーム数の手動修正でずれたときの訂正用） */
+  const handleSetServer = useCallback(async (player: 1 | 2) => {
+    if (!live || live.server === player) return;
+    await apply(setServer(toState(live), player));
+  }, [live, apply]);
+
+  /** 試合途中のゲームルール変更（変更内容はそのまま観戦ページへも配信される） */
+  const handleConfigChange = useCallback(async (patch: Partial<LiveScoreConfig>) => {
+    if (!live || live.status === 'finished') return;
+    const next: LiveScoreConfig = { ...live.config, ...patch };
+    // 2セットマッチ＋ファイナルSTB は1セット6ゲームが既定
+    if (patch.format && patch.format !== live.config.format) {
+      if (patch.format === 'twoSetsSuper10' && live.config.targetGames > 6) next.targetGames = 6;
+      if (patch.format === 'game' && live.config.format === 'twoSetsSuper10') next.targetGames = 8;
+    }
+    setBusy(true);
+    try {
+      await updateLiveScoreConfig(live, next);
+    } finally {
+      setBusy(false);
+    }
+  }, [live]);
+
   const handleFinalize = useCallback(async (winner: 1 | 2) => {
     if (!live) return;
     if (!confirm(`${winner === 1 ? live.player1Name : live.player2Name} の勝利で結果を確定します。よろしいですか？`)) return;
@@ -160,9 +201,12 @@ export default function LiveScorePage() {
   const connected = connectionState === 'connected';
 
   return (
-    <div className="min-h-[100dvh] bg-[#0d1b34] text-white flex flex-col">
+    <div className="min-h-[100dvh] text-white flex flex-col" style={{ backgroundColor: C.bg }}>
       {/* ヘッダー */}
-      <header className="flex items-center gap-2 px-3 h-14 shrink-0 bg-[#08132a] border-b border-white/10">
+      <header
+        className="flex items-center gap-2 px-3 h-14 shrink-0 border-b border-white/10"
+        style={{ backgroundColor: C.deep }}
+      >
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-bold bg-white/10 hover:bg-white/20 transition-colors"
@@ -180,7 +224,7 @@ export default function LiveScorePage() {
         <span
           className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border ${
             connected
-              ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-100'
+              ? 'bg-[#d4e157]/20 border-[#d4e157]/60 text-[#eef7b5]'
               : 'bg-white/10 border-white/20 text-white/60'
           }`}
           title={roomCode ? `ルーム: ${roomCode}` : '同期は開始されていません'}
@@ -203,12 +247,7 @@ export default function LiveScorePage() {
         <LiveScoreBoard live={live} size="lg" showMeta={false} />
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/50">
           <span>経過 {formatElapsed(now - live.startedAt)}</span>
-          <span>
-            {live.config.format === 'twoSetsSuper10'
-              ? `2セットマッチ＋ファイナル${live.config.superTiebreakTo}ポイントSTB`
-              : `${live.config.targetGames}ゲームマッチ（${live.config.targetGames}-${live.config.targetGames}タイブレーク）`}
-            {live.config.noAd ? '・ノーアド' : ''}
-          </span>
+          <span>{describeConfig(live.config)}</span>
           <span>セット {sets.p1}-{sets.p2}</span>
           {latencyMs != null && (
             <span className="flex items-center gap-1">
@@ -230,16 +269,16 @@ export default function LiveScorePage() {
                   key={p}
                   onClick={() => void handlePoint(p)}
                   disabled={busy}
-                  className="relative flex flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-b from-[#1d4ed8] to-[#15328c] active:from-[#2563eb] active:to-[#1d4ed8] border border-white/15 shadow-lg disabled:opacity-60 transition-colors p-3"
+                  className="relative flex flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-b from-[#2d6a4f] to-[#1b4d3e] active:from-[#37805f] active:to-[#245840] border border-white/15 shadow-lg disabled:opacity-60 transition-colors p-3"
                 >
                   {live.server === p && (
-                    <span className="absolute top-2 right-2 text-[10px] font-black text-[#e8ff4d] bg-black/25 rounded px-1.5 py-0.5">
+                    <span className="absolute top-2 right-2 text-[10px] font-black text-[#d4e157] bg-black/25 rounded px-1.5 py-0.5">
                       SERVE
                     </span>
                   )}
                   <span className="text-xs text-white/60 truncate max-w-full">{aff}</span>
                   <span className="text-lg sm:text-2xl font-black truncate max-w-full">{name || '(未定)'}</span>
-                  <span className="text-5xl sm:text-6xl font-black text-[#e8ff4d] leading-none mt-1">
+                  <span className="text-5xl sm:text-6xl font-black text-[#d4e157] leading-none mt-1">
                     {pointLabel(live, p)}
                   </span>
                   <span className="text-[11px] font-bold text-white/50 mt-1">タップで +1ポイント</span>
@@ -249,7 +288,7 @@ export default function LiveScorePage() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/5 border border-white/10 p-6">
-            <Trophy className="w-10 h-10 text-[#e8ff4d]" />
+            <Trophy className="w-10 h-10 text-[#d4e157]" />
             <p className="text-xl font-black">
               {live.winner === 1 ? live.player1Name : live.player2Name} の勝利
             </p>
@@ -261,7 +300,7 @@ export default function LiveScorePage() {
         )}
 
         {/* 操作列 */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
             onClick={() => void handleUndo()}
             disabled={busy || historyCount === 0}
@@ -279,11 +318,31 @@ export default function LiveScorePage() {
           <button
             onClick={() => setShowAdjust(v => !v)}
             disabled={finished}
-            className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-white/10 border border-white/15 text-sm font-bold hover:bg-white/15 disabled:opacity-40 transition-colors"
+            className={`flex items-center justify-center gap-1.5 py-3 rounded-xl border text-sm font-bold disabled:opacity-40 transition-colors ${
+              showAdjust
+                ? 'bg-[#d4e157] border-[#d4e157] text-[#0f3326]'
+                : 'bg-white/10 border-white/15 hover:bg-white/15'
+            }`}
           >
             <RefreshCw className="w-4 h-4" />ゲーム修正
           </button>
+          <button
+            onClick={() => setShowRules(v => !v)}
+            disabled={finished}
+            className={`flex items-center justify-center gap-1.5 py-3 rounded-xl border text-sm font-bold disabled:opacity-40 transition-colors ${
+              showRules
+                ? 'bg-[#d4e157] border-[#d4e157] text-[#0f3326]'
+                : 'bg-white/10 border-white/15 hover:bg-white/15'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />ルール変更
+          </button>
         </div>
+
+        {/* 試合途中のゲームルール変更 */}
+        {showRules && !finished && (
+          <RuleEditor config={live.config} busy={busy} onChange={patch => void handleConfigChange(patch)} />
+        )}
 
         {/* ゲーム数の手動修正 */}
         {showAdjust && !finished && (
@@ -313,6 +372,30 @@ export default function LiveScorePage() {
                 </button>
               </div>
             ))}
+
+            {/* サーブ側の直接指定 */}
+            {/* ゲーム数だけを直すとサーブ側が実際とずれるため、ここで合わせられるようにする */}
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
+              <p className="text-[11px] text-white/50">
+                このゲームのサーブ側（1ゲーム毎に自動で交代します）
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([1, 2] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => void handleSetServer(p)}
+                    disabled={busy}
+                    className={`py-2 rounded-lg border text-xs font-bold truncate transition-colors disabled:opacity-40 ${
+                      live.server === p
+                        ? 'bg-[#d4e157] border-[#d4e157] text-[#0f3326]'
+                        : 'bg-white/10 border-white/15 hover:bg-white/20'
+                    }`}
+                  >
+                    {(p === 1 ? live.player1Name : live.player2Name) || '(未定)'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -328,7 +411,7 @@ export default function LiveScorePage() {
                   key={p}
                   onClick={() => void handleFinalize(p)}
                   disabled={busy}
-                  className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[#e8ff4d] text-[#0a2461] text-sm font-black hover:brightness-95 disabled:opacity-50 transition"
+                  className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[#d4e157] text-[#0f3326] text-sm font-black hover:brightness-95 disabled:opacity-50 transition"
                 >
                   <Trophy className="w-4 h-4" />
                   {(p === 1 ? live.player1Name : live.player2Name) || '(未定)'} 勝利で確定
@@ -354,6 +437,151 @@ export default function LiveScorePage() {
   );
 }
 
+/**
+ * 試合途中でゲームルールを変更するパネル。
+ * 変更は即座に保存され、観戦ページの表示にも反映される。
+ */
+function RuleEditor({
+  config, busy, onChange,
+}: {
+  config: LiveScoreConfig;
+  busy: boolean;
+  onChange: (patch: Partial<LiveScoreConfig>) => void;
+}) {
+  const isTwoSets = config.format === 'twoSetsSuper10';
+  return (
+    <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-3">
+      <p className="text-[11px] text-white/50 leading-relaxed">
+        試合の途中でもルールを変更できます（変更後のゲーム数から新しいルールで進行します）。
+      </p>
+
+      {/* 試合方式 */}
+      <RuleRow label="試合方式">
+        {([
+          { v: 'game' as MatchFormatType, label: 'Nゲームマッチ' },
+          { v: 'twoSetsSuper10' as MatchFormatType, label: '2セット＋10点STB' },
+        ]).map(o => (
+          <ChoiceButton
+            key={o.v}
+            active={config.format === o.v}
+            disabled={busy}
+            onClick={() => onChange({ format: o.v })}
+          >
+            {o.label}
+          </ChoiceButton>
+        ))}
+      </RuleRow>
+
+      {/* 規定ゲーム数 */}
+      <RuleRow label={isTwoSets ? '1セットのゲーム数' : '規定ゲーム数'}>
+        {[4, 6, 8, 9].map(g => (
+          <ChoiceButton
+            key={g}
+            active={config.targetGames === g}
+            disabled={busy}
+            onClick={() => onChange({ targetGames: g })}
+          >
+            {g}
+          </ChoiceButton>
+        ))}
+        <span className="flex items-center gap-1 ml-1">
+          <button
+            onClick={() => onChange({ targetGames: Math.max(1, config.targetGames - 1) })}
+            disabled={busy}
+            className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 disabled:opacity-40"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span className="w-6 text-center text-sm font-black">{config.targetGames}</span>
+          <button
+            onClick={() => onChange({ targetGames: Math.min(99, config.targetGames + 1) })}
+            disabled={busy}
+            className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 disabled:opacity-40"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </span>
+      </RuleRow>
+
+      {/* デュース / ノーアド */}
+      <RuleRow label="デュース">
+        <ChoiceButton active={!config.noAd} disabled={busy} onClick={() => onChange({ noAd: false })}>
+          アドバンテージ
+        </ChoiceButton>
+        <ChoiceButton active={config.noAd} disabled={busy} onClick={() => onChange({ noAd: true })}>
+          ノーアド
+        </ChoiceButton>
+      </RuleRow>
+
+      {/* タイブレーク目標点 */}
+      <RuleRow label="タイブレーク">
+        {[5, 7, 10].map(p => (
+          <ChoiceButton
+            key={p}
+            active={config.tiebreakTo === p}
+            disabled={busy}
+            onClick={() => onChange({ tiebreakTo: p })}
+          >
+            {p}点
+          </ChoiceButton>
+        ))}
+      </RuleRow>
+
+      {/* ファイナルSTB目標点（2セットマッチのみ） */}
+      {isTwoSets && (
+        <RuleRow label="ファイナルSTB">
+          {[7, 10].map(p => (
+            <ChoiceButton
+              key={p}
+              active={config.superTiebreakTo === p}
+              disabled={busy}
+              onClick={() => onChange({ superTiebreakTo: p })}
+            >
+              {p}点
+            </ChoiceButton>
+          ))}
+        </RuleRow>
+      )}
+
+      <p className="text-[10px] text-white/40 leading-relaxed">
+        現在の設定: {describeConfig(config)}
+      </p>
+    </div>
+  );
+}
+
+function RuleRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-full sm:w-32 shrink-0 text-[11px] font-bold text-white/60">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function ChoiceButton({
+  active, disabled, onClick, children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-2.5 h-8 rounded-lg text-xs font-bold border transition-colors disabled:opacity-40 ${
+        active
+          ? 'bg-[#d4e157] border-[#d4e157] text-[#0f3326]'
+          : 'bg-white/10 border-white/15 text-white hover:bg-white/20'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -366,7 +594,10 @@ function formatElapsed(ms: number): string {
 
 function CenteredNotice({ text, onBack }: { text: string; onBack: () => void }) {
   return (
-    <div className="min-h-[100dvh] bg-[#0d1b34] text-white flex flex-col items-center justify-center gap-4 p-6">
+    <div
+      className="min-h-[100dvh] text-white flex flex-col items-center justify-center gap-4 p-6"
+      style={{ backgroundColor: C.bg }}
+    >
       <p className="text-sm text-white/70 text-center">{text}</p>
       <button
         onClick={onBack}
