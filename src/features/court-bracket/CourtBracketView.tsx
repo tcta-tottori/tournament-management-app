@@ -100,6 +100,22 @@ export default function CourtBracketView({
     return !s || s.isBye || !s.entryId;
   };
 
+  /**
+   * その枝（回戦 r・位置 i の配下）が全て BYE か。
+   * BYE だけの枝は紙のトーナメント表と同じく線も枠も描かない。
+   * これを見ないと、空の枝にも枠が描かれて実際の対戦カードとずれて見える。
+   */
+  const emptyCache = new Map<string, boolean>();
+  const isEmptySubtree = (r: number, i: number): boolean => {
+    if (r <= 0) return isSlotBye(i);
+    const key = `${r}-${i}`;
+    const hit = emptyCache.get(key);
+    if (hit !== undefined) return hit;
+    const v = isEmptySubtree(r - 1, i * 2) && isEmptySubtree(r - 1, i * 2 + 1);
+    emptyCache.set(key, v);
+    return v;
+  };
+
   // 表示の起点となる回戦（最低でも2列は残す）
   const leafRound = Math.min(Math.max(Math.floor(startRound), 0), Math.max(0, roundsCount - 1));
 
@@ -162,7 +178,15 @@ export default function CourtBracketView({
 
   const getCompactY = (r: number, i: number): number => {
     if (r <= leafRound) return leafY[i] ?? OFFSET_Y;
-    return (getCompactY(r - 1, i * 2) + getCompactY(r - 1, i * 2 + 1)) / 2;
+    const a = getCompactY(r - 1, i * 2);
+    const b = getCompactY(r - 1, i * 2 + 1);
+    // 片方が BYE だけの枝なら、もう片方のラインをそのまま通す
+    // （中点にすると、実際の対戦相手のいない側へ枠がずれてしまう）
+    const ea = isEmptySubtree(r - 1, i * 2);
+    const eb = isEmptySubtree(r - 1, i * 2 + 1);
+    if (ea && !eb) return b;
+    if (eb && !ea) return a;
+    return (a + b) / 2;
   };
   const getX = (r: number) => offsetX + (r - leafRound) * (slotW + xSpacing);
 
@@ -224,18 +248,17 @@ export default function CourtBracketView({
       const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
       const yMid = getCompactY(r + 1, m) + SLOT_HEIGHT / 2;
 
-      if (r === 0) {
-        const topBye = isSlotBye(m * 2);
-        const botBye = isSlotBye(m * 2 + 1);
-        if (topBye && botBye) continue;
-        if (topBye || botBye) {
-          const playerY = topBye ? yBottom : yTop;
-          paths.push(
-            <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`}
-              fill="none" stroke="#94a3b8" strokeWidth="1" />
-          );
-          continue;
-        }
+      // BYE だけの枝は描かず、相手のラインをそのまま次の回戦へ通す（全回戦共通）
+      const topEmpty = isEmptySubtree(r, m * 2);
+      const botEmpty = isEmptySubtree(r, m * 2 + 1);
+      if (topEmpty && botEmpty) continue;
+      if (topEmpty || botEmpty) {
+        const playerY = topEmpty ? yBottom : yTop;
+        paths.push(
+          <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`}
+            fill="none" stroke="#94a3b8" strokeWidth="1" />
+        );
+        continue;
       }
 
       const matchResult = findMatch(r + 1, m + 1);
@@ -451,6 +474,8 @@ export default function CourtBracketView({
   for (let r = Math.max(1, leafRound); r <= roundsCount; r++) {
     const numNodes = drawSize / Math.pow(2, r);
     for (let m = 0; m < numNodes; m++) {
+      // BYE だけの枝には枠を描かない（実際の対戦カードと重なってずれて見えるため）
+      if (isEmptySubtree(r, m)) continue;
       const x = getX(r);
       const y = getCompactY(r, m);
       const matchResult = findMatch(r, m + 1);
