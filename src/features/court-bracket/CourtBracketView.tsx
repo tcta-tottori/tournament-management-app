@@ -222,8 +222,10 @@ export default function CourtBracketView({
   const roundHeaders: React.ReactNode[] = [];
   for (let r = leafRound; r <= roundsCount; r++) {
     const x = getX(r);
-    // 決勝の次の列（優勝者列）は「N回戦」ではなく「優勝」にする
-    const displayLabel = r === 0 ? '1回戦' : r === roundsCount ? '優勝' : getRoundName(r + 1, totalRounds);
+    // 各列には「その回戦の試合」が並ぶので、列の見出しはその回戦名にする。
+    // （r+1 にすると、準決勝の対戦カードが「決勝」の下に並んでしまう）
+    // 左端の選手一覧の列は回戦ではないので「選手」とする。
+    const displayLabel = r === 0 ? '選手' : getRoundName(r, totalRounds);
     roundHeaders.push(
       <div
         key={`rh-${r}`}
