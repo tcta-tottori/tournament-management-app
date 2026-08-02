@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trophy, Play } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
+import { parseScoreParts } from '../score/scoreDisplay';
 
 /** 経過時間を H:MM 形式 */
 function formatElapsed(startedAt: number): string {
@@ -296,39 +297,48 @@ export default function CourtBracketView({
       // 上側=player1のスコアは合流点の上、下側=player2のスコアは下に配置。勝者側は緑ピル。
       if (isFinished && matchResult.score) {
         const raw = matchResult.score.trim();
-        const nums = raw.match(/^(\d+)\s*-\s*(\d+)/);
+        // タイブレークの得点は落とした側に "6(4)" のように付き、Ret / W.O は注記として分かれる
+        const parts = parseScoreParts(raw);
         const scoreX = (xMid + xNext) / 2; // 合流後の横線の中央付近
-        if (nums) {
+        if (parts?.hasGames) {
           const topWin = !!winnerIsTop;
           const botWin = !!winnerIsBottom;
-          const pill = (key: string, cx: number, cy: number, val: string, win: boolean) => {
-            const w = 20, h = 16;
+          // 文字数に合わせてピルを広げる（"6(4)" や "6 4" でも欠けないように）
+          const pillW = (val: string) => Math.max(20, val.length * 7.5 + 8);
+          const maxW = Math.max(pillW(parts.p1), pillW(parts.p2));
+          // 次の回戦のカードに重ならないよう、右端を少し内側に留める
+          const cx = Math.min(scoreX, xNext - 4 - maxW / 2);
+          const pill = (key: string, cy: number, val: string, win: boolean) => {
+            const w = pillW(val), h = 16;
             return (
               <g key={key}>
                 <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={7}
                   fill={win ? '#16a34a' : '#ffffff'} stroke={win ? '#16a34a' : '#cbd5e1'} strokeWidth="1" />
                 <text x={cx} y={cy + 4.5} fill={win ? '#ffffff' : '#64748b'}
-                  fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                  fontSize={val.length > 3 ? 10 : 13} fontWeight="bold" fontFamily="monospace" textAnchor="middle">
                   {val}
                 </text>
               </g>
             );
           };
           // 合流点(yMid)を挟んで上に上側選手のスコア、下に下側選手のスコア
-          paths.push(pill(`sT-${r}-${m}`, scoreX, yMid - 11, nums[1], topWin));
-          paths.push(pill(`sB-${r}-${m}`, scoreX, yMid + 11, nums[2], botWin));
-        } else {
-          // Ret / W.O 等は敗者側の横線上に表示（対象の人側に記載）。
+          paths.push(pill(`sT-${r}-${m}`, yMid - 11, parts.p1, topWin));
+          paths.push(pill(`sB-${r}-${m}`, yMid + 11, parts.p2, botWin));
+        }
+        // Ret / W.O は棄権した側（敗者側）の横線上に表示する。
+        // スコアがある途中棄権（"4-6 Ret"）でもゲームスコアと一緒に出す。
+        const note = parts ? parts.note : raw;
+        if (note) {
           const loserY = winnerIsTop ? yBottom : yTop; // 勝者でない側
           const loserFeederMidX = (x + xMid) / 2;
-          const w = Math.max(26, raw.length * 7 + 10);
+          const w = Math.max(26, note.length * 7 + 10);
           paths.push(
             <g key={`sX-${r}-${m}`}>
               <rect x={loserFeederMidX - w / 2} y={loserY - 8} width={w} height={16} rx={7}
                 fill="#ffffff" stroke="#f87171" strokeWidth="1" />
               <text x={loserFeederMidX} y={loserY + 4} fill="#dc2626"
                 fontSize="10" fontWeight="bold" textAnchor="middle">
-                {raw}
+                {note}
               </text>
             </g>
           );

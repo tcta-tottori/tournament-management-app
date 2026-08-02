@@ -12,6 +12,7 @@
 import * as XLSX from 'xlsx';
 import type { Draw, Match, Entry, Player, Event, Tournament } from '../../db/database';
 import type { FontWeight } from './resultCanvasKit';
+import { sideScoreText } from '../score/scoreDisplay';
 import {
   COL,
   clamp,
@@ -131,9 +132,9 @@ function downloadCanvasAsJpeg(canvas: HTMLCanvasElement, fileName: string): void
   }, 'image/jpeg', 0.95);
 }
 
-/** 結果画像のファイル名（ダウンロード用） */
+/** 結果画像のファイル名（ダウンロード用）。クラス（種目）名を先頭にする。 */
 export function buildEventResultFileName(opts: ResultExportOptions): string {
-  return `${opts.tournament.name}_${opts.event.name}_結果.jpg`;
+  return `${opts.event.name}_${opts.tournament.name}_結果.jpg`;
 }
 
 export async function exportTournamentResultAsJpeg(opts: ResultExportOptions): Promise<void> {
@@ -397,16 +398,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     meas.font = fontOf('normal', 12);
     champTextW = Math.max(champTextW, meas.measureText(`（${champAff}）`).width);
   }
-  const CENTER_W = clamp(champTextW + 56, 264, 430);
+  // 優勝表示の左右幅。名前が収まる分だけにして、左右の山の間の余白を詰める。
+  const CENTER_W = clamp(champTextW + 36, 196, 430);
 
-  // 優勝表示ブロックの高さ（合流点から「優勝」バッジ上端まで／描画側と同じ積み上げ）
-  const CHAMP_TICK = 12;
-  const CHAMP_CHIP_H = 21;
+  // 優勝表示ブロックの高さ（合流点から WINNER バッジ上端まで／描画側と同じ積み上げ）
+  const CHAMP_TICK = 9;
+  const CHAMP_CHIP_H = 20;
   const champBlockH = champName
-    ? CHAMP_TICK + 4
-      + (finalScoreText ? CHAMP_SCORE_PX + 6 : 0)
-      + (champAff ? 17 : 0)
-      + CHAMP_NAME_PX + 8 + CHAMP_CHIP_H
+    ? CHAMP_TICK + 2
+      + (finalScoreText ? CHAMP_SCORE_PX + 4 : 0)
+      + (champAff ? 15 : 0)
+      + CHAMP_NAME_PX + 5 + CHAMP_CHIP_H
     : 0;
 
   // ---- 全体レイアウト ----
@@ -421,8 +423,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ラウンドラベル（枠上端から 37px）と優勝表示が重ならないだけの上部余白を確保する
   // 回戦ラベルは表示しないので、上部は最小限の余白でよい
   const bracketTopPad = champBlockH > 0
-    ? Math.max(22, Math.ceil(champBlockH + 40 - apexRel))
-    : 22;
+    ? Math.max(18, Math.ceil(champBlockH + 18 - apexRel))
+    : 18;
   const bracketBodyH = maxRows * ROW_H;   // BYE を詰めた実際の高さ
 
   // 中央下部（枠内）に置く協会ロゴ
@@ -524,6 +526,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     const p1IsBot = !!match.player1EntryId && match.player1EntryId === botId;
     const p1IsTop = !!match.player1EntryId && match.player1EntryId === topId;
     const swap = p1IsBot && !p1IsTop;
+
+    // 1ゲームも行われていない棄権（"W.O" / "Ret" のみ）。ゲームスコアは無く注記だけ出す。
+    const noteOnly = raw.match(/^(Ret\.?|W\.?\s?O\.?)$/i);
+    if (noteOnly) return { top: '', bot: '', note: noteOnly[1] };
 
     // 「9-8(5)」「6-2 Ret」のような1セットのスコア
     const one = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
@@ -699,16 +705,19 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // ---- 中央上部: 優勝者名とスコア ----
   if (champName) {
-    let cursor = apexY - CHAMP_TICK - 4;
+    let cursor = apexY - CHAMP_TICK - 2;
     const scoreY = cursor - CHAMP_SCORE_PX / 2;
-    if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 6;
-    const affY = champAff ? cursor - 6 : cursor;
-    if (champAff) cursor = affY - 6 - 5;
+    if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 4;
+    const affY = champAff ? cursor - 5 : cursor;
+    if (champAff) cursor = affY - 5 - 5;
     const nameY = cursor - CHAMP_NAME_PX / 2;
-    cursor = nameY - CHAMP_NAME_PX / 2 - 8;
+    cursor = nameY - CHAMP_NAME_PX / 2 - 5;
 
-    // 「優勝」バッジ
-    const chipW = 60;
+    // 優勝バッジ（小さな日本語より読みやすいので英語表記にする）
+    const chipLabel = 'WINNER';
+    const chipPx = 12;
+    meas.font = fontOf('black', chipPx);
+    const chipW = Math.ceil(meas.measureText(chipLabel).width) + 26;
     const chipH = CHAMP_CHIP_H;
     const chipX = centerX - chipW / 2;
     const chipY = cursor - chipH;
@@ -716,7 +725,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     chipGrad.addColorStop(0, COL.gold1);
     chipGrad.addColorStop(1, COL.gold3);
     roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2, chipGrad);
-    drawText(ctx, '優勝', centerX, chipY + chipH / 2 + 0.5, 11.5, 'center', COL.white, 'black');
+    drawText(ctx, chipLabel, centerX, chipY + chipH / 2 + 0.5, chipPx, 'center', COL.white, 'black');
 
     drawText(ctx, champName, centerX, nameY, CHAMP_NAME_PX, 'center', COL.slate900, 'black', CENTER_W - 16);
     if (champAff) {
@@ -808,17 +817,10 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     const m = findMatch(rowPlayer, colPlayer);
     if (!m || !m.winnerEntryId) return { text: '', isWin: false, played: false };
     const isWin = m.winnerEntryId === rowPlayer.entryId;
-    // スコアを行プレイヤー視点で表示
+    // スコアを行プレイヤー視点で表示（タイブレークの得点は落とした側に付き、Ret / W.O も残す）
     if (m.score) {
-      if (m.player1EntryId === rowPlayer.entryId) {
-        return { text: m.score, isWin, played: true };
-      }
-      // スコアを反転 "8-2" → "2-8"
-      const parts = m.score.split('-');
-      if (parts.length === 2) {
-        return { text: `${parts[1].trim()}-${parts[0].trim()}`, isWin, played: true };
-      }
-      return { text: m.score, isWin, played: true };
+      const text = sideScoreText(m.score, m.player1EntryId === rowPlayer.entryId) || m.score;
+      return { text, isWin, played: true };
     }
     return { text: isWin ? '○' : '●', isWin, played: true };
   };
@@ -862,9 +864,13 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   const CELL_W = 96;
   const NAME_W = clamp(maxNameW + 46, 220, 420);
   const ROW_H = 46;
-  const HDR_H = 44;
   const STAT_W = 88;
   const RANK_W = 72;
+
+  // 協会ロゴはリーグ表の左上（選手名列のヘッダー）の中に入れる。
+  // ロゴが入る分だけヘッダー行を高くする。
+  const cornerLogo = showLogo ? fitLogo(logos.tcta, NAME_W - 28, 46) : { w: 0, h: 0 };
+  const HDR_H = Math.max(44, Math.ceil(cornerLogo.h + 12));
 
   const paddingX = 30;
   const paddingY = 26;
@@ -879,8 +885,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   const cardBottomPad = 18;
   const cardH = gridH + cardTopPad + cardBottomPad;
 
-  const tcta = showLogo ? fitLogo(logos.tcta, Math.min(360, tableW * 0.4), 80) : { w: 0, h: 0 };
-  const footerH = tcta.h > 0 ? tcta.h + 10 : 4;
+  // 協会ロゴは表の中（左上）へ移したので、下の余白は最小限にする
+  const footerH = 4;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + cardH + footerH + 14;
@@ -938,6 +944,17 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     if (row % 2 === 0) continue;
     ctx.fillStyle = COL.slate50;
     ctx.fillRect(gridX, gridY + HDR_H + row * ROW_H, gridW, ROW_H);
+  }
+
+  // 左上（選手名列のヘッダー）に協会ロゴ
+  if (showLogo && cornerLogo.w > 0) {
+    ctx.drawImage(
+      logos.tcta!,
+      gridX + (NAME_W - cornerLogo.w) / 2,
+      gridY + (HDR_H - cornerLogo.h) / 2,
+      cornerLogo.w,
+      cornerLogo.h,
+    );
   }
 
   // ヘッダーテキスト（列名 = 選手名）
@@ -1030,11 +1047,6 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
         drawText(ctx, `${rank}位`, rankX + RANK_W / 2, cy, 14, 'center', COL.slate600, 'bold');
       }
     }
-  }
-
-  // ---- フッター（右下に協会ロゴ） ----
-  if (showLogo && tcta.w > 0) {
-    ctx.drawImage(logos.tcta!, paddingX + tableW - tcta.w, cardY + cardH + 8, tcta.w, tcta.h);
   }
 
   return canvas;

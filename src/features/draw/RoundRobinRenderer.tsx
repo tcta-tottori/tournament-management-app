@@ -1,4 +1,5 @@
 import type { DrawSlotData, MatchResult } from './DrawBoard';
+import { sideScoreText } from '../score/scoreDisplay';
 
 interface RoundRobinRendererProps {
   slots: DrawSlotData[];
@@ -115,14 +116,9 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
     if (!match) return { text: '', isWin: false, isLoss: false };
     if (!match.winnerEntryId) return { text: '', isWin: false, isLoss: false, match };
     const isWin = match.winnerEntryId === p1.entryId;
-    // スコアを行選手視点にそろえる
-    let scoreText = match.score || (isWin ? '○' : '●');
-    const sc = parseScore(match.score);
-    if (sc) {
-      const mine = match.player1EntryId === p1.entryId ? sc[0] : sc[1];
-      const theirs = match.player1EntryId === p1.entryId ? sc[1] : sc[0];
-      scoreText = `${mine}-${theirs}`;
-    }
+    // スコアを行選手視点にそろえる（タイブレークの得点・Ret / W.O も残す）
+    const aligned = sideScoreText(match.score, match.player1EntryId === p1.entryId);
+    const scoreText = aligned || match.score || (isWin ? '○' : '●');
     return { text: scoreText, isWin, isLoss: !isWin, match };
   };
 

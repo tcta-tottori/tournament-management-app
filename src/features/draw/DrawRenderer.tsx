@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DrawSlotData, MatchResult } from './DrawBoard';
+import { parseScoreParts } from '../score/scoreDisplay';
 
 interface DrawRendererProps {
   slots: DrawSlotData[];
@@ -26,29 +27,14 @@ const LOSE_COLOR = '#CBD5E0';
 const SEED_BG = '#FFF2CC';
 const BYE_BG = '#F2F2F2';
 
-/** Parse score like "8-6", "6-4 7-5", "6-4 6-7(3) [10-5]" into p1/p2 parts */
-function parseScore(score: string): { p1: string; p2: string } | null {
-  if (!score) return null;
-  const clean = score.replace(/\s*W\.O\.?\s*/gi, '').replace(/\s*Ret\.?\s*/gi, '').trim();
-  if (!clean) return null;
-
-  const parts = clean.split(/\s+/).filter(Boolean);
-  const p1Parts: string[] = [];
-  const p2Parts: string[] = [];
-
-  for (const part of parts) {
-    // Super tiebreak [10-5]
-    const stb = part.match(/^\[(\d+)-(\d+)\]$/);
-    if (stb) { p1Parts.push(`[${stb[1]}`); p2Parts.push(`${stb[2]}]`); continue; }
-    // Normal: 6-4 or 7-6(3)
-    const m = part.match(/^(\d+)-(\d+)(?:\((\d+)\))?$/);
-    if (m) {
-      p1Parts.push(m[1]);
-      p2Parts.push(m[3] ? `${m[2]}(${m[3]})` : m[2]);
-    }
-  }
-  if (p1Parts.length === 0) return null;
-  return { p1: p1Parts.join(' '), p2: p2Parts.join(' ') };
+/**
+ * "8-6" / "6-4 7-5" / "6-4 6-7(3) [10-5]" / "4-6 Ret" を p1・p2 の表示に分解する。
+ * タイブレークの得点は落とした側に付き、Ret / W.O は note として分かれる。
+ */
+function parseScore(score: string): { p1: string; p2: string; note: string } | null {
+  const parts = parseScoreParts(score);
+  if (!parts) return null;
+  return { p1: parts.p1, p2: parts.p2, note: parts.note };
 }
 
 export default function DrawRenderer({
@@ -189,11 +175,14 @@ export default function DrawRenderer({
             </text>
           );
         }
-        if (isWalkover) {
+        // Ret / W.O は棄権した側（敗者側）の線に添える
+        const note = parsed?.note || (isWalkover ? 'W.O' : '');
+        if (note) {
+          const loserY = winnerIsP1 ? yBot + 11 : winnerIsP2 ? yTop - 3 : yMid + 4;
           svgElements.push(
-            <text key={`wo-${r}-${m}`} x={lineX + 4} y={yMid + 4}
+            <text key={`wo-${r}-${m}`} x={lineX + 4 + (parsed?.p1 || parsed?.p2 ? 22 : 0)} y={loserY}
               style={{ fontSize: 9, fontWeight: 700 }} fill={WIN_COLOR}>
-              W.O.
+              {note}
             </text>
           );
         }
