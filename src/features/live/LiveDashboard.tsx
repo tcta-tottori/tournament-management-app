@@ -729,7 +729,8 @@ function LiveDashboardInner() {
                   <div className="text-[10px] text-emerald-600 font-bold mb-2 px-1 text-center">
                     {block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}〜{block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}
                   </div>
-                  <div className="flex flex-col gap-2">
+                  {/* 対戦情報の有無でカード幅が変わらないよう、全ブロックを同じ幅に揃える */}
+                  <div className="flex flex-col gap-2 w-[224px]">
                     {[...block].reverse().map(cs => {
                       const match = cs.currentMatch || cs.nextMatch;
                       const evtName = match ? eventNameMap.get(match.eventId) : undefined;

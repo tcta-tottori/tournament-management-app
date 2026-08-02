@@ -198,6 +198,21 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     return v;
   };
 
+  /**
+   * 実際の対戦に勝ったことがある選手。
+   * BYE で勝ち上がっただけの枝に勝ち上がり線（赤）を引くと、
+   * 一度も勝っていない選手にも赤線が付いてしまうため、
+   * 「相手のいる試合に勝った」選手だけを赤線の対象にする。
+   */
+  const realWinnerIds = new Set<string>();
+  for (const m of matches) {
+    if (!m.winnerEntryId) continue;
+    if (!m.player1EntryId || !m.player2EntryId) continue; // BYE 戦は勝ちに数えない
+    realWinnerIds.add(m.winnerEntryId);
+  }
+  const hasRealWin = (node: { entryId: string | null } | null): boolean =>
+    !!node?.entryId && realWinnerIds.has(node.entryId);
+
   // entryId → 所属 の逆引き（優勝者の所属表示用）
   const affById = new Map<string, string>();
   for (const s of slotMap.values()) {
@@ -482,8 +497,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         const parent = resolve(r, gIdx);
         const top = resolve(r - 1, 2 * gIdx);
         const bot = resolve(r - 1, 2 * gIdx + 1);
-        const winTop = !!parent?.entryId && parent.entryId === top?.entryId;
-        const winBot = !!parent?.entryId && parent.entryId === bot?.entryId;
+        const winTop = !!parent?.entryId && parent.entryId === top?.entryId && hasRealWin(top);
+        const winBot = !!parent?.entryId && parent.entryId === bot?.entryId && hasRealWin(bot);
 
         // BYE 側の枝は線を引かず、相手のラインをそのまま通す
         if (!emptyTop) segs.push({ x1: xChild, y1: yTop, x2: xJoin, y2: yTop, win: winTop });
@@ -516,8 +531,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   }
 
   // ---- 決勝（中央で左右の山が合流し、上に立ち上がる） ----
-  const winL = !!champEntryId && champEntryId === finL?.entryId;
-  const winR = !!champEntryId && champEntryId === finR?.entryId;
+  const winL = !!champEntryId && champEntryId === finL?.entryId && hasRealWin(finL);
+  const winR = !!champEntryId && champEntryId === finR?.entryId && hasRealWin(finR);
   const yL = rowsTopY + yLRel;
   const yR = rowsTopY + yRRel;
   // 左右の山は「同じ高さ」で中央へ入れ、紙のトーナメント表と同じく
@@ -537,7 +552,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     segs.push({ x1: xFinR, y1: apexY, x2: centerX, y2: apexY, win: winR });
   }
   // 優勝者へ立ち上がる縦線
-  segs.push({ x1: centerX, y1: apexY, x2: centerX, y2: apexY - CHAMP_TICK, win: !!champEntryId });
+  segs.push({ x1: centerX, y1: apexY, x2: centerX, y2: apexY - CHAMP_TICK, win: hasRealWin(champNode) });
 
   // 通常線 → 勝ち上がり線 の順に描画して、赤いラインが必ず前面に出るようにする
   ctx.lineCap = 'round';

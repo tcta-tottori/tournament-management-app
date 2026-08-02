@@ -5,7 +5,7 @@ import {
   ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X, Volume2,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, Radio
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -32,6 +32,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-07', path: '/score', label: 'スコア', icon: Trophy },
   { id: 'S-07b', path: '/court-bracket', label: 'ドロー', icon: Network },
   { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
+  { id: 'S-09b', path: '/broadcast', label: 'ライブ配信', icon: Radio },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
 ];
