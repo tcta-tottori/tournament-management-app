@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import DrawRenderer from './DrawRenderer';
 import RoundRobinRenderer from './RoundRobinRenderer';
 import { exportDrawToExcel } from './DrawExporter';
+import { rebuildEventMatches } from './rebuildMatches';
 import {
   exportTournamentResultAsJpeg,
   exportTournamentResultAsExcel,
@@ -240,7 +241,15 @@ function NormalDrawBoard() {
         updatedAt: Date.now()
       });
       setHasUnsavedChanges(false);
-      alert('ドローの調整を保存しました');
+
+      // 対戦表が既にある場合は、新しいあたりに合わせて組み直す。
+      // 対戦カードが変わらない試合の入力済みスコアはそのまま引き継がれる。
+      if (matches.length > 0) {
+        await rebuildEventMatches(selectedEventId);
+        alert('ドローの調整を保存し、対戦表に反映しました');
+      } else {
+        alert('ドローの調整を保存しました');
+      }
     } catch (e) {
       console.error(e);
       alert('保存に失敗しました');

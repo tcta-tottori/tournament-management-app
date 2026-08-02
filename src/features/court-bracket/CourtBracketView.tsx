@@ -33,6 +33,15 @@ interface CourtBracketViewProps {
    * 回戦が進むほど対戦相手同士が上下に離れて見にくくなるのを防ぐ。
    */
   startRound?: number;
+  /**
+   * あたり修正モード。1回戦の枠（BYEの空き枠を含む）をタップで選び、
+   * もう一方をタップすると入れ替える。試合ノードのタップは無効になる。
+   */
+  editMode?: boolean;
+  /** 修正モードで選択中の枠の position */
+  selectedSlotPosition?: number | null;
+  /** 修正モードで枠がタップされたとき */
+  onSlotSelect?: (position: number) => void;
 }
 
 const SLOT_HEIGHT = 36;
@@ -63,6 +72,9 @@ export default function CourtBracketView({
   onMatchSelect,
   onEnterCourt,
   startRound = 0,
+  editMode = false,
+  selectedSlotPosition = null,
+  onSlotSelect,
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
@@ -106,6 +118,15 @@ export default function CourtBracketView({
 
       if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
         nextCompactY += Y_SPACING * 0.8;
+      }
+
+      // 修正モードでは空き枠も入れ替え先として並べるので、全ての枠に行を割り当てる
+      if (editMode) {
+        const EDIT_SPACING = SLOT_HEIGHT + 10;
+        leafY[topIdx] = nextCompactY;
+        leafY[botIdx] = nextCompactY + EDIT_SPACING;
+        nextCompactY += EDIT_SPACING * 2 + 8;
+        continue;
       }
 
       if (topBye && botBye) {
@@ -316,18 +337,33 @@ export default function CourtBracketView({
   let visibleIndex = 0;
   for (let i = 0; leafRound === 0 && i < drawSize; i++) {
     const slot = slots[i];
-    if (!slot || (slot.isBye && !slot.entryId)) continue;
-    visibleIndex++;
+    const isEmpty = !slot || (slot.isBye && !slot.entryId);
+    // 修正モードでは空き枠（BYE）も入れ替え先として表示する
+    if (isEmpty && !editMode) continue;
+    if (!slot) continue;
+    if (!isEmpty) visibleIndex++;
     const x = getX(0);
     const y = leafY[i];
+    const isSelected = editMode && selectedSlotPosition === slot.position;
+    const editProps = editMode && onSlotSelect
+      ? { onClick: () => onSlotSelect(slot.position), role: 'button' as const }
+      : {};
+    const editCls = editMode
+      ? isSelected
+        ? ' ring-2 ring-primary-500 bg-primary-50 cursor-pointer'
+        : ' cursor-pointer hover:ring-2 hover:ring-primary-200'
+      : '';
 
     slotElements.push(
       <div key={`s-${slot.position}`}
-        className="absolute flex items-center px-1.5 gap-1 bg-white border border-gray-400 rounded select-none"
+        {...editProps}
+        className={`absolute flex items-center px-1.5 gap-1 border rounded select-none transition-all${editCls} ${
+          isEmpty ? 'bg-gray-50 border-dashed border-gray-300' : 'bg-white border-gray-400'
+        }`}
         style={{ left: x, top: y, width: slotW, height: SLOT_HEIGHT }}
       >
         <div className="w-5 text-[10px] font-mono font-bold text-gray-600 border-r border-gray-300 pr-1 text-center shrink-0">
-          {visibleIndex}
+          {editMode ? slot.position : visibleIndex}
         </div>
         {slot.seed > 0 && (
           <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[8px] font-bold rounded-full">
@@ -335,7 +371,9 @@ export default function CourtBracketView({
           </div>
         )}
         <div className="flex-1 truncate font-semibold text-gray-900 text-[13px]" title={slot.name}>
-          {slot.isBye ? <span className="text-gray-400">BYE</span> : slot.name}
+          {isEmpty
+            ? <span className="text-gray-400 font-normal">空き</span>
+            : slot.isBye ? <span className="text-gray-400">BYE</span> : slot.name}
         </div>
         {!slot.isBye && slot.affiliation && (
           <div className="text-[10px] text-gray-500 whitespace-nowrap shrink-0" title={slot.affiliation}>
@@ -429,11 +467,14 @@ export default function CourtBracketView({
       // 空きコートに入れる状態（enterCourtName付き・未試合）は、タップでコート投入。
       const isEnterable = !!(matchResult?.enterCourtName && bothPlayers && !isPlaying && !isFinished);
       // クリック動作: 入れる状態なら onEnterCourt、それ以外は onMatchSelect（スコア入力）
-      const clickHandler = isEnterable && onEnterCourt
-        ? () => onEnterCourt(matchResult!.round, matchResult!.position)
-        : (onMatchSelect && bothPlayers)
-          ? () => onMatchSelect(matchResult!.round, matchResult!.position)
-          : null;
+      // 修正モード中はスコア入力・コート投入のタップを止める（枠の入れ替えに専念）
+      const clickHandler = editMode
+        ? null
+        : isEnterable && onEnterCourt
+          ? () => onEnterCourt(matchResult!.round, matchResult!.position)
+          : (onMatchSelect && bothPlayers)
+            ? () => onMatchSelect(matchResult!.round, matchResult!.position)
+            : null;
       const clickProps = clickHandler ? { onClick: clickHandler, role: 'button' as const } : {};
       const clickCls = clickHandler
         ? (isEnterable && onEnterCourt ? ' cursor-pointer hover:ring-2 hover:ring-orange-400' : ' cursor-pointer hover:ring-2 hover:ring-emerald-400')
@@ -510,7 +551,10 @@ export default function CourtBracketView({
       matchElements.push(
         <div key={`m-${r}-${m}`}
           {...clickProps}
-          className={`absolute flex items-center overflow-hidden rounded transition-all${clickCls} ${cardClass}`}
+          className={`absolute flex items-center overflow-hidden rounded transition-all${clickCls} ${cardClass}${
+            // 修正モード中は「保存前の古い対戦」であることが分かるよう薄く表示する
+            editMode ? ' opacity-40' : ''
+          }`}
           style={{ left: x, top, width: slotW, height: cardH }}
         >
           {content}
