@@ -58,6 +58,7 @@ import Manual from './features/manual/Manual'
 import BackupPage from './features/backup/BackupPage';
 // ResultsPage は結果タブ削除に伴い廃止
 import CourtBracketPage from './features/court-bracket/CourtBracketPage';
+import LiveBroadcastPage from './features/livescore/LiveBroadcastPage';
 import TeamCallStatusBubble from './features/team/TeamCallStatusBubble';
 // BroadcastPanel は Scoreboard の MatchActionPanel に統合済み
 
@@ -105,11 +106,11 @@ createRoot(document.getElementById('root')!).render(
           <Route path="court-bracket" element={<CourtBracketPage />} />
           <Route path="schedule" element={<CourtSchedule />} />
           <Route path="dashboard" element={<LiveDashboard />} />
+          <Route path="broadcast" element={<LiveBroadcastPage />} />
           {/* results ルートは結果タブ削除に伴い廃止 */}
 
           <Route path="manual" element={<Manual />} />
           <Route path="backup" element={<BackupPage />} />
-          {/* broadcast は Scoreboard の MatchActionPanel に統合済み */}
         </Route>
       </Routes>
       {/* 団体戦コール中の右下ステータスバブル（全ルート共通） */}
