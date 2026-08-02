@@ -267,7 +267,12 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const finR = resolve(totalRounds - 1, 1);
   const yLRel = nodeYRel(totalRounds - 1, 0);
   const yRRel = nodeYRel(totalRounds - 1, 1);
-  const apexRel = Math.min(yLRel, yRRel);
+  const emptyFinL = isEmptyNode(totalRounds - 1, 0);
+  const emptyFinR = isEmptyNode(totalRounds - 1, 1);
+  // 決勝の合流点は左右の山の中間に置く（他の回戦の合流点と同じ決め方）。
+  // 高い方に合わせると、優勝者へ立ち上がる線がその山の線とそのまま繋がり、
+  // もう一方の山の線だけがずれて見えてしまう。
+  const apexRel = nodeYRel(totalRounds, 0);
 
   // ---- 中央の優勝表示（カードではなく、中央から立ち上がる線＋テキスト） ----
   const champName = champNode && !champNode.isBye ? champNode.name : '';
@@ -493,9 +498,11 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         const match = matchMap.get(`${r}-${gIdx + 1}`);
         const align: CanvasTextAlign = side === 'L' ? 'left' : 'right';
         const sx = side === 'L' ? xJoin + 6 : xJoin - 6;
-        // 上下のスコアは合流点をはさんで並べる（回戦が進んでも間隔は一定）
-        const scoreTopY = yMid - SCORE_OFFSET;
-        const scoreBotY = yMid + SCORE_OFFSET;
+        // 上下のスコアは合流点をはさんで並べる（回戦が進んでも間隔は一定）。
+        // 決勝へ向かう最終列だけは、中央へ引く線の高さ（左右共通）を挟むように置く。
+        const scoreCenterY = r === halfRounds ? apexY : yMid;
+        const scoreTopY = scoreCenterY - SCORE_OFFSET;
+        const scoreBotY = scoreCenterY + SCORE_OFFSET;
         const sc = parseScore(match, top?.entryId ?? null, bot?.entryId ?? null);
         if (sc) {
           if (sc.top) tags.push({ x: sx, y: scoreTopY, text: sc.top, align, win: winTop });
@@ -513,10 +520,22 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const winR = !!champEntryId && champEntryId === finR?.entryId;
   const yL = rowsTopY + yLRel;
   const yR = rowsTopY + yRRel;
-  segs.push({ x1: joinX('L', halfRounds), y1: yL, x2: centerX, y2: yL, win: winL });
-  segs.push({ x1: joinX('R', halfRounds), y1: yR, x2: centerX, y2: yR, win: winR });
-  if (yL !== apexY) segs.push({ x1: centerX, y1: yL, x2: centerX, y2: apexY, win: winL });
-  if (yR !== apexY) segs.push({ x1: centerX, y1: yR, x2: centerX, y2: apexY, win: winR });
+  // 左右の山は「同じ高さ」で中央へ入れ、紙のトーナメント表と同じく
+  // 決勝を1本の横線として見せる。
+  // 準決勝の合流点の高さ（yL / yR）は BYE の有無で左右がずれるため、
+  // それぞれの高さのまま中央へ引くと決勝の線が段違いになってしまう。
+  // 高さの差は準決勝の合流線（縦線）の上で吸収する。
+  const xFinL = joinX('L', halfRounds);
+  const xFinR = joinX('R', halfRounds);
+  // 片側がすべて BYE のときは、その山からの線は引かない
+  if (!emptyFinL) {
+    if (yL !== apexY) segs.push({ x1: xFinL, y1: yL, x2: xFinL, y2: apexY, win: winL });
+    segs.push({ x1: xFinL, y1: apexY, x2: centerX, y2: apexY, win: winL });
+  }
+  if (!emptyFinR) {
+    if (yR !== apexY) segs.push({ x1: xFinR, y1: yR, x2: xFinR, y2: apexY, win: winR });
+    segs.push({ x1: xFinR, y1: apexY, x2: centerX, y2: apexY, win: winR });
+  }
   // 優勝者へ立ち上がる縦線
   segs.push({ x1: centerX, y1: apexY, x2: centerX, y2: apexY - CHAMP_TICK, win: !!champEntryId });
 
