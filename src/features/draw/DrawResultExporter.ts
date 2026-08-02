@@ -252,6 +252,37 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const SCORE_LINE_GAP = clamp(ROW_H / 2 - 8, 7, 13);
   const SCORE_OFFSET = Math.max(6, ROW_H / 2 - SCORE_LINE_GAP);
 
+  // ---- 選手行の割り当て（BYE の空きを詰める） ----
+  // BYE のスロットにも1行ずつ確保すると、ドロー表どおりに並べたときに
+  // 大きな空白ができてしまう。BYE だけの対戦枠は行を消費せず、
+  // 片方だけ BYE の枠は相手選手の1行にまとめる。
+  const slotRow: number[] = new Array(drawSize).fill(0);
+  const halfRows = [0, 0];   // 左右それぞれで使った行数
+  for (let side = 0; side < 2; side++) {
+    const base = side * halfSlots;
+    let row = 0;
+    for (let m = 0; m < halfSlots / 2; m++) {
+      const t = base + m * 2;
+      const b = t + 1;
+      const tb = slotMap.get(t + 1)?.isBye ?? true;
+      const bb = slotMap.get(b + 1)?.isBye ?? true;
+      if (tb && bb) {
+        slotRow[t] = row; slotRow[b] = row;          // 行は使わない
+      } else if (tb || bb) {
+        slotRow[t] = row; slotRow[b] = row; row += 1; // 相手の1行にまとめる
+      } else {
+        slotRow[t] = row; slotRow[b] = row + 1; row += 2;
+      }
+    }
+    halfRows[side] = row;
+  }
+  // 行数が少ない側は上下中央に寄せて、左右の山の高さを揃える
+  const maxRows = Math.max(halfRows[0], halfRows[1], 1);
+  const halfOffset = [
+    ((maxRows - halfRows[0]) / 2) * ROW_H,
+    ((maxRows - halfRows[1]) / 2) * ROW_H,
+  ];
+
   // ---- 各ノードのY座標（rowsTopY からの相対値） ----
   // BYE だけの枝は「無いもの」として扱い、相手のラインをまっすぐ通す。
   const yCache = new Map<string, number>();
@@ -261,8 +292,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     if (hit !== undefined) return hit;
     let v: number;
     if (round === 0) {
-      const row = index < halfSlots ? index : index - halfSlots;
-      v = row * ROW_H + ROW_H / 2;
+      const side = index < halfSlots ? 0 : 1;
+      v = slotRow[index] * ROW_H + ROW_H / 2 + halfOffset[side];
     } else {
       const a = nodeYRel(round - 1, index * 2);
       const b = nodeYRel(round - 1, index * 2 + 1);
@@ -347,7 +378,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const bracketTopPad = champBlockH > 0
     ? Math.max(52, Math.ceil(champBlockH + 48 - apexRel))
     : 52;
-  const bracketBodyH = halfSlots * ROW_H;
+  const bracketBodyH = maxRows * ROW_H;   // BYE を詰めた実際の高さ
 
   // 中央下部（枠内）に置く協会ロゴ
   const centerLogo = showLogo
@@ -454,12 +485,13 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   drawRoundLabel(centerX, '決勝', true);
 
   // ---- 選手行の背景（縞）----
-  for (let i = 0; i < halfSlots; i++) {
-    if (i % 2 === 0) continue;
+  // BYE を詰めたあとの実際の行で1行おきに敷く
+  ctx.fillStyle = COL.slate50;
+  for (let i = 0; i < drawSize; i++) {
+    if (slotMap.get(i + 1)?.isBye ?? true) continue;
+    if (slotRow[i] % 2 === 0) continue;
     const y = nodeY(0, i) - ROW_H / 2;
-    ctx.fillStyle = COL.slate50;
-    if (!slotMap.get(i + 1)?.isBye) ctx.fillRect(leftNameX, y, NAME_W, ROW_H);
-    if (!slotMap.get(halfSlots + i + 1)?.isBye) ctx.fillRect(rightNameEndX, y, NAME_W, ROW_H);
+    ctx.fillRect(i < halfSlots ? leftNameX : rightNameEndX, y, NAME_W, ROW_H);
   }
 
   // ---- ブラケット線・スコアの組み立て ----
