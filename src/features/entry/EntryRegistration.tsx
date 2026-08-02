@@ -156,6 +156,8 @@ function NormalEntryRegistration() {
   const [drawEditHistory, setDrawEditHistory] = useState<Draw['slots'][]>([]);
   const [editSelectedPos, setEditSelectedPos] = useState<number | null>(null);
   const [savingDrawEdit, setSavingDrawEdit] = useState(false);
+  /** 一度にずらす枠数（4枠のまとまりに合わせるとき 2〜4 をよく使う） */
+  const [shiftCount, setShiftCount] = useState(1);
 
   // 処理中モーダル
   const [procModalOpen, setProcModalOpen] = useState(false);
@@ -1580,17 +1582,36 @@ function NormalEntryRegistration() {
     setEditSelectedPos(null);
   }, [drawEdit, editSelectedPos, pushDrawEdit]);
 
-  const handleEditInsertGap = useCallback((position: number) => {
+  /**
+   * 空き枠をまとめて挿入する。
+   * 「4枠ずつのまとまり」の境目に合わせるには複数個ずらす必要があるため、
+   * 個数を指定して一度に動かせるようにする。
+   */
+  const handleEditInsertGap = useCallback((position: number, count = 1) => {
     if (!drawEdit) return;
-    const { slots: next, error } = insertGapAt(drawEdit.slots, position);
-    if (error) { alert(error); return; }
-    pushDrawEdit(next);
-    // 選択は残す（同じ位置に続けて空きを入れて、まとめてずらせるように）
+    let slots = drawEdit.slots;
+    for (let i = 0; i < count; i++) {
+      const { slots: next, error } = insertGapAt(slots, position);
+      if (error) {
+        if (i === 0) { alert(error); return; }
+        alert(`${i}つ分だけずらしました（${error}）`);
+        break;
+      }
+      slots = next;
+    }
+    pushDrawEdit(slots);
+    // 選択は残す（続けてずらせるように）
   }, [drawEdit, pushDrawEdit]);
 
-  const handleEditRemoveGap = useCallback((position: number) => {
+  const handleEditRemoveGap = useCallback((position: number, count = 1) => {
     if (!drawEdit) return;
-    pushDrawEdit(removeGapAt(drawEdit.slots, position));
+    let slots = drawEdit.slots;
+    for (let i = 0; i < count; i++) {
+      const target = slots.find(s => s.position === position);
+      if (!target || !isEmptySlot(target)) break;
+      slots = removeGapAt(slots, position);
+    }
+    pushDrawEdit(slots);
     // 選択は残す（続けて詰められるように）
   }, [drawEdit, pushDrawEdit]);
 
@@ -1728,15 +1749,27 @@ function NormalEntryRegistration() {
           </span>
           {editSelectedPos != null && (
             <>
-              <button onClick={() => handleEditInsertGap(editSelectedPos)}
+              {/* ずらす数（まとまりの境目に合わせるには複数ずらすことが多い） */}
+              <span className="flex items-center gap-0.5 text-[11px] text-gray-600 bg-white border border-gray-300 rounded-full px-1.5 py-0.5">
+                <button
+                  onClick={() => setShiftCount(c => Math.max(1, c - 1))}
+                  className="w-5 h-5 rounded-full hover:bg-gray-100 font-bold leading-none"
+                >−</button>
+                <span className="w-10 text-center font-bold tabular-nums">{shiftCount}枠</span>
+                <button
+                  onClick={() => setShiftCount(c => Math.min(16, c + 1))}
+                  className="w-5 h-5 rounded-full hover:bg-gray-100 font-bold leading-none"
+                >＋</button>
+              </span>
+              <button onClick={() => handleEditInsertGap(editSelectedPos, shiftCount)}
                 className="flex items-center gap-1 text-[11px] font-bold text-gray-700 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100"
-                title="この位置に空き枠を作り、以降の選手を1つずつ下へずらします">
+                title="この位置に空き枠を作り、以降の選手をその分だけ下へずらします">
                 <ArrowDownToLine className="w-3.5 h-3.5" />空きを入れて下へ
               </button>
               {selectedIsEmpty && (
-                <button onClick={() => handleEditRemoveGap(editSelectedPos)}
+                <button onClick={() => handleEditRemoveGap(editSelectedPos, shiftCount)}
                   className="flex items-center gap-1 text-[11px] font-bold text-gray-700 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100"
-                  title="この空き枠を詰めて、以降の選手を1つずつ上へ上げます">
+                  title="この空き枠を詰めて、以降の選手をその分だけ上へ上げます">
                   <ArrowUpToLine className="w-3.5 h-3.5" />空きを詰めて上へ
                 </button>
               )}
