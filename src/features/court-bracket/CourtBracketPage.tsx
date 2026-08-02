@@ -4,8 +4,11 @@ import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { useAppStore } from '../../stores/appStore';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
+import {
+  buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
+} from '../draw/rebuildMatches';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -85,6 +88,15 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
   // スコア入力対象の試合キー "round-position"
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
+
+  // === あたり（対戦の組み合わせ）修正モード ===
+  // 取り込んだドロー表と実際の組み合わせが違っていた場合に、
+  // 1回戦の枠（空き枠を含む）を入れ替えて直せるようにする。
+  const [editMode, setEditMode] = useState(false);
+  /** 修正中のスロット（保存するまでDBには書き込まない） */
+  const [draftSlots, setDraftSlots] = useState<DrawSlotData[] | null>(null);
+  const [selectedSlotPos, setSelectedSlotPos] = useState<number | null>(null);
+  const [savingDraw, setSavingDraw] = useState(false);
 
   const events = useLiveQuery(
     () => currentTournamentId
@@ -306,6 +318,88 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     };
   }, [enableScoreInput, selectedMatchKey, matches, selectedEvent]);
 
+  // --- あたり修正 ---
+  /** 表示に使うスロット（修正中は編集用のドラフト） */
+  const viewSlots = editMode && draftSlots ? draftSlots : slots;
+
+  const startEdit = useCallback(() => {
+    setDraftSlots(slots.map(s => ({ ...s })));
+    setSelectedSlotPos(null);
+    setEditMode(true);
+  }, [slots]);
+
+  const cancelEdit = useCallback(() => {
+    setEditMode(false);
+    setDraftSlots(null);
+    setSelectedSlotPos(null);
+  }, []);
+
+  /** 枠のタップ: 1つ目で選択、2つ目で入れ替え */
+  const handleSlotSelect = useCallback((position: number) => {
+    setSelectedSlotPos(prev => {
+      if (prev === null) return position;
+      if (prev === position) return null;
+      setDraftSlots(cur => {
+        if (!cur) return cur;
+        const next = cur.map(s => ({ ...s }));
+        const a = next.findIndex(s => s.position === prev);
+        const b = next.findIndex(s => s.position === position);
+        if (a < 0 || b < 0) return cur;
+        // 位置はそのままに、中身（選手・シード・BYE）だけを入れ替える
+        const tmp = { ...next[a] };
+        next[a] = { ...next[b], position: next[a].position };
+        next[b] = { ...tmp, position: next[b].position };
+        return next;
+      });
+      return null;
+    });
+  }, []);
+
+  const drawDirty = useMemo(() => {
+    if (!draftSlots) return false;
+    return draftSlots.some((s, i) => s.entryId !== slots[i]?.entryId || s.isBye !== slots[i]?.isBye);
+  }, [draftSlots, slots]);
+
+  /** 修正内容を保存し、対戦表を組み直す（入力済みスコアは可能な限り引き継ぐ） */
+  const saveEdit = useCallback(async () => {
+    if (!drawData?.id || !draftSlots || !selectedEventId) return;
+    const nextSlots = draftSlots.map(s => ({
+      position: s.position, entryId: s.entryId, seed: s.seed, isBye: s.isBye,
+    }));
+
+    // 対戦カードが変わることで結果が消える試合を先に知らせる
+    const draftDraw = { ...drawData, slots: nextSlots };
+    const isLeague = await isLeagueEvent(selectedEventId, draftDraw);
+    const nextMatches = await buildMatchesFromDraw(selectedEventId, draftDraw, isLeague);
+    const lost = findResetMatches(nextMatches, matches);
+    if (lost.length > 0) {
+      const names = lost.slice(0, 5).map(m => `・${m.player1Name} vs ${m.player2Name}（${m.score || '結果あり'}）`).join('\n');
+      const more = lost.length > 5 ? `\n…ほか${lost.length - 5}試合` : '';
+      if (!confirm(`対戦の組み合わせが変わるため、次の試合の結果は取り消されます。\n\n${names}${more}\n\n保存してよろしいですか？`)) return;
+    }
+
+    setSavingDraw(true);
+    try {
+      await db.draws.update(drawData.id, { slots: nextSlots, updatedAt: Date.now() });
+      await rebuildEventMatches(selectedEventId);
+      setEditMode(false);
+      setDraftSlots(null);
+      setSelectedSlotPos(null);
+    } catch (e) {
+      console.error('[あたり修正] 保存に失敗:', e);
+      alert('保存に失敗しました');
+    } finally {
+      setSavingDraw(false);
+    }
+  }, [drawData, draftSlots, selectedEventId, matches]);
+
+  // 種目を切り替えたら修正モードは解除する
+  useEffect(() => {
+    setEditMode(false);
+    setDraftSlots(null);
+    setSelectedSlotPos(null);
+  }, [selectedEventId]);
+
   // --- コート選択（タップした試合をどのコートに入れるか運営が選ぶ）---
   /** コート選択ダイアログの対象 "round-position" */
   const [courtPickKey, setCourtPickKey] = useState<string | null>(null);
@@ -485,6 +579,51 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           </div>
         )}
 
+        {/* あたり（対戦の組み合わせ）修正 */}
+        {enableScoreInput && drawSize > 0 && !isRoundRobin && (
+          <div className="mt-1.5">
+            {!editMode ? (
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1 text-[10px] font-bold text-gray-600 border border-gray-200 bg-gray-50 rounded-full px-2 py-1 hover:bg-gray-100"
+                title="ドロー表と対戦の組み合わせが違う場合に、枠を入れ替えて直します"
+              >
+                <Shuffle className="w-3 h-3" />あたりを修正
+              </button>
+            ) : (
+              <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-primary-700 flex items-center gap-1">
+                    <Shuffle className="w-3 h-3" />あたり修正中
+                  </span>
+                  <span className="text-[10px] text-gray-600 flex-1 min-w-[150px]">
+                    {selectedSlotPos == null
+                      ? '入れ替えたい枠をタップしてください（空き枠も選べます）'
+                      : `#${selectedSlotPos} を選択中 — 入れ替え先の枠をタップ`}
+                  </span>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={savingDraw}
+                    className="text-[10px] font-bold text-gray-600 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100 disabled:opacity-40"
+                  >
+                    やめる
+                  </button>
+                  <button
+                    onClick={() => void saveEdit()}
+                    disabled={savingDraw || !drawDirty}
+                    className="text-[10px] font-bold text-white bg-primary-600 rounded-full px-3 py-1 hover:brightness-110 disabled:opacity-40"
+                  >
+                    {savingDraw ? '保存中...' : '保存して対戦表に反映'}
+                  </button>
+                </div>
+                <p className="text-[9px] text-gray-500 mt-1 leading-relaxed">
+                  入力済みのスコアは、対戦カードが変わらない試合はそのまま引き継がれます。
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 種目タブ（小さいドット） */}
         {events.length > 1 && (
           <div className="flex items-center justify-center gap-1 mt-1.5">
@@ -508,14 +647,17 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       <div className="flex-1 overflow-auto bg-gray-50">
         {drawSize > 0 && !isRoundRobin ? (
           <CourtBracketView
-            slots={slots}
+            slots={viewSlots}
             drawSize={drawSize}
             matchResults={matchResults}
             eventType={selectedEvent?.type as 'Singles' | 'Doubles' | 'Team'}
             totalRounds={totalRounds}
             onMatchSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
             onEnterCourt={enableScoreInput ? handleEnterCourt : undefined}
-            startRound={startRound}
+            startRound={editMode ? 0 : startRound}
+            editMode={editMode}
+            selectedSlotPosition={selectedSlotPos}
+            onSlotSelect={handleSlotSelect}
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">
