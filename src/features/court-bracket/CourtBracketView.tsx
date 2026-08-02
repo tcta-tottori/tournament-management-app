@@ -120,9 +120,11 @@ export default function CourtBracketView({
         nextCompactY += Y_SPACING * 0.8;
       }
 
-      // 修正モードでは空き枠も入れ替え先として並べるので、全ての枠に行を割り当てる
+      // 修正モードでは空き枠も入れ替え先として並べるので、全ての枠に行を割り当てる。
+      // 2回戦の相手が決まる「4枠ずつのまとまり」が分かるよう、2試合ごとに余白を空ける。
       if (editMode) {
         const EDIT_SPACING = SLOT_HEIGHT + 10;
+        if (matchIdx > 0 && matchIdx % 2 === 0) nextCompactY += 18;
         leafY[topIdx] = nextCompactY;
         leafY[botIdx] = nextCompactY + EDIT_SPACING;
         nextCompactY += EDIT_SPACING * 2 + 8;
