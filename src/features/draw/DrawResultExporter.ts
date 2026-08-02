@@ -375,9 +375,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const tableW = Math.max(contentW + sidePad * 2, 820);
 
   // ラウンドラベル（枠上端から 37px）と優勝表示が重ならないだけの上部余白を確保する
+  // 回戦ラベルは表示しないので、上部は最小限の余白でよい
   const bracketTopPad = champBlockH > 0
-    ? Math.max(52, Math.ceil(champBlockH + 48 - apexRel))
-    : 52;
+    ? Math.max(22, Math.ceil(champBlockH + 40 - apexRel))
+    : 22;
   const bracketBodyH = maxRows * ROW_H;   // BYE を詰めた実際の高さ
 
   // 中央下部（枠内）に置く協会ロゴ
@@ -450,39 +451,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const joinX = (side: Side, r: number): number =>
     side === 'L' ? leftNameEndX + r * COL_W : rightNameEndX - r * COL_W;
   const apexY = rowsTopY + apexRel;
-
-  // ---- ラウンドラベル ----
-  const roundName = (r: number): string => {
-    if (r === totalRounds) return '決勝';
-    if (r === totalRounds - 1) return '準決勝';
-    if (r === totalRounds - 2) return '準々決勝';
-    return `${r}回戦`;
-  };
-  const labelY = bracketAreaY + 26;
-  const drawRoundLabel = (cx: number, name: string, isFinal: boolean) => {
-    ctx.font = fontOf('black', 12);
-    const w = ctx.measureText(name).width + 20;
-    const h = 22;
-    const bx = cx - w / 2;
-    const by = labelY - h / 2;
-    if (isFinal) {
-      const grad = ctx.createLinearGradient(bx, 0, bx + w, 0);
-      grad.addColorStop(0, COL.sky500);
-      grad.addColorStop(1, COL.sky600);
-      roundRect(ctx, bx, by, w, h, 11, grad);
-      drawText(ctx, name, cx, labelY + 1, 12, 'center', COL.white, 'black');
-    } else {
-      roundRect(ctx, bx, by, w, h, 11, COL.sky100, COL.sky200, 1);
-      drawText(ctx, name, cx, labelY + 1, 12, 'center', COL.sky700, 'black');
-    }
-  };
-  for (const side of ['L', 'R'] as Side[]) {
-    for (let r = 1; r <= halfRounds; r++) {
-      const cx = side === 'L' ? joinX('L', r) - COL_W / 2 : joinX('R', r) + COL_W / 2;
-      drawRoundLabel(cx, roundName(r), false);
-    }
-  }
-  drawRoundLabel(centerX, '決勝', true);
 
   // ---- 選手行の背景（縞）----
   // BYE を詰めたあとの実際の行で1行おきに敷く
