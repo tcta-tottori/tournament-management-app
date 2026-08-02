@@ -17,7 +17,7 @@ import type { LiveScore, LiveScoreConfig, MatchFormatType } from '../../db/datab
 import { useSyncStore } from '../sync/syncStore';
 import LiveScoreBoard from './LiveScoreBoard';
 import {
-  adjustGames, awardPoint, describeConfig, pointLabel, summarize, toggleServer, wonSets,
+  adjustGames, awardPoint, describeConfig, pointLabel, setServer, summarize, toggleServer, wonSets,
   type ScoreState,
 } from './liveScoreEngine';
 import {
@@ -142,6 +142,12 @@ export default function LiveScorePage() {
   const handleToggleServer = useCallback(async () => {
     if (!live) return;
     await apply(toggleServer(toState(live)));
+  }, [live, apply]);
+
+  /** サーブ側を指定した選手に直す（ゲーム数の手動修正でずれたときの訂正用） */
+  const handleSetServer = useCallback(async (player: 1 | 2) => {
+    if (!live || live.server === player) return;
+    await apply(setServer(toState(live), player));
   }, [live, apply]);
 
   /** 試合途中のゲームルール変更（変更内容はそのまま観戦ページへも配信される） */
@@ -366,6 +372,30 @@ export default function LiveScorePage() {
                 </button>
               </div>
             ))}
+
+            {/* サーブ側の直接指定 */}
+            {/* ゲーム数だけを直すとサーブ側が実際とずれるため、ここで合わせられるようにする */}
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
+              <p className="text-[11px] text-white/50">
+                このゲームのサーブ側（1ゲーム毎に自動で交代します）
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([1, 2] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => void handleSetServer(p)}
+                    disabled={busy}
+                    className={`py-2 rounded-lg border text-xs font-bold truncate transition-colors disabled:opacity-40 ${
+                      live.server === p
+                        ? 'bg-[#d4e157] border-[#d4e157] text-[#0f3326]'
+                        : 'bg-white/10 border-white/15 hover:bg-white/20'
+                    }`}
+                  >
+                    {(p === 1 ? live.player1Name : live.player2Name) || '(未定)'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

@@ -307,6 +307,15 @@ export function toggleServer(state: ScoreState): ScoreState {
 }
 
 /**
+ * サーブ側を指定した選手に直す。
+ * ゲーム数を手動修正したあとなど、サーブ側だけが実際とずれたときの訂正用。
+ */
+export function setServer(state: ScoreState, player: 1 | 2): ScoreState {
+  if (state.server === player) return state;
+  return toggleServer(state);
+}
+
+/**
  * 試合途中でゲームルール（試合方式・規定ゲーム数など）を変更したときに、
  * 現在の進行状態を新しいルールへ合わせ直す。
  *
