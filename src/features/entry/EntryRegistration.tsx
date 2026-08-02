@@ -1585,13 +1585,13 @@ function NormalEntryRegistration() {
     const { slots: next, error } = insertGapAt(drawEdit.slots, position);
     if (error) { alert(error); return; }
     pushDrawEdit(next);
-    setEditSelectedPos(null);
+    // 選択は残す（同じ位置に続けて空きを入れて、まとめてずらせるように）
   }, [drawEdit, pushDrawEdit]);
 
   const handleEditRemoveGap = useCallback((position: number) => {
     if (!drawEdit) return;
     pushDrawEdit(removeGapAt(drawEdit.slots, position));
-    setEditSelectedPos(null);
+    // 選択は残す（続けて詰められるように）
   }, [drawEdit, pushDrawEdit]);
 
   /** あたり修正を保存し、対戦表を組み直す（入力済みスコアは可能な限り引き継ぐ） */
@@ -1653,7 +1653,8 @@ function NormalEntryRegistration() {
     for (let p = 1; p <= drawEdit.slots.length; p += 4) {
       blocks.push(drawEdit.slots.slice(p - 1, p + 3).map(s => s.position));
     }
-    const half = Math.ceil(blocks.length / 2);
+    // 列の切れ目が「次の回戦で合流するまとまり」を割らないように偶数個で分ける
+    const half = Math.ceil(blocks.length / 4) * 2;
 
     const slotButton = (pos: number) => {
       const s = byPos.get(pos);
@@ -1684,19 +1685,34 @@ function NormalEntryRegistration() {
       );
     };
 
-    const blockColumn = (list: number[][]) => (
-      <div className="space-y-1.5">
-        {list.map(block => (
-          <div key={block[0]} className="rounded-lg border border-gray-200 bg-gray-50/60 p-1 space-y-1">
-            {[0, 2].map(off => (
-              <div key={off} className="rounded border-l-2 border-primary-200 pl-1 space-y-0.5">
-                {block.slice(off, off + 2).map(pos => slotButton(pos))}
-              </div>
-            ))}
+    /** 4枠のまとまり（2回戦で当たる単位） */
+    const blockBox = (block: number[]) => (
+      <div key={block[0]} className="rounded-lg border border-gray-200 bg-gray-50/60 p-1 space-y-1">
+        {[0, 2].map(off => (
+          <div key={off} className="rounded border-l-2 border-primary-200 pl-1 space-y-0.5">
+            {block.slice(off, off + 2).map(pos => slotButton(pos))}
           </div>
         ))}
       </div>
     );
+
+    /** 4枠のまとまり2つ＝次の回戦で合流する単位 */
+    const blockColumn = (list: number[][]) => {
+      const groups: number[][][] = [];
+      for (let i = 0; i < list.length; i += 2) groups.push(list.slice(i, i + 2));
+      return (
+        <div className="space-y-2">
+          {groups.map(g => (
+            <div key={g[0][0]} className="rounded-lg border border-primary-200 bg-white/50 p-1 space-y-1">
+              {g.map(block => blockBox(block))}
+              <p className="text-[9px] text-gray-400 text-right pr-1 leading-none pb-0.5">
+                ↑ この2つの勝者が次の回戦で対戦
+              </p>
+            </div>
+          ))}
+        </div>
+      );
+    };
 
     return (
       <div className="border-b border-primary-200 bg-primary-50/60 px-3 py-2.5">

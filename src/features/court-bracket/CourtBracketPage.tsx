@@ -372,7 +372,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     if (error) { alert(error); return; }
     setDraftHistory(h => [...h, draftSlots]);
     setDraftSlots(next);
-    setSelectedSlotPos(null);
+    // 選択は残す（同じ位置に続けて空きを入れて、まとめてずらせるように）
   }, [draftSlots]);
 
   /** 空き枠を詰めて、以降の枠を1つずつ上へ上げる（空き枠は末尾へ回す） */
@@ -380,7 +380,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     if (!draftSlots) return;
     setDraftHistory(h => [...h, draftSlots]);
     setDraftSlots(removeGapAt(draftSlots, position));
-    setSelectedSlotPos(null);
+    // 選択は残す（続けて詰められるように）
   }, [draftSlots]);
 
   /** 選択中の枠が空き枠か */
