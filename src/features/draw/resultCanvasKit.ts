@@ -245,45 +245,31 @@ export interface ResultHeaderOptions {
 export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderOptions): void {
   const { title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos } = o;
 
-  // ---- 左: 種目名バッジ ----
+  // ---- 左: 種目名（バッジ枠は付けず、グラデーションの文字だけで見せる） ----
   const cat = eventBadgeColors(title);
   const runs = splitBigSmall(title);
-  const bigPx = 30;
-  const smallPx = 21;
-  const badgeH = 58;
-  const badgeTextW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
-  const badgePadX = 26;
-  const badgeW = badgeTextW + badgePadX * 2;
-  const badgeX = paddingX;
-  const badgeY = paddingY + (headerH - badgeH) / 2 - 8;
+  const bigPx = 34;
+  const smallPx = 25;
+  const titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  const titleX = paddingX;
+  const baselineY = paddingY + headerH / 2 + bigPx * 0.30;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 9;
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
-  badgeGrad.addColorStop(0, cat.c1);
-  badgeGrad.addColorStop(0.55, cat.c2);
-  badgeGrad.addColorStop(1, cat.c3);
-  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeH / 2, badgeGrad);
+  // 文字そのものに横方向のグラデーションを乗せる
+  const titleGrad = ctx.createLinearGradient(titleX, 0, titleX + Math.max(titleW, 1), 0);
+  titleGrad.addColorStop(0, cat.c2);
+  titleGrad.addColorStop(1, cat.c3);
+  ctx.fillStyle = titleGrad;
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  drawMixed(ctx, runs, titleX, baselineY, bigPx, smallPx, '900', '800');
   ctx.restore();
-
-  // 内側ハイライト
-  const innerHL = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH * 0.55);
-  innerHL.addColorStop(0, 'rgba(255,255,255,0.32)');
-  innerHL.addColorStop(1, 'rgba(255,255,255,0)');
-  roundRect(ctx, badgeX + 2, badgeY + 2, badgeW - 4, badgeH * 0.55, badgeH / 2 - 2, innerHL);
-  // 内側ボーダー
-  roundRect(ctx, badgeX + 1.5, badgeY + 1.5, badgeW - 3, badgeH - 3, badgeH / 2 - 1.5, undefined, 'rgba(255,255,255,0.45)', 1);
-
-  ctx.fillStyle = COL.white;
-  const baselineY = badgeY + badgeH / 2 + bigPx * 0.34;
-  drawMixed(ctx, runs, badgeX + (badgeW - badgeTextW) / 2, baselineY, bigPx, smallPx, '900', '800');
 
   // ---- 右: 大会名 + 会場（団体戦と同じ） ----
   const rightX = paddingX + tableW;
   if (tournamentName) {
-    const nameMaxW = Math.max(200, tableW - badgeW - 48);
+    const nameMaxW = Math.max(200, tableW - titleW - 48);
     drawText(ctx, tournamentName, rightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', nameMaxW);
   }
   drawVenueBadge(ctx, {

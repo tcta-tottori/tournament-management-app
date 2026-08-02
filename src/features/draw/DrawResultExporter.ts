@@ -147,7 +147,7 @@ type Side = 'L' | 'R';
 interface Seg { x1: number; y1: number; x2: number; y2: number; win: boolean }
 
 /** スコアなどのラベル */
-interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win: boolean }
+interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win: boolean; size?: number }
 
 /**
  * トーナメント表の結果を Canvas に描画して返す。
@@ -251,6 +251,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // オフセットを固定する（1回戦のラインからの距離＝SCORE_LINE_GAP と一致する）。
   const SCORE_LINE_GAP = clamp(ROW_H / 2 - 8, 7, 13);
   const SCORE_OFFSET = Math.max(6, ROW_H / 2 - SCORE_LINE_GAP);
+  // タイブレーク得点・Ret / W.O の注記（負けた側のスコアの外側に添える）
+  const NOTE_PX = 11;
+  const NOTE_GAP = 13;
 
   // ---- 選手行の割り当て（BYE の空きを詰める） ----
   // BYE のスロットにも1行ずつ確保すると、ドロー表どおりに並べたときに
@@ -328,24 +331,33 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // 決勝スコアは「左山の獲得ゲーム − 右山の獲得ゲーム」の並びで表示する
   // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
-  // タイブレークの ( ) は負けた側のポイントなので、負けた側の数字に付ける
-  // （例: 8-7 で勝ち、タイブレークが 7-2 なら「7(2)-8」）
-  const finalScoreText = (() => {
-    if (!finalMatch) return '';
-    if (!finalMatch.score) return finalMatch.status === 'walkover' ? 'W.O' : '';
-    const m = finalMatch.score.trim().match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?$/);
-    if (!m) return finalMatch.score;
-    const [, p1Games, p2Games, tb] = m;
+  // タイブレークの得点と Ret / W.O は負けた側のものなので、
+  // 負けた側の外側（スコアの左端／右端）に小さく添える。
+  const finalScore = (() => {
+    const empty = { main: '', note: '', noteLeft: false };
+    if (!finalMatch) return empty;
+    if (!finalMatch.score) {
+      return finalMatch.status === 'walkover' ? { ...empty, main: 'W.O' } : empty;
+    }
+    const raw = finalMatch.score.trim();
+    const m = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
+    if (!m) return { ...empty, main: raw };
+    const [, p1Games, p2Games, tb, note] = m;
     // player1 が左山とは限らないので entryId で判定する
     const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
     const leftGames = p1IsLeft ? p1Games : p2Games;
     const rightGames = p1IsLeft ? p2Games : p1Games;
-    if (!tb) return `${leftGames}-${rightGames}`;
-    const leftLost = Number(leftGames) < Number(rightGames);
-    return leftLost
-      ? `${leftGames}(${tb})-${rightGames}`
-      : `${leftGames}-${rightGames}(${tb})`;
+    const parts = [
+      tb ? `(${tb})` : '',
+      note ? note.toUpperCase().replace('RET', 'Ret') : '',
+    ].filter(Boolean);
+    return {
+      main: `${leftGames}-${rightGames}`,
+      note: parts.join(' '),
+      noteLeft: Number(leftGames) < Number(rightGames),  // 負けた側が左なら左端へ
+    };
   })();
+  const finalScoreText = finalScore.main;
 
   meas.font = fontOf('black', CHAMP_NAME_PX);
   let champTextW = meas.measureText(champName).width;
@@ -466,22 +478,40 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const segs: Seg[] = [];
   const tags: Tag[] = [];
 
-  /** スコア文字列を上側／下側に割り当てる（player1 が上とは限らないので entryId で判定） */
+  /**
+   * スコア文字列を上側／下側に割り当てる（player1 が上とは限らないので entryId で判定）。
+   * タイブレークの得点と Ret / W.O は、負けた側に添える注記として別に返す。
+   */
   const parseScore = (
     match: Match | undefined,
     topId: string | null,
     botId: string | null,
-  ): { top: string; bot: string } | null => {
+  ): { top: string; bot: string; tb?: string; note?: string } | null => {
     if (!match || !match.score) return null;
-    const parts = match.score.split('-');
+    const raw = match.score.trim();
+    const p1IsBot = !!match.player1EntryId && match.player1EntryId === botId;
+    const p1IsTop = !!match.player1EntryId && match.player1EntryId === topId;
+    const swap = p1IsBot && !p1IsTop;
+
+    // 「9-8(5)」「6-2 Ret」のような1セットのスコア
+    const one = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
+    if (one) {
+      const [, g1, g2, tb, note] = one;
+      return {
+        top: swap ? g2 : g1,
+        bot: swap ? g1 : g2,
+        tb: tb || undefined,
+        note: note || undefined,
+      };
+    }
+
+    // それ以外（2セットマッチ等）は従来どおり数字だけを表示する
+    const parts = raw.split('-');
     if (parts.length !== 2) return null;
     const a = parts[0].replace(/\(.*?\)/g, '').trim();
     const b = parts[1].replace(/\(.*?\)/g, '').trim();
     if (!a && !b) return null;
-    const p1IsBot = !!match.player1EntryId && match.player1EntryId === botId;
-    const p1IsTop = !!match.player1EntryId && match.player1EntryId === topId;
-    if (p1IsBot && !p1IsTop) return { top: b, bot: a };
-    return { top: a, bot: b };
+    return swap ? { top: b, bot: a } : { top: a, bot: b };
   };
 
   for (const side of ['L', 'R'] as Side[]) {
@@ -527,6 +557,19 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         if (sc) {
           if (sc.top) tags.push({ x: sx, y: scoreTopY, text: sc.top, align, win: winTop });
           if (sc.bot) tags.push({ x: sx, y: scoreBotY, text: sc.bot, align, win: winBot });
+
+          // タイブレークの得点と Ret / W.O は「負けた側」に添える。
+          // 中央線をはさんでスコアの外側（上側の敗者なら上、下側の敗者なら下）に置く。
+          const notes = [sc.tb ? `(${sc.tb})` : '', sc.note ? sc.note.toUpperCase().replace('RET', 'Ret') : '']
+            .filter(Boolean);
+          const loserIsTop = winBot ? true : winTop ? false : null;
+          if (notes.length > 0 && loserIsTop !== null) {
+            const dir = loserIsTop ? -1 : 1;
+            const baseY = (loserIsTop ? scoreTopY : scoreBotY) + dir * NOTE_GAP;
+            notes.forEach((text, i) => {
+              tags.push({ x: sx, y: baseY + dir * i * NOTE_GAP, text, align, win: false, size: NOTE_PX });
+            });
+          }
         } else if (match?.status === 'walkover') {
           // 棄権した側に W.O を表示する
           tags.push({ x: sx, y: winTop ? scoreBotY : scoreTopY, text: 'W.O', align, win: false });
@@ -573,7 +616,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // スコア
   for (const t of tags) {
-    drawText(ctx, t.text, t.x, t.y, 13, t.align, t.win ? COL.win : COL.slate500, t.win ? 'black' : 'bold');
+    drawText(ctx, t.text, t.x, t.y, t.size ?? 13, t.align, t.win ? COL.win : COL.slate500,
+      t.win ? 'black' : t.size ? 'medium' : 'bold');
   }
 
   // ---- 選手行 ----
@@ -648,6 +692,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     if (finalScoreText) {
       drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
+      // タイブレークの得点・Ret / W.O は負けた側の外側へ小さく添える
+      if (finalScore.note) {
+        const NOTE_PX = 11;
+        meas.font = fontOf('black', CHAMP_SCORE_PX);
+        const mainW = meas.measureText(finalScoreText).width;
+        const nx = finalScore.noteLeft
+          ? centerX - mainW / 2 - 5
+          : centerX + mainW / 2 + 5;
+        drawText(ctx, finalScore.note, nx, scoreY, NOTE_PX,
+          finalScore.noteLeft ? 'right' : 'left', COL.slate500, 'medium');
+      }
     }
   }
 
