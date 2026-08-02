@@ -249,15 +249,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // どのラウンドでも 1回戦と同じ間隔で並ぶように、合流点からの
   // オフセットを固定する（1回戦のラインからの距離＝SCORE_LINE_GAP と一致する）。
   const SCORE_LINE_GAP = clamp(ROW_H / 2 - 8, 7, 13);
-  const SCORE_OFFSET = Math.max(6, ROW_H / 2 - SCORE_LINE_GAP);
+  // スコアの文字サイズ（大きめに出して結果を読み取りやすくする）
+  const SCORE_PX = 16;
+  // 上下のスコアが重ならないよう、文字サイズ分の間隔は必ず確保する
+  const SCORE_OFFSET = Math.max(SCORE_PX * 0.62, ROW_H / 2 - SCORE_LINE_GAP);
   // タイブレーク得点・Ret / W.O の注記（負けた側のスコアの外側に添える）
-  const NOTE_PX = 11;
-  const NOTE_GAP = 13;
+  const NOTE_PX = 13;
+  const NOTE_GAP = 15;
 
   // ---- 1ラウンド分の横幅 ----
   // 回戦ラベルを出さなくなったので、スコア（Ret / W.O・タイブレーク得点を含む）が
   // 次の列の線に被らない範囲まで詰める。
-  const SCORE_PX = 13;
   const scoreTokenW = (() => {
     let w = 0;
     const put = (text: string, px: number, weight: FontWeight) => {
@@ -357,7 +359,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const champName = champNode && !champNode.isBye ? champNode.name : '';
   const champAff = champEntryId ? (affById.get(champEntryId) || '') : '';
   const CHAMP_NAME_PX = 20;
-  const CHAMP_SCORE_PX = 15;
+  const CHAMP_SCORE_PX = 19;
 
   // 決勝スコアは「左山の獲得ゲーム − 右山の獲得ゲーム」の並びで表示する
   // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
@@ -646,7 +648,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // スコア
   for (const t of tags) {
-    drawText(ctx, t.text, t.x, t.y, t.size ?? 13, t.align, t.win ? COL.win : COL.slate500,
+    drawText(ctx, t.text, t.x, t.y, t.size ?? SCORE_PX, t.align, t.win ? COL.win : COL.slate500,
       t.win ? 'black' : t.size ? 'medium' : 'bold');
   }
 
@@ -724,7 +726,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
       // タイブレークの得点・Ret / W.O は負けた側の外側へ小さく添える
       if (finalScore.note) {
-        const NOTE_PX = 11;
         meas.font = fontOf('black', CHAMP_SCORE_PX);
         const mainW = meas.measureText(finalScoreText).width;
         const nx = finalScore.noteLeft
