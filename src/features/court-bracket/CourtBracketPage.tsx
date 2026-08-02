@@ -239,9 +239,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const manualStartRound = roundOverride?.eventId === selectedEventId ? roundOverride.value : null;
   const startRound = Math.min(manualStartRound ?? autoStartRound, maxStartRound);
   const canAdjustRounds = !isRoundRobin && drawSize > 0 && maxStartRound >= 1;
+  // 先頭の列にはその回戦の試合が並ぶので、絞り込みの表示もその回戦名にする
   const startRoundLabel = startRound === 0
     ? '全回戦表示'
-    : `${getRoundName(startRound + 1, totalRounds)}以降`;
+    : `${getRoundName(startRound, totalRounds)}以降`;
   const setStartRound = (value: number | null) =>
     setRoundOverride(value == null ? null : { eventId: selectedEventId, value });
 
