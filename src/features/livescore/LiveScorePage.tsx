@@ -264,6 +264,7 @@ export default function LiveScorePage() {
             {([1, 2] as const).map(p => {
               const name = p === 1 ? live.player1Name : live.player2Name;
               const aff = p === 1 ? live.player1Affiliation : live.player2Affiliation;
+              const num = p === 1 ? live.player1Number : live.player2Number;
               return (
                 <button
                   key={p}
@@ -276,8 +277,14 @@ export default function LiveScorePage() {
                       SERVE
                     </span>
                   )}
-                  <span className="text-xs text-white/60 truncate max-w-full">{aff}</span>
-                  <span className="text-lg sm:text-2xl font-black truncate max-w-full">{name || '(未定)'}</span>
+                  {/* 結果表と同じ「番号 選手名（所属）」の並びで表示する */}
+                  <span className="text-lg sm:text-2xl font-black truncate max-w-full">
+                    {num != null && <span className="text-white/50 mr-1.5">{num}</span>}
+                    {name || '(未定)'}
+                  </span>
+                  <span className="text-xs text-white/60 truncate max-w-full">
+                    {aff ? `（${aff}）` : ''}
+                  </span>
                   <span className="text-5xl sm:text-6xl font-black text-[#d4e157] leading-none mt-1">
                     {pointLabel(live, p)}
                   </span>
