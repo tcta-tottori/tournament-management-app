@@ -9,6 +9,7 @@ import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
 import { extractGamesFromText } from './gameRules';
+import { propagateByes } from '../draw/rebuildMatches';
 import {
   X,
   Trophy,
@@ -465,6 +466,8 @@ export default function ScoreInputDialog({
               updatedAt: Date.now(),
             });
           }
+          // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
+          await propagateByes(dbMatch.eventId);
         }
       }
       onMatchUpdate();
@@ -533,6 +536,10 @@ export default function ScoreInputDialog({
       });
       setSets(Array.from({ length: maxSets }, () => ({ p1: '', p2: '' })));
       setTiebreaks(Array.from({ length: maxSets }, () => null));
+      // BYEで送っていた勝ち上がりも取り消す
+      const resetMatch = await db.matches.get(match.dbId);
+      if (resetMatch) await propagateByes(resetMatch.eventId);
+
       onMatchUpdate();
     } finally { setIsProcessing(false); }
   };
