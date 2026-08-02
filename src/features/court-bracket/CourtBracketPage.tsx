@@ -771,6 +771,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           courts={courtPickList}
           onSelect={enterSelectedCourt}
           onClose={() => setCourtPickKey(null)}
+          onScoreInput={() => {
+            // コート未選択のままスコア入力へ（結果だけ先に入れる運用に対応）
+            const key = `${courtPickMatch.round}-${courtPickMatch.position}`;
+            setCourtPickKey(null);
+            setSelectedMatchKey(key);
+          }}
         />
       )}
     </div>

@@ -296,7 +296,7 @@ export default function AppLayout() {
     <div className="flex flex-col h-[100dvh] bg-bg-main overflow-hidden">
 
       {/* ===== ヘッダー ===== */}
-      <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
+      <header className="header-main flex items-center gap-2 sm:gap-3 px-3 sm:px-5 h-[56px] shrink-0 z-30">
         <HeaderBackdrop />
 
         {/* 左: ハンバーガーボタン + 現在ページ名 */}
@@ -316,11 +316,8 @@ export default function AppLayout() {
           </div>
         )}
 
-        {/* スペーサー */}
-        <div className="flex-1" />
-
-        {/* 右: 協会名 + 大会名（右揃え） */}
-        <div className="header-title-right min-w-0">
+        {/* 右: 協会名 + 大会名（右揃え・残り幅いっぱい） */}
+        <div className="header-title-right">
           {(() => {
             const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
             const mainName = tName
@@ -328,7 +325,7 @@ export default function AppLayout() {
               : '大会運営システム';
             return (<>
               <p className="header-org-name">鳥取市テニス協会</p>
-              <h1 className="header-title truncate">{mainName}</h1>
+              <h1 className="header-title" title={mainName}>{mainName}</h1>
             </>);
           })()}
         </div>

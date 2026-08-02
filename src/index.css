@@ -253,26 +253,51 @@
 }
 
 .header-org-name {
-  font-size: 10px;
+  /* 親（ヘッダー右ブロック）より広がらないようにする。
+     広がると大会名ごと左にはみ出し、ページ名と重なってしまう。 */
+  max-width: 100%;
+  font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   line-height: 1.2;
   color: rgba(218, 185, 92, 0.85);
   text-shadow: 0 0 12px rgba(218, 185, 92, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* スマホ: 大会名は最大2行まで。文字数の多いページ名（決勝トーナメント等）と
+   並んでも重ならないよう、残り幅の中に収める。 */
 .header-title {
-  font-size: 16px;
+  max-width: 100%;
+  font-size: 13px;
   font-weight: 800;
   color: #fff;
-  line-height: 1.3;
-  letter-spacing: 0.04em;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 640px) {
+  .header-org-name {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+  }
   .header-title {
     font-size: 18px;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    /* PCは1行＋末尾省略 */
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 }
 
@@ -334,15 +359,28 @@
 .header-page-name {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 15px;
+  gap: 5px;
+  /* ページ名は省略せず表示する（極端に長い場合のみ上限で省略）。
+     大会名側は残り幅に合わせて折り返すので重ならない。 */
+  flex: 0 0 auto;
+  max-width: 46%;
+  min-width: 0;
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 .header-page-name svg {
   color: #ffd978;
+}
+
+@media (min-width: 640px) {
+  .header-page-name {
+    gap: 6px;
+    font-size: 15px;
+    letter-spacing: 0.03em;
+  }
 }
 
 /* ===== ヘッダー右: 協会名 + 大会名（右揃え） ===== */
@@ -350,8 +388,12 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   text-align: right;
-  max-width: 62%;
+  /* 残り幅をすべて使い、はみ出さない（ページ名との重なり防止） */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ===== ドロワー下部: 操作ボタン4つ ===== */

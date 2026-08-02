@@ -11,7 +11,7 @@
 // 試合中・使用しないコートはグレーで選択できない。
 // =============================================================================
 
-import { X } from 'lucide-react';
+import { X, Trophy } from 'lucide-react';
 
 export interface CourtPickCourt {
   courtId: string;
@@ -31,6 +31,11 @@ interface CourtPickDialogProps {
   courts: CourtPickCourt[];
   onSelect: (courtId: string) => void;
   onClose: () => void;
+  /**
+   * コートを選ばずにそのままスコア入力へ進む。
+   * 空きコートが無い・コート運用をしていない場合でも結果を入力できるようにするための導線。
+   */
+  onScoreInput?: () => void;
 }
 
 /** 1ブロックのコート数（コート状況の並びに合わせる） */
@@ -53,6 +58,7 @@ export default function CourtPickDialog({
   courts,
   onSelect,
   onClose,
+  onScoreInput,
 }: CourtPickDialogProps) {
   const blocks = chunk(courts, BLOCK_SIZE);
   const emptyCount = courts.filter(c => c.status === 'empty').length;
@@ -124,6 +130,19 @@ export default function CourtPickDialog({
             <p className="text-sm text-gray-400 py-2 text-center">現在、空きコートがありません。</p>
           )}
         </div>
+
+        {/* コートを決めずに結果だけ入れる導線（コート未選択でもスコア入力できる） */}
+        {onScoreInput && (
+          <div className="pt-1 border-t border-gray-100">
+            <button
+              onClick={onScoreInput}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] text-sm font-bold text-primary-700 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 active:scale-[0.98] transition-colors"
+            >
+              <Trophy className="w-4 h-4" />
+              コートを選ばずにスコア入力
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

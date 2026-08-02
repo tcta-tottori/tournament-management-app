@@ -2750,6 +2750,11 @@ ${printableMatches.map(m => {
             courts={courtPickList}
             onSelect={(courtId) => handleEnterCourt(matchKey(pm), courtId)}
             onClose={() => setCourtPickMatchId(null)}
+            onScoreInput={() => {
+              // コート未選択のままスコア入力へ（結果だけ先に入れる運用に対応）
+              setCourtPickMatchId(null);
+              setScoreDialogMatchId(matchKey(pm));
+            }}
           />
         );
       })()}

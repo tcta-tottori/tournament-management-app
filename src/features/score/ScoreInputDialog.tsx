@@ -88,6 +88,23 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
 
 const DEFAULT_VOICE: VoiceSettings = { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 };
 
+/**
+ * 全角数字を半角へ直し、数字以外を取り除く。
+ * スマホの日本語入力のままでも「６」のように全角で打てるようにするため。
+ */
+function toHalfWidthDigits(s: string): string {
+  return s
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[^0-9]/g, '');
+}
+
+/** 指定した入力欄にフォーカスし、中身を選択状態にする（そのまま上書き入力できる） */
+function focusAndSelect(el: HTMLInputElement | null | undefined) {
+  if (!el) return;
+  el.focus();
+  el.select();
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -297,7 +314,8 @@ export default function ScoreInputDialog({
   // スコアバリデーション: ルールに基づいてスコアの妥当性を検証
   const scoreValidationError = useMemo(() => {
     if (!match || retPlayer) return null; // W.O時はバリデーション不要
-    if (match.status !== 'playing') return null;
+    // 確定済みは編集しないのでチェック不要。未開始（コート未選択）でも入力できるので検証する。
+    if (match.status === 'finished' || match.status === 'walkover') return null;
 
     // 規定ゲーム数: 呼び出し側が解決した値を優先。無ければ gameRuleText から抽出
     // （全角数字も拾えるよう正規化）。回戦別ルールの誤判定・全角入力対策。
@@ -383,15 +401,15 @@ export default function ScoreInputDialog({
     [requiredGamesProp, gameRuleText],
   );
 
-  // セットスコア入力ハンドラ
+  // セットスコア入力ハンドラ（全角数字はその場で半角へ直す）
   const handleSetChange = (setIdx: number, player: 'p1' | 'p2', value: string) => {
-    if (!/^\d{0,2}$/.test(value)) return;
+    const raw = toHalfWidthDigits(value).slice(0, 2);
     setSets(prev => {
       const next = [...prev];
-      const cur = { ...next[setIdx], [player]: value };
+      const cur = { ...next[setIdx], [player]: raw };
       // 団体戦と同じ自動補完: 負け側の数（規定未満）を入れたら勝者側を規定ゲーム数で埋める
-      if (requiredGames && value !== '') {
-        const num = parseInt(value);
+      if (requiredGames && raw !== '') {
+        const num = parseInt(raw);
         if (player === 'p1' && num < requiredGames && cur.p2 === '') {
           cur.p2 = String(requiredGames);
         } else if (player === 'p2' && num < requiredGames && cur.p1 === '') {
@@ -401,18 +419,19 @@ export default function ScoreInputDialog({
       next[setIdx] = cur;
       return next;
     });
-    // 自動フォーカス移動: 入力で次の入力欄へ
-    if (value.length >= 1) {
+    // 自動フォーカス移動: 入力で次の入力欄へ。
+    // 自動で入れた数字はそのまま上書きできるよう、選択状態にしておく。
+    if (raw.length >= 1) {
       const nextRef = player === 'p1' ? setIdx * 3 + 1 : (setIdx + 1) * 3;
-      setTimeout(() => inputRefs.current[nextRef]?.focus(), 50);
+      setTimeout(() => focusAndSelect(inputRefs.current[nextRef]), 50);
     }
   };
 
   const handleTiebreakChange = (setIdx: number, value: string) => {
-    if (!/^\d{0,2}$/.test(value)) return;
+    const raw = toHalfWidthDigits(value).slice(0, 2);
     setTiebreaks(prev => {
       const next = [...prev];
-      next[setIdx] = value || null;
+      next[setIdx] = raw || null;
       return next;
     });
   };
@@ -481,6 +500,8 @@ export default function ScoreInputDialog({
         }
       }
       onMatchUpdate();
+      // 確定後は結果表示のポップアップを出さず、そのまま元のページへ戻る
+      onClose();
     } finally { setIsProcessing(false); }
   };
 
@@ -708,7 +729,8 @@ export default function ScoreInputDialog({
   // 「準備完了」フェーズは廃止。待機からそのまま試合開始できる。
   const canReady = false;
   const canStart = (match.status === 'waiting' || match.status === 'ready') && !retPlayer;
-  const canFinish = match.status === 'playing' || !!retPlayer;
+  // 結果は「試合中」でなくても確定できる（コート未選択・未開始のままスコアだけ入れる運用に対応）
+  const canFinish = !isFinished || !!retPlayer;
   const canCall = !isFinished || !!retPlayer;
   const roundName = getRoundName(match.round);
 
@@ -803,7 +825,7 @@ export default function ScoreInputDialog({
           })()}
         </div>
 
-        {/* Score Input — 試合中・終了時のみ表示 */}
+        {/* Score Input — コート未選択・未開始でもスコアを入力できる */}
         <div className="px-4 sm:px-6 pb-4">
           <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-3">
             {/* コート — 終了後は非表示 */}
@@ -846,129 +868,126 @@ export default function ScoreInputDialog({
               </div>
             )}
 
-            {/* セットスコア入力 — 試合中・終了時のみ */}
-            {(match.status === 'playing' || isFinished) && (
-              <div className="space-y-2">
-                <span className="text-xs text-gray-500">スコア</span>
-                {sets.slice(0, isTwoSetFormat ? 2 : maxSets).map((set, i) => {
-                  const loserSide = tiebreakLoserSide[i];
-                  return (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">
-                        {(isTwoSetFormat || maxSets > 1) ? `Set${i + 1}` : ''}
-                      </span>
-                      <div className="flex items-center gap-1 flex-1 justify-center">
-                        <input
-                          ref={el => { inputRefs.current[i * 3] = el; }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={2}
-                          placeholder="0"
-                          value={set.p1}
-                          onChange={e => handleSetChange(i, 'p1', e.target.value)}
-                          disabled={isFinished}
-                          className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-                        />
-                        {/* タイブレーク — P1側が敗者の場合ここに表示 */}
-                        {tiebreakFlags[i] && loserSide === 'p1' && (
-                          <>
-                            <span className="text-gray-300 text-[10px]">(</span>
-                            <input
-                              ref={el => { inputRefs.current[i * 3 + 2] = el; }}
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={2}
-                              placeholder="TB"
-                              value={tiebreaks[i] || ''}
-                              onChange={e => handleTiebreakChange(i, e.target.value)}
-                              disabled={isFinished}
-                              className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
-                            />
-                            <span className="text-gray-300 text-[10px]">)</span>
-                          </>
-                        )}
-                        <span className="text-gray-400 font-bold">-</span>
-                        <input
-                          ref={el => { inputRefs.current[i * 3 + 1] = el; }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={2}
-                          placeholder="0"
-                          value={set.p2}
-                          onChange={e => handleSetChange(i, 'p2', e.target.value)}
-                          disabled={isFinished}
-                          className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-                        />
-                        {/* タイブレーク — P2側が敗者の場合ここに表示 */}
-                        {tiebreakFlags[i] && loserSide === 'p2' && (
-                          <>
-                            <span className="text-gray-300 text-[10px]">(</span>
-                            <input
-                              ref={el => { inputRefs.current[i * 3 + 2] = el; }}
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={2}
-                              placeholder="TB"
-                              value={tiebreaks[i] || ''}
-                              onChange={e => handleTiebreakChange(i, e.target.value)}
-                              disabled={isFinished}
-                              className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
-                            />
-                            <span className="text-gray-300 text-[10px]">)</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* スーパータイブレーク入力（twoSetsSuper10: 1-1の場合） */}
-                {isTwoSetFormat && needsSuperTB && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-purple-500 w-8 text-right shrink-0 font-bold">STB</span>
+            {/* セットスコア入力 — コート未選択・未開始でも入力できる */}
+            <div className="space-y-2">
+              <span className="text-xs text-gray-500">スコア</span>
+              {sets.slice(0, isTwoSetFormat ? 2 : maxSets).map((set, i) => {
+                const loserSide = tiebreakLoserSide[i];
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">
+                      {(isTwoSetFormat || maxSets > 1) ? `Set${i + 1}` : ''}
+                    </span>
                     <div className="flex items-center gap-1 flex-1 justify-center">
-                      <span className="text-[10px] text-purple-400 font-bold">[</span>
                       <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={2}
-                        placeholder="10"
-                        value={superTB.p1}
-                        onChange={e => {
-                          if (!/^\d{0,2}$/.test(e.target.value)) return;
-                          setSuperTB(prev => ({ ...prev, p1: e.target.value }));
-                          if (e.target.value.length >= 2) {
-                            // フォーカスをp2へ
-                            const next = e.target.nextElementSibling?.nextElementSibling as HTMLInputElement | null;
-                            setTimeout(() => next?.focus(), 50);
-                          }
-                        }}
-                        disabled={isFinished}
-                        className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
-                      />
-                      <span className="text-purple-400 font-bold">-</span>
-                      <input
+                        ref={el => { inputRefs.current[i * 3] = el; }}
                         type="text"
                         inputMode="numeric"
                         maxLength={2}
                         placeholder="0"
-                        value={superTB.p2}
-                        onChange={e => {
-                          if (!/^\d{0,2}$/.test(e.target.value)) return;
-                          setSuperTB(prev => ({ ...prev, p2: e.target.value }));
-                        }}
+                        value={set.p1}
+                        onChange={e => handleSetChange(i, 'p1', e.target.value)}
                         disabled={isFinished}
-                        className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                        className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                       />
-                      <span className="text-[10px] text-purple-400 font-bold">]</span>
+                      {/* タイブレーク — P1側が敗者の場合ここに表示 */}
+                      {tiebreakFlags[i] && loserSide === 'p1' && (
+                        <>
+                          <span className="text-gray-300 text-[10px]">(</span>
+                          <input
+                            ref={el => { inputRefs.current[i * 3 + 2] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={2}
+                            placeholder="TB"
+                            value={tiebreaks[i] || ''}
+                            onChange={e => handleTiebreakChange(i, e.target.value)}
+                            disabled={isFinished}
+                            className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                          />
+                          <span className="text-gray-300 text-[10px]">)</span>
+                        </>
+                      )}
+                      <span className="text-gray-400 font-bold">-</span>
+                      <input
+                        ref={el => { inputRefs.current[i * 3 + 1] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        placeholder="0"
+                        value={set.p2}
+                        onChange={e => handleSetChange(i, 'p2', e.target.value)}
+                        disabled={isFinished}
+                        className="w-12 h-10 text-center text-lg font-bold border border-gray-200 rounded-lg bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                      />
+                      {/* タイブレーク — P2側が敗者の場合ここに表示 */}
+                      {tiebreakFlags[i] && loserSide === 'p2' && (
+                        <>
+                          <span className="text-gray-300 text-[10px]">(</span>
+                          <input
+                            ref={el => { inputRefs.current[i * 3 + 2] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={2}
+                            placeholder="TB"
+                            value={tiebreaks[i] || ''}
+                            onChange={e => handleTiebreakChange(i, e.target.value)}
+                            disabled={isFinished}
+                            className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                          />
+                          <span className="text-gray-300 text-[10px]">)</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
-                {isTwoSetFormat && needsSuperTB && (
-                  <p className="text-center text-[10px] text-purple-500 font-medium">10ポイント スーパータイブレーク</p>
-                )}
-              </div>
-            )}
+                );
+              })}
+
+              {/* スーパータイブレーク入力（twoSetsSuper10: 1-1の場合） */}
+              {isTwoSetFormat && needsSuperTB && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-purple-500 w-8 text-right shrink-0 font-bold">STB</span>
+                  <div className="flex items-center gap-1 flex-1 justify-center">
+                    <span className="text-[10px] text-purple-400 font-bold">[</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder="10"
+                      value={superTB.p1}
+                      onChange={e => {
+                        const raw = toHalfWidthDigits(e.target.value).slice(0, 2);
+                        setSuperTB(prev => ({ ...prev, p1: raw }));
+                        if (raw.length >= 2) {
+                          // フォーカスをp2へ（中身は選択状態にして上書きしやすくする）
+                          const next = e.target.nextElementSibling?.nextElementSibling as HTMLInputElement | null;
+                          setTimeout(() => focusAndSelect(next), 50);
+                        }
+                      }}
+                      disabled={isFinished}
+                      className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                    />
+                    <span className="text-purple-400 font-bold">-</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder="0"
+                      value={superTB.p2}
+                      onChange={e => {
+                        setSuperTB(prev => ({ ...prev, p2: toHalfWidthDigits(e.target.value).slice(0, 2) }));
+                      }}
+                      disabled={isFinished}
+                      className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                    />
+                    <span className="text-[10px] text-purple-400 font-bold">]</span>
+                  </div>
+                </div>
+              )}
+              {isTwoSetFormat && needsSuperTB && (
+                <p className="text-center text-[10px] text-purple-500 font-medium">10ポイント スーパータイブレーク</p>
+              )}
+            </div>
 
             {/* スコアバリデーションエラー */}
             {scoreValidationError && canFinish && (
