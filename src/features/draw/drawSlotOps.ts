@@ -37,7 +37,8 @@ type Content<T> = Omit<T, 'position'>;
 /** 枠の中身だけを取り出す（position は動かさない） */
 function contentsOf<T extends SlotLike>(slots: T[]): Content<T>[] {
   return slots.map(s => {
-    const { position: _position, ...rest } = s;
+    const rest = { ...(s as object) } as Record<string, unknown>;
+    delete rest.position;
     return rest as Content<T>;
   });
 }
@@ -49,7 +50,8 @@ function applyContents<T extends SlotLike>(slots: T[], contents: Content<T>[]): 
 
 /** 空き枠の中身を作る（氏名などの表示用フィールドがある形にも合わせる） */
 function emptyContent<T extends SlotLike>(sample: T): Content<T> {
-  const { position: _position, ...rest } = sample;
+  const rest = { ...(sample as object) } as Record<string, unknown>;
+  delete rest.position;
   return {
     ...rest,
     entryId: null,
@@ -174,6 +176,67 @@ export function blockPatternOf<T extends SlotLike>(slots: T[], blockStart: numbe
 export interface ApplyBlockResult<T extends SlotLike> {
   slots: T[];
   error: string | null;
+}
+
+/** まとめ指定で使う短い記号 */
+const PATTERN_TOKENS: Record<string, BlockPattern> = {
+  '4': 'four', '4人': 'four',
+  '3下': 'trioBottom', '3': 'trioBottom',
+  '3上': 'trioTop',
+  '2': 'two', '2人': 'two',
+  '1': 'one', '1人': 'one',
+  '0': 'none', '空': 'none', '空き': 'none', '-': 'none', 'ー': 'none',
+};
+
+const PATTERN_TO_TOKEN: Record<BlockPattern, string> = {
+  four: '4', trioBottom: '3下', trioTop: '3上', two: '2', one: '1', none: '空',
+};
+
+/**
+ * まとまりの型を並べた文字列を解釈する。
+ * 例: "4,空,2,3下,4,空,2,3下,3上,2,4,空,3上,2,4,空"
+ */
+export function parseBlockPatterns(text: string): { patterns: BlockPattern[]; error: string | null } {
+  const tokens = text
+    .replace(/[，、]/g, ',')
+    .split(/[,\s/]+/)
+    .map(t => t.trim())
+    .filter(Boolean);
+  const patterns: BlockPattern[] = [];
+  for (const t of tokens) {
+    const p = PATTERN_TOKENS[t];
+    if (!p) return { patterns: [], error: `「${t}」は型として読み取れません（4 / 3下 / 3上 / 2 / 1 / 空）` };
+    patterns.push(p);
+  }
+  if (patterns.length === 0) return { patterns: [], error: '型が指定されていません' };
+  return { patterns, error: null };
+}
+
+/** 現在の並びを、まとまりの型の並びとして書き出す */
+export function describeBlockPatterns<T extends SlotLike>(slots: T[]): string {
+  const out: string[] = [];
+  for (let p = 1; p <= slots.length; p += 4) {
+    const pattern = blockPatternOf(slots, p);
+    out.push(pattern ? PATTERN_TO_TOKEN[pattern] : '?');
+  }
+  return out.join(',');
+}
+
+/** まとまりの型を上から順にまとめて適用する */
+export function applyBlockPatterns<T extends SlotLike>(
+  slots: T[], patterns: BlockPattern[],
+): ApplyBlockResult<T> {
+  let cur = slots;
+  for (let i = 0; i < patterns.length; i++) {
+    const blockStart = i * 4 + 1;
+    if (blockStart > slots.length) {
+      return { slots, error: `ドローの枠数（${slots.length}）より多くの型が指定されています` };
+    }
+    const r = applyBlockPattern(cur, blockStart, patterns[i]);
+    if (r.error) return { slots, error: `${blockStart}〜${blockStart + 3}: ${r.error}` };
+    cur = r.slots;
+  }
+  return { slots: cur, error: null };
 }
 
 /**

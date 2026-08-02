@@ -13,7 +13,8 @@ import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
 import {
-  applyBlockPattern, blockPatternOf, BLOCK_PATTERN_LABELS, insertGapAt, isEmptySlot,
+  applyBlockPattern, applyBlockPatterns, blockPatternOf, BLOCK_PATTERN_LABELS,
+  describeBlockPatterns, insertGapAt, isEmptySlot, parseBlockPatterns,
   removeGapAt, swapSlotContents, type BlockPattern,
 } from '../draw/drawSlotOps';
 import { useMixedStore } from '../mixed/mixedStore';
@@ -161,6 +162,8 @@ function NormalEntryRegistration() {
   const [savingDrawEdit, setSavingDrawEdit] = useState(false);
   /** 一度にずらす枠数（4枠のまとまりに合わせるとき 2〜4 をよく使う） */
   const [shiftCount, setShiftCount] = useState(1);
+  /** 型のまとめ指定（"4,空,2,3下,..." の形式） */
+  const [patternText, setPatternText] = useState('');
 
   // 処理中モーダル
   const [procModalOpen, setProcModalOpen] = useState(false);
@@ -1631,6 +1634,20 @@ function NormalEntryRegistration() {
     setEditSelectedPos(null);
   }, [drawEdit, pushDrawEdit]);
 
+  /**
+   * まとまりの型をまとめて指定して並べ替える。
+   * 例: "4,空,2,3下,4,空,2,3下,3上,2,4,空,3上,2,4,空"
+   */
+  const handleApplyPatternText = useCallback(() => {
+    if (!drawEdit) return;
+    const { patterns, error } = parseBlockPatterns(patternText);
+    if (error) { alert(error); return; }
+    const r = applyBlockPatterns(drawEdit.slots, patterns);
+    if (r.error) { alert(r.error); return; }
+    pushDrawEdit(r.slots);
+    setEditSelectedPos(null);
+  }, [drawEdit, patternText, pushDrawEdit]);
+
   /** あたり修正を保存し、対戦表を組み直す（入力済みスコアは可能な限り引き継ぐ） */
   const saveDrawEdit = useCallback(async () => {
     if (!drawEdit) return;
@@ -1820,6 +1837,31 @@ function NormalEntryRegistration() {
           <button onClick={() => void saveDrawEdit()} disabled={savingDrawEdit || drawEditHistory.length === 0}
             className="text-[11px] font-bold text-white bg-primary-600 rounded-full px-3 py-1 hover:brightness-110 disabled:opacity-40">
             {savingDrawEdit ? '保存中...' : '保存して対戦表に反映'}
+          </button>
+        </div>
+
+        {/* 型のまとめ指定（ドロー表から読み取った並びを一度に反映できる） */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          <span className="text-[10px] font-bold text-gray-600 shrink-0">型をまとめて指定</span>
+          <input
+            value={patternText}
+            onChange={e => setPatternText(e.target.value)}
+            placeholder="例: 4,空,2,3下,4,空,2,3下,3上,2,4,空,3上,2,4,空"
+            className="flex-1 min-w-[220px] text-[11px] border border-gray-300 rounded px-2 py-1 bg-white"
+          />
+          <button
+            onClick={handleApplyPatternText}
+            disabled={!patternText.trim()}
+            className="text-[11px] font-bold text-white bg-primary-600 rounded-full px-3 py-1 hover:brightness-110 disabled:opacity-40"
+          >
+            一括で並べ替え
+          </button>
+          <button
+            onClick={() => setPatternText(describeBlockPatterns(drawEdit.slots))}
+            className="text-[11px] font-bold text-gray-600 border border-gray-300 bg-white rounded-full px-2 py-1 hover:bg-gray-100"
+            title="今の並びを型の記号で書き出します"
+          >
+            今の並びを読み込む
           </button>
         </div>
 
