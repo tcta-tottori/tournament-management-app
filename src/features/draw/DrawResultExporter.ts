@@ -11,6 +11,7 @@
  */
 import * as XLSX from 'xlsx';
 import type { Draw, Match, Entry, Player, Event, Tournament } from '../../db/database';
+import type { FontWeight } from './resultCanvasKit';
 import {
   COL,
   clamp,
@@ -242,8 +243,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
   const ROW_H = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
-  const COL_W = 74;        // 1ラウンド分の横幅
-
   // スコアは合流点（縦線の中央）を挟んで上下に置く。
   // 2回戦以降は上下のラインが大きく離れるため、それぞれのラインに寄せると
   // 上下のスコアが遠く離れて対戦結果として読み取りにくい。
@@ -254,6 +253,37 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // タイブレーク得点・Ret / W.O の注記（負けた側のスコアの外側に添える）
   const NOTE_PX = 11;
   const NOTE_GAP = 13;
+
+  // ---- 1ラウンド分の横幅 ----
+  // 回戦ラベルを出さなくなったので、スコア（Ret / W.O・タイブレーク得点を含む）が
+  // 次の列の線に被らない範囲まで詰める。
+  const SCORE_PX = 13;
+  const scoreTokenW = (() => {
+    let w = 0;
+    const put = (text: string, px: number, weight: FontWeight) => {
+      if (!text) return;
+      meas.font = fontOf(weight, px);
+      w = Math.max(w, meas.measureText(text).width);
+    };
+    for (const m of matches) {
+      const raw = (m.score || '').trim();
+      if (!raw) {
+        if (m.status === 'walkover') put('W.O', SCORE_PX, 'bold');
+        continue;
+      }
+      const one = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
+      if (one) {
+        put(one[1], SCORE_PX, 'black');
+        put(one[2], SCORE_PX, 'black');
+        if (one[3]) put(`(${one[3]})`, NOTE_PX, 'medium');
+        if (one[4]) put(one[4], NOTE_PX, 'medium');
+      } else {
+        for (const part of raw.split('-')) put(part.replace(/\(.*?\)/g, '').trim(), SCORE_PX, 'black');
+      }
+    }
+    return w;
+  })();
+  const COL_W = clamp(Math.ceil(scoreTokenW) + 20, 44, 74);
 
   // ---- 選手行の割り当て（BYE の空きを詰める） ----
   // BYE のスロットにも1行ずつ確保すると、ドロー表どおりに並べたときに
