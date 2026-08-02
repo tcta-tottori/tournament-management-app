@@ -10,7 +10,8 @@ import type { LiveScore, LiveScoreConfig, LiveScoreSet, MatchFormatType } from '
 /** 進行に必要な最小限の状態（LiveScore の部分集合） */
 export type ScoreState = Pick<
   LiveScore,
-  'sets' | 'p1Points' | 'p2Points' | 'isTiebreak' | 'isSuperTiebreak' | 'server' | 'status' | 'winner' | 'lastPointBy'
+  'sets' | 'p1Points' | 'p2Points' | 'isTiebreak' | 'isSuperTiebreak' | 'server' | 'status' | 'winner'
+  | 'lastPointBy' | 'tiebreakFirstServer'
 >;
 
 const POINT_LABELS = ['0', '15', '30', '40'];
@@ -62,6 +63,7 @@ export function createInitialState(server: 1 | 2 = 1): ScoreState {
     status: 'live',
     winner: null,
     lastPointBy: null,
+    tiebreakFirstServer: null,
   };
 }
 
@@ -140,8 +142,27 @@ function finishMatch(s: ScoreState, winner: 1 | 2): void {
   s.winner = winner;
   s.isTiebreak = false;
   s.isSuperTiebreak = false;
+  s.tiebreakFirstServer = null;
   s.p1Points = 0;
   s.p2Points = 0;
+}
+
+/**
+ * タイブレークを終えたときの次のサーブ側。
+ * ルール: タイブレークで最初にサーブした側が、次セットの第1ゲームをレシーブする。
+ * （タイブレーク中のサーブ順から単純に交代させると1つずれるため、開始時の
+ *   サーブ側を基準に決める）
+ */
+function serverAfterTiebreak(s: ScoreState): 1 | 2 {
+  const first = s.tiebreakFirstServer;
+  return first ? other(first) : s.server;
+}
+
+/** タイブレーク（通常・スーパー）を開始する。開始時のサーブ側を記録しておく */
+function beginTiebreak(s: ScoreState, kind: 'tiebreak' | 'super'): void {
+  if (kind === 'super') s.isSuperTiebreak = true;
+  else s.isTiebreak = true;
+  s.tiebreakFirstServer = s.server;
 }
 
 /** セットが完了したときの処理（勝敗判定 / 次セットの用意） */
@@ -156,7 +177,10 @@ function completeSet(s: ScoreState, config: LiveScoreConfig): void {
   s.p1Points = 0;
   s.p2Points = 0;
   s.isTiebreak = false;
-  s.isSuperTiebreak = isSuperTiebreakSet(config, s.sets.length - 1);
+  s.isSuperTiebreak = false;
+  s.tiebreakFirstServer = null;
+  // 次がファイナル10ポイントSTBなら、そのまま突入する
+  if (isSuperTiebreakSet(config, s.sets.length - 1)) beginTiebreak(s, 'super');
 }
 
 /** 1ゲーム獲得時の処理 */
@@ -171,8 +195,10 @@ function winGame(s: ScoreState, config: LiveScoreConfig, player: 1 | 2): void {
   s.p1Points = 0;
   s.p2Points = 0;
   s.isTiebreak = false;
-  // ゲーム毎にサーブ交代
-  s.server = other(s.server);
+  // サーブ交代: 通常ゲームは1ゲーム毎、タイブレーク後は
+  // 「タイブレークで先にサーブした側がレシーブ」から次セットを始める
+  s.server = wasTiebreak ? serverAfterTiebreak(s) : other(s.server);
+  s.tiebreakFirstServer = null;
 
   const target = setTargetGames(config);
   const top = Math.max(cur.p1, cur.p2);
@@ -183,7 +209,7 @@ function winGame(s: ScoreState, config: LiveScoreConfig, player: 1 | 2): void {
     completeSet(s, config);
   } else if (cur.p1 === target && cur.p2 === target) {
     // N-N でタイブレーク突入
-    s.isTiebreak = true;
+    beginTiebreak(s, 'tiebreak');
   }
 }
 
@@ -200,12 +226,14 @@ export function awardPoint(state: ScoreState, config: LiveScoreConfig, player: 1
   if (s.isSuperTiebreak) {
     const cur = s.sets[s.sets.length - 1];
     if (player === 1) cur.p1++; else cur.p2++;
-    // 1ポイント目の後、以降2ポイント毎にサーブ交代
+    // サーブ交代: 最初の1ポイントだけ1本、以降は2ポイント毎
+    // （通算ポイントが奇数になったところで交代 = 1, 3, 5, ... 本目の後）
     if ((cur.p1 + cur.p2) % 2 === 1) s.server = other(s.server);
     const top = Math.max(cur.p1, cur.p2);
     const diff = Math.abs(cur.p1 - cur.p2);
     if (top >= config.superTiebreakTo && diff >= 2) {
       cur.tb = { p1: cur.p1, p2: cur.p2 };
+      s.server = serverAfterTiebreak(s);
       completeSet(s, config);
     }
     return s;
@@ -214,6 +242,7 @@ export function awardPoint(state: ScoreState, config: LiveScoreConfig, player: 1
   // --- 通常タイブレーク ---
   if (s.isTiebreak) {
     if (player === 1) s.p1Points++; else s.p2Points++;
+    // サーブ交代: 最初の1ポイントだけ1本、以降は2ポイント毎
     if ((s.p1Points + s.p2Points) % 2 === 1) s.server = other(s.server);
     const top = Math.max(s.p1Points, s.p2Points);
     const diff = Math.abs(s.p1Points - s.p2Points);
@@ -263,6 +292,7 @@ export function adjustGames(state: ScoreState, player: 1 | 2, delta: number): Sc
   s.p1Points = 0;
   s.p2Points = 0;
   s.isTiebreak = false;
+  s.tiebreakFirstServer = null;
   return s;
 }
 
@@ -270,7 +300,61 @@ export function adjustGames(state: ScoreState, player: 1 | 2, delta: number): Sc
 export function toggleServer(state: ScoreState): ScoreState {
   const s = clone(state);
   s.server = other(s.server);
+  // タイブレーク中の訂正なら「最初にサーブした側」も合わせてずらす
+  // （次セットの先サーブが1つずれないようにする）
+  if (s.tiebreakFirstServer) s.tiebreakFirstServer = other(s.tiebreakFirstServer);
   return s;
+}
+
+/**
+ * 試合途中でゲームルール（試合方式・規定ゲーム数など）を変更したときに、
+ * 現在の進行状態を新しいルールへ合わせ直す。
+ *
+ * - 規定ゲーム数を増やした → タイブレーク中なら通常ゲームへ戻す
+ * - 規定ゲーム数を減らした（既に N-N に達している）→ タイブレークへ入る
+ * - ファイナル10ポイントSTB のセットに該当するかを取り直す
+ * すでに終わったセットのスコアや、試合の勝敗判定には手を加えない。
+ */
+export function applyConfig(state: ScoreState, config: LiveScoreConfig): ScoreState {
+  if (state.status === 'finished') return state;
+  const s = clone(state);
+  const idx = s.sets.length - 1;
+  const cur = s.sets[idx];
+  if (!cur) return s;
+
+  const shouldBeSuper = isSuperTiebreakSet(config, idx);
+  if (shouldBeSuper !== s.isSuperTiebreak) {
+    s.isSuperTiebreak = shouldBeSuper;
+    s.isTiebreak = false;
+    s.p1Points = 0;
+    s.p2Points = 0;
+    s.tiebreakFirstServer = shouldBeSuper ? s.server : null;
+    return s;
+  }
+  if (s.isSuperTiebreak) return s;
+
+  const target = setTargetGames(config);
+  const atTarget = cur.p1 === target && cur.p2 === target;
+  if (s.isTiebreak && !atTarget) {
+    // 規定ゲーム数が変わってタイブレークの条件から外れた
+    s.isTiebreak = false;
+    s.p1Points = 0;
+    s.p2Points = 0;
+    s.tiebreakFirstServer = null;
+  } else if (!s.isTiebreak && atTarget) {
+    s.p1Points = 0;
+    s.p2Points = 0;
+    beginTiebreak(s, 'tiebreak');
+  }
+  return s;
+}
+
+/** 表示用のルール説明文 */
+export function describeConfig(config: LiveScoreConfig): string {
+  const base = config.format === 'twoSetsSuper10'
+    ? `2セットマッチ＋ファイナル${config.superTiebreakTo}ポイントSTB（1セット${config.targetGames}ゲーム）`
+    : `${config.targetGames}ゲームマッチ（${config.targetGames}-${config.targetGames}タイブレーク${config.tiebreakTo}ポイント）`;
+  return base + (config.noAd ? '・ノーアド' : '');
 }
 
 /**

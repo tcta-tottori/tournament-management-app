@@ -8,6 +8,7 @@
 import { db } from '../../db/database';
 import type { LiveScore, LiveScoreConfig, MatchFormatType } from '../../db/database';
 import {
+  applyConfig,
   buildConfig,
   buildScoreString,
   createInitialState,
@@ -121,8 +122,30 @@ export async function saveScoreState(live: LiveScore, next: ScoreState): Promise
     status: next.status,
     winner: next.winner,
     lastPointBy: next.lastPointBy,
+    tiebreakFirstServer: next.tiebreakFirstServer ?? null,
     updatedAt: Date.now(),
   });
+}
+
+/**
+ * 試合途中でゲームルールを変更する。
+ * 新しいルールに合わせて進行状態（タイブレーク判定等）も調整して保存する。
+ */
+export async function updateLiveScoreConfig(live: LiveScore, config: LiveScoreConfig): Promise<ScoreState | null> {
+  if (live.id == null) return null;
+  const next = applyConfig(live, config);
+  await db.liveScores.update(live.id, {
+    config,
+    sets: next.sets,
+    p1Points: next.p1Points,
+    p2Points: next.p2Points,
+    isTiebreak: next.isTiebreak,
+    isSuperTiebreak: next.isSuperTiebreak,
+    server: next.server,
+    tiebreakFirstServer: next.tiebreakFirstServer ?? null,
+    updatedAt: Date.now(),
+  });
+  return next;
 }
 
 /** コート情報を更新（途中でコートが変わった場合） */

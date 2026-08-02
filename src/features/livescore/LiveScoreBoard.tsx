@@ -104,7 +104,7 @@ export default function LiveScoreBoard({
       <div className="flex items-end gap-2">
         <span
           className={`inline-block rounded-t-md font-black tracking-[0.18em] text-white py-0.5 ${sz.label} ${
-            finished ? 'bg-[#0a2050]' : 'bg-[#c0392b]'
+            finished ? 'bg-[#0f3326]' : 'bg-[#c0392b]'
           }`}
         >
           {tabLabel}
@@ -117,7 +117,7 @@ export default function LiveScoreBoard({
       </div>
 
       {/* スコアパネル */}
-      <div className="rounded-md rounded-tl-none overflow-hidden shadow-xl bg-gradient-to-r from-[#153f96] to-[#0a2461] ring-1 ring-black/20">
+      <div className="rounded-md rounded-tl-none overflow-hidden shadow-xl bg-gradient-to-r from-[#2d6a4f] to-[#0f3326] ring-1 ring-black/20">
         {rows.map((row, idx) => {
           const isTb = live.isTiebreak || live.isSuperTiebreak;
           return (
@@ -129,7 +129,7 @@ export default function LiveScoreBoard({
               {/* 所属チップ（中継の国旗の位置） */}
               <div className="flex items-center pl-2 sm:pl-3 pr-2">
                 <span
-                  className={`${sz.chip} flex items-center justify-center rounded-[2px] bg-white/90 text-[#0a2461] font-black leading-none overflow-hidden`}
+                  className={`${sz.chip} flex items-center justify-center rounded-[2px] bg-white/90 text-[#0f3326] font-black leading-none overflow-hidden`}
                   title={row.affiliation}
                 >
                   {shortAffiliation(row.affiliation)}
@@ -149,7 +149,7 @@ export default function LiveScoreBoard({
               {/* サーブ表示（中継と同じ黄色のマーク） */}
               <div className="flex items-center justify-center w-6 shrink-0">
                 {row.serving && (
-                  <span className="block w-[3px] h-[45%] bg-[#e8ff4d] rotate-[20deg] rounded-sm shadow-[0_0_6px_#e8ff4d]" />
+                  <span className="block w-[3px] h-[45%] bg-[#d4e157] rotate-[20deg] rounded-sm shadow-[0_0_6px_#d4e157]" />
                 )}
               </div>
 
@@ -163,8 +163,8 @@ export default function LiveScoreBoard({
                     key={i}
                     className={`${sz.score} flex items-center justify-center font-black shrink-0 ${
                       col.isCurrent
-                        ? leading ? 'text-[#e8ff4d]' : 'text-white'
-                        : leading ? 'text-[#e8ff4d]' : 'text-white/55'
+                        ? leading ? 'text-[#d4e157]' : 'text-white'
+                        : leading ? 'text-[#d4e157]' : 'text-white/55'
                     }`}
                   >
                     {val}
@@ -183,15 +183,15 @@ export default function LiveScoreBoard({
               {!finished && (
                 <div
                   data-testid={`lsb-point-${row.player}`}
-                  className={`${sz.pointBox} shrink-0 flex items-center justify-center font-black text-[#0a2461] ${sz.point} ${
-                    isTb ? 'bg-[#e8ff4d]' : 'bg-white'
+                  className={`${sz.pointBox} shrink-0 flex items-center justify-center font-black text-[#0f3326] ${sz.point} ${
+                    isTb ? 'bg-[#d4e157]' : 'bg-white'
                   }`}
                 >
                   {pointLabel(live, row.player)}
                 </div>
               )}
               {finished && (
-                <div className={`${sz.pointBox} shrink-0 flex items-center justify-center font-black bg-white text-[#0a2461] ${sz.point}`}>
+                <div className={`${sz.pointBox} shrink-0 flex items-center justify-center font-black bg-white text-[#0f3326] ${sz.point}`}>
                   {row.isWinner ? '✓' : ''}
                 </div>
               )}
