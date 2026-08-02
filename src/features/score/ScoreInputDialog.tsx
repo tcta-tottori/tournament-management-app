@@ -152,9 +152,11 @@ export default function ScoreInputDialog({
   // 試合が変わったらスコアを同期
   useEffect(() => {
     if (!match) return;
-    // W.O/Retスコアの復元
-    if (match.score && (match.score.includes('W.O') || match.score.includes('Ret'))) {
-      setRetPlayer(match.score.startsWith('W.O') || match.score.startsWith('Ret') ? 1 : 2);
+    // W.O/Retスコアの復元（棄権したのは負けた側）
+    if (match.score && /W\.?O|Ret/i.test(match.score)) {
+      const winnerIsP1 = !!match.winnerEntryId && match.winnerEntryId === match.player1EntryId;
+      const winnerIsP2 = !!match.winnerEntryId && match.winnerEntryId === match.player2EntryId;
+      setRetPlayer(winnerIsP1 ? 2 : winnerIsP2 ? 1 : match.score.trim().startsWith('W.O') ? 1 : 2);
     } else {
       setRetPlayer(null);
     }
@@ -338,6 +340,13 @@ export default function ScoreInputDialog({
     return errors.length > 0 ? errors : null;
   }, [sets, tiebreaks, gameRuleText, requiredGamesProp, match, retPlayer, isTwoSetFormat, maxSets]);
 
+  /** ゲームスコアが1つでも入力されているか（棄権の記載を Ret / W.O で切り替える） */
+  const hasAnyScore = useMemo(
+    () => sets.some(s => s.p1.trim() !== '' || s.p2.trim() !== '')
+      || superTB.p1.trim() !== '' || superTB.p2.trim() !== '',
+    [sets, superTB],
+  );
+
   // スコア文字列を構築
   const buildScoreString = useCallback(() => {
     // twoSetsSuper10: 最初の2セットのみ通常表示、3rdはスーパーTB
@@ -357,14 +366,15 @@ export default function ScoreInputDialog({
     if (isTwoSetFormat && superTB.p1 && superTB.p2) {
       scoreParts.push(`[${superTB.p1}-${superTB.p2}]`);
     }
-    // W.O/Retの場合: 試合中ならRet、それ以外はW.O
+    // 棄権の記載はテニスの慣習に合わせる:
+    //   すでにゲームが行われている（スコアがある）→ 途中棄権なので Ret
+    //   1ゲームも行われていない → 不戦勝なので W.O
     if (retPlayer) {
-      const suffix = match?.status === 'playing' ? 'Ret' : 'W.O';
       const base = scoreParts.join(' ');
-      return base ? `${base} ${suffix}` : suffix;
+      return base ? `${base} Ret` : 'W.O';
     }
     return scoreParts.join(' ');
-  }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB, match?.status]);
+  }, [sets, tiebreaks, tiebreakFlags, retPlayer, isTwoSetFormat, superTB]);
 
   // 規定ゲーム数（例: "8ゲームマッチ" → 8）。団体戦と同じ自動補完に使う。
   // 呼び出し側の解決値を優先し、無ければ gameRuleText から抽出（全角数字も正規化）。
@@ -1048,7 +1058,7 @@ export default function ScoreInputDialog({
             <div className="space-y-2">
               <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
                 <UserX className="w-3.5 h-3.5" />
-                DEF（{match.status === 'playing' ? '途中棄権' : '棄権'}）
+                DEF（{hasAnyScore ? '途中棄権 Ret' : '棄権 W.O'}）
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
