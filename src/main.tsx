@@ -70,6 +70,7 @@ import PublicLiveView from './features/view/PublicLiveView';
 import PublicDrawView from './features/view/PublicDrawView';
 import PublicMatchOrderView from './features/view/PublicMatchOrderView';
 import PublicLiveScoreView from './features/view/PublicLiveScoreView';
+import EmbedLiveScoreView from './features/view/EmbedLiveScoreView';
 import LiveScorePage from './features/livescore/LiveScorePage';
 
 createRoot(document.getElementById('root')!).render(
@@ -81,6 +82,9 @@ createRoot(document.getElementById('root')!).render(
 
         {/* ライブスコア入力（コートサイド用の専用画面・運営メニュー無し） */}
         <Route path="/live-score" element={<LiveScorePage />} />
+
+        {/* HP埋め込み用（ライブスコアだけを表示する単独ページ） */}
+        <Route path="/embed/livescore" element={<EmbedLiveScoreView />} />
 
         {/* 参加者・HP向け公開ビュー（運営メニューなし・読み取り専用） */}
         <Route path="/view" element={<PublicLayout />}>
