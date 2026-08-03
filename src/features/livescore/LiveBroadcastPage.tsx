@@ -22,6 +22,7 @@ import { deleteLiveScore, startLiveScore, updateLiveScoreCourt } from './liveSco
 import { resolveRequiredGames } from '../score/gameRules';
 import { getGameRuleText, getMatchFormat, getRoundName } from '../score/roundRules';
 import { useNow } from './useNow';
+import { formatCourtLabel } from './courtLabel';
 
 /** 終了後もこの時間だけ一覧に残す */
 const FINISHED_WINDOW_MS = 30 * 60 * 1000;
@@ -437,7 +438,7 @@ export default function LiveBroadcastPage() {
                     className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 disabled:opacity-40"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    コートが「{courtNameOf(match!.courtId) || '未割当'}」に変わっています — 配信情報を更新
+                    コートが「{formatCourtLabel(courtNameOf(match!.courtId)) || '未割当'}」に変わっています — 配信情報を更新
                   </button>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -513,7 +514,7 @@ export default function LiveBroadcastPage() {
                   </span>
                   {m.courtId && (
                     <span className="text-[10px] font-bold text-gray-600 flex items-center gap-0.5">
-                      <MapPin className="w-3 h-3" />{courtNameOf(m.courtId)}
+                      <MapPin className="w-3 h-3" />{formatCourtLabel(courtNameOf(m.courtId))}
                     </span>
                   )}
                 </div>

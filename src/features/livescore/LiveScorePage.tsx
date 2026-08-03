@@ -25,6 +25,7 @@ import {
 } from './liveScoreApi';
 import { useNow } from './useNow';
 import { usePlayerNumbers } from './usePlayerNumbers';
+import { formatCourtLabel } from './courtLabel';
 
 /** 状態から ScoreState 部分だけを取り出す */
 function toState(live: LiveScore): ScoreState {
@@ -219,7 +220,7 @@ export default function LiveScorePage() {
             {[live.eventName, live.roundName].filter(Boolean).join(' ・ ')}
           </p>
           <p className="text-sm font-bold truncate">
-            {live.courtName || 'コート未割当'} <span className="text-white/40">#{live.matchOrder}</span>
+            {formatCourtLabel(live.courtName) || 'コート未割当'} <span className="text-white/40">#{live.matchOrder}</span>
           </p>
         </div>
         <span

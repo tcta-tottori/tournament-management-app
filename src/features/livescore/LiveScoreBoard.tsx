@@ -18,6 +18,7 @@ import { Play } from 'lucide-react';
 import type { LiveScore } from '../../db/database';
 import { currentGames, isSuperTiebreakSet, pointLabel, wonSets } from './liveScoreEngine';
 import { usePlayerNumbers } from './usePlayerNumbers';
+import { formatCourtLabel } from './courtLabel';
 
 type BoardSize = 'sm' | 'md' | 'lg';
 
@@ -123,6 +124,9 @@ export default function LiveScoreBoard({
     },
   ];
 
+  // 「9」だけで登録されたコートも「9番コート」と読める形にする
+  const courtLabel = formatCourtLabel(live.courtName);
+
   // 「男子A級シングルス／1R」のようにクラス名とラウンドを並べる
   const classLabel = [live.eventName, shortRound(live.roundName)]
     .filter(Boolean)
@@ -139,11 +143,11 @@ export default function LiveScoreBoard({
           {classLabel}
         </span>
         <span className="flex-1" />
-        {live.courtName && (
+        {courtLabel && (
           <span
             className={`inline-block shrink-0 truncate rounded-t-md font-black text-[#0f3326] py-0.5 bg-[#d4e157] ${sz.label}`}
           >
-            {live.courtName}
+            {courtLabel}
           </span>
         )}
       </div>
