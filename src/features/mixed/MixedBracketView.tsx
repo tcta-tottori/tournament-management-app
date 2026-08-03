@@ -1,16 +1,28 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, Download, ImageIcon, Loader2, X, Printer } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, X, Printer, Settings2 } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import CallPreviewDialog from './CallPreviewDialog';
-import { generateBracketDataUrl } from './exportBracketJpeg';
 import MixedBracketResultPreview from './MixedBracketResultPreview';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { useVisualViewport } from '../../components/ui/useVisualViewport';
 import { autoBracketStartRound, startRoundLabel } from './bracketRounds';
+
+/**
+ * ゲームルールの表示用テキストを整形する。
+ * 「（1）■ 試合方法：ノーアド・6ゲームマッチ ■ 試合順：①-② …」のような
+ * 表紙の1行から、試合方法の部分だけを取り出す。
+ */
+function cleanGameRuleText(raw: string): string {
+  let s = raw.replace(/^（[０-９\d]+）\s*/, '').trim();
+  const segs = s.split(/[■◆●]/).map(x => x.trim()).filter(Boolean);
+  const hit = segs.find(x => /ゲームマッチ|ノーアド|タイブレ|セットマッチ|先取/.test(x));
+  if (hit) s = hit;
+  return s.replace(/^(試合方法|ゲームルール|方法)\s*[：:]\s*/, '').trim();
+}
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -222,18 +234,27 @@ export default function MixedBracketView() {
   const [drawEditMode, setDrawEditMode] = useState(false);
   // 表示回戦の手動指定（null = 自動: 決着済みの回戦を省略）。クラスごとに保持する。
   const [roundOverride, setRoundOverride] = useState<{ category: PlacementCategory; value: number } | null>(null);
+  // ゲームルール設定ポップアップ
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   // ソフトキーボードが出ている間も、見えている領域（画面上半分）にスコア入力を収める
   const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(true);
 
   const bracketGameRule = tournamentInfo?.bracketGameRule || '';
-  // ドロー表のルールから初期値を自動設定
+  // ドロー表のルールから初期値を自動設定。
+  // 表紙は「■ 試合方法：〜 ■ 試合順：〜」のように複数項目が1行に入っていることがあるため、
+  // 試合方法の部分だけを取り出して使う（そのまま入れると見出しが読めなくなる）。
   useEffect(() => {
-    if (!bracketGameRule && tournamentInfo?.rules) {
-      const ruleFromDraw = tournamentInfo.rules.find(r => /ゲームマッチ|ノーアド|タイブレ|セットマッチ/.test(r));
-      if (ruleFromDraw) {
-        const cleaned = ruleFromDraw.replace(/^（[０-９\d]+）\s*/, '').trim();
-        if (cleaned) updateBracketGameRule(cleaned);
-      }
+    if (!tournamentInfo?.rules) return;
+    if (bracketGameRule) {
+      // 既に取り込み済みでも、複数項目が混ざったままなら整形し直す
+      const fixed = cleanGameRuleText(bracketGameRule);
+      if (fixed && fixed !== bracketGameRule) updateBracketGameRule(fixed);
+      return;
+    }
+    const ruleFromDraw = tournamentInfo.rules.find(r => /ゲームマッチ|ノーアド|タイブレ|セットマッチ/.test(r));
+    if (ruleFromDraw) {
+      const cleaned = cleanGameRuleText(ruleFromDraw);
+      if (cleaned) updateBracketGameRule(cleaned);
     }
   }, [tournamentInfo?.rules]);
   const winGames = useMemo(() => {
@@ -435,28 +456,41 @@ export default function MixedBracketView() {
         maxStartRound={maxStartRound}
         startRoundLabel={startRoundLabelText}
         onStartRoundChange={setStartRound}
-        right={currentBracket && isBracketFinished ? (
+        fullBleedClass="-mx-2 sm:-mx-4 -mt-2 sm:-mt-4"
+        right={(
           <div className="flex items-center gap-1.5">
-            <MixedBracketResultPreview
-              opts={{
-                bracket: currentBracket,
-                allTeams: useMixedStore.getState().allTeams,
-                tournamentName: tournamentInfo?.name || '',
-                venue: tournamentInfo?.venue,
-              }}
-            />
-            <CertificatePrintButton
-              brackets={brackets}
-              allTeams={useMixedStore.getState().allTeams}
-              selectedCategory={selectedBracketCategory}
-            />
+            {/* ゲームルール（アイコンのみ・タップでポップアップ） */}
+            <button
+              onClick={() => setRuleDialogOpen(true)}
+              className="flex items-center justify-center w-7 h-7 rounded-full text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 active:scale-95 transition-all"
+              title={bracketGameRule ? `ゲームルール: ${bracketGameRule}` : 'ゲームルールを設定'}
+              aria-label="ゲームルールを設定"
+            >
+              <Settings2 size={14} />
+            </button>
+            {currentBracket && isBracketFinished && (
+              <>
+                <MixedBracketResultPreview
+                  opts={{
+                    bracket: currentBracket,
+                    allTeams: useMixedStore.getState().allTeams,
+                    tournamentName: tournamentInfo?.name || '',
+                    venue: tournamentInfo?.venue,
+                  }}
+                />
+                <CertificatePrintButton
+                  brackets={brackets}
+                  allTeams={useMixedStore.getState().allTeams}
+                  selectedCategory={selectedBracketCategory}
+                />
+              </>
+            )}
           </div>
-        ) : undefined}
+        )}
       />
 
-      {/* ドロー編集 / トーナメント表画像 */}
+      {/* ドロー編集 */}
       <div className="flex justify-end gap-2">
-        {currentBracket && <BracketPreviewButton bracket={currentBracket} />}
         <button
           onClick={() => setDrawEditMode(!drawEditMode)}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
@@ -468,38 +502,59 @@ export default function MixedBracketView() {
         </button>
       </div>
 
-      {/* 決勝トーナメント用ゲームルール設定（選択式＋記述式） */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-        <label className="text-xs font-bold text-gray-500 block mb-1.5">ゲームルール:</label>
-        <div className="flex flex-wrap gap-1.5 mb-1.5">
-          {[
-            'ノーアド・6ゲームマッチ（6-6タイブレーク）',
-            'ノーアド・4ゲームマッチ（4-4タイブレーク）',
-            'デュースあり・6ゲームマッチ（6-6タイブレーク）',
-            '1セットマッチ（6-6タイブレーク）',
-            '8ゲームマッチ（8-8タイブレーク）',
-          ].map(preset => (
-            <button
-              key={preset}
-              onClick={() => updateBracketGameRule(preset)}
-              className={`px-2 py-1 text-[10px] rounded-lg border transition-colors ${
-                bracketGameRule === preset
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-              }`}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
-        <input
-          type="text"
-          value={bracketGameRule}
-          onChange={e => updateBracketGameRule(e.target.value)}
-          placeholder="上記から選択、または直接入力"
-          className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
-        />
-      </div>
+      {/* ゲームルール設定ポップアップ */}
+      {ruleDialogOpen && createPortal(
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={() => setRuleDialogOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <Settings2 size={15} className="text-gray-500" />
+                決勝トーナメントのゲームルール
+              </h3>
+              <button onClick={() => setRuleDialogOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              <div className="flex flex-col gap-1.5">
+                {[
+                  'ノーアド・6ゲームマッチ（6-6タイブレーク）',
+                  'ノーアド・4ゲームマッチ（4-4タイブレーク）',
+                  'デュースあり・6ゲームマッチ（6-6タイブレーク）',
+                  '1セットマッチ（6-6タイブレーク）',
+                  '8ゲームマッチ（8-8タイブレーク）',
+                ].map(preset => (
+                  <button
+                    key={preset}
+                    onClick={() => updateBracketGameRule(preset)}
+                    className={`px-3 py-2 text-xs text-left rounded-xl border transition-colors ${
+                      bracketGameRule === preset
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={bracketGameRule}
+                onChange={e => updateBracketGameRule(e.target.value)}
+                placeholder="上記から選択、または直接入力"
+                className="w-full text-xs border border-gray-300 rounded-lg px-2 py-2 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+              />
+              <button
+                onClick={() => setRuleDialogOpen(false)}
+                className="w-full py-2.5 min-h-[44px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm font-bold active:scale-[0.98] transition-all"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ドロー編集パネル */}
       {drawEditMode && currentBracket && (
@@ -1524,130 +1579,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
         .bracket-playing-blink { animation: bracket-playing 2s ease-in-out infinite; }
       `}</style>
     </div>
-  );
-}
-
-/** 苗字取得ヘルパー */
-const getFN = (n: string) => n.trim().split(/[\s　]+/)[0] || n;
-
-/** トーナメント表プレビュー＋ダウンロードボタン */
-function BracketPreviewButton({ bracket }: { bracket: PlacementBracket }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [winnerName, setWinnerName] = useState('');
-  const [lineOv, setLineOv] = useState<Record<string, 't1red' | 't2red' | 'black'>>({});
-  const allTeams = useMixedStore(s => s.allTeams);
-  const tournamentName = useMixedStore(s => s.tournamentInfo?.name || '');
-
-  const getDefaultWinner = useCallback(() => {
-    const maxRound = Math.max(...bracket.matches.map(m => m.round));
-    const fm = bracket.matches.find(m => m.round === maxRound);
-    if (fm?.winnerId) {
-      const w = allTeams.find(t => t.teamId === fm.winnerId);
-      if (w) return `${getFN(w.male.name)}・${getFN(w.female.name)}`;
-    }
-    return '';
-  }, [bracket, allTeams]);
-
-  const regen = useCallback(() => {
-    setDataUrl(null);
-    setIsLoading(true);
-    generateBracketDataUrl(bracket, allTeams, tournamentName, winnerName || undefined, Object.keys(lineOv).length > 0 ? lineOv : undefined)
-      .then(url => { setDataUrl(url); setIsLoading(false); })
-      .catch(() => setIsLoading(false));
-  }, [bracket, allTeams, tournamentName, winnerName, lineOv]);
-
-  useEffect(() => {
-    if (isOpen) setWinnerName(getDefaultWinner());
-  }, [isOpen, getDefaultWinner]);
-
-  useEffect(() => {
-    if (isOpen) regen();
-  }, [isOpen, regen]);
-
-  const handleDownload = () => {
-    if (!dataUrl) return;
-    const labels: Record<string, string> = { '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント' };
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `${labels[bracket.category] || bracket.category}.jpg`;
-    a.click();
-  };
-
-  return (
-    <>
-      <button onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors">
-        <ImageIcon size={12} /> 画像DL
-      </button>
-      {isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/60 z-[200]" onClick={() => setIsOpen(false)}>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-[95vw] max-w-5xl max-h-[90vh] z-[210]" onClick={e => e.stopPropagation()}>
-            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <ImageIcon size={16} className="text-gray-500" /> トーナメント表プレビュー
-              </h3>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 shrink-0">優勝者:</span>
-                  <input type="text" value={winnerName} onChange={e => setWinnerName(e.target.value)}
-                    placeholder="苗字・苗字" className="text-xs border border-gray-300 rounded px-2 py-1 w-28 focus:border-blue-400 outline-none" />
-                </div>
-                {dataUrl && (
-                  <button onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 text-white text-xs font-bold rounded-lg shadow hover:bg-emerald-600 transition-colors active:scale-95">
-                    <Download size={14} /> ダウンロード
-                  </button>
-                )}
-                <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex flex-col items-center">
-              {isLoading && <div className="flex flex-col items-center gap-2 text-gray-400 mt-8"><Loader2 size={32} className="animate-spin" /><span className="text-sm">生成中...</span></div>}
-              {dataUrl && !isLoading && <img src={dataUrl} alt="トーナメント表" className="max-w-full h-auto shadow border border-gray-200 bg-white" style={{ maxHeight: 'calc(100% - 50px)' }} />}
-              {/* 線の色手動修正 */}
-              {!isLoading && bracket.matches.filter(m => !m.isBye && m.status === 'finished').length > 0 && (
-                <div className="mt-2 bg-white rounded-lg border border-gray-200 px-3 py-2 w-full max-w-3xl">
-                  <div className="text-[10px] text-gray-500 mb-1">線の色を手動修正（クリックで切替）:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {bracket.matches.filter(m => m.status === 'finished' || m.isBye).map(m => {
-                      const current = lineOv[m.matchId];
-                      const label = `R${m.round}-${m.position}`;
-                      const states: (undefined | 't1red' | 't2red' | 'black')[] = [undefined, 't1red', 't2red', 'black'];
-                      const stateLabels: Record<string, string> = { t1red: '上赤', t2red: '下赤', black: '黒' };
-                      return (
-                        <button key={m.matchId}
-                          onClick={() => setLineOv(prev => {
-                            const next = { ...prev };
-                            const curIdx = states.indexOf(next[m.matchId]);
-                            const nextState = states[(curIdx + 1) % states.length];
-                            if (nextState) next[m.matchId] = nextState;
-                            else delete next[m.matchId];
-                            return next;
-                          })}
-                          className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
-                            current === 't1red' ? 'bg-red-100 border-red-300 text-red-700' :
-                            current === 't2red' ? 'bg-orange-100 border-orange-300 text-orange-700' :
-                            current === 'black' ? 'bg-gray-200 border-gray-400 text-gray-700' :
-                            'bg-white border-gray-200 text-gray-400'
-                          }`}
-                        >
-                          {label}{current ? ` ${stateLabels[current]}` : ''}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
   );
 }
 

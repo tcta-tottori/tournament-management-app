@@ -30,6 +30,8 @@ interface Props {
   onStartRoundChange?: (value: number | null) => void;
   /** 右側に置く追加のボタンなど */
   right?: React.ReactNode;
+  /** 親のパディングを打ち消して、画面の横幅いっぱいに表示する */
+  fullBleedClass?: string;
 }
 
 /**
@@ -49,6 +51,7 @@ export default function BracketTopBar({
   startRoundLabel = '全回戦表示',
   onStartRoundChange,
   right,
+  fullBleedClass = '',
 }: Props) {
   const idx = Math.max(0, tabs.findIndex(t => t.id === selectedId));
   const current = tabs[idx];
@@ -83,7 +86,7 @@ export default function BracketTopBar({
 
   return (
     <div
-      className="sticky top-0 z-30 shrink-0 bg-white border-b px-3 py-2 shadow-sm"
+      className={`sticky top-0 z-30 shrink-0 bg-white border-b px-3 py-2 shadow-sm ${fullBleedClass}`}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >

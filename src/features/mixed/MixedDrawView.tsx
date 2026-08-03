@@ -21,6 +21,19 @@ const LEAGUE_COLORS = [
   { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700' },
 ];
 
+// =============================================
+// 左固定列（# ＋ ペア名）
+// 名前枠は従来の 2/3 程度に圧縮し、所属から先は横スクロールで見る。
+// =============================================
+const NUM_COL_W = 26;
+const NAME_COL_W = 88;
+const NUM_COL_STYLE = { width: NUM_COL_W, minWidth: NUM_COL_W, left: 0 } as const;
+const NAME_COL_STYLE = {
+  width: NAME_COL_W, minWidth: NAME_COL_W, maxWidth: NAME_COL_W, left: NUM_COL_W,
+} as const;
+const STICKY_NUM_CLS = 'sticky z-20 px-0.5 py-2';
+const STICKY_NAME_CLS = 'sticky z-20 px-0.5 py-2 border-r border-gray-200 whitespace-nowrap';
+
 /** 名前を均等割り付けで表示（5文字幅基準） */
 function AlignedName({ name, className = '' }: { name: string; className?: string }) {
   return (
@@ -511,8 +524,8 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                 <table className="w-full text-xs sm:text-sm" style={{ minWidth: league.teams.length >= 5 ? 740 : 580 }}>
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-6">#</th>
-                      <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-[120px] sm:w-[150px]">ペア名</th>
+                      <th className={`${STICKY_NUM_CLS} bg-gray-50 text-left text-[10px] sm:text-xs text-gray-500`} style={NUM_COL_STYLE}>#</th>
+                      <th className={`${STICKY_NAME_CLS} bg-gray-50 text-left text-[10px] sm:text-xs text-gray-500`} style={NAME_COL_STYLE}>ペア名</th>
                       <th className="px-1.5 sm:px-2 py-1.5 text-left text-[10px] sm:text-xs text-gray-500 w-[80px] sm:w-[100px]">所属</th>
                       {league.teams.map((t, i) => {
                         const maleSei = t.male.name.replace(/[\s\u3000]+/g, '').slice(0, 2);
@@ -536,17 +549,17 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                       const standing = standings.find(s => s.teamId === team.teamId);
                       return (
                         <tr key={team.teamId} className={`border-t border-gray-100 hover:bg-gray-50/50 ${rowIdx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                          <td className="px-1.5 sm:px-2 py-2">
+                          <td className={`${STICKY_NUM_CLS} ${rowIdx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`} style={NUM_COL_STYLE}>
                             <div className="flex flex-col items-center">
                               <span className={`inline-flex items-center justify-center w-5 h-5 ${colors.badge} rounded-full text-[10px] font-bold`}>{rowIdx + 1}</span>
                               <span className="text-[8px] text-gray-400 mt-0.5">No.{team.pairNumber}</span>
                             </div>
                           </td>
-                          <td className="px-1.5 sm:px-2 py-2 w-[130px] sm:w-[150px]">
+                          <td className={`${STICKY_NAME_CLS} ${rowIdx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`} style={NAME_COL_STYLE}>
                             <div className="text-sm font-bold text-gray-800 leading-snug"><AlignedName name={team.male.name} /></div>
                             <div className="text-sm font-bold text-gray-800 leading-snug"><AlignedName name={team.female.name} /></div>
                           </td>
-                          <td className="px-1.5 sm:px-2 py-2 w-[80px] sm:w-[100px] border-l border-gray-200">
+                          <td className="px-1.5 sm:px-2 py-2 w-[80px] sm:w-[100px]">
                             <div className="text-[11px] text-gray-400 leading-snug truncate">{team.male.affiliation}</div>
                             <div className="text-[11px] text-gray-400 leading-snug truncate">{team.female.affiliation}</div>
                           </td>

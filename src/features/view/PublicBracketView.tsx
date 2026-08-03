@@ -97,8 +97,9 @@ export default function PublicBracketView() {
   );
 
   return (
-    <div className="-mt-4">
+    <div>
       <BracketTopBar
+        fullBleedClass="-mx-3 md:-mx-4 -mt-4"
         tabs={tabs}
         selectedId={bracket.category}
         onSelect={id => setSelectedCategory(id as PlacementCategory)}

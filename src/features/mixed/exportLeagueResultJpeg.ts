@@ -1,9 +1,13 @@
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
 import { drawVenueBadge, isTottoriUniv } from '../team/venueBadge';
+import { splitBigSmall, measureMixed, drawMixed } from '../team/mixedSizeText';
+import { eventBadgeColors } from '../draw/resultCanvasKit';
+
+/** 会場ロゴの表示倍率（表が小さいので既定より控えめにする） */
+const VENUE_LOGO_SCALE = 2 / 3;
 
 /** 水色ベースの配色（他大会の結果画像と統一） */
 const SKY = {
-  badge: '#0ea5e9',      // sky-500: リーグバッジ
   headerBg: '#e0f2fe',   // sky-100: 列ヘッダー背景
   headerLine: '#0ea5e9', // sky-500: 列ヘッダー下線
   headerText: '#075985', // sky-800: 列ヘッダー文字
@@ -50,12 +54,12 @@ export async function generateLeagueResultDataUrl(
   const venueTopY = paddingY + 42;
   let venueH = 0;
   if (isTottoriUniv(venue)) {
-    venueH = 30;
+    venueH = 30 * VENUE_LOGO_SCALE;
   } else if (venueLogo) {
     const vRatio = venueLogo.width / venueLogo.height;
-    let vH = 48;
+    let vH = 48 * VENUE_LOGO_SCALE;
     let vW = vH * vRatio;
-    if (vW > 230) { vW = 230; vH = vW / vRatio; }
+    if (vW > 230 * VENUE_LOGO_SCALE) { vW = 230 * VENUE_LOGO_SCALE; vH = vW / vRatio; }
     venueH = vH;
   }
   const headerH = Math.max(65, (venueTopY - paddingY) + venueH + 14);
@@ -115,17 +119,40 @@ export async function generateLeagueResultDataUrl(
   };
 
   // ---- ページヘッダー ----
-  const pLId = league.leagueId.trim();
-  // リーグバッジ風
-  drawRoundRect(paddingX, paddingY - 10, 52, 52, 12, SKY.badge);
-  drawText(pLId, paddingX + 26, paddingY + 16, 32, 'center', '#ffffff', true);
-  drawText('リーグ', paddingX + 65, paddingY + 28, 16, 'left', '#64748b', true);
+  // 「Aリーグ」をバッジではなくグラデーション文字で表示（英数字だけ大きく）
+  const title = `${league.leagueId.trim()}リーグ`;
+  const runs = splitBigSmall(title);
+  const cat = eventBadgeColors(title);
+  let bigPx = 44;
+  let smallPx = 24;
+  const maxTitleW = Math.max(140, tableW * 0.42);
+  let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  if (titleW > maxTitleW) {
+    const k = maxTitleW / titleW;
+    bigPx = Math.floor(bigPx * k);
+    smallPx = Math.floor(smallPx * k);
+    titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
+  }
+  ctx.save();
+  const titleGrad = ctx.createLinearGradient(paddingX, 0, paddingX + Math.max(titleW, 1), 0);
+  titleGrad.addColorStop(0, cat.c2);
+  titleGrad.addColorStop(1, cat.c3);
+  ctx.fillStyle = titleGrad;
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  drawMixed(ctx, runs, paddingX, paddingY + 16 + bigPx * 0.34, bigPx, smallPx, '900', '800');
+  ctx.restore();
 
-  // 大会名
-  drawText(tournamentName, paddingX + tableW, paddingY + 24, 20, 'right', '#334155', true);
+  // 大会名（右揃え。タイトルと重ならない幅に収める）
+  drawText(tournamentName, paddingX + tableW, paddingY + 24, 20, 'right', '#334155', true,
+    Math.max(180, tableW - titleW - 40));
 
-  // 大会名の下に会場表示（他大会の結果画像と同じ意匠）
-  drawVenueBadge(ctx, { venue, rightX: paddingX + tableW, topY: venueTopY, venueLogo, tottoriLogo });
+  // 大会名の下に会場表示（他大会の結果画像と同じ意匠・2/3サイズ）
+  drawVenueBadge(ctx, {
+    venue, rightX: paddingX + tableW, topY: venueTopY, venueLogo, tottoriLogo,
+    scale: VENUE_LOGO_SCALE,
+  });
 
   // ---- 表全体枠（影付け） ----
   const tableX = paddingX;

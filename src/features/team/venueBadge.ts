@@ -26,6 +26,8 @@ interface VenueBadgeOptions {
   venueLogo: HTMLImageElement | null;
   /** 鳥取大学用ロゴ */
   tottoriLogo: HTMLImageElement | null;
+  /** 表示倍率（1 = 既定。小さめの画像では 0.66 などで縮小する） */
+  scale?: number;
 }
 
 /**
@@ -33,14 +35,14 @@ interface VenueBadgeOptions {
  * 鳥取大学の場合は専用ロゴ＋テキスト、それ以外は従来の会場ロゴ。
  */
 export function drawVenueBadge(ctx: CanvasRenderingContext2D, opts: VenueBadgeOptions): void {
-  const { venue, rightX, topY, venueLogo, tottoriLogo } = opts;
+  const { venue, rightX, topY, venueLogo, tottoriLogo, scale = 1 } = opts;
 
   ctx.save();
   if (isTottoriUniv(venue)) {
     // 鳥取大学ロゴ（マーク）を「鳥取大学テニスコート」テキストの左側に横並びで配置。
     // ［ロゴ］ 鳥取大学テニスコート  の並びで、全体を rightX に右揃えする。
     const label = '鳥取大学テニスコート';
-    const fontPx = 16;
+    const fontPx = Math.round(16 * scale);
     ctx.font = `700 ${fontPx}px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -50,7 +52,7 @@ export function drawVenueBadge(ctx: CanvasRenderingContext2D, opts: VenueBadgeOp
     let logoW = 0;
     let logoH = 0;
     if (tottoriLogo) {
-      logoH = 30;
+      logoH = 30 * scale;
       logoW = logoH * (tottoriLogo.width / tottoriLogo.height);
     }
     const gap = tottoriLogo ? 8 : 0;
@@ -66,8 +68,8 @@ export function drawVenueBadge(ctx: CanvasRenderingContext2D, opts: VenueBadgeOp
     ctx.fillText(label, startX + logoW + gap, centerY);
   } else if (venueLogo) {
     // 従来の会場ロゴ
-    const venueMaxH = 48;
-    const venueMaxW = 230;
+    const venueMaxH = 48 * scale;
+    const venueMaxW = 230 * scale;
     const vRatio = venueLogo.width / venueLogo.height;
     let vH = venueMaxH;
     let vW = vH * vRatio;
