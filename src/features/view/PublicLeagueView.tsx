@@ -5,12 +5,36 @@ import { calculateLeagueStandings } from '../mixed/mixedLogic';
 import { calculateTeamStandings, MATCH_TYPE_SHORT } from '../team/teamLogic';
 import type { LeagueMatchScore, MixedLeague, LeagueStanding } from '../mixed/types';
 import type { TeamLeagueMatch, TeamLeague, TeamLeagueStanding } from '../team/types';
-import { MapPin, Trophy, Info } from 'lucide-react';
+import { MapPin, Info } from 'lucide-react';
+
+// =========================================================================
+// 左側固定列（# ＋ 選手名/所属）の寸法
+// 画面中央より少し左までを固定表示にして、スコア・勝敗・順位は横スクロールさせる。
+// =========================================================================
+/** 行番号列の幅(px) */
+const NUM_COL_W = 32;
+/** 固定表示する左側全体の幅（# ＋ 選手名/所属） */
+const FIXED_LEFT_W = 'min(46vw, 300px)';
+/** 選手名/所属列の幅 */
+const NAME_COL_W = `calc(${FIXED_LEFT_W} - ${NUM_COL_W}px)`;
+
+const numColStyle = { width: NUM_COL_W, minWidth: NUM_COL_W, left: 0 } as const;
+const nameColStyle = { width: NAME_COL_W, minWidth: NAME_COL_W, maxWidth: NAME_COL_W, left: NUM_COL_W } as const;
+/** 横スクロール側の列幅（ミックス / 団体戦） */
+const scoreColStyle = { width: 64, minWidth: 64 } as const;
+const teamScoreColStyle = { width: 84, minWidth: 84 } as const;
+const recordColStyle = { width: 56, minWidth: 56 } as const;
+const rankColStyle = { width: 52, minWidth: 52 } as const;
+
+/** 固定列（ヘッダー行 / データ行）の共通クラス */
+const stickyNumCls = 'sticky z-20 px-1 py-2';
+const stickyNameCls = 'sticky z-20 px-2 py-2 border-r border-gray-200';
 
 /**
  * 予選リーグ公開ビュー（全リーグを縦に並べて一覧表示）
  * - ミックス大会・団体戦どちらも対応
  * - 編集操作は一切無効（読み取り専用）
+ * - 選手名/所属は左側に固定し、スコア・勝敗・順位を横スクロールで見る
  */
 export default function PublicLeagueView() {
   const mixedImported = useMixedStore(s => s.isImported);
@@ -87,22 +111,26 @@ function MixedLeagueSection({
         total={total}
       />
 
-      {/* 対戦結果マトリクス */}
+      {/* 対戦結果マトリクス（選手名/所属は左固定、スコア以降は横スクロール） */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-        <table className="w-full min-w-[520px]">
+        <table className="min-w-full w-max">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-2 py-2 text-left text-[11px] text-gray-500 w-8">#</th>
-              <th className="px-2 py-2 text-left text-[11px] text-gray-500">ペア名 / 所属</th>
+              <th className={`${stickyNumCls} bg-gray-50 text-left text-[11px] text-gray-500`} style={numColStyle}>#</th>
+              <th className={`${stickyNameCls} bg-gray-50 text-left text-[11px] text-gray-500`} style={nameColStyle}>
+                ペア名 / 所属
+              </th>
               {league.teams.map((_, i) => (
-                <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500 w-16">
+                <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500" style={scoreColStyle}>
                   <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
                     {i + 1}
                   </span>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center text-[11px] text-gray-500 w-14">勝敗</th>
-              {complete && <th className="px-2 py-2 text-center text-[11px] text-gray-500 w-12">順位</th>}
+              <th className="px-2 py-2 text-center text-[11px] text-gray-500" style={recordColStyle}>勝敗</th>
+              {complete && (
+                <th className="px-2 py-2 text-center text-[11px] text-gray-500" style={rankColStyle}>順位</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -110,16 +138,16 @@ function MixedLeagueSection({
               const standing = standings.find(s => s.teamId === team.teamId);
               return (
                 <tr key={team.teamId} className="border-t border-gray-100">
-                  <td className="px-2 py-2">
+                  <td className={`${stickyNumCls} bg-white`} style={numColStyle}>
                     <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
                       {rowIdx + 1}
                     </span>
                   </td>
-                  <td className="px-2 py-2">
-                    <div className="text-sm font-bold text-gray-800 leading-tight">
+                  <td className={`${stickyNameCls} bg-white`} style={nameColStyle}>
+                    <div className="text-sm font-bold text-gray-800 leading-tight truncate">
                       {team.male.name.replace(/[\s\u3000]+/g, '')}
                     </div>
-                    <div className="text-sm font-bold text-gray-800 leading-tight">
+                    <div className="text-sm font-bold text-gray-800 leading-tight truncate">
                       {team.female.name.replace(/[\s\u3000]+/g, '')}
                     </div>
                     <div className="text-[10px] text-gray-400 truncate">
@@ -191,76 +219,6 @@ function MixedLeagueSection({
         </table>
       </div>
 
-      {/* 対戦順 */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <h3 className="text-sm font-bold text-gray-700 mb-3">対戦順</h3>
-        <div className="flex flex-wrap gap-2">
-          {league.matchOrder.map(mo => {
-            const match = matches.find(m => m.matchNumber === mo.matchNumber);
-            const isFinished = match?.status === 'finished';
-            const isPlaying = match?.status === 'playing';
-            return (
-              <div
-                key={mo.matchNumber}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
-                  isFinished
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : isPlaying
-                    ? 'bg-amber-50 border-amber-200 text-amber-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-500'
-                }`}
-              >
-                <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
-                <span className="font-bold">
-                  {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-
-                  {String.fromCodePoint(0x2460 + mo.team2Index - 1)}
-                </span>
-                {isFinished && match && (
-                  <span className="text-xs ml-1 text-gray-500">
-                    ({match.score1}-{match.score2})
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 順位表 */}
-      {standings.length > 0 && finished > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            {complete ? '確定順位' : '暫定順位'}
-          </h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-gray-500 border-b border-gray-200">
-                <th className="py-2 px-2 text-center w-10">順位</th>
-                <th className="py-2 px-2 text-left">ペア名</th>
-                <th className="py-2 px-2 text-center w-14">勝敗</th>
-                <th className="py-2 px-2 text-center w-14">取得G</th>
-                <th className="py-2 px-2 text-center w-14">失G</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map(s => (
-                <tr key={s.teamId} className="border-b border-gray-100 last:border-0">
-                  <td className="py-2 px-2 text-center">
-                    <RankBadge rank={s.rank} />
-                  </td>
-                  <td className="py-2 px-2 font-medium text-gray-800">{s.teamName}</td>
-                  <td className="py-2 px-2 text-center font-mono text-gray-700">
-                    {s.wins}-{s.losses}
-                  </td>
-                  <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
-                  <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </section>
   );
 }
@@ -326,22 +284,26 @@ function TeamLeagueSection({
         total={total}
       />
 
-      {/* 対戦結果 */}
+      {/* 対戦結果（チーム名は左固定、スコア以降は横スクロール） */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-        <table className="w-full min-w-[520px]">
+        <table className="min-w-full w-max">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-2 py-2 text-left text-[11px] text-gray-500 w-8">#</th>
-              <th className="px-2 py-2 text-left text-[11px] text-gray-500">チーム</th>
+              <th className={`${stickyNumCls} bg-gray-50 text-left text-[11px] text-gray-500`} style={numColStyle}>#</th>
+              <th className={`${stickyNameCls} bg-gray-50 text-left text-[11px] text-gray-500`} style={nameColStyle}>
+                チーム
+              </th>
               {league.teams.map((_, i) => (
-                <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500 w-20">
+                <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500" style={teamScoreColStyle}>
                   <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
                     {i + 1}
                   </span>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center text-[11px] text-gray-500 w-14">勝敗</th>
-              {complete && <th className="px-2 py-2 text-center text-[11px] text-gray-500 w-12">順位</th>}
+              <th className="px-2 py-2 text-center text-[11px] text-gray-500" style={recordColStyle}>勝敗</th>
+              {complete && (
+                <th className="px-2 py-2 text-center text-[11px] text-gray-500" style={rankColStyle}>順位</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -349,13 +311,13 @@ function TeamLeagueSection({
               const standing = standings.find(s => s.teamId === team.teamId);
               return (
                 <tr key={team.teamId} className="border-t border-gray-100">
-                  <td className="px-2 py-2">
+                  <td className={`${stickyNumCls} bg-white`} style={numColStyle}>
                     <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
                       {rowIdx + 1}
                     </span>
                   </td>
-                  <td className="px-2 py-2">
-                    <div className="text-sm font-bold text-gray-800 leading-tight">{team.teamName}</div>
+                  <td className={`${stickyNameCls} bg-white`} style={nameColStyle}>
+                    <div className="text-sm font-bold text-gray-800 leading-tight truncate">{team.teamName}</div>
                     <div className="text-[10px] text-gray-400">{team.members.length}名</div>
                   </td>
                   {league.teams.map((col, colIdx) => {
@@ -430,76 +392,6 @@ function TeamLeagueSection({
         </table>
       </div>
 
-      {/* 対戦順 */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <h3 className="text-sm font-bold text-gray-700 mb-3">対戦順</h3>
-        <div className="flex flex-wrap gap-2">
-          {league.matchOrder.map(mo => {
-            const match = matches.find(m => m.matchNumber === mo.matchNumber);
-            const isFinished = match?.status === 'finished';
-            const isPlaying = match?.status === 'playing';
-            return (
-              <div
-                key={mo.matchNumber}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
-                  isFinished
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : isPlaying
-                    ? 'bg-amber-50 border-amber-200 text-amber-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-500'
-                }`}
-              >
-                <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
-                <span className="font-bold">
-                  {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-
-                  {String.fromCodePoint(0x2460 + mo.team2Index - 1)}
-                </span>
-                {isFinished && match && (
-                  <span className="text-xs ml-1 text-gray-500">
-                    ({match.winsTeam1}-{match.winsTeam2})
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 順位表 */}
-      {standings.length > 0 && finished > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            {complete ? '確定順位' : '暫定順位'}
-          </h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-gray-500 border-b border-gray-200">
-                <th className="py-2 px-2 text-center w-10">順位</th>
-                <th className="py-2 px-2 text-left">チーム名</th>
-                <th className="py-2 px-2 text-center w-14">勝敗</th>
-                <th className="py-2 px-2 text-center w-14">取得P</th>
-                <th className="py-2 px-2 text-center w-14">失P</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map(s => (
-                <tr key={s.teamId} className="border-b border-gray-100 last:border-0">
-                  <td className="py-2 px-2 text-center">
-                    <RankBadge rank={s.rank} />
-                  </td>
-                  <td className="py-2 px-2 font-medium text-gray-800">{s.teamName}</td>
-                  <td className="py-2 px-2 text-center font-mono text-gray-700">
-                    {s.wins}-{s.losses}
-                  </td>
-                  <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.pointsWon}</td>
-                  <td className="py-2 px-2 text-center font-mono text-red-500">{s.pointsLost}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </section>
   );
 }
