@@ -3,6 +3,13 @@ import type {
   PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry, TournamentInfo
 } from './types';
 
+/** 3チームリーグの対戦順（①-② ②-③ ①-③） */
+const MATCH_ORDER_3: MatchOrderEntry[] = [
+  { matchNumber: 1, team1Index: 1, team2Index: 2 },
+  { matchNumber: 2, team1Index: 2, team2Index: 3 },
+  { matchNumber: 3, team1Index: 1, team2Index: 3 },
+];
+
 /** 4チームリーグの対戦順 */
 const MATCH_ORDER_4: MatchOrderEntry[] = [
   { matchNumber: 1, team1Index: 1, team2Index: 2 },
@@ -29,6 +36,7 @@ const MATCH_ORDER_5: MatchOrderEntry[] = [
 
 /** ラウンドロビン対戦順を生成（一般N人用） */
 function generateMatchOrder(n: number): MatchOrderEntry[] {
+  if (n === 3) return MATCH_ORDER_3;
   if (n === 4) return MATCH_ORDER_4;
   if (n === 5) return MATCH_ORDER_5;
   const order: MatchOrderEntry[] = [];
@@ -238,20 +246,88 @@ export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
 };
 
 /**
+ * 1位トーナメント（13ペア・16ドロー）の既定スロット配置。
+ * ドロー表通り index 1 / 9 / 15 が BYE。
+ */
+const DEFAULT_1ST_LAYOUT_13: (string | null)[] =
+  Array.from({ length: 16 }, (_, i) => ([1, 9, 15].includes(i) ? null : ''));
+
+/** 既定スロットマップ（A〜M・13リーグ）が今回の大会構成に使えるか判定 */
+function slotMapFitsLeagues(slotMap: (string | null)[], leagueIds: string[]): boolean {
+  const ids = new Set(leagueIds);
+  const used = new Set(slotMap.filter((s): s is string => s !== null).map(s => s.replace(/\d+$/, '')));
+  if (used.size !== ids.size) return false;
+  for (const u of used) {
+    if (!ids.has(u)) return false;
+  }
+  return true;
+}
+
+/**
+ * 並び順（左上から順のリーグID配列）を drawSize 分のスロットに展開する。
+ * 足りない分は BYE(null) として、1回戦の各マッチにできるだけ均等に振り分ける。
+ */
+export function distributeToSlots<T>(entries: T[], drawSize: number): (T | null)[] {
+  const slots: (T | null)[] = Array(drawSize).fill(null);
+  const matchCount = drawSize / 2;
+  const byeCount = drawSize - entries.length;
+  if (byeCount <= 0) return entries.slice(0, drawSize);
+
+  // e: 両方BYEのマッチ数 / k: 片側だけBYEのマッチ数 / それ以外は通常マッチ
+  const emptyMatches = Math.max(0, byeCount - matchCount);
+  const singleByeMatches = byeCount - emptyMatches * 2;
+
+  // BYEを含むマッチを均等に散らす
+  const byeMatchIdx = new Set<number>();
+  const totalByeMatches = emptyMatches + singleByeMatches;
+  for (let i = 0; i < totalByeMatches; i++) {
+    let idx = Math.floor(((i + 0.5) * matchCount) / totalByeMatches);
+    while (byeMatchIdx.has(idx) && idx < matchCount) idx++;
+    if (idx >= matchCount) idx = [...Array(matchCount).keys()].find(n => !byeMatchIdx.has(n)) ?? 0;
+    byeMatchIdx.add(idx);
+  }
+  // 両方BYEのマッチはBYEマッチの中から均等に選ぶ
+  const byeMatchList = [...byeMatchIdx].sort((a, b) => a - b);
+  const emptyIdx = new Set<number>();
+  for (let i = 0; i < emptyMatches; i++) {
+    emptyIdx.add(byeMatchList[Math.floor(((i + 0.5) * byeMatchList.length) / emptyMatches)]);
+  }
+
+  let ei = 0;
+  for (let m = 0; m < matchCount; m++) {
+    if (emptyIdx.has(m)) continue;
+    if (byeMatchIdx.has(m)) {
+      if (ei < entries.length) slots[m * 2] = entries[ei++];
+    } else {
+      if (ei < entries.length) slots[m * 2] = entries[ei++];
+      if (ei < entries.length) slots[m * 2 + 1] = entries[ei++];
+    }
+  }
+  return slots;
+}
+
+/**
  * 順位別トーナメント生成
  */
 export function generateAllBrackets(
   standings: Map<string, LeagueStanding[]>,
   _allTeams: MixedTeam[],
   leagues: MixedLeague[],
-  _bracketOrders?: TournamentInfo['bracketOrders']
+  bracketOrders?: TournamentInfo['bracketOrders']
 ): PlacementBracket[] {
-  const categories: { cat: PlacementCategory; label: string; rank: number }[] = [
+  const leagueIds = leagues.map(l => l.leagueId.trim());
+  const maxTeamsInLeague = leagues.reduce((max, l) => Math.max(max, l.teams.length), 0);
+
+  const allCategories: { cat: PlacementCategory; label: string; rank: number }[] = [
     { cat: '1st', label: '1位トーナメント', rank: 1 },
     { cat: '2nd', label: '2位トーナメント', rank: 2 },
     { cat: '3rd', label: '3位トーナメント', rank: 3 },
     { cat: '4th', label: '4・5位トーナメント', rank: 4 },
   ];
+  // 3ペアリーグのみの大会では4位トーナメントは開催されない
+  const categories = allCategories.filter(c =>
+    c.rank <= maxTeamsInLeague || (bracketOrders?.[c.cat as '2nd' | '3rd' | '4th']?.length ?? 0) > 0
+  );
 
   const brackets: PlacementBracket[] = [];
 
@@ -271,30 +347,8 @@ export function generateAllBrackets(
       }
     }
 
-    // スロットマップからdrawSize=16のスロット配列を構築
-    const slotMap = BRACKET_SLOT_MAP[cat];
-    if (slotMap) {
-      // スロットマップ使用: BYE位置を明示的に含む
-      const drawSize = slotMap.length; // 16
-      const slots: ({ teamId: string; teamName: string; leagueId: string } | null)[] = [];
-      for (const lid of slotMap) {
-        if (lid === null) {
-          slots.push(null); // BYE
-        } else {
-          const teamList = teamByLeague.get(lid);
-          if (teamList && teamList.length > 0) {
-            slots.push(teamList.shift()!);
-          } else {
-            slots.push(null); // チームが見つからない場合もBYE
-          }
-        }
-      }
-      const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
-        .map((t, i) => ({ ...t, seedPosition: i + 1 }));
-      const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
-      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
-    } else {
-      // 1位トーナメント: 抽選なのでリーグ順で収集、BYE位置付き16スロットで生成
+    if (cat === '1st') {
+      // 1位トーナメント: 抽選なのでリーグ順で収集し、空スロットのまま生成
       const teamsForBracket: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[] = [];
       let seed = 1;
       for (const [, teamList] of teamByLeague) {
@@ -302,12 +356,63 @@ export function generateAllBrackets(
           teamsForBracket.push({ ...t, seedPosition: seed++ });
         }
       }
-      const drawSize = 16; // 固定16ドロー
-      // BYE位置(index 1,9,15)を含む空スロットで生成（チームは配置しない、抽選で決める）
-      const emptySlots: (null)[] = Array(drawSize).fill(null);
-      const matches = generateBracketMatchesWithSlots(cat, drawSize, emptySlots);
-      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches });
+      const entryCount = Math.max(teamsForBracket.length, leagueIds.length);
+      const drawSize = Math.max(4, nextPowerOf2(entryCount));
+      // BYE位置だけ決めておき、チームは抽選で配置する
+      const layout = drawSize === 16 && entryCount === 13
+        ? DEFAULT_1ST_LAYOUT_13   // 従来のドロー表通りの配置を維持
+        : distributeToSlots(leagueIds.slice(0, entryCount), drawSize);
+      const byePositions = layout.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0);
+      const matches = generateBracketMatchesWithSlots(cat, drawSize, Array(drawSize).fill(null));
+      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches, byePositions });
+      continue;
     }
+
+    // 並び順: Excel の順位別トーナメント表 → 既定スロットマップ → リーグ順
+    const orderEntries = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
+    const defaultMap = BRACKET_SLOT_MAP[cat];
+    let slotCodes: (string | null)[];
+    if (orderEntries && orderEntries.length > 0) {
+      slotCodes = distributeToSlots(orderEntries, Math.max(4, nextPowerOf2(orderEntries.length)));
+    } else if (defaultMap && slotMapFitsLeagues(defaultMap, leagueIds)) {
+      slotCodes = defaultMap;
+    } else {
+      const codes = leagueIds.flatMap(lid => (teamByLeague.get(lid) || []).map(() => lid));
+      slotCodes = distributeToSlots(codes, Math.max(4, nextPowerOf2(codes.length || leagueIds.length)));
+    }
+
+    const drawSize = slotCodes.length;
+    const slots: ({ teamId: string; teamName: string; leagueId: string } | null)[] = [];
+    for (const code of slotCodes) {
+      if (code === null) {
+        slots.push(null); // BYE
+        continue;
+      }
+      // "M5" のように順位まで指定されている場合に対応
+      const m = code.match(/^(.+?)(\d)$/);
+      const leagueKey = m ? m[1] : code;
+      const teamList = teamByLeague.get(leagueKey);
+      if (!teamList || teamList.length === 0) {
+        slots.push(null); // チームが見つからない場合もBYE
+        continue;
+      }
+      if (m && rank >= 4) {
+        const wanted = standings.get(leagueKey)?.find(s => s.rank === Number(m[2]));
+        const idx = wanted ? teamList.findIndex(t => t.teamId === wanted.teamId) : -1;
+        slots.push(idx >= 0 ? teamList.splice(idx, 1)[0] : null);
+      } else {
+        slots.push(teamList.shift()!);
+      }
+    }
+
+    const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
+      .map((t, i) => ({ ...t, seedPosition: i + 1 }));
+    const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
+    brackets.push({
+      category: cat, label, drawSize, teams: teamsForBracket, matches,
+      slotLeagueIds: slotCodes,
+      byePositions: slotCodes.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0),
+    });
   }
 
   return brackets;

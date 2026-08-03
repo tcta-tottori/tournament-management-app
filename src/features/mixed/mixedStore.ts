@@ -482,8 +482,8 @@ export const useMixedStore = create<MixedState>()(
             }
           }
 
-          // 16スロット配列を構築（BYE位置: ドロー表通り ①シード,⑧シード,⑬シード）
-          const BYE_POSITIONS = new Set([1, 9, 15]);
+          // スロット配列を構築（BYE位置はブラケット生成時に決めたものを使う）
+          const BYE_POSITIONS = new Set(bracket.byePositions ?? [1, 9, 15]);
           const slots: (typeof reorderedTeams[0] | null)[] = Array(drawSize).fill(null);
           let teamIdx = 0;
           for (let i = 0; i < drawSize; i++) {

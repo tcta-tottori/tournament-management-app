@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, ClipboardList, Download, ImageIcon, Loader2, X, Printer } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import CallPreviewDialog from './CallPreviewDialog';
@@ -935,17 +936,18 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
 
   const teams = bracket.teams;
 
-  // ドロー表通りの16スロット構造（1位トーナメント）
-  // ①=slot0, BYE=slot1, ②③=slot2-3, ④⑤=slot4-5, ⑥⑦=slot6-7
-  // ⑧=slot8, BYE=slot9, ⑨⑩=slot10-11, ⑪⑫=slot12-13, ⑬=slot14, BYE=slot15
-  const DRAW_SIZE = 16;
-  const BYE_POSITIONS = new Set([1, 9, 15]); // ①シード, ⑧シード, ⑬シード
+  // スロット構造は大会のペア数から決まる（例: 13ペア→16ドロー, BYE=slot1,9,15）
+  const DRAW_SIZE = bracket.drawSize;
+  const BYE_POSITIONS = useMemo(
+    () => new Set(bracket.byePositions ?? [1, 9, 15]),
+    [bracket.byePositions],
+  );
   const circled = (n: number) => String.fromCodePoint(0x2460 + n);
 
   // チーム配置可能なスロット（BYE以外）
   const teamSlots = useMemo(() =>
     Array.from({ length: DRAW_SIZE }, (_, i) => i).filter(i => !BYE_POSITIONS.has(i)),
-  []);
+  [DRAW_SIZE, BYE_POSITIONS]);
 
   // 割当済みチームID
   const assignedTeamIds = useMemo(() => new Set(assignedSlots.values()), [assignedSlots]);
@@ -958,7 +960,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
     const slots16: (string | null)[] = Array(DRAW_SIZE).fill(null);
     slotsMap.forEach((teamId, slot) => { slots16[slot] = teamId; });
     onRebuild(bracket.category, slots16, BYE_POSITIONS);
-  }, [bracket.category, onRebuild]);
+  }, [bracket.category, onRebuild, DRAW_SIZE, BYE_POSITIONS]);
 
   // ルーレット
   const spinRoulette = useCallback(() => {
@@ -1008,7 +1010,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
     }
     onRebuild(bracket.category, slots16, BYE_POSITIONS);
     setDrawComplete(true);
-  }, [teams, bracket.category, onRebuild]);
+  }, [teams, bracket.category, onRebuild, DRAW_SIZE, BYE_POSITIONS]);
 
   // 手動割当確定
   const confirmDraw = useCallback(() => {
@@ -1016,7 +1018,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
     assignedSlots.forEach((teamId, slot) => { slots16[slot] = teamId; });
     onRebuild(bracket.category, slots16, BYE_POSITIONS);
     setDrawComplete(true);
-  }, [assignedSlots, bracket.category, onRebuild]);
+  }, [assignedSlots, bracket.category, onRebuild, DRAW_SIZE, BYE_POSITIONS]);
 
   const resetDraw = () => {
     setAssignedSlots(new Map());
@@ -1226,24 +1228,24 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
 
 
   // 未配置スロットに配置予定のリーグ情報を表示
-  const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
-    '2nd': ['G',null,'E','L','H','C','J',null,'B','F','A','M','I','D','K',null],
-    '3rd': ['D',null,'H','M','F','A','K',null,'I','G','C','E','L','J','B',null],
-    '4th': ['A','M','F','J','L','B','D',null,'E','H','K','I','G','C',null,'M'],
-  };
+  // Excel から並び順を読み込めた場合は bracket.slotLeagueIds を使う
+  const slotLeagueIds = bracket.slotLeagueIds ?? DEFAULT_BRACKET_SLOT_MAP[bracket.category];
   // 1位トーナメント: BYE位置 (0-indexed)
-  const BYE_POSITIONS_1ST = new Set([1, 9, 15]);
+  const BYE_POSITIONS_1ST = useMemo(
+    () => new Set(bracket.byePositions ?? [1, 9, 15]),
+    [bracket.byePositions],
+  );
   // スロット→丸番号マップ（BYE以外に①~⑬を割り当て）
   const slotCircledNum = useMemo(() => {
     const map = new Map<number, string>();
     let num = 0;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < bracket.drawSize; i++) {
       if (BYE_POSITIONS_1ST.has(i)) continue;
       map.set(i, String.fromCodePoint(0x2460 + num));
       num++;
     }
     return map;
-  }, []);
+  }, [bracket.drawSize, BYE_POSITIONS_1ST]);
 
   // 1回戦スロットの丸番号を取得（1位トーナメントの1回戦のみ）
   const getSlotNumber = (match: BracketMatch, slot: 'team1' | 'team2'): string | null => {
@@ -1267,17 +1269,20 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     }
 
     // スロットマップからリーグIDを取得
-    const slotMap = BRACKET_SLOT_MAP[bracket.category];
+    const slotMap = slotLeagueIds;
+    const defaultRank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
     if (slotMap && slotIdx < slotMap.length) {
-      const lid = slotMap[slotIdx];
-      if (lid === null) return { text: 'BYE' };
-      const rank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
+      const code = slotMap[slotIdx];
+      if (code === null || code === '') return { text: 'BYE' };
+      // "M5" のように順位まで指定されている場合に対応
+      const m = code.match(/^(.+?)(\d)$/);
+      const lid = m ? m[1] : code;
+      const rank = m ? m[2] : defaultRank;
       return { text: `${lid}リーグ ${rank}位`, leagueId: lid, rank };
     }
     if (slotIdx < bracket.teams.length) {
       const t = bracket.teams[slotIdx];
-      const rank = bracket.category === '2nd' ? '2' : bracket.category === '3rd' ? '3' : '4';
-      return { text: `${t.leagueId}リーグ ${rank}位`, leagueId: t.leagueId, rank };
+      return { text: `${t.leagueId}リーグ ${defaultRank}位`, leagueId: t.leagueId, rank: defaultRank };
     }
     return { text: 'BYE' };
   };

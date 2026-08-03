@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Users, Settings } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { parseMixedExcel } from './mixedExcelParser';
@@ -8,6 +8,12 @@ export default function MixedImportView() {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setPreview] = useState<{ leagueCount: number; teamCount: number; matchCount: number } | null>(null);
+
+  // 読み込んだリーグに実在するペア数（ゲームルール入力欄の出し分けに使う）
+  const leagueSizes = useMemo(
+    () => [...new Set(leagues.map(l => l.teams.length))].sort((a, b) => a - b),
+    [leagues],
+  );
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
@@ -62,16 +68,16 @@ export default function MixedImportView() {
         </div>
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-emerald-100">
-            <div className="text-3xl font-bold text-emerald-700">13</div>
-            <div className="text-sm text-gray-500">リーグ (A〜M)</div>
+            <div className="text-3xl font-bold text-emerald-700">{isImported ? leagues.length : '—'}</div>
+            <div className="text-sm text-gray-500">リーグ</div>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-emerald-100">
-            <div className="text-3xl font-bold text-teal-700">54</div>
+            <div className="text-3xl font-bold text-teal-700">{isImported ? leagues.reduce((s, l) => s + l.teams.length, 0) : '—'}</div>
             <div className="text-sm text-gray-500">ペア参加</div>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-emerald-100">
-            <div className="text-3xl font-bold text-cyan-700">4</div>
-            <div className="text-sm text-gray-500">順位別トーナメント</div>
+            <div className="text-3xl font-bold text-cyan-700">{isImported ? leagueSizes.join('・') : '—'}</div>
+            <div className="text-sm text-gray-500">リーグのペア数</div>
           </div>
         </div>
       </div>
@@ -178,32 +184,24 @@ export default function MixedImportView() {
               />
             </div>
 
-            {/* ゲームルール */}
+            {/* ゲームルール（読み込んだリーグのペア数ごとに表示） */}
             <div className="pt-2 border-t border-gray-100">
               <label className="text-xs font-bold text-gray-700 block mb-2">ゲームルール</label>
               <div className="space-y-2">
+                {leagueSizes.map(size => (
+                  <div key={size}>
+                    <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（{size}ペア）</label>
+                    <input
+                      type="text"
+                      value={tournamentInfo.gameRules?.[size] || ''}
+                      onChange={e => updateGameRule(size, e.target.value)}
+                      placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                ))}
                 <div>
-                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（4チーム）</label>
-                  <input
-                    type="text"
-                    value={tournamentInfo.gameRules?.[4] || ''}
-                    onChange={e => updateGameRule(4, e.target.value)}
-                    placeholder="例: ノーアド・6ゲームマッチ（6-6タイブレーク）"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">予選リーグ（5チーム）</label>
-                  <input
-                    type="text"
-                    value={tournamentInfo.gameRules?.[5] || ''}
-                    onChange={e => updateGameRule(5, e.target.value)}
-                    placeholder="例: ノーアド・4ゲームマッチ（4-4タイブレーク）"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">決勝トーナメント</label>
+                  <label className="text-[10px] font-medium text-gray-400 block mb-0.5">順位別トーナメント</label>
                   <input
                     type="text"
                     value={tournamentInfo.gameRules?.[0] || ''}

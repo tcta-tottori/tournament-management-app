@@ -94,6 +94,10 @@ export interface PlacementBracket {
   drawSize: number;
   teams: { teamId: string; teamName: string; leagueId: string; seedPosition: number }[];
   matches: BracketMatch[];
+  /** 各スロットに入るリーグID（null=BYE）。未配置スロットの表示に使う */
+  slotLeagueIds?: (string | null)[];
+  /** BYEとなるスロット位置（0始まり） */
+  byePositions?: number[];
 }
 
 /** フェーズ */
