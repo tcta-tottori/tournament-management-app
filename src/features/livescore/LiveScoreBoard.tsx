@@ -29,19 +29,19 @@ const SIZE: Record<BoardSize, {
 }> = {
   sm: {
     row: 'min-h-9', serveCol: 'w-5', serveIcon: 'w-2.5 h-2.5', num: 'w-4 text-[10px]',
-    name: 'text-sm', aff: 'text-[10px]', seed: 'text-[8px] px-1',
+    name: 'text-[13px]', aff: 'text-[10px]', seed: 'text-[8px] px-1',
     setCol: 'w-6', setText: 'text-sm', curCol: 'w-7', curText: 'text-base',
     point: 'text-base', pointBox: 'w-9', label: 'text-[9px] px-2',
   },
   md: {
     row: 'min-h-12', serveCol: 'w-6', serveIcon: 'w-3.5 h-3.5', num: 'w-5 text-[11px]',
-    name: 'text-lg sm:text-xl', aff: 'text-[11px] sm:text-xs', seed: 'text-[9px] px-1',
+    name: 'text-base sm:text-lg', aff: 'text-[11px] sm:text-xs', seed: 'text-[9px] px-1',
     setCol: 'w-8', setText: 'text-xl', curCol: 'w-10', curText: 'text-xl',
     point: 'text-2xl', pointBox: 'w-14', label: 'text-[10px] px-2.5',
   },
   lg: {
     row: 'min-h-16', serveCol: 'w-8', serveIcon: 'w-5 h-5', num: 'w-7 text-sm',
-    name: 'text-2xl sm:text-3xl', aff: 'text-xs sm:text-sm', seed: 'text-[10px] px-1.5',
+    name: 'text-xl sm:text-2xl', aff: 'text-xs sm:text-sm', seed: 'text-[10px] px-1.5',
     setCol: 'w-10', setText: 'text-3xl', curCol: 'w-14', curText: 'text-3xl',
     point: 'text-4xl', pointBox: 'w-20', label: 'text-xs px-3',
   },
