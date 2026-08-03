@@ -227,6 +227,9 @@ export interface LiveScore {
   player2Affiliation: string;
   player1EntryId: string | null;
   player2EntryId: string | null;
+  /** ドロー番号（結果表と同じ「番号 選手名（所属）」表示に使う） */
+  player1Number?: number;
+  player2Number?: number;
   player1Seed?: number;
   player2Seed?: number;
   config: LiveScoreConfig;

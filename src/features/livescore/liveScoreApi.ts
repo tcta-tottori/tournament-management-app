@@ -38,14 +38,30 @@ export async function startLiveScore(params: StartLiveScoreParams): Promise<Live
   const match = await db.matches.get(params.dbId);
   if (!match) return null;
 
+  // ドロー番号（テロップの「番号 選手名（所属）」表示用）。
+  // 結果表・結果画像と同じくドローのポジション番号をそのまま使う。
+  const draw = await db.draws.where('eventId').equals(match.eventId).first();
+  const numberOf = (entryId: string | null): number | undefined => {
+    if (!entryId || !draw) return undefined;
+    const slot = draw.slots.find(s => s.entryId === entryId);
+    return slot && slot.position > 0 ? slot.position : undefined;
+  };
+  const player1Number = numberOf(match.player1EntryId);
+  const player2Number = numberOf(match.player2EntryId);
+
   const existing = await findLiveScore(match.matchId, match.eventId);
   if (existing) {
-    // 既存のライブスコアを再開（終了済みなら live に戻す）
-    if (existing.status === 'finished') {
-      await db.liveScores.update(existing.id!, { status: 'live', updatedAt: Date.now() });
-      return { ...existing, status: 'live' };
+    // 既存のライブスコアを再開（終了済みなら live に戻す）。
+    // ドロー番号を持たない古い記録はここで補う。
+    const patch: Partial<LiveScore> = {};
+    if (existing.player1Number == null && player1Number != null) patch.player1Number = player1Number;
+    if (existing.player2Number == null && player2Number != null) patch.player2Number = player2Number;
+    if (existing.status === 'finished') patch.status = 'live';
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await db.liveScores.update(existing.id!, patch);
     }
-    return existing;
+    return { ...existing, ...patch };
   }
 
   const event = await db.events.where('eventId').equals(match.eventId).first();
@@ -85,6 +101,8 @@ export async function startLiveScore(params: StartLiveScoreParams): Promise<Live
     player2Affiliation: match.player2Affiliation,
     player1EntryId: match.player1EntryId,
     player2EntryId: match.player2EntryId,
+    player1Number,
+    player2Number,
     player1Seed: seedOf(match.player1EntryId),
     player2Seed: seedOf(match.player2EntryId),
     config,
