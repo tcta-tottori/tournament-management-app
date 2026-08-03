@@ -1,4 +1,24 @@
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
+import { drawVenueBadge, isTottoriUniv } from '../team/venueBadge';
+
+/** 水色ベースの配色（他大会の結果画像と統一） */
+const SKY = {
+  badge: '#0ea5e9',      // sky-500: リーグバッジ
+  headerBg: '#e0f2fe',   // sky-100: 列ヘッダー背景
+  headerLine: '#0ea5e9', // sky-500: 列ヘッダー下線
+  headerText: '#075985', // sky-800: 列ヘッダー文字
+};
+
+/** 画像の読み込みに失敗しても描画を止めないローダー */
+function tryLoadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
 
 /**
  * リーグ結果を表形式で描画したCanvasからData URL (JPEG) を生成する
@@ -9,16 +29,36 @@ export async function generateLeagueResultDataUrl(
   matches: LeagueMatchScore[],
   _allTeams: MixedTeam[],
   tournamentName: string,
+  venue?: string,
 ): Promise<string> {
   // ペア番号順に並べ替え
   const teams = [...league.teams].sort((a, b) => a.pairNumber - b.pairNumber);
   const teamCount = teams.length;
 
+  // 会場ロゴ（大会名の下に表示）
+  const base = import.meta.env.BASE_URL;
+  const [venueLogo, tottoriLogo] = await Promise.all([
+    tryLoadImage(`${base}logo-venue.png`),
+    tryLoadImage(`${base}logo-tottori-univ.png`),
+  ]);
+
   // レイアウト定数
   const scale = 2; // 高解像度
   const paddingX = 40;
   const paddingY = 40;
-  const headerH = 65;
+  // 会場表示の高さ（鳥取大学=ロゴ+テキスト、それ以外=会場ロゴ）
+  const venueTopY = paddingY + 42;
+  let venueH = 0;
+  if (isTottoriUniv(venue)) {
+    venueH = 30;
+  } else if (venueLogo) {
+    const vRatio = venueLogo.width / venueLogo.height;
+    let vH = 48;
+    let vW = vH * vRatio;
+    if (vW > 230) { vW = 230; vH = vW / vRatio; }
+    venueH = vH;
+  }
+  const headerH = Math.max(65, (venueTopY - paddingY) + venueH + 14);
   const colHeaderH = 34;
   const rowH = 76;
   const nameColW = 260;
@@ -77,12 +117,15 @@ export async function generateLeagueResultDataUrl(
   // ---- ページヘッダー ----
   const pLId = league.leagueId.trim();
   // リーグバッジ風
-  drawRoundRect(paddingX, paddingY - 10, 52, 52, 12, '#10b981');
+  drawRoundRect(paddingX, paddingY - 10, 52, 52, 12, SKY.badge);
   drawText(pLId, paddingX + 26, paddingY + 16, 32, 'center', '#ffffff', true);
   drawText('リーグ', paddingX + 65, paddingY + 28, 16, 'left', '#64748b', true);
-  
+
   // 大会名
   drawText(tournamentName, paddingX + tableW, paddingY + 24, 20, 'right', '#334155', true);
+
+  // 大会名の下に会場表示（他大会の結果画像と同じ意匠）
+  drawVenueBadge(ctx, { venue, rightX: paddingX + tableW, topY: venueTopY, venueLogo, tottoriLogo });
 
   // ---- 表全体枠（影付け） ----
   const tableX = paddingX;
@@ -104,15 +147,15 @@ export async function generateLeagueResultDataUrl(
   ctx.arcTo(tableX, tableY + colHeaderH, tableX, tableY, 0);
   ctx.arcTo(tableX, tableY, tableX + tableW, tableY, 12);
   ctx.clip();
-  ctx.fillStyle = '#f0fdf4'; // 薄いグリーン
+  ctx.fillStyle = SKY.headerBg; // 薄い水色
   ctx.fillRect(tableX, tableY, tableW, colHeaderH);
   ctx.restore();
 
   // ---- 列ヘッダー区切り線 ----
-  drawLine(tableX, tableY + colHeaderH, tableX + tableW, tableY + colHeaderH, '#10b981', 1.5);
+  drawLine(tableX, tableY + colHeaderH, tableX + tableW, tableY + colHeaderH, SKY.headerLine, 1.5);
 
   // 列ヘッダーテキスト
-  const thColor = '#166534';
+  const thColor = SKY.headerText;
   drawText('選手名', tableX + nameColW / 2, tableY + colHeaderH / 2, 13, 'center', thColor, true);
   
   for (let i = 0; i < teamCount; i++) {
@@ -243,8 +286,9 @@ export async function exportLeagueResultJpeg(
   matches: LeagueMatchScore[],
   allTeams: MixedTeam[],
   tournamentName: string,
+  venue?: string,
 ) {
-  const dataUrl = await generateLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName);
+  const dataUrl = await generateLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, venue);
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${league.leagueId.trim()}リーグ結果.jpg`;

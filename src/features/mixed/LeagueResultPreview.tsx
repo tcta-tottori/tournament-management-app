@@ -10,9 +10,11 @@ interface Props {
   matches: LeagueMatchScore[];
   allTeams: MixedTeam[];
   tournamentName: string;
+  /** 会場名（大会名の下に会場ロゴを表示する） */
+  venue?: string;
 }
 
-export function LeagueResultPreview({ league, standings, matches, allTeams, tournamentName }: Props) {
+export function LeagueResultPreview({ league, standings, matches, allTeams, tournamentName, venue }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +26,7 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
     let isMounted = true;
     setIsLoading(true);
     
-    generateLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName)
+    generateLeagueResultDataUrl(league, standings, matches, allTeams, tournamentName, venue)
       .then(url => {
         if (isMounted) {
           setDataUrl(url);
@@ -37,7 +39,7 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
       });
       
     return () => { isMounted = false; };
-  }, [isOpen, dataUrl, league, standings, matches, allTeams, tournamentName]);
+  }, [isOpen, dataUrl, league, standings, matches, allTeams, tournamentName, venue]);
 
   const handleDownload = () => {
     if (!dataUrl) return;

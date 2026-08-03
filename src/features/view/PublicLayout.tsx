@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList, RefreshCw, Activity } from 'lucide-react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Trophy, Swords, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList, RefreshCw, Activity, BarChart2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -11,8 +11,10 @@ import HeaderBackdrop from '../../components/layout/HeaderBackdrop';
 
 /**
  * 参加者・HP訪問者向け公開ビューのレイアウト（読み取り専用）。
- * - 個人戦: 本アプリと同じヘッダー＋流れる表示＋ハンバーガーメニュー（ドロー / ダッシュボード の2項目）
- * - 団体戦/ミックス: 従来のタブUI（予選リーグ / 全トーナメント / LIVE）
+ * 個人戦・団体戦/ミックスとも操作画面と同じヘッダー＋流れる表示＋
+ * ハンバーガーメニュー（タブ）で統一する。表示するタブだけを大会種別で切り替える。
+ * - 個人戦: ライブスコア / ドロー / 対戦順 / ダッシュボード
+ * - 団体戦/ミックス: 予選リーグ / 決勝トーナメント / LIVE
  */
 export default function PublicLayout() {
   const location = useLocation();
@@ -23,6 +25,14 @@ export default function PublicLayout() {
   const teamInfo = useTeamStore(s => s.tournamentInfo);
   const groupInfo = mixedInfo || teamInfo;
   const isGroup = !!groupInfo;
+
+  // 団体戦/ミックスの流れる表示用データ
+  const mixedLeagues = useMixedStore(s => s.leagues);
+  const mixedLeagueMatches = useMixedStore(s => s.leagueMatches);
+  const mixedBrackets = useMixedStore(s => s.brackets);
+  const teamLeagues = useTeamStore(s => s.leagues);
+  const teamLeagueMatches = useTeamStore(s => s.leagueMatches);
+  const teamBrackets = useTeamStore(s => s.brackets);
 
   // 個人戦: 同期で受信した選択中大会
   const currentTournamentId = useAppStore(s => s.currentTournamentId);
@@ -87,8 +97,15 @@ export default function PublicLayout() {
     }
   }, [isGroup, individualTournament, location.pathname, location.search, navigate]);
 
+  // 団体戦/ミックスなのに個人戦用ルートに居る場合は予選リーグへ寄せる
+  useEffect(() => {
+    if (isGroup && /\/(draw|order|livescore)$/.test(location.pathname)) {
+      navigate(`/view/league${location.search}`, { replace: true });
+    }
+  }, [isGroup, location.pathname, location.search, navigate]);
+
   // 個人戦の流れる表示（本アプリと同じ内容）
-  const tickerItems = useMemo(() => {
+  const individualTickerItems = useMemo(() => {
     const items: string[] = [];
     if (allMatches.length === 0 && courts.length === 0) return items;
     const playing = allMatches.filter(m => m.status === 'playing');
@@ -114,23 +131,61 @@ export default function PublicLayout() {
     return items;
   }, [allMatches, courts, matchDuration, now]);
 
-  // ============================ 団体戦/ミックス: 従来のタブUI ============================
-  if (isGroup) {
-    return <GroupTabsLayout info={groupInfo!} sync={sync} />;
-  }
+  // 団体戦/ミックスの流れる表示（操作画面と同じ内容）
+  const groupTickerItems = useMemo(() => {
+    if (!isGroup) return [];
+    const isMixed = !!mixedInfo;
+    const leagues: { leagueId: string }[] = isMixed ? mixedLeagues : teamLeagues;
+    const leagueMatches: { leagueId: string; status: string }[] = isMixed ? mixedLeagueMatches : teamLeagueMatches;
+    const brackets: { matches: { status: string }[] }[] = isMixed ? mixedBrackets : teamBrackets;
+    const unit = isMixed ? '試合' : '対戦';
+    if (leagueMatches.length === 0) return [];
 
-  // ============================ 個人戦: 本アプリ同様のヘッダー＋ハンバーガー ============================
-  const info = individualTournament
-    ? { name: individualTournament.name, date: individualTournament.date, venue: individualTournament.venue }
-    : null;
+    const items: string[] = [];
+    const finished = leagueMatches.filter(m => m.status === 'finished').length;
+    const total = leagueMatches.length;
+    items.push(`予選リーグ: ${finished}/${total}${unit}完了 (${Math.round((finished / total) * 100)}%)`);
+
+    const isLeagueComplete = (leagueId: string) => {
+      const lm = leagueMatches.filter(m => m.leagueId === leagueId);
+      return lm.length > 0 && lm.every(m => m.status === 'finished');
+    };
+    const completedLeagues = leagues.filter(l => isLeagueComplete(l.leagueId));
+    if (completedLeagues.length > 0) {
+      items.push(`${completedLeagues.length}/${leagues.length}リーグ完了 (${completedLeagues.map(l => l.leagueId.trim()).join(',')})`);
+    }
+
+    // 全リーグ完了時のみ決勝トーナメントの進捗を表示（未完了時は旧データの可能性）
+    const allLeaguesComplete = leagues.every(l => isLeagueComplete(l.leagueId));
+    if (brackets.length > 0 && allLeaguesComplete) {
+      const bFinished = brackets.reduce((sum, b) => sum + b.matches.filter(m => m.status === 'finished' || m.status === 'bye').length, 0);
+      const bTotal = brackets.reduce((sum, b) => sum + b.matches.length, 0);
+      items.push(`決勝トーナメント: ${bFinished}/${bTotal}${unit}完了`);
+    }
+    return items;
+  }, [isGroup, mixedInfo, mixedLeagues, mixedLeagueMatches, mixedBrackets, teamLeagues, teamLeagueMatches, teamBrackets]);
+
+  // ============================ 操作画面と同じヘッダー＋タブ（ハンバーガー） ============================
+  const info = isGroup
+    ? groupInfo!
+    : individualTournament
+      ? { name: individualTournament.name, date: individualTournament.date, venue: individualTournament.venue }
+      : null;
   const tournamentName = info?.name?.replace(/\(.*?\)|（.*?）/g, '').trim() || '';
+  const tickerItems = isGroup ? groupTickerItems : individualTickerItems;
 
-  const menuItems = [
-    { path: '/view/livescore', label: 'ライブスコア', icon: Activity },
-    { path: '/view/draw', label: 'ドロー', icon: Network },
-    { path: '/view/order', label: '対戦順', icon: ClipboardList },
-    { path: '/view/live', label: 'ダッシュボード', icon: Radio },
-  ];
+  const menuItems = isGroup
+    ? [
+        { path: '/view/league', label: '予選リーグ', icon: Swords },
+        { path: '/view/bracket', label: '決勝トーナメント', icon: Trophy },
+        { path: '/view/live', label: 'LIVE', icon: BarChart2 },
+      ]
+    : [
+        { path: '/view/livescore', label: 'ライブスコア', icon: Activity },
+        { path: '/view/draw', label: 'ドロー', icon: Network },
+        { path: '/view/order', label: '対戦順', icon: ClipboardList },
+        { path: '/view/live', label: 'ダッシュボード', icon: Radio },
+      ];
   const current = menuItems.find(mi => location.pathname.startsWith(mi.path)) || menuItems[0];
   const CurrentIcon = current.icon;
   const go = (path: string) => { navigate(`${path}${location.search}`); setMenuOpen(false); };
@@ -211,7 +266,13 @@ export default function PublicLayout() {
           </div>
         ) : (
           <div key={location.pathname} className="page-enter min-h-full pb-24 [padding-bottom:calc(6rem_+_env(safe-area-inset-bottom))]">
-            <Outlet />
+            {isGroup ? (
+              <div className="max-w-7xl w-full mx-auto px-3 md:px-4 py-4">
+                <Outlet />
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </div>
         )}
       </main>
@@ -264,51 +325,6 @@ function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
           <p className="text-gray-400 text-xs mt-1">運営端末で発行された観戦用URLからアクセスしてください。</p>
         </>
       )}
-    </div>
-  );
-}
-
-/** 団体戦/ミックス向けの従来タブUI */
-function GroupTabsLayout({ info, sync }: { info: { name: string; date?: string; venue?: string }; sync: ReturnType<typeof usePublicSync> }) {
-  const tabs = [
-    { to: 'league', label: '予選リーグ', icon: Users },
-    { to: 'bracket', label: '全トーナメント', icon: Trophy },
-    { to: 'live', label: 'LIVE', icon: Radio },
-  ];
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-t-lg transition-all border-b-2 ${
-      isActive ? 'bg-white text-emerald-700 border-emerald-500' : 'bg-white/10 text-white/80 border-transparent hover:bg-white/20'
-    }`;
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-700 text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2">
-                <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-300" />
-                {info.name || '大会情報'}
-              </h1>
-              <p className="text-[11px] md:text-xs text-white/80 mt-0.5">{[info.date, info.venue].filter(Boolean).join(' / ')}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {sync.hasRoom && <SyncBadge sync={sync} />}
-              <span className="text-[10px] md:text-xs bg-white/15 border border-white/20 rounded-full px-2.5 py-1 font-bold">観戦用ページ</span>
-            </div>
-          </div>
-          <nav className="flex gap-1 mt-4 -mb-[2px]" aria-label="公開ビュータブ">
-            {tabs.map(t => (
-              <NavLink key={t.to} to={t.to} className={linkClass}>
-                <t.icon className="w-4 h-4" /><span>{t.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-      </header>
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-4 py-4">
-        <Outlet />
-      </main>
-      <footer className="text-center text-[10px] text-gray-400 py-3">大会運営統合Webアプリケーション</footer>
     </div>
   );
 }

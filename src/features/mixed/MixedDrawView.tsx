@@ -492,6 +492,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                       matches={leagueMatches}
                       allTeams={allTeams}
                       tournamentName={tournamentInfo?.name || ''}
+                      venue={tournamentInfo?.venue}
                     />
                   )}
                   <span className="text-xs text-gray-500">{finishedCount}/{totalCount}</span>

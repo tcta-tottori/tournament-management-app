@@ -358,7 +358,7 @@ export default function MixedLeagueView() {
                     onClick={() => {
                       const allTeams = useMixedStore.getState().allTeams;
                       const tName = tournamentInfo?.name || '';
-                      exportLeagueResultJpeg(selectedLeague, standings, leagueMatchList, allTeams, tName);
+                      exportLeagueResultJpeg(selectedLeague, standings, leagueMatchList, allTeams, tName, tournamentInfo?.venue);
                     }}
                     className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-white/25 rounded-lg hover:bg-white/35 transition-colors font-bold"
                   >
