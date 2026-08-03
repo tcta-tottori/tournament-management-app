@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { startLiveScore } from '../livescore/liveScoreApi';
+import { useVisualViewport } from '../../components/ui/useVisualViewport';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -103,6 +104,8 @@ function focusAndSelect(el: HTMLInputElement | null | undefined) {
   if (!el) return;
   el.focus();
   el.select();
+  // キーボードで隠れた位置にあってもスクロールして見えるようにする
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +150,11 @@ export default function ScoreInputDialog({
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const scoreBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // ソフトキーボードが出ている間も、見えている領域にダイアログ全体を収める
+  const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(!!match);
 
   const { isSpeaking, speak, stop } = useGeminiTts();
   const navigate = useNavigate();
@@ -236,6 +244,22 @@ export default function ScoreInputDialog({
     timerRef.current = setInterval(update, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [match?.matchId, match?.status, match?.updatedAt]);
+
+  // キーボードが開いたら、入力中の欄（無ければスコア入力ブロック）を見える位置へスクロール
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const body = bodyRef.current;
+    if (!body) return;
+    const active = document.activeElement;
+    const target = active instanceof HTMLElement && body.contains(active)
+      ? active
+      : scoreBoxRef.current;
+    // キーボードのアニメーション後に位置が確定するので、次フレームで合わせる
+    const id = requestAnimationFrame(() => {
+      target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [keyboardOpen, viewportHeight]);
 
   // タイブレーク判定（各セット）— 6-6 TB (7-6) & 8-8 TB (9-8) に対応
   const tiebreakFlags = useMemo(() => {
@@ -735,17 +759,22 @@ export default function ScoreInputDialog({
   const roundName = getRoundName(match.round);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
+    // キーボード表示中は visualViewport の高さ・位置に合わせ、見えている領域だけを使う
+    <div
+      className="fixed left-0 right-0 z-[100] flex items-center justify-center p-2 sm:p-4"
+      style={{ top: viewportOffsetTop, height: viewportHeight || undefined }}
+      onClick={onClose}
+    >
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
 
-      {/* Dialog */}
+      {/* Dialog — ヘッダー / スクロール本文 / 固定フッター の3段構成 */}
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 m-auto shrink-0"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg max-h-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 sm:px-6 py-3 sm:py-4">
+        <div className={`shrink-0 bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 sm:px-6 ${keyboardOpen ? 'py-2' : 'py-3 sm:py-4'}`}>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 text-primary-200 text-xs">
@@ -762,7 +791,7 @@ export default function ScoreInputDialog({
           </div>
 
           {/* ステータスと経過時間 */}
-          <div className="flex items-center gap-3 mt-3">
+          <div className={`flex items-center gap-3 ${keyboardOpen ? 'mt-1.5' : 'mt-3'}`}>
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCfg.bg} ${statusCfg.text}`}>
               {statusCfg.label}
             </span>
@@ -778,9 +807,12 @@ export default function ScoreInputDialog({
           </div>
         </div>
 
+        {/* 本文（キーボードで高さが足りない時はここだけがスクロールする） */}
+        <div ref={bodyRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+
         {/* ゲームルール表示 */}
         {gameRuleText && (
-          <div className="px-4 sm:px-6 pt-3 pb-0">
+          <div className={`px-4 sm:px-6 pb-0 ${keyboardOpen ? 'pt-2' : 'pt-3'}`}>
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
               <BookOpen className="w-4 h-4 text-amber-600 shrink-0" />
               <span className="text-xs font-bold text-amber-800">{gameRuleText}</span>
@@ -789,7 +821,7 @@ export default function ScoreInputDialog({
         )}
 
         {/* Players */}
-        <div className="px-4 sm:px-6 py-4 sm:py-5">
+        <div className={`px-4 sm:px-6 ${keyboardOpen ? 'py-2' : 'py-4 sm:py-5'}`}>
           {(() => {
             const isP1Winner = isFinished && match.winnerEntryId === match.player1EntryId;
             const isP2Winner = isFinished && match.winnerEntryId === match.player2EntryId;
@@ -826,8 +858,8 @@ export default function ScoreInputDialog({
         </div>
 
         {/* Score Input — コート未選択・未開始でもスコアを入力できる */}
-        <div className="px-4 sm:px-6 pb-4">
-          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-3">
+        <div ref={scoreBoxRef} className={`px-4 sm:px-6 ${keyboardOpen ? 'pb-2' : 'pb-4'} scroll-mt-2`}>
+          <div className={`bg-gray-50 rounded-xl space-y-3 ${keyboardOpen ? 'p-3' : 'p-3 sm:p-4'}`}>
             {/* コート — 終了後は非表示 */}
             {!isFinished && (
               <div className="flex items-center gap-2 sm:gap-3">
@@ -1024,52 +1056,14 @@ export default function ScoreInputDialog({
               {hasLiveScore ? 'ライブスコアを再開' : 'ライブスコア開始'}
               <span className="text-[10px] font-bold bg-white/20 rounded-full px-2 py-0.5">観戦ページへ配信</span>
             </button>
-            <p className="mt-1.5 text-[10px] text-gray-400 text-center">
-              専用画面が開き、1タップ＝1ポイントで観戦ページへリアルタイム配信します
-            </p>
+            {/* キーボード表示中は説明文を省いて高さを稼ぐ */}
+            {!keyboardOpen && (
+              <p className="mt-1.5 text-[10px] text-gray-400 text-center">
+                専用画面が開き、1タップ＝1ポイントで観戦ページへリアルタイム配信します
+              </p>
+            )}
           </div>
         )}
-
-        {/* ===== エントリー（結果入力）ボタン ===== */}
-        <div className="px-4 sm:px-6 pb-3 space-y-2">
-          {/* 準備完了 / 試合開始 */}
-          {(canReady || canStart) && (
-            <div className="flex gap-2">
-              {canReady && (
-                <button onClick={handleReadyMatch} disabled={isProcessing}
-                  className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
-                  <Check className="w-5 h-5" /> 準備完了
-                </button>
-              )}
-              {canStart && (
-                <button onClick={handleStartMatch} disabled={isProcessing}
-                  className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
-                  <Play className="w-5 h-5" /> 試合開始
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* 結果確定ボタン（負け側のスコアを入れると勝者側が自動入力され、勝者は自動判定） */}
-          {canFinish && (
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5 text-primary-500" />
-                結果を確定
-              </span>
-              {autoWinner && !scoreValidationError ? (
-                <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
-                  className="w-full inline-flex items-center justify-center gap-2 text-base font-bold px-4 py-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-primary-500/25 min-h-[56px]">
-                  <Trophy className="w-5 h-5" /> 結果確定（{autoWinner === 1 ? match.player1Name : match.player2Name} 勝利）
-                </button>
-              ) : (
-                <div className="w-full text-center text-[11px] text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xl py-3">
-                  負け側のスコアを入力すると勝者側が自動入力され、確定できます
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* ===== DEF（棄権）ボタン ===== */}
         {!isFinished && (
@@ -1133,6 +1127,54 @@ export default function ScoreInputDialog({
             )}
           </div>
         </div>
+
+        </div>{/* /本文スクロール領域 */}
+
+        {/* ===== フッター（試合開始・結果確定）— キーボード表示中も常に見える ===== */}
+        {(canReady || canStart || canFinish) && (
+          <div className={`shrink-0 border-t border-gray-100 bg-white px-4 sm:px-6 space-y-2 ${keyboardOpen ? 'py-2' : 'py-3'}`}>
+            {/* 準備完了 / 試合開始 */}
+            {(canReady || canStart) && (
+              <div className="flex gap-2">
+                {canReady && (
+                  <button onClick={handleReadyMatch} disabled={isProcessing}
+                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                    <Check className="w-5 h-5" /> 準備完了
+                  </button>
+                )}
+                {canStart && (
+                  <button onClick={handleStartMatch} disabled={isProcessing}
+                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                    <Play className="w-5 h-5" /> 試合開始
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* 結果確定ボタン（負け側のスコアを入れると勝者側が自動入力され、勝者は自動判定） */}
+            {canFinish && (
+              <div className="space-y-2">
+                {/* キーボード表示中は見出しを省いて確定ボタンを優先表示する */}
+                {!keyboardOpen && (
+                  <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                    <Trophy className="w-3.5 h-3.5 text-primary-500" />
+                    結果を確定
+                  </span>
+                )}
+                {autoWinner && !scoreValidationError ? (
+                  <button onClick={() => handleFinishMatch(autoWinner)} disabled={isProcessing}
+                    className={`w-full inline-flex items-center justify-center gap-2 text-base font-bold px-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-primary-500/25 ${keyboardOpen ? 'py-3 min-h-[48px]' : 'py-4 min-h-[56px]'}`}>
+                    <Trophy className="w-5 h-5" /> 結果確定（{autoWinner === 1 ? match.player1Name : match.player2Name} 勝利）
+                  </button>
+                ) : (
+                  <div className={`w-full text-center text-[11px] text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xl ${keyboardOpen ? 'py-2' : 'py-3'}`}>
+                    負け側のスコアを入力すると勝者側が自動入力され、確定できます
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* コール設定ポップアップ（コート・開始時刻・読み（フリガナ）を事前に確認・修正してからコール） */}
