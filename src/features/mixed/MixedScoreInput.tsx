@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Save, Trash2, AlertTriangle, Ban } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { useVisualViewport } from '../../components/ui/useVisualViewport';
 import type { LeagueMatchScore, MixedTeam } from './types';
 
 /** Full-width to half-width number conversion */
@@ -95,6 +96,9 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
   const score2Ref = useRef<HTMLInputElement>(null);
   const tiebreakRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+
+  // ソフトキーボードが出ている間も、見えている領域（＝画面上半分）にポップアップ全体を収める
+  const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(true);
 
   const gameRule = useMemo(() => {
     const teamCount = teams.length;
@@ -272,14 +276,20 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
     : 'border-emerald-300';
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/40 z-[100]" onClick={onClose}>
+    // キーボード表示中は visualViewport の高さ・位置に合わせ、見えている領域（画面上半分）いっぱいに表示する
+    <div
+      className={`fixed left-0 right-0 z-[100] flex justify-center p-2 sm:p-4 ${keyboardOpen ? 'items-start' : 'items-center'}`}
+      style={{ top: viewportOffsetTop, height: viewportHeight || undefined }}
+      onClick={onClose}
+    >
+      <div className="fixed inset-0 bg-black/40" />
       <div
         ref={popupRef}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-[110]"
+        className={`relative bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] max-h-full flex flex-col overflow-hidden z-[110] ${keyboardOpen ? 'h-full' : ''}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-5 py-2.5">
+        <div className={`shrink-0 bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-5 ${keyboardOpen ? 'py-1.5' : 'py-2.5'}`}>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-sm">スコア入力</h3>
@@ -293,23 +303,24 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           </div>
         </div>
 
-        <div className="p-4">
+        {/* Body（キーボードで狭くなったときだけスクロールする） */}
+        <div className={`flex-1 min-h-0 overflow-y-auto ${keyboardOpen ? 'px-4 py-2' : 'p-4'}`}>
           {/* Game rule display */}
           {gameRule && (
-            <div className="mb-3 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className={`px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
               <div className="text-[11px] text-amber-700 font-medium">{gameRule}</div>
             </div>
           )}
 
           {/* Match card */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+          <div className={`flex items-center gap-3 ${keyboardOpen ? 'mb-2' : 'mb-4'}`}>
+            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team1?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team1?.male.name}</div>
               <div className="text-xs text-gray-700">{team1?.female.name}</div>
             </div>
             <div className="text-lg font-bold text-gray-300">VS</div>
-            <div className={`flex-1 text-center p-2.5 rounded-xl border-2 transition-all ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team2?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team2?.male.name}</div>
               <div className="text-xs text-gray-700">{team2?.female.name}</div>
@@ -317,7 +328,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           </div>
 
           {/* Score input */}
-          <div className="flex items-center justify-center gap-2 mb-3">
+          <div className={`flex items-center justify-center gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
             {isTiebreak && loserSide === 1 && (
               <div className="flex flex-col items-center">
                 <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
@@ -368,16 +379,8 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
             </div>
           )}
 
-          {/* Save button */}
-          <button
-            onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98]"
-          >
-            <Save size={14} />決定
-          </button>
-
           {/* DEF buttons */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className={`grid grid-cols-2 gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
             <button
               onClick={() => match.team2Id && handleDEF(match.team2Id)}
               className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
@@ -396,14 +399,23 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
             </button>
           </div>
 
-          {/* Clear / Cancel */}
-          <div className="flex gap-3">
+        </div>
+
+        {/* Footer（決定は常に見える位置に固定する） */}
+        <div className={`shrink-0 border-t border-gray-100 bg-white px-4 ${keyboardOpen ? 'py-2 space-y-1.5' : 'py-3 space-y-2'}`}>
+          <button
+            onClick={handleSave}
+            className={`w-full flex items-center justify-center gap-2 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-bold active:scale-[0.98] ${keyboardOpen ? 'py-2.5 min-h-[44px]' : 'py-3 min-h-[48px]'}`}
+          >
+            <Save size={14} />決定
+          </button>
+          <div className="flex gap-2">
             {match.status === 'finished' && (
-              <button onClick={handleClear} className="flex items-center gap-1 px-4 py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98]">
+              <button onClick={handleClear} className={`flex items-center gap-1 px-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98] ${keyboardOpen ? 'py-2 min-h-[40px]' : 'py-2.5 min-h-[48px]'}`}>
                 <Trash2 size={14} />クリア
               </button>
             )}
-            <button onClick={onClose} className="flex-1 px-4 py-2.5 min-h-[48px] bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98]">
+            <button onClick={onClose} className={`flex-1 px-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm active:scale-[0.98] ${keyboardOpen ? 'py-2 min-h-[40px]' : 'py-2.5 min-h-[48px]'}`}>
               キャンセル
             </button>
           </div>
