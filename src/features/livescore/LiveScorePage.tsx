@@ -5,25 +5,26 @@
 // 1タップ＝1ポイントで進行し、更新はそのまま観戦ページへ配信される。
 // =============================================
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   ArrowLeft, Undo2, RefreshCw, Trophy, Wifi, WifiOff, Radio,
-  Minus, Plus, Repeat, Trash2, Gauge, SlidersHorizontal,
+  Minus, Plus, Repeat, Trash2, SlidersHorizontal,
 } from 'lucide-react';
 import { db } from '../../db/database';
 import type { LiveScore, LiveScoreConfig, MatchFormatType } from '../../db/database';
 import { useSyncStore } from '../sync/syncStore';
 import LiveScoreBoard from './LiveScoreBoard';
 import {
-  adjustGames, awardPoint, describeConfig, pointLabel, setServer, summarize, toggleServer, wonSets,
+  adjustGames, awardPoint, describeConfig, pointLabel, setServer, summarize, toggleServer,
   type ScoreState,
 } from './liveScoreEngine';
 import {
   deleteLiveScore, finalizeLiveScore, revertLiveScoreResult, saveScoreState, updateLiveScoreConfig,
 } from './liveScoreApi';
 import { useNow } from './useNow';
+import { usePlayerNumbers } from './usePlayerNumbers';
 
 /** 状態から ScoreState 部分だけを取り出す */
 function toState(live: LiveScore): ScoreState {
@@ -63,7 +64,6 @@ export default function LiveScorePage() {
 
   const connectionState = useSyncStore(s => s.connectionState);
   const roomCode = useSyncStore(s => s.roomCode);
-  const latencyMs = useSyncStore(s => s.latencyMs);
 
   /** 「1つ戻す」用の履歴（この画面を開いている間のみ保持） */
   const historyRef = useRef<ScoreState[]>([]);
@@ -80,6 +80,9 @@ export default function LiveScorePage() {
     if (rows.length === 0) return null;
     return (eventId ? rows.find(r => r.eventId === eventId) : undefined) ?? rows[0];
   }, [matchId, eventId]);
+
+  /** 選手番号（スコアボードのタップボタンも結果表と同じ並びで出す） */
+  const numbers = usePlayerNumbers(live);
 
   // 画面が開いている間は端末をスリープさせない（コートサイドでの入力用）
   useEffect(() => {
@@ -185,8 +188,6 @@ export default function LiveScorePage() {
     navigate(-1);
   }, [live, navigate]);
 
-  const sets = useMemo(() => (live ? wonSets(live) : { p1: 0, p2: 0 }), [live]);
-
   if (!matchId) {
     return <CenteredNotice text="ライブスコアの対象試合が指定されていません。" onBack={() => navigate(-1)} />;
   }
@@ -244,17 +245,9 @@ export default function LiveScorePage() {
 
       {/* スコアボード（観戦ページと同じ見た目） */}
       <div className="px-3 pt-4 pb-2">
-        <LiveScoreBoard live={live} size="lg" showMeta={false} />
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/50">
-          <span>経過 {formatElapsed(now - live.startedAt)}</span>
-          <span>{describeConfig(live.config)}</span>
-          <span>セット {sets.p1}-{sets.p2}</span>
-          {latencyMs != null && (
-            <span className="flex items-center gap-1">
-              <Gauge className="w-3 h-3" />配信遅延 約{latencyMs}ms
-            </span>
-          )}
-        </div>
+        <LiveScoreBoard live={live} size="lg" />
+        {/* スコアはボードに出ているので、ここは経過時間だけにする */}
+        <p className="mt-2 text-[11px] text-white/50">経過 {formatElapsed(now - live.startedAt)}</p>
       </div>
 
       {/* ポイント入力 */}
@@ -264,7 +257,7 @@ export default function LiveScorePage() {
             {([1, 2] as const).map(p => {
               const name = p === 1 ? live.player1Name : live.player2Name;
               const aff = p === 1 ? live.player1Affiliation : live.player2Affiliation;
-              const num = p === 1 ? live.player1Number : live.player2Number;
+              const num = p === 1 ? numbers.p1 : numbers.p2;
               return (
                 <button
                   key={p}

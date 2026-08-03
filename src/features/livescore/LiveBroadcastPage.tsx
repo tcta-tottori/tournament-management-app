@@ -17,7 +17,6 @@ import type { LiveScore, Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../sync/syncStore';
 import LiveScoreBoard from './LiveScoreBoard';
-import { summarize } from './liveScoreEngine';
 import { deleteLiveScore, startLiveScore, updateLiveScoreCourt } from './liveScoreApi';
 import { resolveRequiredGames } from '../score/gameRules';
 import { getGameRuleText, getMatchFormat, getRoundName } from '../score/roundRules';
@@ -273,15 +272,10 @@ export default function LiveBroadcastPage() {
             return (
               <div key={`${live.eventId}-${live.matchId}`} className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
                 <LiveScoreBoard live={live} size="sm" />
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />{live.courtName || 'コート未割当'}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />経過 {formatElapsed(now - live.startedAt)}
-                  </span>
-                  <span>スコア {summarize(live, live.config) || '—'}</span>
-                </div>
+                {/* スコア・コートはボードに出ているので、ここは経過時間だけにする */}
+                <p className="mt-2 flex items-center gap-1 text-[11px] text-gray-500">
+                  <Clock className="w-3 h-3" />経過 {formatElapsed(now - live.startedAt)}
+                </p>
                 {courtChanged && (
                   <button
                     onClick={() => void handleSyncCourt(live, match!)}
@@ -321,9 +315,7 @@ export default function LiveBroadcastPage() {
             <div key={`${live.eventId}-${live.matchId}`} className="bg-gray-50 rounded-xl border border-gray-200 p-3">
               <LiveScoreBoard live={live} size="sm" />
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-gray-500 flex-1">
-                  最終スコア {summarize(live, live.config) || '—'}
-                </span>
+                <span className="flex-1" />
                 <button
                   onClick={() => void handleResume(live)}
                   disabled={busyKey === `resume-${live.id}`}

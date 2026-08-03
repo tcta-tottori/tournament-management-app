@@ -10,7 +10,6 @@ import { Radio, Clock } from 'lucide-react';
 import { db } from '../../db/database';
 import { useSyncStore } from '../sync/syncStore';
 import LiveScoreBoard from '../livescore/LiveScoreBoard';
-import { summarize } from '../livescore/liveScoreEngine';
 import { useNow } from '../livescore/useNow';
 
 /** 終了後もこの時間だけ FINAL 表示で残す */
@@ -72,14 +71,9 @@ export default function PublicLiveScoreView() {
         </div>
       ) : (
         <div className="space-y-5">
+          {/* 観戦ページはスコアボードだけを見せる（下に文字を足さない） */}
           {visible.map(l => (
-            <div key={`${l.eventId}-${l.matchId}`}>
-              <LiveScoreBoard live={l} size="md" />
-              <p className="mt-1 text-[11px] text-gray-500">
-                {l.status === 'finished' ? '最終スコア ' : 'スコア '}
-                <span className="font-bold text-gray-700">{summarize(l, l.config)}</span>
-              </p>
-            </div>
+            <LiveScoreBoard key={`${l.eventId}-${l.matchId}`} live={l} size="md" />
           ))}
         </div>
       )}
