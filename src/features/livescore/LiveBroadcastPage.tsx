@@ -10,13 +10,14 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
-  Radio, Wifi, WifiOff, Play, Square, Trash2, Gauge, Eye, MapPin, RefreshCw, Clock,
+  Radio, Wifi, WifiOff, Play, Square, Trash2, Gauge, Eye, MapPin, RefreshCw, Clock, Link2, Copy, Check,
 } from 'lucide-react';
 import { db } from '../../db/database';
 import type { LiveScore, Match } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../sync/syncStore';
 import LiveScoreBoard from './LiveScoreBoard';
+import type { EmbedTheme } from '../view/EmbedLiveScoreView';
 import { deleteLiveScore, startLiveScore, updateLiveScoreCourt } from './liveScoreApi';
 import { resolveRequiredGames } from '../score/gameRules';
 import { getGameRuleText, getMatchFormat, getRoundName } from '../score/roundRules';
@@ -38,6 +39,12 @@ export default function LiveBroadcastPage() {
   const connected = connectionState === 'connected';
 
   const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  // --- HP貼り付け用URLの発行設定 ---
+  const [showEmbed, setShowEmbed] = useState(false);
+  const [embedTheme, setEmbedTheme] = useState<EmbedTheme>('light');
+  const [embedHeight, setEmbedHeight] = useState(480);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const events = useLiveQuery(
     () => currentTournamentId
@@ -109,15 +116,48 @@ export default function LiveBroadcastPage() {
       });
   }, [matches, liveScores]);
 
-  /** 観戦ページ（ライブスコア）のURL */
-  const publicHref = useMemo(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  /** ルーム指定のクエリ（既定の公開ルームのときは付けない） */
+  const roomQuery = useMemo(() => {
     const qs = new URLSearchParams();
     if (syncEnabled && roomCode && roomCode !== PUBLIC_ROOM) qs.set('room', roomCode);
     if (syncEnabled && serverUrl && serverUrl !== DEFAULT_SERVER_URL) qs.set('server', serverUrl);
-    const q = qs.toString();
-    return `${base}/view/livescore${q ? `?${q}` : ''}`;
+    return qs;
   }, [syncEnabled, roomCode, serverUrl]);
+
+  /** 観戦ページ（大会全体）のURL */
+  const publicHref = useMemo(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const q = roomQuery.toString();
+    return `${base}/view/livescore${q ? `?${q}` : ''}`;
+  }, [roomQuery]);
+
+  /** HPに貼り付けるライブスコア専用ページの絶対URL */
+  const embedUrl = useMemo(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const qs = new URLSearchParams(roomQuery);
+    if (embedTheme !== 'light') qs.set('theme', embedTheme);
+    const q = qs.toString();
+    return `${window.location.origin}${base}/embed/livescore${q ? `?${q}` : ''}`;
+  }, [roomQuery, embedTheme]);
+
+  /** HPの記事に貼り付ける iframe のコード */
+  const embedCode = useMemo(
+    () =>
+      `<iframe src="${embedUrl}" title="ライブスコア" width="100%" height="${embedHeight}" `
+      + 'style="border:0;max-width:760px;" loading="lazy"></iframe>',
+    [embedUrl, embedHeight]
+  );
+
+  /** URL・埋め込みコードをクリップボードへ */
+  const handleCopy = useCallback(async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(cur => (cur === key ? null : cur)), 2000);
+    } catch {
+      window.prompt('コピーできませんでした。下のURLを選択してコピーしてください。', text);
+    }
+  }, []);
 
   const openInput = useCallback((live: LiveScore) => {
     navigate(`/live-score?match=${encodeURIComponent(live.matchId)}&event=${encodeURIComponent(live.eventId)}`);
@@ -229,6 +269,16 @@ export default function LiveBroadcastPage() {
           >
             <Eye className="w-3.5 h-3.5" />観戦ページを開く
           </a>
+          <button
+            onClick={() => setShowEmbed(v => !v)}
+            className={`flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-2.5 py-1.5 border transition-colors ${
+              showEmbed
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'text-primary-700 bg-primary-50 border-primary-200 hover:bg-primary-100'
+            }`}
+          >
+            <Link2 className="w-3.5 h-3.5" />ライブスコアのURLを発行
+          </button>
           {broadcasting.length > 0 && (
             <button
               onClick={() => void handleStopAll()}
@@ -244,6 +294,110 @@ export default function LiveBroadcastPage() {
             同期に接続していないため、入力はこの端末の中だけで記録されます。
             観戦ページへ配信するには、ヘッダーの同期からルームに接続してください。
           </p>
+        )}
+
+        {/* HP貼り付け用のURL発行 */}
+        {showEmbed && (
+          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+            <p className="text-[11px] text-gray-600 leading-relaxed">
+              ライブスコアだけを表示する専用ページです。ヘッダーやメニューは出ないので、
+              協会HPの記事にそのまま貼り付けられます。
+            </p>
+
+            {/* 表示設定 */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-gray-600">背景</span>
+                {([
+                  { v: 'light' as EmbedTheme, label: '白' },
+                  { v: 'dark' as EmbedTheme, label: '濃い緑' },
+                  { v: 'transparent' as EmbedTheme, label: '透明' },
+                ]).map(o => (
+                  <button
+                    key={o.v}
+                    onClick={() => setEmbedTheme(o.v)}
+                    className={`px-2 h-7 rounded-lg text-[11px] font-bold border transition-colors ${
+                      embedTheme === o.v
+                        ? 'bg-primary-600 border-primary-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
+                貼り付け枠の高さ
+                <input
+                  type="number"
+                  min={200}
+                  max={2000}
+                  step={40}
+                  value={embedHeight}
+                  onChange={e => setEmbedHeight(Math.min(2000, Math.max(200, Number(e.target.value) || 480)))}
+                  className="w-20 h-7 rounded-lg border border-gray-300 px-2 text-[11px] font-bold text-gray-800"
+                />
+                px
+              </label>
+            </div>
+
+            {/* URL */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-gray-600">観戦用URL（リンクとして案内する場合）</p>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={embedUrl}
+                  onFocus={e => e.currentTarget.select()}
+                  className="flex-1 min-w-0 h-8 rounded-lg border border-gray-300 bg-white px-2 text-[11px] text-gray-700 font-mono"
+                />
+                <button
+                  onClick={() => void handleCopy(embedUrl, 'url')}
+                  className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-white bg-primary-600 rounded-lg px-2.5 hover:brightness-110"
+                >
+                  {copiedKey === 'url' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedKey === 'url' ? 'コピーしました' : 'コピー'}
+                </button>
+                <a
+                  href={embedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-primary-700 bg-white border border-primary-200 rounded-lg px-2.5 hover:bg-primary-50"
+                >
+                  <Eye className="w-3.5 h-3.5" />確認
+                </a>
+              </div>
+            </div>
+
+            {/* iframe */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-gray-600">HP貼り付け用コード（記事内に埋め込む場合）</p>
+              <div className="flex gap-2">
+                <textarea
+                  readOnly
+                  value={embedCode}
+                  onFocus={e => e.currentTarget.select()}
+                  rows={3}
+                  className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-white p-2 text-[11px] text-gray-700 font-mono resize-y"
+                />
+                <button
+                  onClick={() => void handleCopy(embedCode, 'code')}
+                  className="shrink-0 self-start flex items-center gap-1 text-[11px] font-bold text-white bg-primary-600 rounded-lg px-2.5 py-2 hover:brightness-110"
+                >
+                  {copiedKey === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedKey === 'code' ? 'コピーしました' : 'コピー'}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              {roomQuery.get('room')
+                ? `ルーム ${roomQuery.get('room')} の配信に接続するURLです。ルームを変えると発行し直しになります。`
+                : '既定の公開ルームに接続するURLです。大会が変わってもURLはそのまま使えます。'}
+              <br />
+              ページを開いている間は自動更新されます（観戦者の操作は不要です）。
+            </p>
+          </div>
         )}
       </div>
 

@@ -5,36 +5,17 @@
 // テレビ中継風のスコアテロップでリアルタイム表示する。
 // =============================================
 
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Radio, Clock } from 'lucide-react';
-import { db } from '../../db/database';
 import { useSyncStore } from '../sync/syncStore';
 import LiveScoreBoard from '../livescore/LiveScoreBoard';
-import { useNow } from '../livescore/useNow';
-
-/** 終了後もこの時間だけ FINAL 表示で残す */
-const FINISHED_WINDOW_MS = 15 * 60 * 1000;
+import { useVisibleLiveScores } from '../livescore/useVisibleLiveScores';
 
 export default function PublicLiveScoreView() {
-  // 「◯秒前に更新」表示と FINAL の表示期限判定に使う時計
-  const now = useNow(5000);
-
   const lastSyncAt = useSyncStore(s => s.lastSyncAt);
   const latencyMs = useSyncStore(s => s.latencyMs);
 
-  const all = useLiveQuery(() => db.liveScores.toArray(), []) || [];
-
-  const visible = all
-    .filter(l => l.status === 'live' || now - l.updatedAt < FINISHED_WINDOW_MS)
-    .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'live' ? -1 : 1;
-      const ca = a.courtName || '￿';
-      const cb = b.courtName || '￿';
-      if (ca !== cb) return ca.localeCompare(cb, 'ja', { numeric: true });
-      return a.matchOrder - b.matchOrder;
-    });
-
-  const liveCount = visible.filter(l => l.status === 'live').length;
+  // 「◯秒前に更新」表示にも使うので now を受け取る
+  const { visible, liveCount, now } = useVisibleLiveScores();
 
   return (
     <div className="max-w-3xl mx-auto px-3 py-4 space-y-4">
