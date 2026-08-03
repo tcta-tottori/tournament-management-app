@@ -178,7 +178,7 @@ export default function PublicLayout() {
     ? [
         { path: '/view/league', label: '予選リーグ', icon: Swords },
         { path: '/view/bracket', label: '決勝トーナメント', icon: Trophy },
-        { path: '/view/live', label: 'LIVE', icon: BarChart2 },
+        { path: '/view/live', label: 'ダッシュボード', icon: BarChart2 },
       ]
     : [
         { path: '/view/livescore', label: 'ライブスコア', icon: Activity },

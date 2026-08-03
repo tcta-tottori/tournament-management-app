@@ -50,7 +50,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   { step: 6, icon: ClipboardList, label: '対戦順', title: '対戦順の生成', description: '試合一覧を自動生成、Web Speech API / VOICEVOX音声コールで選手呼出', timing: '大会当日' },
   { step: 7, icon: CalendarClock, label: '時間割', title: '時間割の自動生成', description: 'コート×時間帯のマトリックスに全試合を自動配置', timing: '試合開始前' },
   { step: 8, icon: MonitorPlay, label: 'スコア', title: 'スコア入力・試合進行', description: 'ブラケット/リーグ上で試合選択→スコア入力→勝者自動進出（2セット+STB対応）', timing: '試合中' },
-  { step: 9, icon: BarChart2, label: 'LIVE', title: 'ライブダッシュボード', description: '大会全体の進行状況、コートマップ、時間超過警告をリアルタイム監視', timing: '終日' },
+  { step: 9, icon: BarChart2, label: 'ダッシュボード', title: 'ライブダッシュボード', description: '大会全体の進行状況、コートマップ、時間超過警告をリアルタイム監視', timing: '終日' },
   { step: 10, icon: Save, label: 'バックアップ', title: 'バックアップ・結果保存', description: 'Google ドライブ・GitHub・ローカルにデータを保全、結果画像出力', timing: '大会前後' },
 ];
 

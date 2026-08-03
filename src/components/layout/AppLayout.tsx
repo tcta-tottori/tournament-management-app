@@ -31,7 +31,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-06b', path: '/schedule-sheet', label: 'タイムテーブル', icon: CalendarClock },
   { id: 'S-07', path: '/score', label: 'スコア', icon: Trophy },
   { id: 'S-07b', path: '/court-bracket', label: 'ドロー', icon: Network },
-  { id: 'S-09', path: '/dashboard', label: 'LIVE', icon: BarChart2 },
+  { id: 'S-09', path: '/dashboard', label: 'ダッシュボード', icon: BarChart2 },
   { id: 'S-09b', path: '/broadcast', label: 'ライブ配信', icon: Radio },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },

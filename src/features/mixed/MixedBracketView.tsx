@@ -7,6 +7,8 @@ import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } fro
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import CallPreviewDialog from './CallPreviewDialog';
 import { generateBracketDataUrl, generateResultDataUrl } from './exportBracketJpeg';
+import BracketTopBar from '../../components/ui/BracketTopBar';
+import { autoBracketStartRound, startRoundLabel } from './bracketRounds';
 
 /** 全角数字→半角変換 */
 function toHalfWidth(s: string): string {
@@ -217,6 +219,8 @@ export default function MixedBracketView() {
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
   const [viewMode, setViewMode] = useState<'bracket' | 'waiting'>('bracket');
   const [drawEditMode, setDrawEditMode] = useState(false);
+  // 表示回戦の手動指定（null = 自動: 決着済みの回戦を省略）。クラスごとに保持する。
+  const [roundOverride, setRoundOverride] = useState<{ category: PlacementCategory; value: number } | null>(null);
 
   const bracketGameRule = tournamentInfo?.bracketGameRule || '';
   // ドロー表のルールから初期値を自動設定
@@ -402,6 +406,31 @@ export default function MixedBracketView() {
   // 1位トーナメントかつ試合がまだ始まっていないかチェック
   const is1stBracket = selectedBracketCategory === '1st';
 
+  // クラス切替ヘッダー用のタブ（進捗つき）
+  const categoryTabs = CATEGORY_TABS.map(tab => {
+    const b = brackets.find(x => x.category === tab.id);
+    const nonBye = b?.matches.filter(m => !m.isBye) || [];
+    return {
+      id: tab.id,
+      label: `${tab.label}トーナメント`,
+      finished: nonBye.filter(m => m.status === 'finished').length,
+      total: nonBye.length,
+    };
+  }).filter(t => brackets.some(b => b.category === t.id));
+
+  // 表示回戦の絞り込み（回戦が進むと前半を隠して表示を縮小する）
+  const bracketTotalRounds = currentBracket ? Math.log2(currentBracket.drawSize) : 0;
+  const autoStartRound = currentBracket
+    ? autoBracketStartRound(currentBracket.matches, bracketTotalRounds)
+    : 0;
+  const maxStartRound = Math.max(0, bracketTotalRounds - 1);
+  const manualStartRound = roundOverride?.category === selectedBracketCategory ? roundOverride.value : null;
+  const startRound = Math.min(manualStartRound ?? autoStartRound, maxStartRound);
+  const canAdjustRounds = maxStartRound >= 1;
+  const startRoundLabelText = startRoundLabel(startRound, bracketTotalRounds);
+  const setStartRound = (value: number | null) =>
+    setRoundOverride(value == null ? null : { category: selectedBracketCategory, value });
+
 
   return (
     <div className="space-y-4">
@@ -436,39 +465,19 @@ export default function MixedBracketView() {
       )}
 
       {viewMode === 'bracket' && (<>
-      {/* カテゴリタブ */}
-      <div className="flex gap-2 overflow-x-auto">
-        {CATEGORY_TABS.map(tab => {
-          const Icon = tab.icon;
-          const bracket = brackets.find(b => b.category === tab.id);
-          const isActive = selectedBracketCategory === tab.id;
-          const nonByeMatches = bracket?.matches.filter(m => !m.isBye) || [];
-          const finished = nonByeMatches.filter(m => m.status === 'finished').length;
-          const total = nonByeMatches.length;
-
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedBracketCategory(tab.id)}
-              className={`
-                flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap
-                ${isActive
-                  ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }
-              `}
-            >
-              <Icon size={14} />
-              {tab.label}
-              {bracket && (
-                <span className={`text-[10px] ml-0.5 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
-                  ({finished}/{total})
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* クラス切替ヘッダー（シングルス大会と同じ形式・左右/スワイプ/ドット） */}
+      <BracketTopBar
+        tabs={categoryTabs}
+        selectedId={selectedBracketCategory}
+        onSelect={id => setSelectedBracketCategory(id as PlacementCategory)}
+        subtitle={bracketGameRule || undefined}
+        playing={Object.keys(bracketCourtAssignments).length}
+        canAdjustRounds={canAdjustRounds}
+        startRound={startRound}
+        maxStartRound={maxStartRound}
+        startRoundLabel={startRoundLabelText}
+        onStartRoundChange={setStartRound}
+      />
 
       {/* ドロー編集 / プレビュー / 賞状ボタン */}
       <div className="flex justify-end gap-2">
@@ -548,6 +557,7 @@ export default function MixedBracketView() {
           getRoundLabel={getRoundLabel}
           allTeams={useMixedStore.getState().allTeams}
           courtAssignments={bracketCourtAssignments}
+          startRound={drawEditMode ? 0 : startRound}
         />
       )}
 
@@ -1171,13 +1181,15 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments, compact = false }: {
+function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments, compact = false, startRound = 0 }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
   courtAssignments: Record<string, { courtName: string; startedAt: number }>;
   compact?: boolean;
+  /** 表示を始める回戦（0=1回戦から。1以上で前の回戦を隠して詰めて表示する） */
+  startRound?: number;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
@@ -1212,10 +1224,14 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
   };
 
   const totalRounds = Math.log2(bracket.drawSize);
-  const matchesByRound: BracketMatch[][] = [];
+  const allMatchesByRound: BracketMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) {
-    matchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
+    allMatchesByRound.push(bracket.matches.filter(m => m.round === r).sort((a, b) => a.position - b.position));
   }
+  // 決着済みの前半の回戦を隠し、残りを詰めて描画する（最低2列は残す）
+  const hiddenRounds = Math.min(Math.max(Math.floor(startRound), 0), Math.max(0, totalRounds - 1));
+  const matchesByRound = allMatchesByRound.slice(hiddenRounds);
+  const visibleRounds = matchesByRound.length;
 
   const MATCH_HEIGHT = compact ? 64 : 130;
   const BYE_HEIGHT = compact ? 28 : 56;
@@ -1297,15 +1313,16 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
     return 36 + matchIdx * spacing * GRID_UNIT + offset + MATCH_HEIGHT / 2;
   };
 
-  // SVG全体の高さ
+  // SVG全体の高さ（表示する先頭列の試合数で決まる）
   const r1count = matchesByRound[0]?.length || 0;
   const svgHeight = r1count * GRID_UNIT + 36;
+  const boardWidth = (MATCH_WIDTH + ROUND_GAP) * visibleRounds;
 
   return (
     <div className={`bg-white shadow-sm border border-gray-200 p-4 overflow-x-auto ${compact ? 'rounded-b-xl' : 'rounded-xl'}`}>
-      <div className="relative" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
+      <div className="relative" style={{ minWidth: boardWidth, height: svgHeight }}>
         {/* 接続線SVG */}
-        <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * totalRounds, height: svgHeight }}>
+        <svg className="absolute inset-0 pointer-events-none" style={{ width: boardWidth, height: svgHeight }}>
           {matchesByRound.slice(0, -1).map((roundMatches, roundIdx) => {
             const x1 = roundIdx * (MATCH_WIDTH + ROUND_GAP) + MATCH_WIDTH;
             const x2 = (roundIdx + 1) * (MATCH_WIDTH + ROUND_GAP);
@@ -1331,7 +1348,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
 
         {/* 各マッチをabsolute配置（接続線の中心と正確に一致） */}
         {matchesByRound.map((roundMatches, roundIdx) => {
-          const round = roundIdx + 1;
+          const round = hiddenRounds + roundIdx + 1;
           const colX = roundIdx * (MATCH_WIDTH + ROUND_GAP);
 
           return (
