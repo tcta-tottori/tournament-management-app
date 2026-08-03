@@ -9,7 +9,7 @@ import TeamLiveCourtView from '../team/TeamLiveCourtView';
 import type { Match, Court } from '../../db/database';
 import {
   BarChart2, Play, CheckCircle, Clock, Trophy, Users, MapPin,
-  AlertCircle, Timer,
+  AlertCircle, Timer, Radio,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,23 @@ type CourtStatus = {
   nextMatch: Match | null;
   matchCount: number;
   status: 'empty' | 'playing' | 'ready' | 'unavailable';
+  /** このコートの試合をライブスコア配信中か */
+  isBroadcasting: boolean;
 };
+
+/** ライブスコア配信中を示すバッジ（コートマップ用） */
+function BroadcastBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      className={`flex items-center gap-0.5 bg-[#c0392b] text-white font-bold rounded-full leading-none shrink-0 ${
+        compact ? 'text-[7px] px-1 py-0.5' : 'text-[7px] sm:text-[8px] px-1 sm:px-1.5 py-0.5'
+      }`}
+      title="ライブスコアを配信中"
+    >
+      <Radio className="w-2 h-2" />配信
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // SVG Donut Chart
@@ -205,18 +221,20 @@ function TennisCourtBlockH({
       <HorizontalCourtLines status={cs.status} />
       <div className="relative z-10 flex items-center h-full px-2 py-1 gap-2">
         {/* 左: コート番号 + バッジ */}
-        <div className="flex flex-col items-center shrink-0 min-w-[36px]">
+        <div className="flex flex-col items-center shrink-0 min-w-[36px] gap-0.5">
           {cs.status === 'playing' && (
             isTimeOver ? (
-              <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0 animate-pulse mb-0.5">
+              <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0 animate-pulse">
                 <AlertCircle className="w-2 h-2" /> 超過
               </span>
             ) : (
-              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0 mb-0.5">
+              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none shrink-0">
                 <Play className="w-2 h-2 fill-white" /> LIVE
               </span>
             )
           )}
+          {/* ライブスコア配信中 */}
+          {cs.isBroadcasting && <BroadcastBadge compact />}
           <div className={`text-xl font-black ${style.text} leading-none`}>{courtNum}</div>
           {elapsed && (
             <div className="flex items-center gap-0.5 mt-0.5">
@@ -304,17 +322,21 @@ function TennisCourtBlock({
           <div className={`text-base sm:text-lg md:text-xl font-black ${style.text} leading-none pl-0.5`}>
             {courtNum}
           </div>
-          {cs.status === 'playing' && (
-            isTimeOver ? (
-              <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0 animate-pulse">
-                <AlertCircle className="w-2 h-2" /> 超過
-              </span>
-            ) : (
-              <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0">
-                <Play className="w-2 h-2 fill-white" /> LIVE
-              </span>
-            )
-          )}
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            {cs.status === 'playing' && (
+              isTimeOver ? (
+                <span className="flex items-center gap-0.5 bg-red-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0 animate-pulse">
+                  <AlertCircle className="w-2 h-2" /> 超過
+                </span>
+              ) : (
+                <span className="flex items-center gap-0.5 bg-green-500 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full leading-none shrink-0">
+                  <Play className="w-2 h-2 fill-white" /> LIVE
+                </span>
+              )
+            )}
+            {/* ライブスコア配信中 */}
+            {cs.isBroadcasting && <BroadcastBadge />}
+          </div>
         </div>
 
         {/* Middle: event name + players */}
@@ -503,6 +525,16 @@ function LiveDashboardInner() {
     };
   }, [allMatches, currentTime]);
 
+  // ライブスコアを配信中のコート（コートマップに配信バッジを出すため）
+  const liveScores = useLiveQuery(() => db.liveScores.toArray(), []) || [];
+  const broadcastingCourtIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const l of liveScores) {
+      if (l.status === 'live' && l.courtId) ids.add(l.courtId);
+    }
+    return ids;
+  }, [liveScores]);
+
   // -- Court status --
   const courtStatusList = useMemo((): CourtStatus[] => {
     return courts
@@ -519,9 +551,14 @@ function LiveDashboardInner() {
         else if (currentMatch) status = 'playing';
         else if (nextMatch) status = 'ready';
 
-        return { court, currentMatch, nextMatch, matchCount: courtMatches.length, status };
+        return {
+          court, currentMatch, nextMatch,
+          matchCount: courtMatches.length,
+          status,
+          isBroadcasting: broadcastingCourtIds.has(court.courtId),
+        };
       });
-  }, [courts, allMatches]);
+  }, [courts, allMatches, broadcastingCourtIds]);
 
   // Time-over courts (elapsed > matchDuration)
   const timeOverCourtIds = useMemo(() => {
@@ -540,6 +577,7 @@ function LiveDashboardInner() {
   }, [courtStatusList, matchDuration, currentTime]);
 
   const courtStats = useMemo(() => ({
+    broadcasting: courtStatusList.filter(c => c.isBroadcasting).length,
     playing: courtStatusList.filter(c => c.status === 'playing').length,
     ready: courtStatusList.filter(c => c.status === 'ready').length,
     empty: courtStatusList.filter(c => c.status === 'empty').length,
@@ -699,6 +737,12 @@ function LiveDashboardInner() {
               コートマップ
             </h2>
             <div className="flex gap-4 text-xs flex-wrap">
+              {courtStats.broadcasting > 0 && (
+                <span className="flex items-center gap-1 font-bold text-[#c0392b]">
+                  <Radio className="w-3 h-3" />
+                  ライブ配信 {courtStats.broadcasting}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
                 試合中 {courtStats.playing}
@@ -835,6 +879,11 @@ function LiveDashboardInner() {
               {selectedDetail.court.name}
             </h3>
             <div className="flex items-center gap-2">
+              {selectedDetail.isBroadcasting && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#c0392b] text-white">
+                  <Radio className="w-3 h-3" />ライブスコア配信中
+                </span>
+              )}
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                 selectedDetail.status === 'playing' ? 'bg-green-100 text-green-800' :
                 selectedDetail.status === 'ready' ? 'bg-blue-100 text-primary-500' :
