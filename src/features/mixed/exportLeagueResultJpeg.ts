@@ -63,7 +63,6 @@ export async function generateLeagueResultDataUrl(
     if (vW > 230 * VENUE_LOGO_SCALE) { vW = 230 * VENUE_LOGO_SCALE; vH = vW / vRatio; }
     venueH = vH;
   }
-  const headerH = Math.max(65, (venueTopY - paddingY) + venueH + 14);
   // 列見出しは協会ロゴを入れるぶん少し高くする
   const colHeaderH = tctaLogo ? 54 : 34;
   const rowH = 76;
@@ -72,6 +71,32 @@ export async function generateLeagueResultDataUrl(
   const recordColW = 90;
   const rankColW = 60;
   const tableW = nameColW + scoreColW * teamCount + recordColW + rankColW;
+
+  // ---- タイトル「◯リーグ」の文字サイズ ----
+  // 見出しとして大会名・会場ロゴに負けない大きさにする。
+  // ヘッダーの高さに影響するので、Canvas を作る前に決めておく。
+  const title = `${league.leagueId.trim()}リーグ`;
+  const runs = splitBigSmall(title);
+  const cat = eventBadgeColors(title);
+  const measureCtx = document.createElement('canvas').getContext('2d')!;
+  let bigPx = 68;
+  let smallPx = 40;
+  const maxTitleW = Math.max(160, tableW * 0.42);
+  let titleW = measureMixed(measureCtx, runs, bigPx, smallPx, '900', '800');
+  if (titleW > maxTitleW) {
+    const k = maxTitleW / titleW;
+    bigPx = Math.floor(bigPx * k);
+    smallPx = Math.floor(smallPx * k);
+    titleW = measureMixed(measureCtx, runs, bigPx, smallPx, '900', '800');
+  }
+  // タイトルは会場ロゴの下端に下端をそろえて描くので、
+  // その上端（≒ベースライン - 大文字の高さ）が余白に収まる高さを確保する
+  const titleCapH = bigPx * 0.78;
+  const headerH = Math.max(
+    65,
+    (venueTopY - paddingY) + venueH + 14,
+    titleCapH + 26,
+  );
   const tableH = colHeaderH + rowH * teamCount;
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + tableH;
@@ -122,19 +147,6 @@ export async function generateLeagueResultDataUrl(
 
   // ---- ページヘッダー ----
   // 「Aリーグ」をバッジではなくグラデーション文字で表示（英数字だけ大きく）
-  const title = `${league.leagueId.trim()}リーグ`;
-  const runs = splitBigSmall(title);
-  const cat = eventBadgeColors(title);
-  let bigPx = 44;
-  let smallPx = 24;
-  const maxTitleW = Math.max(140, tableW * 0.42);
-  let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
-  if (titleW > maxTitleW) {
-    const k = maxTitleW / titleW;
-    bigPx = Math.floor(bigPx * k);
-    smallPx = Math.floor(smallPx * k);
-    titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
-  }
   ctx.save();
   const titleGrad = ctx.createLinearGradient(paddingX, 0, paddingX + Math.max(titleW, 1), 0);
   titleGrad.addColorStop(0, cat.c2);
@@ -143,13 +155,14 @@ export async function generateLeagueResultDataUrl(
   ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
   ctx.shadowBlur = 5;
   ctx.shadowOffsetY = 2;
-  // 会場ロゴの下端とタイトルの下端をそろえる（会場表示が無い場合は従来位置）
-  const venueBottomY = venueH > 0 ? venueTopY + venueH : paddingY + 16 + bigPx * 0.34;
+  // 会場ロゴの下端とタイトルの下端をそろえる
+  // （会場表示が無い場合は、タイトルの上端が余白に収まる位置に置く）
+  const venueBottomY = venueH > 0 ? venueTopY + venueH : paddingY + 8 + titleCapH;
   drawMixed(ctx, runs, paddingX, venueBottomY, bigPx, smallPx, '900', '800');
   ctx.restore();
 
   // 大会名（右揃え。タイトルと重ならない幅に収める）
-  drawText(tournamentName, paddingX + tableW, paddingY + 24, 20, 'right', '#334155', true,
+  drawText(tournamentName, paddingX + tableW, paddingY + 24, 22, 'right', '#334155', true,
     Math.max(180, tableW - titleW - 40));
 
   // 大会名の下に会場表示（他大会の結果画像と同じ意匠・2/3サイズ）
