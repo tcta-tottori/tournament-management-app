@@ -41,9 +41,10 @@ export async function generateLeagueResultDataUrl(
 
   // 会場ロゴ（大会名の下に表示）
   const base = import.meta.env.BASE_URL;
-  const [venueLogo, tottoriLogo] = await Promise.all([
+  const [venueLogo, tottoriLogo, tctaLogo] = await Promise.all([
     tryLoadImage(`${base}logo-venue.png`),
     tryLoadImage(`${base}logo-tottori-univ.png`),
+    tryLoadImage(`${base}logo-tcta.png`),
   ]);
 
   // レイアウト定数
@@ -63,7 +64,8 @@ export async function generateLeagueResultDataUrl(
     venueH = vH;
   }
   const headerH = Math.max(65, (venueTopY - paddingY) + venueH + 14);
-  const colHeaderH = 34;
+  // 列見出しは協会ロゴを入れるぶん少し高くする
+  const colHeaderH = tctaLogo ? 54 : 34;
   const rowH = 76;
   const nameColW = 260;
   const scoreColW = 95;
@@ -141,7 +143,9 @@ export async function generateLeagueResultDataUrl(
   ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
   ctx.shadowBlur = 5;
   ctx.shadowOffsetY = 2;
-  drawMixed(ctx, runs, paddingX, paddingY + 16 + bigPx * 0.34, bigPx, smallPx, '900', '800');
+  // 会場ロゴの下端とタイトルの下端をそろえる（会場表示が無い場合は従来位置）
+  const venueBottomY = venueH > 0 ? venueTopY + venueH : paddingY + 16 + bigPx * 0.34;
+  drawMixed(ctx, runs, paddingX, venueBottomY, bigPx, smallPx, '900', '800');
   ctx.restore();
 
   // 大会名（右揃え。タイトルと重ならない幅に収める）
@@ -183,7 +187,18 @@ export async function generateLeagueResultDataUrl(
 
   // 列ヘッダーテキスト
   const thColor = SKY.headerText;
-  drawText('選手名', tableX + nameColW / 2, tableY + colHeaderH / 2, 13, 'center', thColor, true);
+  // 選手名の列見出しは協会ロゴにする（読み込めない場合は従来の文字）
+  if (tctaLogo) {
+    const maxLogoW = nameColW - 40;
+    const maxLogoH = colHeaderH - 8;
+    const ratio = tctaLogo.width / tctaLogo.height;
+    let lh = maxLogoH;
+    let lw = lh * ratio;
+    if (lw > maxLogoW) { lw = maxLogoW; lh = lw / ratio; }
+    ctx.drawImage(tctaLogo, tableX + (nameColW - lw) / 2, tableY + (colHeaderH - lh) / 2, lw, lh);
+  } else {
+    drawText('選手名', tableX + nameColW / 2, tableY + colHeaderH / 2, 13, 'center', thColor, true);
+  }
   
   for (let i = 0; i < teamCount; i++) {
     const team = teams[i];

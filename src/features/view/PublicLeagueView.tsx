@@ -6,6 +6,7 @@ import { calculateTeamStandings, MATCH_TYPE_SHORT } from '../team/teamLogic';
 import type { LeagueMatchScore, MixedLeague, LeagueStanding } from '../mixed/types';
 import type { TeamLeagueMatch, TeamLeague, TeamLeagueStanding } from '../team/types';
 import { MapPin, Info } from 'lucide-react';
+import { leagueColor } from '../mixed/leagueColors';
 
 // =========================================================================
 // 左側固定列（# ＋ 選手名/所属）の寸法
@@ -71,10 +72,11 @@ function PublicMixedLeagueView() {
 
   return (
     <div className="space-y-8">
-      {leagues.map(league => (
+      {leagues.map((league, idx) => (
         <MixedLeagueSection
           key={league.leagueId}
           league={league}
+          index={idx}
           matches={leagueMatches.filter(m => m.leagueId === league.leagueId)}
           standings={allStandings.get(league.leagueId) || []}
         />
@@ -85,13 +87,17 @@ function PublicMixedLeagueView() {
 
 function MixedLeagueSection({
   league,
+  index,
   matches,
   standings,
 }: {
   league: MixedLeague;
+  index: number;
   matches: LeagueMatchScore[];
   standings: LeagueStanding[];
 }) {
+  // 管理ページと同じリーグ配色を使う
+  const colors = leagueColor(index);
   const finished = matches.filter(m => m.status === 'finished').length;
   const total = matches.length;
   const complete = total > 0 && finished === total;
@@ -109,6 +115,7 @@ function MixedLeagueSection({
         court={league.courtName}
         finished={finished}
         total={total}
+        colors={colors}
       />
 
       {/* 対戦結果マトリクス（選手名/所属は左固定、スコア以降は横スクロール） */}
@@ -122,7 +129,7 @@ function MixedLeagueSection({
               </th>
               {league.teams.map((_, i) => (
                 <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500" style={scoreColStyle}>
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                  <span className={`inline-flex items-center justify-center w-6 h-6 ${colors.badge} rounded-full text-xs font-bold`}>
                     {i + 1}
                   </span>
                 </th>
@@ -139,7 +146,7 @@ function MixedLeagueSection({
               return (
                 <tr key={team.teamId} className="border-t border-gray-100">
                   <td className={`${stickyNumCls} bg-white`} style={numColStyle}>
-                    <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                    <span className={`inline-flex items-center justify-center w-6 h-6 ${colors.badge} rounded-full text-xs font-bold`}>
                       {rowIdx + 1}
                     </span>
                   </td>
@@ -244,10 +251,11 @@ function PublicTeamLeagueView() {
 
   return (
     <div className="space-y-8">
-      {leagues.map(league => (
+      {leagues.map((league, idx) => (
         <TeamLeagueSection
           key={league.leagueId}
           league={league}
+          index={idx}
           matches={leagueMatches.filter(m => m.leagueId === league.leagueId)}
           standings={allStandings.get(league.leagueId) || []}
         />
@@ -258,13 +266,17 @@ function PublicTeamLeagueView() {
 
 function TeamLeagueSection({
   league,
+  index,
   matches,
   standings,
 }: {
   league: TeamLeague;
+  index: number;
   matches: TeamLeagueMatch[];
   standings: TeamLeagueStanding[];
 }) {
+  // 管理ページと同じリーグ配色を使う
+  const colors = leagueColor(index);
   const finished = matches.filter(m => m.status === 'finished').length;
   const total = matches.length;
   const complete = total > 0 && finished === total;
@@ -282,6 +294,7 @@ function TeamLeagueSection({
         court={league.courtName}
         finished={finished}
         total={total}
+        colors={colors}
       />
 
       {/* 対戦結果（チーム名は左固定、スコア以降は横スクロール） */}
@@ -295,7 +308,7 @@ function TeamLeagueSection({
               </th>
               {league.teams.map((_, i) => (
                 <th key={i} className="px-2 py-2 text-center text-[11px] text-gray-500" style={teamScoreColStyle}>
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                  <span className={`inline-flex items-center justify-center w-6 h-6 ${colors.badge} rounded-full text-xs font-bold`}>
                     {i + 1}
                   </span>
                 </th>
@@ -312,7 +325,7 @@ function TeamLeagueSection({
               return (
                 <tr key={team.teamId} className="border-t border-gray-100">
                   <td className={`${stickyNumCls} bg-white`} style={numColStyle}>
-                    <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                    <span className={`inline-flex items-center justify-center w-6 h-6 ${colors.badge} rounded-full text-xs font-bold`}>
                       {rowIdx + 1}
                     </span>
                   </td>
@@ -405,14 +418,16 @@ function LeagueHeaderCard({
   court,
   finished,
   total,
+  colors,
 }: {
   title: string;
   court: string;
   finished: number;
   total: number;
+  colors: ReturnType<typeof leagueColor>;
 }) {
   return (
-    <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+    <div className={`bg-gradient-to-r ${colors.from} ${colors.to} text-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap`}>
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-lg font-bold">
           {title.replace('リーグ', '').trim()}

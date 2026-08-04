@@ -54,9 +54,9 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
       {/* プレビュー呼び出しボタン */}
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 shadow-sm hover:shadow hover:bg-teal-100 hover:border-teal-300 transition-all active:scale-95 whitespace-nowrap"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-200 shadow-sm hover:shadow hover:bg-teal-100 hover:border-teal-300 transition-all active:scale-95 whitespace-nowrap shrink-0"
       >
-        <ImageIcon size={14} className="text-teal-600" />
+        <ImageIcon size={14} className="text-teal-600 shrink-0" />
         結果画像
       </button>
 
@@ -68,24 +68,24 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
             onClick={e => e.stopPropagation()}
           >
             {/* モーダルヘッダー */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <ImageIcon size={16} className="text-gray-500" />
-                {league.leagueId.trim()}リーグ 結果プレビュー表示
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2 shrink-0">
+              <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 min-w-0">
+                <ImageIcon size={16} className="text-gray-500 shrink-0" />
+                <span className="truncate">{league.leagueId.trim()}リーグ 結果プレビュー</span>
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:opacity-90 transition-opacity active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:opacity-90 transition-opacity active:scale-95 whitespace-nowrap shrink-0"
                   >
-                    <Download size={14} />
+                    <Download size={14} className="shrink-0" />
                     ダウンロード
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => setIsOpen(false)}
-                  className="px-3 py-1.5 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="px-3 py-1.5 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors font-medium whitespace-nowrap shrink-0"
                 >
                   閉じる
                 </button>
