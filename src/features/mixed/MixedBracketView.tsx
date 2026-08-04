@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, Square, X, Printer, Settings2 } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X, Printer, Settings2 } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
-import CallPreviewDialog from './CallPreviewDialog';
+import CallPreviewDialog, { toCourtCallName } from './CallPreviewDialog';
+import CallStatusPopup from '../../components/ui/CallStatusPopup';
 import MixedBracketResultPreview from './MixedBracketResultPreview';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { useVisualViewport } from '../../components/ui/useVisualViewport';
@@ -226,8 +227,9 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
-  const { speak, stop, isSpeaking } = useGeminiTts();
-  const [speakingText, setSpeakingText] = useState('');
+  const { speak, stop, isSpeaking, isLoading: isCallLoading } = useGeminiTts();
+  // コール中に画面下部へ出す情報（シングルス大会と同じ表示にするため試合ごと保持する）
+  const [callingInfo, setCallingInfo] = useState<{ match: BracketMatch; courtName: string; roundLabel: string } | null>(null);
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
   const [courtAssignValue, setCourtAssignValue] = useState('');
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
@@ -269,15 +271,6 @@ export default function MixedBracketView() {
   }, [tournamentInfo, bracketGameRule]);
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
-
-  if (brackets.length === 0) {
-    return (
-      <div className="text-center py-20 text-gray-400">
-        <Trophy size={48} className="mx-auto mb-4 opacity-30" />
-        <p className="text-lg">データをインポートするとトーナメント表が表示されます</p>
-      </div>
-    );
-  }
 
   const getRoundLabel = (round: number, totalRounds: number): string => {
     const fromFinal = totalRounds - round;
@@ -440,9 +433,26 @@ export default function MixedBracketView() {
   const setStartRound = (value: number | null) =>
     setRoundOverride(value == null ? null : { category: selectedBracketCategory, value });
 
+  // ブラケット未生成のときの案内。
+  // ※この早期リターンは必ず全てのフックを呼び終えたあとに置くこと。
+  //   予選リーグの結果が変わると MixedScoreView が brackets を一旦空にして作り直すため、
+  //   フックより前で return するとレンダーごとにフック数が変わり React が例外を投げる。
+  if (brackets.length === 0) {
+    // 予選リーグを読み込み済みなら、順位変更を受けて作り直している最中
+    return (
+      <div className="text-center py-20 text-gray-400">
+        <Trophy size={48} className="mx-auto mb-4 opacity-30" />
+        <p className="text-lg">
+          {leagues.length > 0
+            ? '予選リーグの順位からトーナメント表を作成中です…'
+            : 'データをインポートするとトーナメント表が表示されます'}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {/* クラス切替ヘッダー（シングルス大会と同じ形式・左右/スワイプ/ドット）
           決勝が終わったクラスは、カード内に結果画像・賞状印刷のボタンを出す */}
       <BracketTopBar
@@ -459,6 +469,18 @@ export default function MixedBracketView() {
         fullBleedClass="-mx-2 sm:-mx-4 -mt-2 sm:-mt-4"
         right={(
           <div className="flex items-center gap-1.5">
+            {/* ドロー編集（クラスカード内に配置） */}
+            <button
+              onClick={() => setDrawEditMode(!drawEditMode)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm active:scale-95 transition-all whitespace-nowrap ${
+                drawEditMode
+                  ? 'bg-blue-600 text-white border border-blue-600'
+                  : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              <RotateCcw size={12} className={drawEditMode ? 'text-white' : 'text-gray-500'} />
+              {drawEditMode ? '編集を終了' : 'ドロー編集'}
+            </button>
             {/* ゲームルール（アイコンのみ・タップでポップアップ） */}
             <button
               onClick={() => setRuleDialogOpen(true)}
@@ -488,19 +510,6 @@ export default function MixedBracketView() {
           </div>
         )}
       />
-
-      {/* ドロー編集 */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setDrawEditMode(!drawEditMode)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-            drawEditMode ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <RotateCcw size={12} />
-          {drawEditMode ? 'ドロー編集を終了' : 'ドロー編集'}
-        </button>
-      </div>
 
       {/* ゲームルール設定ポップアップ */}
       {ruleDialogOpen && createPortal(
@@ -802,24 +811,27 @@ export default function MixedBracketView() {
         document.body
       )}
 
-      {/* 音声再生中ポップアップ */}
-      {isSpeaking && speakingText && createPortal(
-        <div className="fixed bottom-6 right-6 z-[200] w-80 bg-white rounded-2xl shadow-2xl border border-blue-200 overflow-hidden animate-in slide-in-from-bottom-4">
-          <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center gap-2">
-            <Volume2 size={16} className="animate-pulse shrink-0" />
-            <span className="text-sm font-bold flex-1">コール再生中...</span>
-            <button
-              onClick={() => { stop(); setSpeakingText(''); }}
-              className="flex items-center gap-1 px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
-            >
-              <Square size={10} />
-              停止
-            </button>
-          </div>
-          <div className="px-4 py-3 max-h-24 overflow-y-auto">
-            <p className="text-[11px] text-gray-600 leading-relaxed">{speakingText}</p>
-          </div>
-        </div>,
+      {/* コール読込中／コール中の表示（シングルス大会と共通） */}
+      {(isSpeaking || isCallLoading) && callingInfo && createPortal(
+        (() => {
+          const at = useMixedStore.getState().allTeams;
+          const ct1 = at.find(t => t.teamId === callingInfo.match.team1Id);
+          const ct2 = at.find(t => t.teamId === callingInfo.match.team2Id);
+          const side = (t?: typeof at[number]) => ({
+            name: t ? [t.male.name, t.female.name] : ['-'],
+            sub: t ? [t.male.affiliation, t.female.affiliation] : undefined,
+          });
+          return (
+            <CallStatusPopup
+              loading={isCallLoading}
+              courtLabel={toCourtCallName(callingInfo.courtName)}
+              subtitle={`${currentBracket?.label || ''} ${callingInfo.roundLabel}`}
+              left={side(ct1)}
+              right={side(ct2)}
+              onStop={() => { stop(); setCallingInfo(null); }}
+            />
+          );
+        })(),
         document.body
       )}
 
@@ -842,8 +854,8 @@ export default function MixedBracketView() {
             allTeams={useMixedStore.getState().allTeams}
             onConfirm={(text) => {
               if (text) {
-                setSpeakingText(text);
-                speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => setSpeakingText(''));
+                setCallingInfo({ match: callMatch, courtName: callCourt, roundLabel: rl });
+                speak(text, { rate: 0.9, pitch: 1.0, volume: 1.0, repeatCount: 1 }, () => setCallingInfo(null));
               }
               setCallMatch(null);
             }}
@@ -1265,11 +1277,15 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
   const matchesByRound = allMatchesByRound.slice(hiddenRounds);
   const visibleRounds = matchesByRound.length;
 
-  const MATCH_HEIGHT = compact ? 64 : 130;
-  const BYE_HEIGHT = compact ? 28 : 56;
+  // 1試合カードの高さは中身（選手2行＋ステータス行）と揃える。
+  // 余白が余ると対戦どうしの間隔が広がり、スマートフォンでスクロール量が増えるため。
+  const SLOT_HEIGHT = compact ? 22 : 40;
+  const STATUS_HEIGHT = compact ? 16 : 22;
+  const MATCH_HEIGHT = SLOT_HEIGHT * 2 + STATUS_HEIGHT;
+  const BYE_HEIGHT = compact ? 28 : 48;
   const MATCH_WIDTH = compact ? 160 : 300;
-  const ROUND_GAP = compact ? 20 : 52;
-  const MATCH_GAP = compact ? 6 : 24;
+  const ROUND_GAP = compact ? 20 : 32;
+  const MATCH_GAP = compact ? 6 : 10;
 
   // 1位トーナメント以外: 配置されるリーグ情報をビジュアル表示
   const is1stBracket = bracket.category === '1st';
@@ -1351,7 +1367,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
   const boardWidth = (MATCH_WIDTH + ROUND_GAP) * visibleRounds;
 
   return (
-    <div className={`bg-white shadow-sm border border-gray-200 p-4 overflow-x-auto ${compact ? 'rounded-b-xl' : 'rounded-xl'}`}>
+    <div className={`bg-white shadow-sm border border-gray-200 p-2 sm:p-4 overflow-x-auto ${compact ? 'rounded-b-xl' : 'rounded-xl'}`}>
       <div className="relative" style={{ minWidth: boardWidth, height: svgHeight }}>
         {/* 接続線SVG */}
         <svg className="absolute inset-0 pointer-events-none" style={{ width: boardWidth, height: svgHeight }}>
@@ -1419,7 +1435,7 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                     if (wName && wLeague) winnerData = allTeams.find(t => t.teamName === wName && t.leagueId === wLeague.trim()) || null;
                   }
                   const winnerLeague = winnerId === match.team1Id ? match.team1League : match.team2League;
-                  const byeBoxH = winnerData ? (compact ? 28 : 70) : BYE_HEIGHT;
+                  const byeBoxH = winnerData ? (compact ? 28 : 52) : BYE_HEIGHT;
                   const byeSlotNum = match.round === 1 ? getSlotNumber(match, match.team1Id ? 'team1' : 'team2') : null;
                   return (
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
@@ -1454,8 +1470,6 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                 }
 
                 // 通常マッチ
-                const SLOT_HEIGHT = compact ? 22 : 42;
-                const STATUS_HEIGHT = compact ? 16 : 30;
                 const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null; defLabel?: string }) => {
                   // teamIdから探す。なければnameから逆引き
                   let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;

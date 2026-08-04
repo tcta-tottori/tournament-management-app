@@ -17,6 +17,7 @@ import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder, matchKey } from './standbyRanking';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
+import CallStatusPopup from '../../components/ui/CallStatusPopup';
 import { fillTestScores } from '../score/testScoreFiller';
 
 /** 回戦に応じたゲームルール（試合方式）を解決する */
@@ -406,7 +407,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { speak, stop } = useGeminiTts();
+  const { speak, stop, isLoading: isCallLoading } = useGeminiTts();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(
@@ -2457,47 +2458,14 @@ ${printableMatches.map(m => {
         const roundName = getRoundName(sm.round, evTotalRounds);
         const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
         return (
-          <div className="fixed inset-x-0 bottom-0 z-[9998] flex justify-center px-3 pb-3 pointer-events-none">
-            {/* 枠のみ点滅・背景は半透明・赤ベース */}
-            <div className="pointer-events-auto w-full max-w-lg rounded-xl border-2 bg-white/80 backdrop-blur-sm shadow-2xl overflow-hidden call-popup-blink">
-              <div className="flex items-center gap-3 bg-gradient-to-r from-red-600/90 to-rose-600/90 px-4 py-2">
-                <div className="relative shrink-0">
-                  <Megaphone className="w-5 h-5 text-white" />
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-bold">
-                    コール中{courtName ? ` ・ ${courtName}番コート` : ''}
-                  </p>
-                  <p className="text-white/90 text-[11px] truncate">
-                    {evt?.name || ''} {roundName}
-                  </p>
-                </div>
-                <button
-                  onClick={handleVoiceStop}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-white/25 hover:bg-white/40 text-white text-xs font-bold rounded-lg transition-colors shrink-0"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  停止
-                </button>
-              </div>
-              <div className="flex items-center justify-center gap-3 px-4 py-3 text-center bg-red-50/70">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900 truncate">{sm.player1Name || '-'}</p>
-                  {sm.player1Affiliation && sm.player1Affiliation !== 'BYE' && (
-                    <p className="text-[10px] text-gray-500 truncate">{sm.player1Affiliation}</p>
-                  )}
-                </div>
-                <span className="text-xs font-bold text-red-500 shrink-0">vs</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900 truncate">{sm.player2Name || '-'}</p>
-                  {sm.player2Affiliation && sm.player2Affiliation !== 'BYE' && (
-                    <p className="text-[10px] text-gray-500 truncate">{sm.player2Affiliation}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <CallStatusPopup
+            loading={isCallLoading}
+            courtLabel={courtName ? `${courtName}番コート` : ''}
+            subtitle={`${evt?.name || ''} ${roundName}`}
+            left={{ name: sm.player1Name || '-', sub: sm.player1Affiliation }}
+            right={{ name: sm.player2Name || '-', sub: sm.player2Affiliation }}
+            onStop={handleVoiceStop}
+          />
         );
       })()}
 

@@ -7,7 +7,7 @@
 // - proxy モード:  sync-server 経由（APIキーはサーバー側で保持）
 // =============================================================================
 
-import { getVoiceSettings } from './voiceConfig';
+import { getVoiceSettings, getResolvedModel, setResolvedModel, MODEL_FALLBACKS } from './voiceConfig';
 
 /** 無音 WAV（再生を「プライム」するだけに使用） */
 const SILENT_WAV =
@@ -22,6 +22,9 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
  * モデルが temperature を受け付けない場合は自動でリトライする（下記 400 フォールバック）。
  */
 export const TTS_TEMPERATURE = 0.15;
+
+/** 生成済み音声を保持しておく最大件数 */
+const MAX_CACHE_ENTRIES = 20;
 
 /**
  * 繰り返しを含む読み上げテキストを1つにまとめる。
@@ -41,9 +44,24 @@ export interface GeminiTtsState {
   isSpeaking: boolean;
   /** API から音声データを取得中 true（再生開始すると false） */
   isLoading: boolean;
+  /** 直近の生成で実際に使われたモデル ID（未生成なら空文字） */
+  lastModel: string;
+  /** 直近の生成にかかったミリ秒（未生成なら 0） */
+  lastLatencyMs: number;
 }
 
 type Listener = (state: GeminiTtsState) => void;
+
+/** 指定モデルがこの API キーで使えない（存在しない）ことを表す */
+class ModelUnavailableError extends Error {
+  readonly model: string;
+
+  constructor(model: string, detail: string) {
+    super(`モデル ${model} は利用できません（${detail}）`);
+    this.name = 'ModelUnavailableError';
+    this.model = model;
+  }
+}
 
 class GeminiTtsService {
   private audio: HTMLAudioElement | null = null;
@@ -51,8 +69,20 @@ class GeminiTtsService {
   private currentUrl: string | null = null;
   private _isSpeaking = false;
   private _isLoading = false;
+  private _lastModel = '';
+  private _lastLatencyMs = 0;
   private listeners = new Set<Listener>();
   private abortCtrl: AbortController | null = null;
+  /**
+   * モデルごとの `temperature` 対応可否。
+   * 対応していないモデルに毎回 temperature 付きで投げると 400 → 再送となり、
+   * 1回のコールで2往復ぶんの待ち時間が発生するため、一度判明したら記憶する。
+   */
+  private temperatureSupport = new Map<string, boolean>();
+  /** 生成済み音声のキャッシュ（同じ文面のコールをやり直しても待たずに済む） */
+  private cache = new Map<string, Blob>();
+  /** 事前生成の進行中リクエスト（同じ文面を二重に生成しないため） */
+  private inFlight = new Map<string, Promise<Blob>>();
 
   private getAudio(): HTMLAudioElement {
     if (!this.audio) {
@@ -72,7 +102,12 @@ class GeminiTtsService {
   }
 
   get state(): GeminiTtsState {
-    return { isSpeaking: this._isSpeaking, isLoading: this._isLoading };
+    return {
+      isSpeaking: this._isSpeaking,
+      isLoading: this._isLoading,
+      lastModel: this._lastModel,
+      lastLatencyMs: this._lastLatencyMs,
+    };
   }
 
   subscribe(listener: Listener): () => void {
@@ -223,14 +258,74 @@ class GeminiTtsService {
     }
   }
 
+  /** 生成済み音声のキャッシュキー（同じ設定・同じ文面なら再利用できる） */
+  private cacheKey(text: string, cfg: ReturnType<typeof getVoiceSettings>): string {
+    return [cfg.mode, cfg.model, cfg.voiceName, cfg.styleInstruction, text].join('\u0000');
+  }
+
+  /**
+   * 読み上げ内容を先に生成しておく。
+   *
+   * コールプレビューを開いている間に裏で用意しておくことで、
+   * 「コール」を押してから音が出るまでの待ち時間をほぼゼロにできる。
+   * 画面のローディング表示（isLoading）は変化させない。
+   */
+  prefetch(text: string, repeatCount = 1): void {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+    const cfg = getVoiceSettings();
+    if (cfg.mode === 'direct' ? !cfg.apiKey : !cfg.serverUrl) return;
+    const full = buildRepeatedText(trimmed, repeatCount);
+    const key = this.cacheKey(full, cfg);
+    if (this.cache.has(key) || this.inFlight.has(key)) return;
+
+    // 再生の停止（stop）で事前生成まで中断されないよう、専用の signal を渡す
+    const own = new AbortController().signal;
+    const task = (cfg.mode === 'direct'
+      ? this.synthesizeDirect(full, cfg, own)
+      : this.synthesizeViaProxy(full, cfg, own)
+    ).then(blob => {
+      this.putCache(key, blob);
+      return blob;
+    }).finally(() => {
+      this.inFlight.delete(key);
+    });
+    // 事前生成の失敗は無視する（本番のコール時に改めてエラーを出す）
+    task.catch(() => { /* noop */ });
+    this.inFlight.set(key, task);
+  }
+
+  private putCache(key: string, blob: Blob): void {
+    this.cache.set(key, blob);
+    while (this.cache.size > MAX_CACHE_ENTRIES) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest === undefined) break;
+      this.cache.delete(oldest);
+    }
+  }
+
   private async synthesizeAndPlay(text: string): Promise<void> {
     const cfg = getVoiceSettings();
+    const key = this.cacheKey(text, cfg);
+
+    // 事前生成済みならネットワーク待ちなしで再生する
+    const cached = this.cache.get(key);
+    if (cached) {
+      await this.playAudioBlob(cached);
+      return;
+    }
+
     this.beginLoading();
     let audioBlob: Blob;
     try {
-      audioBlob = cfg.mode === 'direct'
-        ? await this.synthesizeDirect(text, cfg)
-        : await this.synthesizeViaProxy(text, cfg);
+      // 事前生成が進行中ならその結果を待つ（二重リクエストを避ける）
+      const pending = this.inFlight.get(key);
+      audioBlob = pending
+        ? await pending
+        : cfg.mode === 'direct'
+          ? await this.synthesizeDirect(text, cfg)
+          : await this.synthesizeViaProxy(text, cfg);
+      this.putCache(key, audioBlob);
     } finally {
       this.endLoading();
     }
@@ -268,6 +363,7 @@ class GeminiTtsService {
   ): Promise<Blob> {
     if (!cfg.serverUrl) throw new Error('中継サーバーURLが未設定です');
     const url = `${cfg.serverUrl.replace(/\/$/, '')}/api/gemini-tts`;
+    const startedAt = performance.now();
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -284,7 +380,21 @@ class GeminiTtsService {
       const body = await res.text().catch(() => '');
       throw new Error(`Gemini TTS HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
-    return res.blob();
+    const blob = await res.blob();
+    // 中継サーバー側のモデル名はレスポンスヘッダー（無ければ /api/gemini-status）で分かる
+    this._lastModel = res.headers.get('X-Gemini-Model') || this._lastModel;
+    this._lastLatencyMs = Math.round(performance.now() - startedAt);
+    return blob;
+  }
+
+  /**
+   * 設定されたモデルを先頭に、フォールバック候補を並べた試行順を返す。
+   * 一度成功したモデルが記録されていればそれを最優先にする（毎回の総当たりを避ける）。
+   */
+  private modelCandidates(configured: string): string[] {
+    const resolved = getResolvedModel();
+    const list = [resolved, configured, ...MODEL_FALLBACKS].filter(Boolean);
+    return Array.from(new Set(list));
   }
 
   private async synthesizeDirect(
@@ -293,7 +403,36 @@ class GeminiTtsService {
     signal?: AbortSignal,
   ): Promise<Blob> {
     if (!cfg.apiKey) throw new Error('Gemini API キーが未設定です');
-    const url = `${GEMINI_API_BASE}/${encodeURIComponent(cfg.model)}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+
+    const candidates = this.modelCandidates(cfg.model);
+    let lastError: Error | null = null;
+
+    for (const model of candidates) {
+      try {
+        const startedAt = performance.now();
+        const blob = await this.requestAudio(text, model, cfg, signal);
+        this._lastModel = model;
+        this._lastLatencyMs = Math.round(performance.now() - startedAt);
+        setResolvedModel(model);
+        return blob;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') throw err;
+        // モデルが存在しない／このキーで使えない場合のみ次の候補へ
+        if (!(err instanceof ModelUnavailableError)) throw err;
+        lastError = err;
+      }
+    }
+    throw lastError ?? new Error('利用可能な Gemini TTS モデルが見つかりませんでした');
+  }
+
+  /** 1モデルぶんの音声生成リクエスト */
+  private async requestAudio(
+    text: string,
+    model: string,
+    cfg: ReturnType<typeof getVoiceSettings>,
+    signal?: AbortSignal,
+  ): Promise<Blob> {
+    const url = `${GEMINI_API_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
     const prompt = cfg.styleInstruction ? `${cfg.styleInstruction}: ${text}` : text;
     const buildPayload = (withTemperature: boolean) => ({
       contents: [{ parts: [{ text: prompt }] }],
@@ -313,13 +452,21 @@ class GeminiTtsService {
       signal: signal ?? this.abortCtrl?.signal,
     });
 
-    let res = await post(true);
-    // temperature を受け付けないモデルでは 400 になるため、その場合のみ外して再試行
-    if (!res.ok && res.status === 400) {
+    // temperature 非対応と判明済みのモデルには最初から付けずに送る（往復を1回に抑える）
+    const useTemperature = this.temperatureSupport.get(model) !== false;
+    let res = await post(useTemperature);
+    if (!res.ok && res.status === 400 && useTemperature) {
+      this.temperatureSupport.set(model, false);
       res = await post(false);
+    } else if (res.ok && useTemperature) {
+      this.temperatureSupport.set(model, true);
     }
+
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+      if (res.status === 404 || /NOT_FOUND|is not found|not supported/i.test(body)) {
+        throw new ModelUnavailableError(model, `HTTP ${res.status}: ${body.slice(0, 200)}`);
+      }
       throw new Error(`Gemini API HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
     const json = await res.json();
@@ -425,22 +572,27 @@ class GeminiTtsService {
     const cfg = getVoiceSettings();
     if (cfg.mode === 'direct') {
       if (!cfg.apiKey) return { available: false, error: 'APIキーが未設定です' };
-      // モデル情報の取得で API キーの有効性を実際に検証
-      try {
-        const res = await fetch(
-          `${GEMINI_API_BASE}/${encodeURIComponent(cfg.model)}?key=${encodeURIComponent(cfg.apiKey)}`,
-        );
-        if (!res.ok) {
+      // モデル情報の取得で API キーの有効性を実際に検証。
+      // 設定モデルが無ければ候補を順に試し、使えたものを記録する。
+      let lastError = '';
+      for (const model of this.modelCandidates(cfg.model)) {
+        try {
+          const res = await fetch(
+            `${GEMINI_API_BASE}/${encodeURIComponent(model)}?key=${encodeURIComponent(cfg.apiKey)}`,
+          );
+          if (res.ok) {
+            setResolvedModel(model);
+            return { available: true, model };
+          }
           const body = await res.text().catch(() => '');
-          return {
-            available: false,
-            error: `HTTP ${res.status}: ${body.slice(0, 160) || '詳細不明'}`,
-          };
+          lastError = `HTTP ${res.status}: ${body.slice(0, 160) || '詳細不明'}`;
+          // モデルが無いだけなら次の候補へ。認証エラー等はそこで打ち切る。
+          if (res.status !== 404 && !/NOT_FOUND|is not found/i.test(body)) break;
+        } catch (err) {
+          return { available: false, error: String(err) };
         }
-        return { available: true, model: cfg.model };
-      } catch (err) {
-        return { available: false, error: String(err) };
       }
+      return { available: false, error: lastError || '利用できるモデルが見つかりませんでした' };
     }
     if (!cfg.serverUrl) return { available: false, error: '中継サーバーURLが未設定です' };
     try {

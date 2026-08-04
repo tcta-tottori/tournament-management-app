@@ -48,9 +48,34 @@ const KEY_VOICE = 'voice_name';
 const KEY_STYLE = 'voice_style';
 const EVENT_CHANGED = 'voice-settings-changed';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
+/**
+ * 既定モデル。Flash 系は Pro 系より生成が速く、コールの待ち時間が短い。
+ * ここで指定した ID がその API キーで使えない場合は
+ * `MODEL_FALLBACKS` の順に自動で切り替える（geminiTts 側で処理）。
+ */
+const DEFAULT_MODEL = 'gemini-3.1-flash-preview-tts';
+
+/**
+ * モデル ID が存在しなかったときに順に試す候補。
+ * Gemini の TTS モデルは ID の付き方（`-tts-preview` / `-preview-tts`）が
+ * 世代ごとに揺れているため、速い順に並べて総当たりする。
+ */
+export const MODEL_FALLBACKS = [
+  'gemini-3.1-flash-preview-tts',
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-3.1-pro-preview-tts',
+  'gemini-2.5-pro-preview-tts',
+];
+
+/** 以前の既定値。ユーザーが明示的に選んだものではないので、新しい既定へ載せ替える */
+const LEGACY_DEFAULT_MODELS = ['gemini-2.5-flash-preview-tts'];
+
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
+
+/** 実際に音声生成に成功したモデル（自動フォールバックの結果） */
+const KEY_RESOLVED_MODEL = 'voice_model_resolved';
 
 /**
  * ビルド時に `VITE_GEMINI_API_KEY` / `VITE_GEMINI_MODEL` が設定されていれば、
@@ -66,21 +91,47 @@ export const IS_MODEL_LOCKED = BAKED_MODEL.length > 0;
 
 /** 選択可能な既知モデル（カスタム入力も可） */
 export const GEMINI_TTS_MODELS: { id: string; label: string }[] = [
-  { id: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS（最新・高速）' },
-  { id: 'gemini-3.1-pro-tts-preview', label: 'Gemini 3.1 Pro TTS（最新・高品質）' },
+  { id: 'gemini-3.1-flash-preview-tts', label: 'Gemini 3.1 Flash TTS（最新・高速）' },
+  { id: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash TTS（別ID表記）' },
+  { id: 'gemini-3.1-pro-preview-tts', label: 'Gemini 3.1 Pro TTS（最新・高品質）' },
   { id: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS（安定）' },
   { id: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro TTS（高品質）' },
 ];
+
+/** 実際に音声生成に成功したモデル ID（未確定なら空文字） */
+export function getResolvedModel(): string {
+  try {
+    return localStorage.getItem(KEY_RESOLVED_MODEL) || '';
+  } catch {
+    return '';
+  }
+}
+
+/** 自動フォールバックで確定したモデルを記録する */
+export function setResolvedModel(model: string): void {
+  try {
+    if (getResolvedModel() === model) return;
+    localStorage.setItem(KEY_RESOLVED_MODEL, model);
+    window.dispatchEvent(new Event(EVENT_CHANGED));
+  } catch {
+    // 無視
+  }
+}
 
 export function getVoiceSettings(): VoiceConfig {
   const mode: VoiceMode = IS_KEY_LOCKED
     ? 'direct'
     : ((localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct');
+  const stored = localStorage.getItem(KEY_MODEL) || '';
+  // 旧バージョンの既定値がそのまま残っている場合は新しい既定（高速なFlash）へ載せ替える
+  const model = IS_MODEL_LOCKED
+    ? BAKED_MODEL
+    : (!stored || LEGACY_DEFAULT_MODELS.includes(stored) ? DEFAULT_MODEL : stored);
   return {
     mode,
     apiKey: IS_KEY_LOCKED ? BAKED_API_KEY : (localStorage.getItem(KEY_API) || ''),
     serverUrl: localStorage.getItem(KEY_SERVER) || defaultServerUrl(),
-    model: IS_MODEL_LOCKED ? BAKED_MODEL : (localStorage.getItem(KEY_MODEL) || DEFAULT_MODEL),
+    model,
     voiceName: localStorage.getItem(KEY_VOICE) || 'Kore',
     styleInstruction: localStorage.getItem(KEY_STYLE) ?? DEFAULT_STYLE,
   };
@@ -91,7 +142,11 @@ export function setVoiceSettings(patch: Partial<VoiceConfig>): void {
   if (patch.mode !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_MODE, patch.mode);
   if (patch.apiKey !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_API, patch.apiKey);
   if (patch.serverUrl !== undefined) localStorage.setItem(KEY_SERVER, patch.serverUrl);
-  if (patch.model !== undefined && !IS_MODEL_LOCKED) localStorage.setItem(KEY_MODEL, patch.model);
+  if (patch.model !== undefined && !IS_MODEL_LOCKED) {
+    localStorage.setItem(KEY_MODEL, patch.model);
+    // モデルを変えたら、自動フォールバックで確定した結果は捨てて選び直す
+    localStorage.removeItem(KEY_RESOLVED_MODEL);
+  }
   if (patch.voiceName !== undefined) localStorage.setItem(KEY_VOICE, patch.voiceName);
   if (patch.styleInstruction !== undefined) localStorage.setItem(KEY_STYLE, patch.styleInstruction);
   try {

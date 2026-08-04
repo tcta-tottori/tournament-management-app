@@ -34,7 +34,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   }[] | null>(null);
   const [listingModels, setListingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const { isSpeaking, isLoading, speak, stop, lastError, clearError } = useGeminiTts();
+  const { isSpeaking, isLoading, speak, stop, lastError, clearError, lastModel, lastLatencyMs } = useGeminiTts();
 
   const persist = useCallback((patch: Parameters<typeof setVoiceSettings>[0]) => {
     setVoiceSettings(patch);
@@ -352,6 +352,17 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               感情・話速・トーンなどを自然言語で指定できます（例:「明るく元気に」）。
             </p>
           </div>
+
+          {/* 直近の生成結果（実際に使われたモデルと所要時間） */}
+          {(lastModel || lastLatencyMs > 0) && (
+            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[11px] text-gray-700 leading-snug">
+              <div className="font-bold text-gray-800 mb-0.5">直近の音声生成</div>
+              <div className="font-mono text-[10px] break-all">{lastModel || '（不明）'}</div>
+              {lastLatencyMs > 0 && (
+                <div className="text-gray-500">生成にかかった時間: {(lastLatencyMs / 1000).toFixed(1)} 秒</div>
+              )}
+            </div>
+          )}
 
           {/* 直近の再生エラー */}
           {lastError && (

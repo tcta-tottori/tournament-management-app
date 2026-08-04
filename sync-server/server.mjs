@@ -76,6 +76,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
+  // どのモデルで生成したかをブラウザ側から読めるようにする
+  'Access-Control-Expose-Headers': 'X-Gemini-Model',
 };
 
 function sendJson(res, status, obj) {
@@ -181,7 +183,12 @@ async function handleGeminiTts(req, res) {
     const pcm = Buffer.from(inline.data, 'base64');
     const sampleRate = parseSampleRate(inline.mimeType || inline.mime_type);
     const wav = pcmToWav(pcm, sampleRate, 1, 16);
-    res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'audio/wav', 'Content-Length': wav.length });
+    res.writeHead(200, {
+      ...CORS_HEADERS,
+      'Content-Type': 'audio/wav',
+      'Content-Length': wav.length,
+      'X-Gemini-Model': model,
+    });
     res.end(wav);
   } catch (err) {
     console.error('[Gemini TTS] fetch failed', err);

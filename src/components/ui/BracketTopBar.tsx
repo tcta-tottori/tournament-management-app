@@ -126,9 +126,10 @@ export default function BracketTopBar({
         )}
       </div>
 
-      {/* 表示回戦の絞り込み（回戦が進むと表示を縮小） */}
+      {/* 表示回戦の絞り込み（回戦が進むと表示を縮小）と、右側のボタン群。
+          ボタンが増えても横にはみ出さないよう、狭い画面では折り返す。 */}
       {(canAdjustRounds || right) && (
-        <div className="flex items-center justify-between gap-2 mt-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-1.5">
           {canAdjustRounds && onStartRoundChange ? (
             <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-1 py-0.5">
               <button

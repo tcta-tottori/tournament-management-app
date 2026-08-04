@@ -40,7 +40,9 @@ jobs:
           # ユーザーはキー入力なしで音声を利用できる。未設定ならユーザーが
           # 音声設定ダイアログでキーを入れるフォールバックになる。
           VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # 任意: 既定モデルを固定したい場合に設定（例: gemini-3.1-flash-tts-preview）
+          # 任意: 既定モデルを固定したい場合に設定（例: gemini-3.1-flash-preview-tts）
+          # 未設定なら voiceConfig.ts の既定（高速な Flash 系）を使い、
+          # そのIDが使えない場合はアプリ側が自動で候補を試す。
           VITE_GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
           # 観戦用インターネット公開: Render等に立てた中継サーバーの wss URL を
           # リポジトリの Variables もしくは Secrets `SYNC_SERVER_URL` に登録すると、

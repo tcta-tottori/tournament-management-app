@@ -2,14 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Volume2, Edit3, Save, X } from 'lucide-react';
 import { db } from '../../db/database';
+import { geminiTts } from '../broadcast/geminiTts';
+import {
+  buildSurnameReadingMap,
+  collectKnownSurnames,
+  estimateSurnameReading,
+  extractSurname,
+} from '../broadcast/surnameReading';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 
 const CATEGORY_LABELS_FULL: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント',
 };
 
-/** 苗字のみ取得 */
-export const familyName = (name: string) => name.trim().split(/[\s　]+/)[0] || name;
+/**
+ * 苗字のみ取得。
+ * 「西山 英汰」のようにスペース区切りならその前を、
+ * 「西山英汰」のように区切りが無い場合は先頭2文字を苗字とみなす。
+ */
+export const familyName = (name: string) => extractSurname(name);
 
 /** カタカナ→ひらがな変換 */
 const kataToHira = (s: string) => s.replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
@@ -107,6 +118,14 @@ export default function CallPreviewDialog({
       const players = await db.players.toArray();
       // キー: スペース除去した名前 → { name: スペース付き名前, furigana: カタカナふりがな }
       const playerMap = new Map(players.map(p => [p.name.replace(/\s+/g, ''), { name: p.name, furigana: p.furigana }]));
+      // 名簿から拾える苗字（「佐々木」のような3文字姓を2文字で切らないために使う）
+      const knownSurnames = collectKnownSurnames(players.map(p => p.name));
+      // 苗字漢字 → 苗字の読み（同姓選手の読みの共通部分から推定）
+      const surnameReadingMap = buildSurnameReadingMap(players);
+      // 過去にこのダイアログで手修正した読み（苗字がキー）を最優先で使う
+      const manualDict = new Map(
+        (await db.furiganaDict.toArray()).map(d => [d.name, d.furigana]),
+      );
 
       // Playerテーブルのスペース付き名前から苗字漢字を取得
       const getKanjiFamily = (mixedName: string): string => {
@@ -114,11 +133,11 @@ export default function CallPreviewDialog({
         const player = playerMap.get(key);
         if (player) {
           // Playerテーブルの名前はスペース区切り（"岸本 健悟"）
-          const parts = player.name.trim().split(/[\s　]+/);
+          const parts = player.name.trim().split(/[\s\u3000]+/);
           if (parts.length > 1) return parts[0];
         }
-        // MixedPlayer名にスペースがある場合
-        return familyName(mixedName);
+        // MixedPlayer名にスペースがある場合／区切りが無い場合
+        return extractSurname(mixedName, knownSurnames);
       };
 
       const maleFN1 = getKanjiFamily(team1.male.name);
@@ -133,19 +152,25 @@ export default function CallPreviewDialog({
       const affFuriganas = await db.affiliationFurigana.where('name').anyOf(affKeys).toArray();
       const affMap = new Map(affFuriganas.map(f => [f.name, f.furigana]));
 
-      // 苗字のひらがな読みを取得
+      // 苗字のひらがな読みを取得。
+      // コールは苗字のみで行うため、フルネームの読み（"にしやまえいた"）を
+      // そのまま返してはいけない。苗字部分だけを特定できないときは漢字の苗字に落とす。
       const getFamilyFurigana = (mixedName: string): string => {
-        const key = mixedName.replace(/\s+/g, '');
-        const player = playerMap.get(key);
+        const kanjiFamily = getKanjiFamily(mixedName);
+        // 1) 手修正済みの読み
+        const manual = manualDict.get(kanjiFamily);
+        if (manual) return kataToHira(manual);
+        // 2) 選手名簿のふりがなが「スペース区切り」なら苗字の読みが確定する
+        const player = playerMap.get(mixedName.replace(/\s+/g, ''));
         if (player?.furigana) {
-          const hira = kataToHira(player.furigana);
-          const parts = hira.trim().split(/[\s　]+/);
-          if (parts.length > 1) return parts[0];
-          // スペースなしだがPlayerふりがなが存在する場合はそのまま返す
-          return hira;
+          const parts = kataToHira(player.furigana).trim().split(/[\s\u3000]+/);
+          if (parts.length > 1 && parts[0]) return parts[0];
         }
-        // フォールバック: 漢字の苗字
-        return getKanjiFamily(mixedName);
+        // 3) 同姓選手の読みの共通部分／全国名簿から苗字の読みを推定
+        const estimated = surnameReadingMap[kanjiFamily] || estimateSurnameReading(kanjiFamily);
+        if (estimated) return estimated;
+        // 4) 推定できなければ漢字の苗字のまま（TTSに読ませる）
+        return kanjiFamily;
       };
 
       setEntries([
@@ -165,6 +190,18 @@ export default function CallPreviewDialog({
   const updateFurigana = useCallback((key: string, value: string) => {
     setEntries(prev => prev.map(e => e.key === key ? { ...e, furigana: value } : e));
   }, []);
+
+  const overrides: Record<string, string> = {};
+  for (const entry of entries) overrides[entry.key] = entry.furigana;
+  const previewText = buildCallText(match, allTeams, category, roundLabel, courtName, startTime, overrides);
+
+  // 読み上げテキストが落ち着いたら裏で音声を作っておく。
+  // 「保存してコール」を押してから音が出るまでの待ち時間をなくすため。
+  useEffect(() => {
+    if (!previewText) return;
+    const t = setTimeout(() => geminiTts.prefetch(previewText), 600);
+    return () => clearTimeout(t);
+  }, [previewText]);
 
   const handleSaveAndSpeak = async () => {
     setSaving(true);
@@ -192,16 +229,10 @@ export default function CallPreviewDialog({
     }
     setSaving(false);
 
-    const overrides: Record<string, string> = {};
-    for (const entry of entries) overrides[entry.key] = entry.furigana;
-    const text = buildCallText(match, allTeams, category, roundLabel, courtName, startTime, overrides);
-    onConfirm(text, overrides);
+    onConfirm(previewText, overrides);
   };
 
   const catLabel = CATEGORY_LABELS_FULL[category];
-  const overrides: Record<string, string> = {};
-  for (const entry of entries) overrides[entry.key] = entry.furigana;
-  const previewText = buildCallText(match, allTeams, category, roundLabel, courtName, startTime, overrides);
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 z-[200]" onClick={onClose}>

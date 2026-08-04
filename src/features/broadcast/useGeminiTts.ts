@@ -43,6 +43,10 @@ export function useGeminiTts() {
   return {
     isSpeaking: state.isSpeaking,
     isLoading: state.isLoading,
+    /** 直近の生成で実際に使われたモデル ID */
+    lastModel: state.lastModel,
+    /** 直近の生成にかかったミリ秒 */
+    lastLatencyMs: state.lastLatencyMs,
     speak,
     stop,
     lastError,
