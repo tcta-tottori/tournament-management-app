@@ -264,46 +264,59 @@ function slotMapFitsLeagues(slotMap: (string | null)[], leagueIds: string[]): bo
 }
 
 /**
- * 並び順（左上から順のリーグID配列）を drawSize 分のスロットに展開する。
- * 足りない分は BYE(null) として、1回戦の各マッチにできるだけ均等に振り分ける。
+ * 半面（drawSize/2 スロット）にエントリーを外側から詰める。
+ * ドロー表の書き方に合わせ、先頭は単独（BYE）で置き、以降は2つずつ組ませる。
+ * 余った枠（空マッチ）は内側＝中央寄りに残す。
+ *
+ *   例) 8スロットに5エントリー → [e0, -, e1, e2, e3, e4, -, -]
+ *       8スロットに6エントリー → [e0, -, e1, e2, e3, e4, e5, -]
  */
-export function distributeToSlots<T>(entries: T[], drawSize: number): (T | null)[] {
-  const slots: (T | null)[] = Array(drawSize).fill(null);
-  const matchCount = drawSize / 2;
-  const byeCount = drawSize - entries.length;
-  if (byeCount <= 0) return entries.slice(0, drawSize);
+function layoutHalfFromOuter<T>(entries: T[], slotCount: number): (T | null)[] {
+  const out: (T | null)[] = Array(slotCount).fill(null);
+  if (entries.length === 0) return out;
 
-  // e: 両方BYEのマッチ数 / k: 片側だけBYEのマッチ数 / それ以外は通常マッチ
-  const emptyMatches = Math.max(0, byeCount - matchCount);
-  const singleByeMatches = byeCount - emptyMatches * 2;
-
-  // BYEを含むマッチを均等に散らす
-  const byeMatchIdx = new Set<number>();
-  const totalByeMatches = emptyMatches + singleByeMatches;
-  for (let i = 0; i < totalByeMatches; i++) {
-    let idx = Math.floor(((i + 0.5) * matchCount) / totalByeMatches);
-    while (byeMatchIdx.has(idx) && idx < matchCount) idx++;
-    if (idx >= matchCount) idx = [...Array(matchCount).keys()].find(n => !byeMatchIdx.has(n)) ?? 0;
-    byeMatchIdx.add(idx);
-  }
-  // 両方BYEのマッチはBYEマッチの中から均等に選ぶ
-  const byeMatchList = [...byeMatchIdx].sort((a, b) => a - b);
-  const emptyIdx = new Set<number>();
-  for (let i = 0; i < emptyMatches; i++) {
-    emptyIdx.add(byeMatchList[Math.floor(((i + 0.5) * byeMatchList.length) / emptyMatches)]);
+  const matchCount = slotCount / 2;
+  // 先頭を単独で置くと枠が足りない場合は、頭から詰める
+  const neededMatches = 1 + Math.ceil((entries.length - 1) / 2);
+  if (entries.length >= slotCount || neededMatches > matchCount) {
+    entries.slice(0, slotCount).forEach((e, i) => { out[i] = e; });
+    return out;
   }
 
   let ei = 0;
-  for (let m = 0; m < matchCount; m++) {
-    if (emptyIdx.has(m)) continue;
-    if (byeMatchIdx.has(m)) {
-      if (ei < entries.length) slots[m * 2] = entries[ei++];
-    } else {
-      if (ei < entries.length) slots[m * 2] = entries[ei++];
-      if (ei < entries.length) slots[m * 2 + 1] = entries[ei++];
-    }
+  out[0] = entries[ei++]; // 先頭は単独（1回戦BYE）
+  for (let m = 1; m < matchCount && ei < entries.length; m++) {
+    out[m * 2] = entries[ei++];
+    if (ei < entries.length) out[m * 2 + 1] = entries[ei++];
   }
-  return slots;
+  return out;
+}
+
+/**
+ * 並び順（左上から順のリーグID配列）を drawSize 分のスロットに展開する。
+ * 足りない分は BYE(null)。
+ *
+ * ドロー表と同じ並びになるよう、上半分・下半分それぞれ外側（上端・下端）から
+ * 詰めて配置する。各半面の外側の1チームは1回戦BYEとなり、空マッチは中央側に残る。
+ *
+ *   例) 16ドロー・10エントリー
+ *       [e0, -, e1, e2, e3, e4, -, -, -, -, e5, e6, e7, e8, -, e9]
+ *       1回戦: e1-e2 / e3-e4 / e5-e6 / e7-e8、e0・e9 はBYE
+ */
+export function distributeToSlots<T>(entries: T[], drawSize: number): (T | null)[] {
+  if (entries.length >= drawSize) return entries.slice(0, drawSize);
+
+  const half = drawSize / 2;
+  // 奇数のときは下半分を1つ多くする（ドロー表の書き方に合わせる）
+  const leftCount = Math.floor(entries.length / 2);
+  const leftEntries = entries.slice(0, leftCount);
+  // 下半分は外側（下端）から詰めるため、逆順で配置してから反転する
+  const rightEntries = entries.slice(leftCount).reverse();
+
+  const leftSlots = layoutHalfFromOuter(leftEntries, half);
+  const rightSlots = layoutHalfFromOuter(rightEntries, half).reverse();
+
+  return [...leftSlots, ...rightSlots];
 }
 
 /**

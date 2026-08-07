@@ -7,6 +7,9 @@ import type {
 } from './types';
 import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches } from './mixedLogic';
 
+/** 保存データの移行でブラケットの作り直しが必要になったか（復元直後に1度だけ実行する） */
+let needsBracketRebuild = false;
+
 interface MixedState {
   // Data
   tournamentInfo: TournamentInfo | null;
@@ -722,7 +725,7 @@ export const useMixedStore = create<MixedState>()(
     }),
     {
       name: 'mixed-tournament-storage',
-      version: 4,
+      version: 5,
       migrate: (persisted: any, version: number) => {
         const state = { ...persisted };
         if (version < 2) {
@@ -736,7 +739,21 @@ export const useMixedStore = create<MixedState>()(
           state.brackets = [];
           state.bracketCourtAssignments = {};
         }
+        if (version < 5) {
+          // v5: 1回戦のBYE配置をドロー表通りに修正したため作り直す
+          //     （試合が進行中・完了しているクラスはそのまま維持される）
+          needsBracketRebuild = true;
+        }
         return state;
+      },
+      onRehydrateStorage: () => () => {
+        if (!needsBracketRebuild) return;
+        needsBracketRebuild = false;
+        // create() の完了後に実行する
+        setTimeout(() => {
+          const s = useMixedStore.getState();
+          if (s.isImported && s.leagues.length > 0 && s.brackets.length > 0) s.regenerateBrackets();
+        }, 0);
       },
     }
   )
