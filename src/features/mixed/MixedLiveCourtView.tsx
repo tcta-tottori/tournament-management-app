@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { LeagueMatchScore, MixedLeague } from './types';
+import { useMixedCourtNumbers } from './mixedCourts';
 
 /** SVG コートライン（縦向き） */
 function VerticalCourtLines({ status }: { status: 'playing' | 'ready' | 'complete' | 'empty' }) {
@@ -61,6 +62,8 @@ export default function MixedLiveCourtView() {
   const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments } = useMixedStore();
 
   const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
+  // 大会設定（読込ページ）で選んだ使用コート
+  const courtNumbers = useMixedCourtNumbers();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -78,12 +81,12 @@ export default function MixedLiveCourtView() {
   const totalMatches = leagueTotal + bracketTotal;
   const progressPct = totalMatches > 0 ? Math.round((totalFinished / totalMatches) * 100) : 0;
 
-  // 物理コート(1〜16)の固定配置マップを構築
+  // 物理コートの固定配置マップを構築
   // 各リーグのコート名から番号を抽出してマッピング
   const courtMap = useMemo(() => {
     const map = new Map<number, { league: MixedLeague; status: ReturnType<typeof getLeagueCourtStatus>; nextMatch: LeagueMatchScore | null } | null>();
-    // 1〜16の物理コートを用意
-    for (let i = 1; i <= 16; i++) map.set(i, null);
+    // 大会設定（読込ページ）で選んだ使用コートを用意
+    for (const n of courtNumbers) map.set(n, null);
 
     for (const league of leagues) {
       const lm = leagueMatches.filter(m => m.leagueId === league.leagueId);
@@ -99,15 +102,27 @@ export default function MixedLiveCourtView() {
       }
     }
     return map;
-  }, [leagues, leagueMatches]);
+  }, [courtNumbers, leagues, leagueMatches]);
 
-  // 4コートごとのブロック: 1-4, 5-8, 9-12, 13-16
-  const physicalBlocks = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]];
+  // 表示するコート番号（使用コート ∪ リーグに割り当て済みのコート）
+  const displayCourtNumbers = useMemo(
+    () => [...courtMap.keys()].sort((a, b) => a - b),
+    [courtMap],
+  );
+
+  // 4コートごとのブロック（例: 全面なら 1-4, 5-8, 9-12, 13-16）
+  const physicalBlocks = useMemo(() => {
+    const blocks: number[][] = [];
+    for (let i = 0; i < displayCourtNumbers.length; i += 4) {
+      blocks.push(displayCourtNumbers.slice(i, i + 4));
+    }
+    return blocks;
+  }, [displayCourtNumbers]);
 
   // コート状態集計
   const courtStats = useMemo(() => {
     let playing = 0, occupied = 0, empty = 0;
-    for (let i = 1; i <= 16; i++) {
+    for (const i of displayCourtNumbers) {
       const info = courtMap.get(i);
       const courtStr = `${i}コート`;
       const hasBracketMatch = Object.values(bracketCourtAssignments).some(ca => ca.courtName === courtStr);
@@ -118,7 +133,7 @@ export default function MixedLiveCourtView() {
       else empty++;
     }
     return { playing, occupied, empty };
-  }, [courtMap, bracketCourtAssignments]);
+  }, [courtMap, displayCourtNumbers, bracketCourtAssignments]);
 
   const getTeamName = (id: string) => allTeams.find(t => t.teamId === id)?.teamName || '';
 
@@ -199,7 +214,7 @@ export default function MixedLiveCourtView() {
               <div className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 w-full max-w-lg">
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {block[0]}〜{block[block.length - 1]}
+                    {block[0] === block[block.length - 1] ? block[0] : `${block[0]}〜${block[block.length - 1]}`}
                   </span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">

@@ -11,6 +11,7 @@ import MixedBracketResultPreview from './MixedBracketResultPreview';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { useVisualViewport } from '../../components/ui/useVisualViewport';
 import { autoBracketStartRound, startRoundLabel } from './bracketRounds';
+import { useMixedCourtNames } from './mixedCourts';
 
 /**
  * ゲームルールの表示用テキストを整形する。
@@ -233,6 +234,8 @@ export default function MixedBracketView() {
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
   const [courtAssignValue, setCourtAssignValue] = useState('');
   const { assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
+  // 大会設定（読込ページ）で選んだ使用コート
+  const courtOpts = useMixedCourtNames();
   const [drawEditMode, setDrawEditMode] = useState(false);
   // 表示回戦の手動指定（null = 自動: 決着済みの回戦を省略）。クラスごとに保持する。
   const [roundOverride, setRoundOverride] = useState<{ category: PlacementCategory; value: number } | null>(null);
@@ -601,7 +604,6 @@ export default function MixedBracketView() {
         const t2 = allTeamsData.find(t => t.teamId === courtAssignMatch.team2Id);
         // 使用中コートを除外
         const usedCourts = new Set(Object.values(bracketCourtAssignments).map(ca => ca.courtName));
-        const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
         const leagueInProgress = new Set<string>();
         for (const l of leagues) {
           const lm = useMixedStore.getState().leagueMatches.filter(m => m.leagueId === l.leagueId);

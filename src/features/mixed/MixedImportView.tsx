@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Users, Settings } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { parseMixedExcel } from './mixedExcelParser';
+import CourtSelector, { STANDARD_COURTS } from '../data/CourtSelector';
 
 export default function MixedImportView() {
   const { importData, setImportFileName, importFileName, isImported, leagues, tournamentInfo, updateTournamentInfo, updateGameRule } = useMixedStore();
@@ -182,6 +183,17 @@ export default function MixedImportView() {
                 onChange={e => updateTournamentInfo('date', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+            </div>
+
+            {/* 使用コート */}
+            <div className="pt-2 border-t border-gray-100">
+              <CourtSelector
+                value={tournamentInfo.courtNames ?? STANDARD_COURTS}
+                onChange={v => updateTournamentInfo('courtNames', v)}
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                決勝トーナメントのコート割当・コートマップで選択できるコートになります
+              </p>
             </div>
 
             {/* ゲームルール（読み込んだリーグのペア数ごとに表示） */}

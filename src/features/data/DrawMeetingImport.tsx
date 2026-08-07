@@ -552,6 +552,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
     fileName: string;
   } | null>(null);
   const [mixedEditName, setMixedEditName] = useState('');
+  // ミックス大会の使用コート（既定は全面=1〜16）
+  const [mixedEditCourtNames, setMixedEditCourtNames] = useState(STANDARD_COURTS);
   // 団体戦確認ダイアログ
   const [teamPending, setTeamPending] = useState<{
     info: TeamTournamentInfo;
@@ -1573,6 +1575,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
               </div>
             </div>
 
+            {/* 使用コート */}
+            <div>
+              <CourtSelector value={mixedEditCourtNames} onChange={setMixedEditCourtNames} />
+              <p className="text-[10px] text-gray-400 mt-1">
+                決勝トーナメントのコート割当・コートマップで選択できるコートになります
+              </p>
+            </div>
+
             {/* 読込概要 */}
             <div className="flex gap-3 text-center">
               <div className="flex-1 bg-emerald-50 rounded-lg p-2 border border-emerald-100">
@@ -1614,6 +1624,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                     name: mixedEditName,
                     date: mixedEditDate,
                     venue: mixedEditVenue,
+                    courtNames: mixedEditCourtNames,
                   };
                   const mixedStore = useMixedStore.getState();
                   mixedStore.importData(info, mixedPending!.leagues, mixedPending!.matches);

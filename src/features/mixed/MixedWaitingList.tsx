@@ -4,6 +4,7 @@ import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useGeminiTts } from '../broadcast/useGeminiTts';
 import CallPreviewDialog from './CallPreviewDialog';
+import { useMixedCourtNames } from './mixedCourts';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
@@ -136,7 +137,8 @@ export default function MixedWaitingList() {
     return set;
   }, [bracketCourtAssignments, leagues]);
 
-  const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
+  // 大会設定（読込ページ）で選んだ使用コート
+  const courtOpts = useMixedCourtNames();
 
   // 全ブラケットから対戦可能な試合を収集
   const waitingMatches = useMemo(() => {

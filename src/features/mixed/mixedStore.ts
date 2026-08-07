@@ -62,7 +62,7 @@ interface MixedState {
   moveTeamToLeague: (teamId: string, targetLeagueId: string) => void;
 
   // Tournament info editing
-  updateTournamentInfo: (field: 'name' | 'date' | 'venue', value: string) => void;
+  updateTournamentInfo: (field: 'name' | 'date' | 'venue' | 'courtNames', value: string) => void;
 
   // Bracket seed shuffle (roulette)
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;

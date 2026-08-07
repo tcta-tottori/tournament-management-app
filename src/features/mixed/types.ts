@@ -113,6 +113,8 @@ export interface TournamentInfo {
   gameRules?: Record<number, string>;
   /** 決勝トーナメント用ゲームルール */
   bracketGameRule?: string;
+  /** 使用コート（カンマ区切りの番号。例: "5,6,7,8"。未設定は全面1〜16） */
+  courtNames?: string;
   /** 順位別トーナメントの並び順（リーグID配列） */
   bracketOrders?: {
     '2nd'?: string[];

@@ -1009,6 +1009,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           name: wizardEditName,
           date: wizardEditDate,
           venue: wizardEditVenue,
+          courtNames: wizardEditCourtNames,
         };
         const mixedStore = useMixedStore.getState();
         mixedStore.importData(info, wizardMixedPending.leagues, wizardMixedPending.matches);
@@ -1884,6 +1885,16 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* 使用コート（ミックス大会）: 時間割は使わないためコートのみ選択 */}
+                    {wizardMixedPending && (
+                      <div>
+                        <CourtSelector value={wizardEditCourtNames} onChange={setWizardEditCourtNames} />
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          決勝トーナメントのコート割当・コートマップで選択できるコートになります
+                        </p>
                       </div>
                     )}
 
