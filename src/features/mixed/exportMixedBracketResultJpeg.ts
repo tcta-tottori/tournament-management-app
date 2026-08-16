@@ -73,17 +73,38 @@ export async function generateMixedBracketResultDataUrl(
   const paddingY = 26;
   const headerH = 110;
   const matchW = 300;
+  /** 2回戦以降は姓のみの表示なので、カード幅を詰めて余白を減らす */
+  const matchWLater = 200;
   const rowH = 48;
   const matchH = rowH * 2;
   const roundGap = 44;
+  /** 2回戦以降の列間も合わせて詰める */
+  const roundGapLater = 32;
   const matchGap = 22;
+  /**
+   * 2回戦以降の縦の間隔をどれだけ詰めるか（1回戦は変えない）。
+   * ラウンドが進むごとに ROUND_COMPRESS 倍ずつ間隔が縮み、
+   * 後半の列が上下に間延びして見えるのを防ぐ。
+   */
+  const ROUND_COMPRESS = 0.68;
 
   const gridUnit = matchH + matchGap;
   const r1Count = roundMatches[0]?.length || 0;
 
   const bracketTopPad = 56;   // ラウンドラベル用
   const bracketSidePad = 28;
-  const bracketW = maxRound * matchW + (maxRound - 1) * roundGap;
+  /** 各ラウンドのカード幅 */
+  const roundW = (ri: number) => (ri === 0 ? matchW : matchWLater);
+  /** ブラケット左端からの各ラウンドの相対X座標 */
+  const roundOffsets: number[] = [];
+  {
+    let x = 0;
+    for (let ri = 0; ri < maxRound; ri++) {
+      roundOffsets.push(x);
+      x += roundW(ri) + (ri === 0 ? roundGap : roundGapLater);
+    }
+  }
+  const bracketW = roundOffsets[maxRound - 1] + roundW(maxRound - 1);
   const tableW = Math.max(bracketW + bracketSidePad * 2, 760);
 
   // 協会ロゴ（ブラケット枠内の右下に配置）
@@ -127,12 +148,19 @@ export async function generateMixedBracketResultDataUrl(
   ctx.restore();
   roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.sky200, 1.5);
 
+  // 1回戦の並びの中心。2回戦以降はこの線に向かって間隔を詰める
+  const bracketCenterY =
+    bracketAreaY + bracketTopPad + matchH / 2 + Math.max(0, r1Count - 1) * gridUnit / 2;
+
   const getMatchY = (ri: number, mi: number) => {
     const spacing = Math.pow(2, ri);
     const offset = (spacing - 1) * gridUnit / 2;
-    return bracketAreaY + bracketTopPad + mi * spacing * gridUnit + offset + matchH / 2;
+    const y = bracketAreaY + bracketTopPad + mi * spacing * gridUnit + offset + matchH / 2;
+    if (ri === 0) return y;
+    // 中心からの距離を縮めることで、並び順を保ったまま縦の余白だけを詰める
+    return bracketCenterY + (y - bracketCenterY) * Math.pow(ROUND_COMPRESS, ri);
   };
-  const getRoundX = (ri: number) => bracketAreaX + ri * (matchW + roundGap);
+  const getRoundX = (ri: number) => bracketAreaX + roundOffsets[ri];
 
   const getRoundName = (round: number) => {
     if (round === maxRound) return '決勝';
@@ -146,7 +174,7 @@ export async function generateMixedBracketResultDataUrl(
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.7;
   for (let ri = 0; ri < roundMatches.length - 1; ri++) {
-    const x1 = getRoundX(ri) + matchW;
+    const x1 = getRoundX(ri) + roundW(ri);
     const x2 = getRoundX(ri + 1);
     const xMid = (x1 + x2) / 2;
     const rMatches = roundMatches[ri];
@@ -156,7 +184,12 @@ export async function generateMixedBracketResultDataUrl(
       const yNext = getMatchY(ri + 1, Math.floor(i / 2));
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(xMid, y1); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x1, y2); ctx.lineTo(xMid, y2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(xMid, y1); ctx.lineTo(xMid, y2); ctx.stroke();
+      // 縦線は次戦の位置まで伸ばす。間隔を詰めた分だけ次戦は2試合の中点から
+      // ずれるため、中点だけを結ぶと横線が縦線から浮いてしまう。
+      ctx.beginPath();
+      ctx.moveTo(xMid, Math.min(y1, y2, yNext));
+      ctx.lineTo(xMid, Math.max(y1, y2, yNext));
+      ctx.stroke();
       ctx.beginPath(); ctx.moveTo(xMid, yNext); ctx.lineTo(x2, yNext); ctx.stroke();
     }
   }
@@ -166,7 +199,7 @@ export async function generateMixedBracketResultDataUrl(
   for (let ri = 0; ri < roundMatches.length; ri++) {
     const round = ri + 1;
     const roundName = getRoundName(round);
-    const labelX = getRoundX(ri) + matchW / 2;
+    const labelX = getRoundX(ri) + roundW(ri) / 2;
     const labelY = bracketAreaY + 26;
     const isFinal = round === maxRound;
 
@@ -194,13 +227,13 @@ export async function generateMixedBracketResultDataUrl(
 
   /** ペア1組分の行を描く */
   const drawPairRow = (
-    cx: number, rowY: number, round: number,
+    cx: number, rowY: number, round: number, cardW: number,
     teamId: string | null, league: string, score: number | null,
     isWinner: boolean, tiebreak: number | null, defLabel?: string,
   ) => {
     if (isWinner) {
       ctx.fillStyle = 'rgba(14, 165, 233, 0.08)';
-      ctx.fillRect(cx + 6, rowY + 2, matchW - 12, rowH - 4);
+      ctx.fillRect(cx + 6, rowY + 2, cardW - 12, rowH - 4);
     }
     const t = teamId ? allTeams.find(tm => tm.teamId === teamId) : null;
     if (!t) return;
@@ -219,7 +252,8 @@ export async function generateMixedBracketResultDataUrl(
     const numX = bgX + bgW + 8;
     drawText(ctx, String(t.pairNumber), numX + 8, rowY + rowH / 2, 11, 'center', isWinner ? COL.sky600 : COL.slate400, 'bold');
 
-    const nameColor = isWinner ? COL.sky700 : COL.slate700;
+    // 勝者は黒文字で強調する（敗者はグレー）
+    const nameColor = isWinner ? COL.slate900 : COL.slate700;
     const nameX = numX + 20;
     const y1 = rowY + rowH * 0.32;
     const y2 = rowY + rowH * 0.70;
@@ -231,7 +265,7 @@ export async function generateMixedBracketResultDataUrl(
       drawText(ctx, compactName(t.male.name), nameX, y1, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
       drawText(ctx, compactName(t.female.name), nameX, y2, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
       const affX = nameX + nameW + 8;
-      const affW = matchW - (affX - cx) - scoreW - 10;
+      const affW = cardW - (affX - cx) - scoreW - 10;
       if (affW > 16) {
         drawText(ctx, t.male.affiliation, affX, y1, 10, 'left', COL.slate400, 'medium', affW);
         drawText(ctx, t.female.affiliation, affX, y2, 10, 'left', COL.slate400, 'medium', affW);
@@ -241,17 +275,18 @@ export async function generateMixedBracketResultDataUrl(
       const parts = t.teamName.split('・');
       const f1 = parts[0] && parts[0] !== t.male.name ? parts[0] : familyName(t.male.name);
       const f2 = parts[1] && parts[1] !== t.female.name ? parts[1] : familyName(t.female.name);
-      const nameW = matchW - (nameX - cx) - scoreW - 10;
+      const nameW = cardW - (nameX - cx) - scoreW - 10;
       drawText(ctx, f1, nameX, y1, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
       drawText(ctx, f2, nameX, y2, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
     }
 
     // スコア（棄権時はラベル）
-    const scoreX = cx + matchW - 12;
+    const scoreX = cx + cardW - 12;
     if (defLabel) {
       drawText(ctx, defLabel, scoreX, rowY + rowH / 2, 12, 'right', defLabel === 'W.O' ? COL.slate400 : COL.win, 'bold');
     } else if (score !== null) {
-      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.sky600 : COL.slate300, 'black');
+      // 勝者側のスコアは赤文字で目立たせる
+      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.win : COL.slate300, 'black');
       if (!isWinner && tiebreak != null) {
         ctx.font = '700 20px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
         const sw = ctx.measureText(String(score)).width;
@@ -263,6 +298,7 @@ export async function generateMixedBracketResultDataUrl(
   // ---- マッチカード ----
   const drawMatchCard = (ri: number, mi: number, match: BracketMatch) => {
     const cx = getRoundX(ri);
+    const cardW = roundW(ri);
     const cyCenter = getMatchY(ri, mi);
     const round = ri + 1;
 
@@ -275,11 +311,11 @@ export async function generateMixedBracketResultDataUrl(
       ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
-      roundRect(ctx, cx, byeY, matchW, rowH, 12, COL.white);
+      roundRect(ctx, cx, byeY, cardW, rowH, 12, COL.white);
       ctx.restore();
-      roundRect(ctx, cx, byeY, matchW, rowH, 12, undefined, COL.sky200, 1.5);
+      roundRect(ctx, cx, byeY, cardW, rowH, 12, undefined, COL.sky200, 1.5);
       const league = winnerId === match.team1Id ? match.team1League : match.team2League;
-      drawPairRow(cx, byeY, round, winnerId, league || '', null, false, null);
+      drawPairRow(cx, byeY, round, cardW, winnerId, league || '', null, false, null);
       return;
     }
 
@@ -290,9 +326,9 @@ export async function generateMixedBracketResultDataUrl(
     ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 3;
-    roundRect(ctx, cx, cy, matchW, matchH, 12, COL.white);
+    roundRect(ctx, cx, cy, cardW, matchH, 12, COL.white);
     ctx.restore();
-    roundRect(ctx, cx, cy, matchW, matchH, 12, undefined, isFinished ? COL.sky300 : COL.sky200, 1.5);
+    roundRect(ctx, cx, cy, cardW, matchH, 12, undefined, isFinished ? COL.sky300 : COL.sky200, 1.5);
 
     const win1 = !!match.winnerId && match.winnerId === match.team1Id;
     const win2 = !!match.winnerId && match.winnerId === match.team2Id;
@@ -311,10 +347,10 @@ export async function generateMixedBracketResultDataUrl(
     }
     const isWO = def1 === 'W.O' || def2 === 'W.O';
 
-    drawPairRow(cx, cy, round, match.team1Id, match.team1League || '',
+    drawPairRow(cx, cy, round, cardW, match.team1Id, match.team1League || '',
       isWO && win1 ? null : match.score1, win1, match.tiebreakScore, def1 || undefined);
-    drawLine(ctx, cx + 8, cy + rowH, cx + matchW - 8, cy + rowH, COL.slate100, 1);
-    drawPairRow(cx, cy + rowH, round, match.team2Id, match.team2League || '',
+    drawLine(ctx, cx + 8, cy + rowH, cx + cardW - 8, cy + rowH, COL.slate100, 1);
+    drawPairRow(cx, cy + rowH, round, cardW, match.team2Id, match.team2League || '',
       isWO && win2 ? null : match.score2, win2, match.tiebreakScore, def2 || undefined);
   };
 
