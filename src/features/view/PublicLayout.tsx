@@ -292,39 +292,49 @@ function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
     setTimeout(() => setRetrying(false), 1500);
   };
 
+  // 中継サーバーが未設定のビルドでは、そもそも他端末のデータを受け取れない。
+  // 観戦者には「待てば映る」と誤解させず、運営側の設定漏れだと分かる文言にする。
+  if (!sync.serverConfigured) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center mt-6">
+        <Info className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+        <p className="text-gray-500 text-sm">観戦用の配信設定が有効になっていません。</p>
+        <p className="text-gray-400 text-xs mt-1">
+          中継サーバーが設定されていないため、他の端末の大会データを受信できません。
+        </p>
+        <p className="text-gray-400 text-xs mt-3 leading-relaxed">
+          運営の方へ: リポジトリの Variables に SYNC_SERVER_URL を登録して再デプロイしてください。
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center mt-6">
       <Info className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-      {sync.hasRoom ? (
-        <>
-          <p className="text-gray-500 text-sm">
-            {sync.connectionState === 'connected'
-              ? '運営端末からのデータ受信を待っています...'
-              : sync.connectionState === 'disconnected'
-                ? '中継サーバーに接続できていません。'
-                : '運営端末のルームに接続しています...'}
-          </p>
-          <p className="text-gray-400 text-xs mt-1">
-            ルーム: <span className="font-mono font-bold">{sync.roomCode}</span>
-          </p>
-          <p className="text-gray-400 text-xs mt-3 leading-relaxed">
-            運営端末で大会データが読み込まれ、同期が開始されると自動で表示されます。
-          </p>
-          <button
-            onClick={handleRetry}
-            disabled={retrying}
-            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
-            再読み込み
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-gray-500 text-sm">大会データが読み込まれていません。</p>
-          <p className="text-gray-400 text-xs mt-1">運営端末で発行された観戦用URLからアクセスしてください。</p>
-        </>
-      )}
+      <p className="text-gray-500 text-sm">
+        {sync.connectionState === 'connected'
+          ? '運営端末からのデータ受信を待っています...'
+          : sync.connectionState === 'disconnected'
+            ? '中継サーバーに接続できていません。'
+            : '運営端末のルームに接続しています...'}
+      </p>
+      <p className="text-gray-400 text-xs mt-1">
+        ルーム: <span className="font-mono font-bold">{sync.roomCode}</span>
+      </p>
+      <p className="text-gray-400 text-xs mt-3 leading-relaxed">
+        {sync.connectionState === 'connected'
+          ? '運営端末で大会データを読み込み、ヘッダーの電波アイコンから「インターネット公開を開始」すると自動で表示されます。'
+          : '運営端末で大会データが読み込まれ、同期が開始されると自動で表示されます。'}
+      </p>
+      <button
+        onClick={handleRetry}
+        disabled={retrying}
+        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+      >
+        <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
+        再読み込み
+      </button>
     </div>
   );
 }

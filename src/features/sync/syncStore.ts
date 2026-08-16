@@ -7,6 +7,7 @@ import type { SyncConnectionState, SyncPeer } from './types';
 // GitHub Actions のシークレット/変数から注入される。
 //   VITE_SYNC_SERVER_URL … 公開中継サーバー(wss://xxx.onrender.com)
 //   VITE_PUBLIC_ROOM      … HP掲載用の固定ルームコード(例: TCTA01)
+//                           未設定でも下の内蔵既定値が使われる
 // これらが設定されていれば、各端末は個別設定なしで
 // インターネット越しに観戦データを閲覧・配信できる。
 // =============================================
@@ -15,9 +16,21 @@ import type { SyncConnectionState, SyncPeer } from './types';
 export const DEFAULT_SERVER_URL: string =
   ((import.meta.env.VITE_SYNC_SERVER_URL as string | undefined) || '').trim();
 
-/** HP掲載用の固定公開ルームコード（未設定なら空文字） */
+/**
+ * VITE_PUBLIC_ROOM が未設定のときに使う内蔵の固定ルームコード。
+ *
+ * これが無いと運営端末は「インターネット公開」のたびにランダムな
+ * ルームコードで配信する一方、HPに貼る固定URL（クエリ無し）は
+ * 接続先ルームを持たないため、観戦者には必ず「データが出ない」状態になる。
+ * 配信側・観戦側の双方がこの定数を参照することで、GitHub側の変数登録が
+ * 無くても固定URLだけで観戦できるようにしておく。
+ */
+const BUILTIN_PUBLIC_ROOM = 'TCTA01';
+
+/** HP掲載用の固定公開ルームコード（未設定なら内蔵の既定値） */
 export const PUBLIC_ROOM: string =
-  ((import.meta.env.VITE_PUBLIC_ROOM as string | undefined) || '').trim().toUpperCase();
+  (((import.meta.env.VITE_PUBLIC_ROOM as string | undefined) || '').trim() || BUILTIN_PUBLIC_ROOM)
+    .toUpperCase();
 
 /** インターネット公開が有効か（サーバーURLが埋め込まれているか） */
 export const PUBLIC_PUBLISH_ENABLED = !!DEFAULT_SERVER_URL;
