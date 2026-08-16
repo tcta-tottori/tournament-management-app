@@ -193,6 +193,10 @@ export async function generateLeagueResultDataUrl(
   ctx.clip();
   ctx.fillStyle = SKY.headerBg; // 薄い水色
   ctx.fillRect(tableX, tableY, tableW, colHeaderH);
+  // 左上のセル（協会ロゴを置く枠）だけ白にする。
+  // ロゴ画像の背景が白なので、水色のままだとロゴが浮いて見えてしまう。
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(tableX, tableY, nameColW, colHeaderH);
   ctx.restore();
 
   // ---- 列ヘッダー区切り線 ----
