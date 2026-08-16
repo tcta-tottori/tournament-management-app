@@ -8,7 +8,7 @@
 
 import type { BracketMatch, MixedTeam, PlacementBracket } from './types';
 import {
-  COL, drawLine, drawResultHeader, drawText, drawTopAccentBar,
+  COL, drawLine, drawResultHeader, drawText, drawTopAccentBar, fontOf,
   fitLogo, getAssociationLogoEnabled, loadResultLogos, roundRect,
 } from '../draw/resultCanvasKit';
 
@@ -203,7 +203,7 @@ export async function generateMixedBracketResultDataUrl(
     const labelY = bracketAreaY + 26;
     const isFinal = round === maxRound;
 
-    ctx.font = '900 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.font = fontOf('bold', 12);
     const labelW = ctx.measureText(roundName).width + 24;
     const labelH = 22;
     const labelBoxX = labelX - labelW / 2;
@@ -219,7 +219,7 @@ export async function generateMixedBracketResultDataUrl(
       roundRect(ctx, labelBoxX, labelBoxY, labelW, labelH, 11, COL.sky100, COL.sky200, 1);
       ctx.fillStyle = COL.sky700;
     }
-    ctx.font = '900 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.font = fontOf('bold', 12);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(roundName, labelX, labelY + 1);
@@ -240,19 +240,20 @@ export async function generateMixedBracketResultDataUrl(
 
     // リーグバッジ
     const badgeLabel = (league || t.leagueId || '').trim() || '-';
-    ctx.font = '900 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+    ctx.font = fontOf('bold', 11);
     const bgW = Math.max(22, ctx.measureText(badgeLabel).width + 12);
     const bgH = 20;
     const bgX = cx + 10;
     const bgY = rowY + (rowH - bgH) / 2;
     roundRect(ctx, bgX, bgY, bgW, bgH, 5, COL.sky100, COL.sky200, 1);
-    drawText(ctx, badgeLabel, bgX + bgW / 2, bgY + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'black', bgW - 6);
+    drawText(ctx, badgeLabel, bgX + bgW / 2, bgY + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'bold', bgW - 6);
 
     // ペア番号
     const numX = bgX + bgW + 8;
-    drawText(ctx, String(t.pairNumber), numX + 8, rowY + rowH / 2, 11, 'center', isWinner ? COL.sky600 : COL.slate400, 'bold');
+    drawText(ctx, String(t.pairNumber), numX + 8, rowY + rowH / 2, 11, 'center', isWinner ? COL.sky600 : COL.slate400, 'medium');
 
-    // 勝者は黒文字で強調する（敗者はグレー）
+    // 勝者は黒文字で強調する（敗者はグレー）。
+    // 太いウェイトは漢字がつぶれて読みにくいため、太字は使わず色で差をつける。
     const nameColor = isWinner ? COL.slate900 : COL.slate700;
     const nameX = numX + 20;
     const y1 = rowY + rowH * 0.32;
@@ -262,8 +263,8 @@ export async function generateMixedBracketResultDataUrl(
     if (round === 1) {
       // 1回戦: フルネーム + 所属
       const nameW = 96;
-      drawText(ctx, compactName(t.male.name), nameX, y1, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
-      drawText(ctx, compactName(t.female.name), nameX, y2, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
+      drawText(ctx, compactName(t.male.name), nameX, y1, 14, 'left', nameColor, 'normal', nameW);
+      drawText(ctx, compactName(t.female.name), nameX, y2, 14, 'left', nameColor, 'normal', nameW);
       const affX = nameX + nameW + 8;
       const affW = cardW - (affX - cx) - scoreW - 10;
       if (affW > 16) {
@@ -276,21 +277,21 @@ export async function generateMixedBracketResultDataUrl(
       const f1 = parts[0] && parts[0] !== t.male.name ? parts[0] : familyName(t.male.name);
       const f2 = parts[1] && parts[1] !== t.female.name ? parts[1] : familyName(t.female.name);
       const nameW = cardW - (nameX - cx) - scoreW - 10;
-      drawText(ctx, f1, nameX, y1, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
-      drawText(ctx, f2, nameX, y2, 14, 'left', nameColor, isWinner ? 'black' : 'bold', nameW);
+      drawText(ctx, f1, nameX, y1, 14, 'left', nameColor, 'normal', nameW);
+      drawText(ctx, f2, nameX, y2, 14, 'left', nameColor, 'normal', nameW);
     }
 
     // スコア（棄権時はラベル）
     const scoreX = cx + cardW - 12;
     if (defLabel) {
-      drawText(ctx, defLabel, scoreX, rowY + rowH / 2, 12, 'right', defLabel === 'W.O' ? COL.slate400 : COL.win, 'bold');
+      drawText(ctx, defLabel, scoreX, rowY + rowH / 2, 12, 'right', defLabel === 'W.O' ? COL.slate400 : COL.win, 'medium');
     } else if (score !== null) {
       // 勝者側のスコアは赤文字で目立たせる
-      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.win : COL.slate300, 'black');
+      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.win : COL.slate300, 'medium');
       if (!isWinner && tiebreak != null) {
-        ctx.font = '700 20px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
+        ctx.font = fontOf('medium', 20);
         const sw = ctx.measureText(String(score)).width;
-        drawText(ctx, `(${tiebreak})`, scoreX - sw - 3, rowY + rowH / 2, 10, 'right', COL.sky500, 'bold');
+        drawText(ctx, `(${tiebreak})`, scoreX - sw - 3, rowY + rowH / 2, 10, 'right', COL.sky500, 'normal');
       }
     }
   };
