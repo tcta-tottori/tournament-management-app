@@ -64,7 +64,7 @@ export function drawVenueBadge(ctx: CanvasRenderingContext2D, opts: VenueBadgeOp
     if (tottoriLogo) {
       ctx.drawImage(tottoriLogo, startX, centerY - logoH / 2, logoW, logoH);
     }
-    ctx.fillStyle = '#334155'; // slate-700
+    ctx.fillStyle = '#262626'; // 墨（サイトの本文色）
     ctx.fillText(label, startX + logoW + gap, centerY);
   } else if (venueLogo) {
     // 従来の会場ロゴ

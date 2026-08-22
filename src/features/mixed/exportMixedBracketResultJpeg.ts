@@ -2,7 +2,7 @@
 // ミックス大会 決勝トーナメントの結果画像
 //
 // 意匠は団体戦の結果画像（exportTeamBracketResultJpeg）に合わせ、
-// ヘッダー（種目名のグラデーション文字 + 大会名 + 会場ロゴ）と
+// ヘッダー（赤い四角＋種目名 + 大会名 + 会場ロゴ）と
 // 協会ロゴはシングルス大会と共通の resultCanvasKit を使う。
 // =============================================
 
@@ -124,7 +124,7 @@ export async function generateMixedBracketResultDataUrl(
   ctx.fillRect(0, 0, totalW, totalH);
   drawTopAccentBar(ctx, totalW);
 
-  // ---- ヘッダー（種目名はバッジではなくグラデーション文字） ----
+  // ---- ヘッダー（赤い四角＋墨の見出し。白ベース＋赤の差し色） ----
   drawResultHeader(ctx, {
     title: MIXED_CATEGORY_LABELS[bracket.category] || bracket.category,
     tournamentName,
@@ -141,12 +141,12 @@ export async function generateMixedBracketResultDataUrl(
   const bracketAreaY = paddingY + headerH;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.06)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
-  roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.sky200, 1.5);
+  roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.gray200, 1.5);
 
   // 1回戦の並びの中心。2回戦以降はこの線に向かって間隔を詰める
   const bracketCenterY =
@@ -170,7 +170,7 @@ export async function generateMixedBracketResultDataUrl(
   };
 
   // ---- 接続線 ----
-  ctx.strokeStyle = COL.sky300;
+  ctx.strokeStyle = COL.gray300;
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.7;
   for (let ri = 0; ri < roundMatches.length - 1; ri++) {
@@ -211,13 +211,13 @@ export async function generateMixedBracketResultDataUrl(
 
     if (isFinal) {
       const grad = ctx.createLinearGradient(labelBoxX, 0, labelBoxX + labelW, 0);
-      grad.addColorStop(0, COL.sky500);
-      grad.addColorStop(1, COL.sky600);
+      grad.addColorStop(0, COL.champ2);
+      grad.addColorStop(1, COL.champ3);
       roundRect(ctx, labelBoxX, labelBoxY, labelW, labelH, 11, grad);
       ctx.fillStyle = COL.white;
     } else {
-      roundRect(ctx, labelBoxX, labelBoxY, labelW, labelH, 11, COL.sky100, COL.sky200, 1);
-      ctx.fillStyle = COL.sky700;
+      roundRect(ctx, labelBoxX, labelBoxY, labelW, labelH, 11, COL.white, COL.gray300, 1);
+      ctx.fillStyle = COL.gray700;
     }
     ctx.font = fontOf('bold', 12);
     ctx.textAlign = 'center';
@@ -232,7 +232,7 @@ export async function generateMixedBracketResultDataUrl(
     isWinner: boolean, tiebreak: number | null, defLabel?: string,
   ) => {
     if (isWinner) {
-      ctx.fillStyle = 'rgba(14, 165, 233, 0.08)';
+      ctx.fillStyle = COL.winRow;
       ctx.fillRect(cx + 6, rowY + 2, cardW - 12, rowH - 4);
     }
     const t = teamId ? allTeams.find(tm => tm.teamId === teamId) : null;
@@ -245,16 +245,16 @@ export async function generateMixedBracketResultDataUrl(
     const bgH = 20;
     const bgX = cx + 10;
     const bgY = rowY + (rowH - bgH) / 2;
-    roundRect(ctx, bgX, bgY, bgW, bgH, 5, COL.sky100, COL.sky200, 1);
-    drawText(ctx, badgeLabel, bgX + bgW / 2, bgY + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'bold', bgW - 6);
+    roundRect(ctx, bgX, bgY, bgW, bgH, 5, COL.gray100, COL.gray200, 1);
+    drawText(ctx, badgeLabel, bgX + bgW / 2, bgY + bgH / 2 + 0.5, 11, 'center', COL.gray700, 'bold', bgW - 6);
 
     // ペア番号
     const numX = bgX + bgW + 8;
-    drawText(ctx, String(t.pairNumber), numX + 8, rowY + rowH / 2, 11, 'center', isWinner ? COL.sky600 : COL.slate400, 'medium');
+    drawText(ctx, String(t.pairNumber), numX + 8, rowY + rowH / 2, 11, 'center', isWinner ? COL.gray700 : COL.gray400, 'medium');
 
     // 勝者は黒文字で強調する（敗者はグレー）。
     // 太いウェイトは漢字がつぶれて読みにくいため、太字は使わず色で差をつける。
-    const nameColor = isWinner ? COL.slate900 : COL.slate700;
+    const nameColor = isWinner ? COL.gray900 : COL.gray700;
     const nameX = numX + 20;
     const y1 = rowY + rowH * 0.32;
     const y2 = rowY + rowH * 0.70;
@@ -268,8 +268,8 @@ export async function generateMixedBracketResultDataUrl(
       const affX = nameX + nameW + 8;
       const affW = cardW - (affX - cx) - scoreW - 10;
       if (affW > 16) {
-        drawText(ctx, t.male.affiliation, affX, y1, 10, 'left', COL.slate400, 'medium', affW);
-        drawText(ctx, t.female.affiliation, affX, y2, 10, 'left', COL.slate400, 'medium', affW);
+        drawText(ctx, t.male.affiliation, affX, y1, 10, 'left', COL.gray400, 'medium', affW);
+        drawText(ctx, t.female.affiliation, affX, y2, 10, 'left', COL.gray400, 'medium', affW);
       }
     } else {
       // 2回戦以降: 姓のみ（横に長くならないように）
@@ -284,14 +284,14 @@ export async function generateMixedBracketResultDataUrl(
     // スコア（棄権時はラベル）
     const scoreX = cx + cardW - 12;
     if (defLabel) {
-      drawText(ctx, defLabel, scoreX, rowY + rowH / 2, 12, 'right', defLabel === 'W.O' ? COL.slate400 : COL.win, 'medium');
+      drawText(ctx, defLabel, scoreX, rowY + rowH / 2, 12, 'right', defLabel === 'W.O' ? COL.gray400 : COL.win, 'medium');
     } else if (score !== null) {
       // 勝者側のスコアは赤文字で目立たせる
-      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.win : COL.slate300, 'medium');
+      drawText(ctx, String(score), scoreX, rowY + rowH / 2, 20, 'right', isWinner ? COL.win : COL.gray300, 'medium');
       if (!isWinner && tiebreak != null) {
         ctx.font = fontOf('medium', 20);
         const sw = ctx.measureText(String(score)).width;
-        drawText(ctx, `(${tiebreak})`, scoreX - sw - 3, rowY + rowH / 2, 10, 'right', COL.sky500, 'normal');
+        drawText(ctx, `(${tiebreak})`, scoreX - sw - 3, rowY + rowH / 2, 10, 'right', COL.gray400, 'normal');
       }
     }
   };
@@ -309,12 +309,12 @@ export async function generateMixedBracketResultDataUrl(
       if (!winnerId) return;
       const byeY = cyCenter - rowH / 2;
       ctx.save();
-      ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
       roundRect(ctx, cx, byeY, cardW, rowH, 12, COL.white);
       ctx.restore();
-      roundRect(ctx, cx, byeY, cardW, rowH, 12, undefined, COL.sky200, 1.5);
+      roundRect(ctx, cx, byeY, cardW, rowH, 12, undefined, COL.gray200, 1.5);
       const league = winnerId === match.team1Id ? match.team1League : match.team2League;
       drawPairRow(cx, byeY, round, cardW, winnerId, league || '', null, false, null);
       return;
@@ -324,12 +324,12 @@ export async function generateMixedBracketResultDataUrl(
     const isFinished = match.status === 'finished';
 
     ctx.save();
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 3;
     roundRect(ctx, cx, cy, cardW, matchH, 12, COL.white);
     ctx.restore();
-    roundRect(ctx, cx, cy, cardW, matchH, 12, undefined, isFinished ? COL.sky300 : COL.sky200, 1.5);
+    roundRect(ctx, cx, cy, cardW, matchH, 12, undefined, isFinished ? COL.gray300 : COL.gray200, 1.5);
 
     const win1 = !!match.winnerId && match.winnerId === match.team1Id;
     const win2 = !!match.winnerId && match.winnerId === match.team2Id;
@@ -350,7 +350,7 @@ export async function generateMixedBracketResultDataUrl(
 
     drawPairRow(cx, cy, round, cardW, match.team1Id, match.team1League || '',
       isWO && win1 ? null : match.score1, win1, match.tiebreakScore, def1 || undefined);
-    drawLine(ctx, cx + 8, cy + rowH, cx + cardW - 8, cy + rowH, COL.slate100, 1);
+    drawLine(ctx, cx + 8, cy + rowH, cx + cardW - 8, cy + rowH, COL.gray100, 1);
     drawPairRow(cx, cy + rowH, round, cardW, match.team2Id, match.team2League || '',
       isWO && win2 ? null : match.score2, win2, match.tiebreakScore, def2 || undefined);
   };

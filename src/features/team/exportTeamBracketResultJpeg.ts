@@ -1,8 +1,7 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
-import { drawVenueBadge } from './venueBadge';
 import { buildResultFileName } from './resultFileName';
-import { splitBigSmall, measureMixed, drawMixed } from './mixedSizeText';
+import { COL, drawResultHeader, drawScorePair, drawTopAccentBar } from '../draw/resultCanvasKit';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -26,25 +25,12 @@ function shortLeagueBadge(league: string): string {
   return s.slice(0, 3);
 }
 
-/** 種目別カラー（画面側・予選リーグ結果と統一） */
-const TYPE_COLORS: Record<MatchType, { bg: string; fg: string; accent: string }> = {
-  MIX: { bg: '#ede9fe', fg: '#6d28d9', accent: '#8b5cf6' }, // violet
-  WD:  { bg: '#fce7f3', fg: '#be185d', accent: '#ec4899' }, // pink
-  MD:  { bg: '#e0f2fe', fg: '#0369a1', accent: '#0ea5e9' }, // sky
-  D3:  { bg: '#dbeafe', fg: '#1d4ed8', accent: '#3b82f6' }, // blue
-  D2:  { bg: '#cffafe', fg: '#0e7490', accent: '#06b6d4' }, // cyan
-  D1:  { bg: '#ccfbf1', fg: '#0f766e', accent: '#14b8a6' }, // teal
-  S2:  { bg: '#fef3c7', fg: '#b45309', accent: '#f59e0b' }, // amber
-  S1:  { bg: '#fee2e2', fg: '#b91c1c', accent: '#ef4444' }, // red
-};
-
-/** カテゴリ別カラー（ヘッダーのバッジに使用） */
-const CATEGORY_COLORS: Record<PlacementCategory, { c1: string; c2: string; c3: string }> = {
-  '1st': { c1: '#fbbf24', c2: '#f59e0b', c3: '#b45309' }, // amber / gold
-  '2nd': { c1: '#cbd5e1', c2: '#94a3b8', c3: '#475569' }, // slate / silver
-  '3rd': { c1: '#fb923c', c2: '#f97316', c3: '#c2410c' }, // orange / bronze
-  '4th': { c1: '#60a5fa', c2: '#3b82f6', c3: '#1d4ed8' }, // blue
-};
+/**
+ * 種目バッジの配色。
+ * 白ベース＋赤の差し色というトンマナに合わせ、種目は色分けせず
+ * 無彩色のタグで統一する（種目は D1 / S1 などのラベルで判別できる）。
+ */
+const TYPE_TAG = { bg: COL.gray50, fg: COL.gray700, border: COL.gray300 };
 
 /** 画像を読み込むヘルパー（失敗時は null） */
 function tryLoadImage(src: string): Promise<HTMLImageElement | null> {
@@ -137,29 +123,6 @@ export async function generateTeamBracketResultDataUrl(
   const paddingYBottom = 12; // 下部は最小限
   const totalH = paddingY + paddingYBottom + headerH + bracketH;
 
-  // ---- カラーパレット ----
-  const COL = {
-    white: '#ffffff',
-    sky50: '#f0f9ff',
-    sky100: '#e0f2fe',
-    sky200: '#bae6fd',
-    sky300: '#7dd3fc',
-    sky500: '#0ea5e9',
-    sky600: '#0284c7',
-    sky700: '#0369a1',
-    sky800: '#075985',
-    slate50: '#f8fafc',
-    slate100: '#f1f5f9',
-    slate200: '#e2e8f0',
-    slate300: '#cbd5e1',
-    slate400: '#94a3b8',
-    slate500: '#64748b',
-    slate600: '#475569',
-    slate700: '#334155',
-    slate800: '#1e293b',
-    slate900: '#0f172a',
-  };
-
   const canvas = document.createElement('canvas');
   canvas.width = totalW * scale;
   canvas.height = totalH * scale;
@@ -170,17 +133,11 @@ export async function generateTeamBracketResultDataUrl(
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // ---- 上端アクセントバー（水色ベース） ----
-  const topBarH = 5;
-  const topBarGrad = ctx.createLinearGradient(0, 0, totalW, 0);
-  topBarGrad.addColorStop(0,   COL.sky300);
-  topBarGrad.addColorStop(0.5, COL.sky500);
-  topBarGrad.addColorStop(1,   COL.sky300);
-  ctx.fillStyle = topBarGrad;
-  ctx.fillRect(0, 0, totalW, topBarH);
+  // ---- 上端アクセントバー（ブランド赤） ----
+  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘルパー ----
-  const drawLine = (x1: number, y1: number, x2: number, y2: number, color = COL.slate200, w = 1) => {
+  const drawLine = (x1: number, y1: number, x2: number, y2: number, color: string = COL.gray200, w = 1) => {
     ctx.strokeStyle = color;
     ctx.lineWidth = w;
     ctx.beginPath();
@@ -195,7 +152,7 @@ export async function generateTeamBracketResultDataUrl(
     y: number,
     size: number,
     align: CanvasTextAlign = 'center',
-    color = COL.slate800,
+    color: string = COL.gray800,
     weight: 'normal' | 'medium' | 'bold' | 'black' = 'normal',
     maxWidth?: number,
   ) => {
@@ -237,90 +194,31 @@ export async function generateTeamBracketResultDataUrl(
     }
   };
 
-  // ---- ヘッダー ----
-  // 左: "◯位トーナメント" を一体化した横長バッジ
-  const catColor = CATEGORY_COLORS[bracket.category];
-  const catText = resolveBracketLabel(bracket.category, customLabels);
-
-  // 数字・英字は大きく、その他（日本語など）は小さく描画する（例:「1位・2位決定戦」の 1,2 のみ大）
-  const catRuns = splitBigSmall(catText);
-  const badgeBigPx = 34;
-  const badgeSmallPx = 23;
-  const badgeH = 62;
-  const badgeTextW = measureMixed(ctx, catRuns, badgeBigPx, badgeSmallPx, '900', '800');
-  const badgePadX = 28;
-  const badgeW = badgeTextW + badgePadX * 2;
-  const badgeX = paddingX;
-  const badgeY = paddingY + (headerH - badgeH) / 2 - 8;
-
-  ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
-  ctx.shadowBlur = 22;
-  ctx.shadowOffsetY = 10;
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
-  badgeGrad.addColorStop(0, catColor.c1);
-  badgeGrad.addColorStop(0.55, catColor.c2);
-  badgeGrad.addColorStop(1, catColor.c3);
-  drawRoundRect(badgeX, badgeY, badgeW, badgeH, badgeH / 2, badgeGrad);
-  ctx.restore();
-
-  // 内側ハイライト
-  const innerHL = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH * 0.55);
-  innerHL.addColorStop(0, 'rgba(255,255,255,0.32)');
-  innerHL.addColorStop(1, 'rgba(255,255,255,0)');
-  drawRoundRect(badgeX + 2, badgeY + 2, badgeW - 4, badgeH * 0.55, badgeH / 2 - 2, innerHL);
-
-  // 内側ボーダー
-  drawRoundRect(badgeX + 1.5, badgeY + 1.5, badgeW - 3, badgeH - 3, badgeH / 2 - 1.5, undefined, 'rgba(255,255,255,0.45)', 1);
-
-  // バッジ内テキスト（数字/英字=大, その他=小。alphabetic ベースラインで下端そろえ）
-  ctx.fillStyle = COL.white;
-  const badgeBaselineY = badgeY + badgeH / 2 + badgeBigPx * 0.34;
-  drawMixed(ctx, catRuns, badgeX + (badgeW - badgeTextW) / 2, badgeBaselineY, badgeBigPx, badgeSmallPx, '900', '800');
-
-  // 右: 大会名 + 会場ロゴ
-  const headerRightX = paddingX + tableW;
-  if (tournamentName) {
-    // バッジの右側だけに収める（重なり防止）。最低幅は確保。
-    const nameMaxW = Math.max(200, tableW - badgeW - 48);
-    drawText(tournamentName, headerRightX, paddingY + 34, 22, 'right', COL.slate800, 'bold', nameMaxW);
-  }
-  // 会場表示（鳥取大学の場合は専用ロゴ＋テキスト、それ以外は会場ロゴ）
-  drawVenueBadge(ctx, {
+  // ---- ヘッダー（他の結果画像と共通の意匠）----
+  drawResultHeader(ctx, {
+    title: resolveBracketLabel(bracket.category, customLabels),
+    tournamentName,
     venue,
-    rightX: headerRightX,
-    topY: paddingY + 54,
-    venueLogo,
-    tottoriLogo,
+    paddingX,
+    paddingY,
+    tableW,
+    headerH,
+    logos: { tcta: tctaLogo, venue: venueLogo, tottori: tottoriLogo },
   });
-
-  // ---- ヘッダーと表の間のアクセントライン ----
-  const accentY = paddingY + headerH - 4;
-  const accentGrad = ctx.createLinearGradient(paddingX, accentY, paddingX + tableW, accentY);
-  accentGrad.addColorStop(0, 'rgba(14, 165, 233, 0)');
-  accentGrad.addColorStop(0.2, 'rgba(14, 165, 233, 0.45)');
-  accentGrad.addColorStop(0.8, 'rgba(14, 165, 233, 0.45)');
-  accentGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
-  ctx.strokeStyle = accentGrad;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(paddingX, accentY);
-  ctx.lineTo(paddingX + tableW, accentY);
-  ctx.stroke();
 
   // ---- ブラケット本体エリア ----
   // 横方向は常にブラケットをフレーム内にセンタリング（左右に最低 bracketSidePad のマージン）
   const bracketAreaX = paddingX + Math.max(bracketSidePad, (tableW - bracketW) / 2);
   const bracketAreaY = paddingY + headerH;
 
-  // 背景カード（白 + 水色ボーダー）
+  // 背景カード（白 + 淡いグレーのボーダー）
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.06)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
   drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
-  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.sky200, 1.5);
+  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.gray200, 1.5);
 
   // 試合の中心Y座標
   const getMatchY = (ri: number, mi: number) => {
@@ -337,8 +235,8 @@ export async function generateTeamBracketResultDataUrl(
     return `${round}回戦`;
   };
 
-  // ---- 接続線（水色ベースで統一） ----
-  const lineColor = COL.sky300;
+  // ---- 接続線（無彩色で統一） ----
+  const lineColor = COL.gray300;
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.7;
@@ -375,13 +273,13 @@ export async function generateTeamBracketResultDataUrl(
 
     if (isFinal) {
       const grad = ctx.createLinearGradient(labelBoxX, 0, labelBoxX + labelW, 0);
-      grad.addColorStop(0, COL.sky500);
-      grad.addColorStop(1, COL.sky600);
+      grad.addColorStop(0, COL.champ2);
+      grad.addColorStop(1, COL.champ3);
       drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, grad);
       ctx.fillStyle = COL.white;
     } else {
-      drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, COL.sky100, COL.sky200, 1);
-      ctx.fillStyle = COL.sky700;
+      drawRoundRect(labelBoxX, labelBoxY, labelW, labelH, 11, COL.white, COL.gray300, 1);
+      ctx.fillStyle = COL.gray700;
     }
     ctx.font = '900 12px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
     ctx.textAlign = 'center';
@@ -403,14 +301,14 @@ export async function generateTeamBracketResultDataUrl(
       const byeH = 44;
       const byeY = cyCenter - byeH / 2;
 
-      // カード背景（影付き、白 + 水色ボーダー）
+      // カード背景（影付き、白 + 淡いグレーのボーダー）
       ctx.save();
-      ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
       drawRoundRect(cx, byeY, matchW, byeH, 12, COL.white);
       ctx.restore();
-      drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.sky200, 1.5);
+      drawRoundRect(cx, byeY, matchW, byeH, 12, undefined, COL.gray200, 1.5);
 
       // リーグ色バッジ（短縮ラベル＋自動幅で重なり防止）
       const bgBadgeX = cx + 10;
@@ -419,8 +317,8 @@ export async function generateTeamBracketResultDataUrl(
       const bgBadgeW = Math.max(22, ctx.measureText(bgBadgeLabel).width + 12);
       const bgBadgeH = 20;
       const bgBadgeY = byeY + (byeH - bgBadgeH) / 2;
-      drawRoundRect(bgBadgeX, bgBadgeY, bgBadgeW, bgBadgeH, 5, COL.sky100, COL.sky200, 1);
-      drawText(bgBadgeLabel, bgBadgeX + bgBadgeW / 2, bgBadgeY + bgBadgeH / 2 + 0.5, 11, 'center', COL.sky700, 'black', bgBadgeW - 6);
+      drawRoundRect(bgBadgeX, bgBadgeY, bgBadgeW, bgBadgeH, 5, COL.gray100, COL.gray200, 1);
+      drawText(bgBadgeLabel, bgBadgeX + bgBadgeW / 2, bgBadgeY + bgBadgeH / 2 + 0.5, 11, 'center', COL.gray700, 'black', bgBadgeW - 6);
 
       // チーム名（中央寄せ風、badgeの右から右端まで）
       const nameX = bgBadgeX + bgBadgeW + 8;
@@ -431,22 +329,22 @@ export async function generateTeamBracketResultDataUrl(
         byeY + byeH / 2,
         13,
         'left',
-        COL.slate700,
+        COL.gray700,
         'bold',
         nameMaxW,
       );
       return;
     }
 
-    // カード背景（影付き、白 + 水色ボーダー）
+    // カード背景（影付き、白 + 淡いグレーのボーダー）
     ctx.save();
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.10)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 3;
     drawRoundRect(cx, cy, matchW, matchH, 12, COL.white);
     ctx.restore();
 
-    const borderColor = isFinished ? COL.sky300 : COL.sky200;
+    const borderColor = isFinished ? COL.gray300 : COL.gray200;
     drawRoundRect(cx, cy, matchW, matchH, 12, undefined, borderColor, 1.5);
 
     // 上部: チーム名 × 2段
@@ -462,9 +360,9 @@ export async function generateTeamBracketResultDataUrl(
 
       const rowY = teamAreaY + idx * teamRowH;
 
-      // 勝者の背景ハイライト（水色ベース）
+      // 勝者の背景ハイライト（淡い赤）
       if (isWinner) {
-        ctx.fillStyle = 'rgba(14, 165, 233, 0.08)';
+        ctx.fillStyle = COL.winRow;
         ctx.fillRect(cx + 6, rowY + 2, matchW - 12, teamRowH - 2);
       }
 
@@ -475,8 +373,8 @@ export async function generateTeamBracketResultDataUrl(
       ctx.font = '900 11px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
       const bgW = Math.max(22, ctx.measureText(badgeLabel).width + 12);
       const bgH = 20;
-      drawRoundRect(badgeX2, badgeY2, bgW, bgH, 5, COL.sky100, COL.sky200, 1);
-      drawText(badgeLabel, badgeX2 + bgW / 2, badgeY2 + bgH / 2 + 0.5, 11, 'center', COL.sky700, 'black', bgW - 6);
+      drawRoundRect(badgeX2, badgeY2, bgW, bgH, 5, COL.gray100, COL.gray200, 1);
+      drawText(badgeLabel, badgeX2 + bgW / 2, badgeY2 + bgH / 2 + 0.5, 11, 'center', COL.gray700, 'black', bgW - 6);
 
       // チーム名（バッジの右端から開始）
       const nameX = badgeX2 + bgW + 8;
@@ -488,7 +386,7 @@ export async function generateTeamBracketResultDataUrl(
         rowY + teamRowH / 2,
         13,
         'left',
-        isWinner ? COL.sky700 : COL.slate700,
+        isWinner ? COL.gray900 : COL.gray600,
         isWinner ? 'black' : 'bold',
         nameMaxW,
       );
@@ -501,20 +399,20 @@ export async function generateTeamBracketResultDataUrl(
           rowY + teamRowH / 2,
           17,
           'right',
-          isWinner ? COL.sky600 : COL.slate300,
+          isWinner ? COL.win : COL.gray300,
           'black',
         );
       }
     };
     drawTeamRow(0);
     // チーム間のセパレータ
-    drawLine(cx + 8, teamAreaY + teamRowH, cx + matchW - 8, teamAreaY + teamRowH, COL.slate100, 1);
+    drawLine(cx + 8, teamAreaY + teamRowH, cx + matchW - 8, teamAreaY + teamRowH, COL.gray100, 1);
     drawTeamRow(1);
 
     // サブマッチエリア
     const subAreaY = teamAreaY + teamRowH * 2 + 6;
     const subAreaH2 = matchH - (subAreaY - cy) - 10;
-    drawLine(cx + 8, subAreaY, cx + matchW - 8, subAreaY, COL.slate200, 1);
+    drawLine(cx + 8, subAreaY, cx + matchW - 8, subAreaY, COL.gray200, 1);
 
     const subRowH = subAreaH2 / TYPE_ORDER.length;
     for (let i = 0; i < TYPE_ORDER.length; i++) {
@@ -523,20 +421,19 @@ export async function generateTeamBracketResultDataUrl(
       const subY = subAreaY + i * subRowH + subRowH / 2;
 
       // 種目バッジ
-      const tc = TYPE_COLORS[mt];
       const tagW = 30;
       const tagH = 15;
       const tagX = cx + 10;
       const tagY = subY - tagH / 2;
-      drawRoundRect(tagX, tagY, tagW, tagH, 4, tc.bg, tc.accent, 1);
-      ctx.fillStyle = tc.fg;
+      drawRoundRect(tagX, tagY, tagW, tagH, 4, TYPE_TAG.bg, TYPE_TAG.border, 1);
+      ctx.fillStyle = TYPE_TAG.fg;
       ctx.font = 'bold 9px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(TYPE_LABEL[mt], tagX + tagW / 2, tagY + tagH / 2 + 0.5);
 
       if (!sub || sub.score1 === null || sub.score2 === null) {
-        drawText('—', cx + matchW / 2, subY, 11, 'center', COL.slate300);
+        drawText('—', cx + matchW / 2, subY, 11, 'center', COL.gray300);
         continue;
       }
 
@@ -546,24 +443,20 @@ export async function generateTeamBracketResultDataUrl(
       const p1 = (sub.players1 || []).join('/') || '';
       const p2 = (sub.players2 || []).join('/') || '';
 
-      // 中央にスコア、両サイドに選手名
-      const scoreText = `${sub.score1} - ${sub.score2}`;
-      ctx.font = 'bold 13px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
-      const scoreWid = ctx.measureText(scoreText).width;
-      const scoreColor = won1 ? COL.sky700 : won2 ? '#be185d' : COL.slate500;
-
+      // 中央にスコア、両サイドに選手名。勝った側の数字だけ赤で強調する。
       const scoreCx = cx + matchW / 2 + 6;
-      ctx.fillStyle = scoreColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(scoreText, scoreCx, subY);
+      const scoreWid = drawScorePair(ctx, {
+        left: sub.score1, right: sub.score2,
+        centerX: scoreCx, centerY: subY, px: 13,
+        leftWin: won1, rightWin: won2,
+      });
 
       // 左選手名
       const leftX = tagX + tagW + 6;
       const leftMaxW = scoreCx - scoreWid / 2 - leftX - 6;
       if (p1 && leftMaxW > 10) {
         ctx.font = `${won1 ? 'bold' : '500'} 10px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-        ctx.fillStyle = COL.slate600;
+        ctx.fillStyle = COL.gray600;
         ctx.textAlign = 'right';
         ctx.fillText(p1, scoreCx - scoreWid / 2 - 5, subY, leftMaxW);
       }
@@ -572,7 +465,7 @@ export async function generateTeamBracketResultDataUrl(
       const rightMaxW = cx + matchW - 10 - rightX;
       if (p2 && rightMaxW > 10) {
         ctx.font = `${won2 ? 'bold' : '500'} 10px "Inter", "Hiragino Sans", "Yu Gothic", sans-serif`;
-        ctx.fillStyle = COL.slate600;
+        ctx.fillStyle = COL.gray600;
         ctx.textAlign = 'left';
         ctx.fillText(p2, rightX, subY, rightMaxW);
       }
