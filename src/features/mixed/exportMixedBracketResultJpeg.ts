@@ -8,7 +8,7 @@
 
 import type { BracketMatch, MixedTeam, PlacementBracket } from './types';
 import {
-  COL, drawLine, drawResultHeader, drawText, drawTopAccentBar, fontOf,
+  COL, drawLine, drawResultHeader, drawText, fontOf,
   fitLogo, getAssociationLogoEnabled, loadResultLogos, roundRect,
 } from '../draw/resultCanvasKit';
 
@@ -122,7 +122,6 @@ export async function generateMixedBracketResultDataUrl(
 
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘッダー（赤い四角＋墨の見出し。白ベース＋赤の差し色） ----
   drawResultHeader(ctx, {

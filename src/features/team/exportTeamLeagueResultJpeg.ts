@@ -2,7 +2,7 @@ import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchT
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
 import {
-  COL, drawResultHeader, drawScorePair, drawTopAccentBar, promotionBadgeStyle,
+  COL, drawResultHeader, drawScorePair, promotionBadgeStyle,
 } from '../draw/resultCanvasKit';
 
 const TYPE_LABEL: Record<MatchType, string> = {
@@ -168,9 +168,6 @@ export async function generateTeamLeagueResultDataUrl(
   // 背景: リーグの枠外は完全な白で塗りつぶす（ロゴの矩形が背景に浮かないように）
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-
-  // ---- 上端のアクセントバー（ブランド赤） ----
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘルパー ----
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color: string = COL.gray200, w = 1) => {

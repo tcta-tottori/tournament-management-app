@@ -19,7 +19,6 @@ import {
   drawLine,
   drawResultHeader,
   drawText,
-  drawTopAccentBar,
   fitLogo,
   fontOf,
   getAssociationLogoEnabled,
@@ -458,7 +457,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘッダー（団体戦と同じ体裁） ----
   drawResultHeader(ctx, {
@@ -470,6 +468,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     tableW,
     headerH,
     logos,
+    titleEn: 'TOURNAMENT',
   });
 
   // ---- ブラケット枠 ----
@@ -900,7 +899,6 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
 
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘッダー（トーナメント表と共通） ----
   drawResultHeader(ctx, {
@@ -912,6 +910,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     tableW,
     headerH,
     logos,
+    titleEn: 'LEAGUE',
   });
 
   // ---- カード ----

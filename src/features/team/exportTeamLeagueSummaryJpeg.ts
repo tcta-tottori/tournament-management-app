@@ -1,7 +1,7 @@
 import type { TeamLeague, TeamLeagueStanding, MatchFormat } from './types';
 import { resolveClubPromotionStatus } from './teamLogic';
 import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
-import { COL, drawResultHeader, drawTopAccentBar, promotionBadgeStyle } from '../draw/resultCanvasKit';
+import { COL, drawResultHeader, promotionBadgeStyle } from '../draw/resultCanvasKit';
 
 // =============================================
 // リーグ結果「順位表サマリー」画像
@@ -104,9 +104,6 @@ export async function generateTeamLeagueSummaryDataUrl(
 
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-
-  // 上端アクセントバー（ブランド赤）
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘルパー ----
   const drawText = (

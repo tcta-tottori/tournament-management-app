@@ -1,7 +1,7 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
 import { buildResultFileName } from './resultFileName';
-import { COL, drawResultHeader, drawScorePair, drawTopAccentBar } from '../draw/resultCanvasKit';
+import { COL, drawResultHeader, drawScorePair } from '../draw/resultCanvasKit';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -132,9 +132,6 @@ export async function generateTeamBracketResultDataUrl(
   // 背景（白）
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-
-  // ---- 上端アクセントバー（ブランド赤） ----
-  drawTopAccentBar(ctx, totalW);
 
   // ---- ヘルパー ----
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color: string = COL.gray200, w = 1) => {

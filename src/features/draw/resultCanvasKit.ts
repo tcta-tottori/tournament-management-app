@@ -25,6 +25,8 @@ export const COL = {
   white: '#ffffff',
   /** サイトの地色と同じ、ごくわずかに落とした白 */
   paper: '#f8f8f8',
+  /** 見出しの背後に敷く英字のグレー（サイトと同じ薄さ） */
+  ghost: '#ededed',
 
   // ---- 差し色（サイトのブランド赤） ----
   red50: '#fdf3f2',
@@ -233,16 +235,6 @@ export function headingColors(): { text: string; mark: string } {
   return { text: COL.gray900, mark: COL.red500 };
 }
 
-/** 上端のアクセントバー（ブランド赤のベタ） */
-export function drawTopAccentBar(ctx: CanvasRenderingContext2D, totalW: number, h = 5): void {
-  const grad = ctx.createLinearGradient(0, 0, totalW, 0);
-  grad.addColorStop(0, COL.red500);
-  grad.addColorStop(0.65, COL.red500);
-  grad.addColorStop(1, COL.red700);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, totalW, h);
-}
-
 /**
  * ヘッダー下の罫線。
  * 全幅は淡いグレー、左端だけブランド赤を重ねてサイトの見出し罫と揃える。
@@ -266,6 +258,53 @@ export function drawHeaderRule(
   ctx.moveTo(x, y);
   ctx.lineTo(x + Math.min(96, w * 0.16), y);
   ctx.stroke();
+}
+
+/**
+ * 見出しの英字ラベル。サイトの見出しと同じく、日本語見出しの背後に
+ * 薄いグレーの英語を敷くために使う。
+ */
+export function headingEnglish(title: string, subtitle?: string): string {
+  const s = `${title} ${subtitle ?? ''}`;
+  if (/順位表|STANDINGS/i.test(s)) return 'STANDINGS';
+  if (/リーグ|LEAGUE|部|予選/.test(s)) return 'LEAGUE';
+  if (/トーナメント|決勝|TOURNAMENT/.test(s)) return 'TOURNAMENT';
+  return 'RESULT';
+}
+
+/**
+ * 見出しの背後に敷く薄いグレーの英字（サイトのセクション見出しと同じ意匠）。
+ * 文字間を広げて描くので、canvas の letterSpacing に依存しない。
+ */
+export function drawHeadingGhost(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  centerY: number,
+  px: number,
+  maxW: number,
+): void {
+  if (!text || maxW <= 0) return;
+  const tracking = px * 0.06;
+  ctx.save();
+  ctx.fillStyle = COL.ghost;
+  ctx.font = fontOf('black', px);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  // 文字間を足した実幅が maxW に収まるまで詰める
+  const widths = [...text].map(ch => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + tracking * (text.length - 1);
+  const k = total > maxW ? maxW / total : 1;
+  let cx = x;
+  for (let i = 0; i < text.length; i++) {
+    ctx.save();
+    ctx.translate(cx, centerY);
+    ctx.scale(k, 1);
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
+    cx += (widths[i] + tracking) * k;
+  }
+  ctx.restore();
 }
 
 /**
@@ -299,13 +338,15 @@ export interface ResultHeaderOptions {
   subtitle?: string;
   /** 見出しの基準サイズ（既定 46px）。表が大きい画像では大きくする */
   titlePx?: number;
+  /** 見出しの背後に敷く英字（未指定なら見出しから自動判定） */
+  titleEn?: string;
   /** 会場バッジの表示倍率（既定 1） */
   venueScale?: number;
 }
 
 /**
  * 結果画像のヘッダーを描画する（白ベース＋赤の差し色）。
- *   左  : 赤い四角 ＋ 種目名（墨）
+ *   左  : 赤い四角 ＋ 種目名（墨）＋ 背後に薄いグレーの英字
  *   右上: 大会名（墨） ＋ 会場
  *   下  : 淡いグレーの罫線＋左端だけ赤
  */
@@ -314,6 +355,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
     title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos,
     subtitle, titlePx = 46, venueScale = 1,
   } = o;
+  const titleEn = o.titleEn ?? headingEnglish(title, subtitle);
 
   // ---- 右側（大会名・会場）の基準位置 ----
   // 種目名の高さをここに合わせるため、先に決めておく。
@@ -329,8 +371,8 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   const runs = splitBigSmall(title);
   let bigPx = titlePx;
   let smallPx = Math.round(titlePx * 0.74);
-  const markSize = Math.max(10, Math.round(titlePx * 0.30));
-  const markGap = Math.max(8, Math.round(titlePx * 0.22));
+  const markSize = Math.max(16, Math.round(titlePx * 0.46));
+  const markGap = Math.max(10, Math.round(titlePx * 0.24));
   // 右側の大会名と重ならない範囲まで、はみ出す場合だけ縮める
   const maxTitleW = Math.max(180, tableW * 0.46) - markSize - markGap;
   let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
@@ -345,6 +387,9 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
 
   const markRight = drawHeadingMark(ctx, paddingX, dividerY, markSize);
   const titleX = markRight + markGap;
+  // 日本語見出しの背後に薄いグレーの英字（サイトと同じ意匠）
+  drawHeadingGhost(ctx, titleEn, titleX, dividerY - bigPx * 0.12, bigPx * 1.06,
+    Math.max(160, tableW * 0.62 - (titleX - paddingX)));
   ctx.fillStyle = heading.text;
   drawMixed(ctx, runs, titleX, baselineY, bigPx, smallPx, '900', '800');
   // 見出し全体の幅（右側の大会名の折り返し判定に使う）

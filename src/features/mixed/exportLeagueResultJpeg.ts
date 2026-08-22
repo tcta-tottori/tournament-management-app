@@ -1,7 +1,7 @@
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
 import { drawVenueBadge, isTottoriUniv } from '../team/venueBadge';
 import { splitBigSmall, measureMixed, drawMixed } from '../team/mixedSizeText';
-import { COL, drawHeadingMark, drawTopAccentBar } from '../draw/resultCanvasKit';
+import { COL, drawHeadingGhost, drawHeadingMark } from '../draw/resultCanvasKit';
 
 /** 会場ロゴの表示倍率（表が小さいので既定より控えめにする） */
 const VENUE_LOGO_SCALE = 2 / 3;
@@ -81,8 +81,8 @@ export async function generateLeagueResultDataUrl(
   let bigPx = 68;
   let smallPx = 40;
   // 見出しの左に置く赤い四角（サイトのセクション見出しと同じ記号）
-  const markSize = 20;
-  const markGap = 14;
+  const markSize = 30;
+  const markGap = 16;
   const maxTitleW = Math.max(160, tableW * 0.42) - markSize - markGap;
   let titleW = measureMixed(measureCtx, runs, bigPx, smallPx, '900', '800');
   if (titleW > maxTitleW) {
@@ -112,7 +112,6 @@ export async function generateLeagueResultDataUrl(
   // 背景
   ctx.fillStyle = COL.white;
   ctx.fillRect(0, 0, totalW, totalH);
-  drawTopAccentBar(ctx, totalW);
 
   // ヘルパー
   const drawLine = (x1: number, y1: number, x2: number, y2: number, color: string = COL.gray300, w = 1.5) => {
@@ -153,9 +152,14 @@ export async function generateLeagueResultDataUrl(
   // 会場ロゴの下端とタイトルの下端をそろえる
   // （会場表示が無い場合は、タイトルの上端が余白に収まる位置に置く）
   const venueBottomY = venueH > 0 ? venueTopY + venueH : paddingY + 8 + titleCapH;
-  const markRight = drawHeadingMark(ctx, paddingX, venueBottomY - titleCapH / 2, markSize);
+  const titleCenterY = venueBottomY - titleCapH / 2;
+  const markRight = drawHeadingMark(ctx, paddingX, titleCenterY, markSize);
+  const titleX = markRight + markGap;
+  // 日本語見出しの背後に薄いグレーの英字（サイトと同じ意匠）
+  drawHeadingGhost(ctx, 'LEAGUE', titleX, titleCenterY - bigPx * 0.12, bigPx * 1.06,
+    Math.max(160, tableW * 0.62 - (titleX - paddingX)));
   ctx.fillStyle = COL.gray900;
-  drawMixed(ctx, runs, markRight + markGap, venueBottomY, bigPx, smallPx, '900', '800');
+  drawMixed(ctx, runs, titleX, venueBottomY, bigPx, smallPx, '900', '800');
   const headingW = markSize + markGap + titleW;
 
   // 大会名（右揃え。タイトルと重ならない幅に収める）
