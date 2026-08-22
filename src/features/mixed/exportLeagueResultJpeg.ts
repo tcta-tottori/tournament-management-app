@@ -1,7 +1,7 @@
 import type { MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding } from './types';
 import { drawVenueBadge, isTottoriUniv } from '../team/venueBadge';
 import { splitBigSmall, measureMixed, drawMixed } from '../team/mixedSizeText';
-import { COL, drawHeadingGhost, drawHeadingMark } from '../draw/resultCanvasKit';
+import { COL, drawHeaderAccent, drawHeadingGhost, drawHeadingMark, headingEnglish } from '../draw/resultCanvasKit';
 
 /** 会場ロゴの表示倍率（表が小さいので既定より控えめにする） */
 const VENUE_LOGO_SCALE = 2 / 3;
@@ -94,11 +94,12 @@ export async function generateLeagueResultDataUrl(
   // タイトルは会場ロゴの下端に下端をそろえて描くので、
   // その上端（≒ベースライン - 大文字の高さ）が余白に収まる高さを確保する
   const titleCapH = bigPx * 0.78;
+  // 末尾の +16 は、見出しの下に入れるアクセント（赤ベタ＋ストライプ）の分
   const headerH = Math.max(
     65,
     (venueTopY - paddingY) + venueH + 14,
     titleCapH + 26,
-  );
+  ) + 16;
   const tableH = colHeaderH + rowH * teamCount;
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + tableH;
@@ -155,9 +156,10 @@ export async function generateLeagueResultDataUrl(
   const titleCenterY = venueBottomY - titleCapH / 2;
   const markRight = drawHeadingMark(ctx, paddingX, titleCenterY, markSize);
   const titleX = markRight + markGap;
-  // 日本語見出しの背後に薄いグレーの英字（サイトと同じ意匠）
-  drawHeadingGhost(ctx, 'LEAGUE', titleX, titleCenterY - bigPx * 0.12, bigPx * 1.06,
-    Math.max(160, tableW * 0.62 - (titleX - paddingX)));
+  // 日本語見出しの右側に薄いグレーの英字（サイトと同じ意匠）
+  drawHeadingGhost(ctx, headingEnglish(title, 'LEAGUE'), paddingX + tableW * 0.66,
+    titleCenterY - bigPx * 0.1, bigPx, Math.max(160, tableW * 0.66 - markSize - markGap + titleW * 0.35),
+    'right');
   ctx.fillStyle = COL.gray900;
   drawMixed(ctx, runs, titleX, venueBottomY, bigPx, smallPx, '900', '800');
   const headingW = markSize + markGap + titleW;
@@ -175,6 +177,9 @@ export async function generateLeagueResultDataUrl(
   // ---- 表全体枠（影付け） ----
   const tableX = paddingX;
   const tableY = paddingY + headerH;
+
+  // 見出し下のアクセント（他の結果画像と同じ赤ベタ＋斜めストライプ）
+  drawHeaderAccent(ctx, paddingX, tableY - 12, tableW);
   
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.06)';
@@ -240,6 +245,11 @@ export async function generateLeagueResultDataUrl(
     const standing = standings.find(s => s.teamId === team.teamId) || { wins: 0, losses: 0, rank: 0 };
     const rowTop = tableY + colHeaderH + rowH * rowIdx;
 
+    // 行のストライプ（1行おきにごく淡いグレーを敷く）
+    if (rowIdx % 2 === 1) {
+      ctx.fillStyle = COL.gray50;
+      ctx.fillRect(tableX + 1, rowTop, tableW - 2, rowH);
+    }
     if (rowIdx > 0) {
       drawLine(tableX, rowTop, tableX + tableW, rowTop, COL.gray200, 1);
     }

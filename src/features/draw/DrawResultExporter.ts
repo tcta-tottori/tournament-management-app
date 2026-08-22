@@ -468,7 +468,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     tableW,
     headerH,
     logos,
-    titleEn: 'TOURNAMENT',
+    titleEnFallback: 'TOURNAMENT',
   });
 
   // ---- ブラケット枠 ----
@@ -910,7 +910,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     tableW,
     headerH,
     logos,
-    titleEn: 'LEAGUE',
+    titleEnFallback: 'LEAGUE',
   });
 
   // ---- カード ----

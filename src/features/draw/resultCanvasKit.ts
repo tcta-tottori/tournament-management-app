@@ -236,8 +236,40 @@ export function headingColors(): { text: string; mark: string } {
 }
 
 /**
+ * 斜めストライプの帯（サイトのアクセント意匠）。
+ * 指定した矩形の中に、右上がりの細い赤線を等間隔で並べる。
+ */
+export function drawStripeBand(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: string = COL.red500,
+  gap = 7,
+  lineW = 3,
+): void {
+  if (w <= 0 || h <= 0) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'butt';
+  for (let sx = x - h; sx < x + w + h; sx += gap) {
+    ctx.beginPath();
+    ctx.moveTo(sx, y + h);
+    ctx.lineTo(sx + h, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
  * ヘッダー下の罫線。
- * 全幅は淡いグレー、左端だけブランド赤を重ねてサイトの見出し罫と揃える。
+ * 全幅は淡いグレー。左端はブランド赤のベタ＋斜めストライプで、
+ * サイトの見出し罫と同じ表情にする。
  */
 export function drawHeaderRule(
   ctx: CanvasRenderingContext2D,
@@ -251,25 +283,83 @@ export function drawHeaderRule(
   ctx.moveTo(x, y);
   ctx.lineTo(x + w, y);
   ctx.stroke();
-
-  ctx.strokeStyle = COL.red500;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + Math.min(96, w * 0.16), y);
-  ctx.stroke();
+  drawHeaderAccent(ctx, x, y, w);
 }
 
 /**
- * 見出しの英字ラベル。サイトの見出しと同じく、日本語見出しの背後に
- * 薄いグレーの英語を敷くために使う。
+ * 見出し下のアクセント（赤ベタ＋斜めストライプ）だけを描く。
+ * 罫線を引く余白が無い画像（予選リーグ表など）で使う。
  */
-export function headingEnglish(title: string, subtitle?: string): string {
-  const s = `${title} ${subtitle ?? ''}`;
+export function drawHeaderAccent(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+): void {
+  const solidW = Math.min(84, w * 0.12);
+  ctx.fillStyle = COL.red500;
+  ctx.fillRect(x, y - 2.5, solidW, 5);
+  const stripeW = Math.min(112, w * 0.14);
+  drawStripeBand(ctx, x + solidW + 6, y - 4, stripeW, 8, COL.red300, 11, 4);
+}
+
+/** 1 → 1st, 2 → 2nd … の序数表記 */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  const suffix =
+    mod100 >= 11 && mod100 <= 13 ? 'th'
+      : n % 10 === 1 ? 'st'
+        : n % 10 === 2 ? 'nd'
+          : n % 10 === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+}
+
+/** 「男子」「女子」「ミックス」から英語の区分を返す */
+function genderEnglish(s: string): string {
+  if (/ミックス|ミクスト|混合|MIX/i.test(s)) return 'MIXED';
+  if (/女子|レディ|WOMEN/i.test(s)) return "WOMEN'S";
+  if (/男子|MEN/i.test(s)) return "MEN'S";
+  return '';
+}
+
+/**
+ * 見出しの英字ラベル。日本語見出しの背後に敷く英語を組み立てる。
+ *   1位トーナメント → 1st TOURNAMENT
+ *   Aリーグ         → LEAGUE A
+ *   男子1部         → MEN'S DIVISION 1
+ *   一般男子シングルス → MEN'S SINGLES
+ * @param fallback どの規則にも当てはまらないときの英字（例: TOURNAMENT）
+ */
+export function headingEnglish(title: string, fallback = 'RESULT'): string {
+  const s = (title || '').trim();
+  const gender = genderEnglish(s);
+
+  // 「◯位トーナメント」「4・5位トーナメント」「1位・2位決定戦」など。
+  // 連番表記は先頭の数字を採用する（4・5位 → 4th）。
+  const place = s.match(/(\d+)(?:\s*[・,、\-–~～]\s*\d+)*\s*位/);
+  if (place && /トーナメント|決定戦|決勝|TOURNAMENT/i.test(s)) {
+    return `${ordinal(Number(place[1]))} TOURNAMENT`;
+  }
+  // 「◯部」（男子1部 → MEN'S DIVISION 1）
+  const division = s.match(/(\d+)\s*部/);
+  if (division) {
+    return [gender, 'DIVISION', division[1]].filter(Boolean).join(' ');
+  }
+  // 「予選会」
+  if (/予選/.test(s)) return [gender, 'QUALIFIER'].filter(Boolean).join(' ');
+  // 「Aリーグ」「1リーグ」
+  const league = s.match(/([0-9A-Za-z])\s*リーグ/);
+  if (league) return `LEAGUE ${league[1].toUpperCase()}`;
+  // 種目名（一般男子シングルス → MEN'S SINGLES / 45歳以上 → 45+）
+  const kind = /ダブルス|DOUBLES/i.test(s) ? 'DOUBLES' : /シングルス|SINGLES/i.test(s) ? 'SINGLES' : '';
+  if (kind) {
+    const age = s.match(/(\d+)\s*歳/);
+    return [gender, kind, age ? `${age[1]}+` : ''].filter(Boolean).join(' ');
+  }
   if (/順位表|STANDINGS/i.test(s)) return 'STANDINGS';
-  if (/リーグ|LEAGUE|部|予選/.test(s)) return 'LEAGUE';
-  if (/トーナメント|決勝|TOURNAMENT/.test(s)) return 'TOURNAMENT';
-  return 'RESULT';
+  if (/リーグ|LEAGUE/i.test(s)) return 'LEAGUE';
+  if (/トーナメント|決勝|TOURNAMENT/i.test(s)) return 'TOURNAMENT';
+  return gender ? `${gender} ${fallback}` : fallback;
 }
 
 /**
@@ -283,6 +373,7 @@ export function drawHeadingGhost(
   centerY: number,
   px: number,
   maxW: number,
+  align: 'left' | 'right' = 'left',
 ): void {
   if (!text || maxW <= 0) return;
   const tracking = px * 0.06;
@@ -295,7 +386,8 @@ export function drawHeadingGhost(
   const widths = [...text].map(ch => ctx.measureText(ch).width);
   const total = widths.reduce((a, b) => a + b, 0) + tracking * (text.length - 1);
   const k = total > maxW ? maxW / total : 1;
-  let cx = x;
+  // right 指定時は x を右端として扱う
+  let cx = align === 'right' ? x - total * k : x;
   for (let i = 0; i < text.length; i++) {
     ctx.save();
     ctx.translate(cx, centerY);
@@ -340,6 +432,8 @@ export interface ResultHeaderOptions {
   titlePx?: number;
   /** 見出しの背後に敷く英字（未指定なら見出しから自動判定） */
   titleEn?: string;
+  /** 英字を自動判定できないときの既定値（例: TOURNAMENT / LEAGUE） */
+  titleEnFallback?: string;
   /** 会場バッジの表示倍率（既定 1） */
   venueScale?: number;
 }
@@ -355,7 +449,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
     title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos,
     subtitle, titlePx = 46, venueScale = 1,
   } = o;
-  const titleEn = o.titleEn ?? headingEnglish(title, subtitle);
+  const titleEn = o.titleEn ?? headingEnglish(title, o.titleEnFallback);
 
   // ---- 右側（大会名・会場）の基準位置 ----
   // 種目名の高さをここに合わせるため、先に決めておく。
@@ -387,9 +481,11 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
 
   const markRight = drawHeadingMark(ctx, paddingX, dividerY, markSize);
   const titleX = markRight + markGap;
-  // 日本語見出しの背後に薄いグレーの英字（サイトと同じ意匠）
-  drawHeadingGhost(ctx, titleEn, titleX, dividerY - bigPx * 0.12, bigPx * 1.06,
-    Math.max(160, tableW * 0.62 - (titleX - paddingX)));
+  // 日本語見出しの右側に薄いグレーの英字（サイトと同じ意匠）。
+  // 見出しの末尾に少し重なる位置から右へ伸ばす。
+  const ghostRightX = paddingX + tableW * 0.66;
+  drawHeadingGhost(ctx, titleEn, ghostRightX, dividerY - bigPx * 0.1, bigPx * 1.0,
+    Math.max(160, tableW * 0.66 - (titleX - paddingX) + titleW * 0.35), 'right');
   ctx.fillStyle = heading.text;
   drawMixed(ctx, runs, titleX, baselineY, bigPx, smallPx, '900', '800');
   // 見出し全体の幅（右側の大会名の折り返し判定に使う）

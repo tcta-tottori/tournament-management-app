@@ -306,6 +306,11 @@ export async function generateTeamLeagueResultDataUrl(
     const standing = standings.find(s => s.teamId === team.teamId);
     const rowTop = tableY + colHeaderH + rowH * rowIdx;
 
+    // 行のストライプ（1行おきにごく淡いグレーを敷く）
+    if (rowIdx % 2 === 1) {
+      ctx.fillStyle = COL.gray50;
+      ctx.fillRect(tableX + 1, rowTop, tableW - 2, rowH);
+    }
     if (rowIdx > 0) {
       drawLine(tableX, rowTop, tableX + tableW, rowTop, COL.gray200, 1);
     }
