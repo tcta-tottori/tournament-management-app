@@ -77,7 +77,7 @@ export async function generateTeamBracketResultDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
+  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
   const matchW = 260;
   // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて高さを調整
   // 158 = チーム名2段 + サブマッチ3行 + ステータス

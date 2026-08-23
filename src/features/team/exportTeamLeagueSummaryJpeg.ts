@@ -69,7 +69,7 @@ export async function generateTeamLeagueSummaryDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 172; // 見出し + 大会名 + 「順位表」 + 会場ロゴ + 英字（ストライプ文字）
+  const headerH = 118; // 見出し + 大会名 + 「順位表」 + 会場ロゴ
 
   const rankColW = 96;
   const teamColW = 300;

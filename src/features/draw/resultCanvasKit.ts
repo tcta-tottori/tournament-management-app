@@ -252,10 +252,7 @@ export function drawHeaderRule(
   ctx.stroke();
 }
 
-/**
- * トーナメント表・リーグ表の外枠。
- * ブランド赤の細い二重線（外＝赤、内＝淡い赤）で、白地に映える枠にする。
- */
+/** トーナメント表・リーグ表の外枠（淡いグレーの細線） */
 export function drawResultFrame(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -264,8 +261,7 @@ export function drawResultFrame(
   h: number,
   r: number,
 ): void {
-  roundRect(ctx, x, y, w, h, r, undefined, COL.red500, 2);
-  roundRect(ctx, x + 5, y + 5, w - 10, h - 10, Math.max(2, r - 5), undefined, COL.red100, 1.2);
+  roundRect(ctx, x, y, w, h, r, undefined, COL.gray300, 1.5);
 }
 
 /** 1 → 1st, 2 → 2nd … の序数表記 */
@@ -462,18 +458,12 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   // 文字の高さの中心を「分け目」に合わせる（alphabetic ベースラインからの補正）
   const baselineY = dividerY + bigPx * 0.34;
 
-  // 英字（横線入りの大きな薄いグレー文字）は、大会名・会場の真下に
-  // 右揃えで置く。日本語見出しの背面に回すため先に描く。
-  const venueBottomY = venue
-    ? venueTopY + 48 * venueScale
-    : nameY + NAME_PX / 2;
-  const ghostTopY = venueBottomY + 8;
-  const ghostBottomY = paddingY + headerH - 10;
-  const ghostPx = clamp((ghostBottomY - ghostTopY) / 0.78, 20, titlePx * 1.2);
-  drawHeadingGhost(
-    ctx, titleEn, paddingX + tableW, ghostBottomY - ghostPx * 0.78 * 0.52, ghostPx,
-    tableW * 0.9, 'right',
-  );
+  // 英字（横線入りの大きな薄いグレー文字）は、大会名・会場の文字に
+  // 重ねて右揃えで敷く。最初に描くことで下のレイヤーになる。
+  const venueBottomY = venue ? venueTopY + 48 * venueScale : nameY + NAME_PX / 2;
+  const ghostPx = titlePx * 1.25;
+  const ghostCenterY = (nameY - NAME_PX / 2 + venueBottomY) / 2;
+  drawHeadingGhost(ctx, titleEn, paddingX + tableW, ghostCenterY, ghostPx, tableW * 0.9, 'right');
 
   const markRight = drawHeadingMark(ctx, paddingX, dividerY, markSize);
   const titleX = markRight + markGap;

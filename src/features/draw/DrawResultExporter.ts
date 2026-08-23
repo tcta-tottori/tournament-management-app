@@ -414,7 +414,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ---- 全体レイアウト ----
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
+  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
   const sidePad = 22;
 
   const contentW = NAME_W * 2 + halfRounds * COL_W * 2 + CENTER_W;
@@ -874,7 +874,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
 
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
+  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
   const sidePad = 22;
 
   const gridW = NAME_W + n * CELL_W + STAT_W + RANK_W;

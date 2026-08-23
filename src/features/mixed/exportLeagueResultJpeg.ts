@@ -94,15 +94,11 @@ export async function generateLeagueResultDataUrl(
   // タイトルは会場ロゴの下端に下端をそろえて描くので、
   // その上端（≒ベースライン - 大文字の高さ）が余白に収まる高さを確保する
   const titleCapH = bigPx * 0.78;
-  // 英字（横線入りのストライプ文字）は大会名・会場の真下に敷くので、
-  // その分の高さをヘッダーに足しておく。
-  const ghostPx = 48;
-  const ghostCapH = ghostPx * 0.78;
   const headerH = Math.max(
     65,
     (venueTopY - paddingY) + venueH + 14,
     titleCapH + 26,
-  ) + ghostCapH + 10;
+  );
   const tableH = colHeaderH + rowH * teamCount;
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY * 2 + headerH + tableH;
@@ -157,10 +153,10 @@ export async function generateLeagueResultDataUrl(
   // （会場表示が無い場合は、タイトルの上端が余白に収まる位置に置く）
   const venueBottomY = venueH > 0 ? venueTopY + venueH : paddingY + 8 + titleCapH;
   const titleCenterY = venueBottomY - titleCapH / 2;
-  // 英字（横線入りの薄いグレー文字）は大会名・会場の真下に右揃えで置く
-  const ghostBottomY = paddingY + headerH - 8;
+  // 英字（横線入りの薄いグレー文字）は大会名・会場の文字に重ねて右揃えで敷く
+  const ghostCenterY = (paddingY + 24 + venueTopY + venueH) / 2;
   drawHeadingGhost(ctx, headingEnglish(title, 'LEAGUE'), paddingX + tableW,
-    ghostBottomY - ghostCapH * 0.52, ghostPx, tableW * 0.9, 'right');
+    ghostCenterY, bigPx * 1.05, tableW * 0.9, 'right');
 
   const markRight = drawHeadingMark(ctx, paddingX, titleCenterY, markSize);
   const titleX = markRight + markGap;
