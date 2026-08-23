@@ -8,7 +8,7 @@
 
 import type { BracketMatch, MixedTeam, PlacementBracket } from './types';
 import {
-  COL, drawLine, drawResultHeader, drawText, fontOf,
+  COL, drawLine, drawResultFrame, drawResultHeader, drawText, fontOf,
   fitLogo, getAssociationLogoEnabled, loadResultLogos, roundRect,
 } from '../draw/resultCanvasKit';
 
@@ -71,7 +71,7 @@ export async function generateMixedBracketResultDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110;
+  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
   const matchW = 300;
   /** 2回戦以降は姓のみの表示なので、カード幅を詰めて余白を減らす */
   const matchWLater = 200;
@@ -145,7 +145,7 @@ export async function generateMixedBracketResultDataUrl(
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
-  roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.gray200, 1.5);
+  drawResultFrame(ctx, paddingX, bracketAreaY, tableW, bracketH, 18);
 
   // 1回戦の並びの中心。2回戦以降はこの線に向かって間隔を詰める
   const bracketCenterY =

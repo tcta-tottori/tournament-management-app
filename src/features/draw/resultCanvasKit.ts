@@ -26,7 +26,7 @@ export const COL = {
   /** サイトの地色と同じ、ごくわずかに落とした白 */
   paper: '#f8f8f8',
   /** 見出しの背後に敷く英字のグレー（サイトと同じ薄さ） */
-  ghost: '#ededed',
+  ghost: '#e6e6e6',
 
   // ---- 差し色（サイトのブランド赤） ----
   red50: '#fdf3f2',
@@ -236,40 +236,7 @@ export function headingColors(): { text: string; mark: string } {
 }
 
 /**
- * 斜めストライプの帯（サイトのアクセント意匠）。
- * 指定した矩形の中に、右上がりの細い赤線を等間隔で並べる。
- */
-export function drawStripeBand(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  color: string = COL.red500,
-  gap = 7,
-  lineW = 3,
-): void {
-  if (w <= 0 || h <= 0) return;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = lineW;
-  ctx.lineCap = 'butt';
-  for (let sx = x - h; sx < x + w + h; sx += gap) {
-    ctx.beginPath();
-    ctx.moveTo(sx, y + h);
-    ctx.lineTo(sx + h, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/**
- * ヘッダー下の罫線。
- * 全幅は淡いグレー。左端はブランド赤のベタ＋斜めストライプで、
- * サイトの見出し罫と同じ表情にする。
+ * ヘッダー下の罫線（淡いグレーのみ）。
  */
 export function drawHeaderRule(
   ctx: CanvasRenderingContext2D,
@@ -283,24 +250,22 @@ export function drawHeaderRule(
   ctx.moveTo(x, y);
   ctx.lineTo(x + w, y);
   ctx.stroke();
-  drawHeaderAccent(ctx, x, y, w);
 }
 
 /**
- * 見出し下のアクセント（赤ベタ＋斜めストライプ）だけを描く。
- * 罫線を引く余白が無い画像（予選リーグ表など）で使う。
+ * トーナメント表・リーグ表の外枠。
+ * ブランド赤の細い二重線（外＝赤、内＝淡い赤）で、白地に映える枠にする。
  */
-export function drawHeaderAccent(
+export function drawResultFrame(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
+  h: number,
+  r: number,
 ): void {
-  const solidW = Math.min(84, w * 0.12);
-  ctx.fillStyle = COL.red500;
-  ctx.fillRect(x, y - 2.5, solidW, 5);
-  const stripeW = Math.min(112, w * 0.14);
-  drawStripeBand(ctx, x + solidW + 6, y - 4, stripeW, 8, COL.red300, 11, 4);
+  roundRect(ctx, x, y, w, h, r, undefined, COL.red500, 2);
+  roundRect(ctx, x + 5, y + 5, w - 10, h - 10, Math.max(2, r - 5), undefined, COL.red100, 1.2);
 }
 
 /** 1 → 1st, 2 → 2nd … の序数表記 */
@@ -363,8 +328,9 @@ export function headingEnglish(title: string, fallback = 'RESULT'): string {
 }
 
 /**
- * 見出しの背後に敷く薄いグレーの英字（サイトのセクション見出しと同じ意匠）。
- * 文字間を広げて描くので、canvas の letterSpacing に依存しない。
+ * 見出しの英字（サイトと同じ、横線を入れた大きな薄いグレーの文字）。
+ * 文字を描いたあと、背景色の横線を等間隔で重ねてストライプにする。
+ * 文字間を広げて描くので canvas の letterSpacing に依存しない。
  */
 export function drawHeadingGhost(
   ctx: CanvasRenderingContext2D,
@@ -374,9 +340,10 @@ export function drawHeadingGhost(
   px: number,
   maxW: number,
   align: 'left' | 'right' = 'left',
+  bg: string = COL.white,
 ): void {
   if (!text || maxW <= 0) return;
-  const tracking = px * 0.06;
+  const tracking = px * 0.08;
   ctx.save();
   ctx.fillStyle = COL.ghost;
   ctx.font = fontOf('black', px);
@@ -386,8 +353,8 @@ export function drawHeadingGhost(
   const widths = [...text].map(ch => ctx.measureText(ch).width);
   const total = widths.reduce((a, b) => a + b, 0) + tracking * (text.length - 1);
   const k = total > maxW ? maxW / total : 1;
-  // right 指定時は x を右端として扱う
-  let cx = align === 'right' ? x - total * k : x;
+  const startX = align === 'right' ? x - total * k : x;
+  let cx = startX;
   for (let i = 0; i < text.length; i++) {
     ctx.save();
     ctx.translate(cx, centerY);
@@ -395,6 +362,22 @@ export function drawHeadingGhost(
     ctx.fillText(text[i], 0, 0);
     ctx.restore();
     cx += (widths[i] + tracking) * k;
+  }
+
+  // 横ストライプ（背景色の線で文字を切る）
+  const capH = px * 0.78;
+  const top = centerY - capH * 0.72;
+  const bottom = centerY + capH * 0.52;
+  const gap = Math.max(6, px * 0.125);
+  const lineW = Math.max(2, px * 0.038);
+  ctx.strokeStyle = bg;
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'butt';
+  for (let y = top; y <= bottom; y += gap) {
+    ctx.beginPath();
+    ctx.moveTo(startX - 2, y);
+    ctx.lineTo(cx + 2, y);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -479,13 +462,21 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   // 文字の高さの中心を「分け目」に合わせる（alphabetic ベースラインからの補正）
   const baselineY = dividerY + bigPx * 0.34;
 
+  // 英字（横線入りの大きな薄いグレー文字）は、大会名・会場の真下に
+  // 右揃えで置く。日本語見出しの背面に回すため先に描く。
+  const venueBottomY = venue
+    ? venueTopY + 48 * venueScale
+    : nameY + NAME_PX / 2;
+  const ghostTopY = venueBottomY + 8;
+  const ghostBottomY = paddingY + headerH - 10;
+  const ghostPx = clamp((ghostBottomY - ghostTopY) / 0.78, 20, titlePx * 1.2);
+  drawHeadingGhost(
+    ctx, titleEn, paddingX + tableW, ghostBottomY - ghostPx * 0.78 * 0.52, ghostPx,
+    tableW * 0.9, 'right',
+  );
+
   const markRight = drawHeadingMark(ctx, paddingX, dividerY, markSize);
   const titleX = markRight + markGap;
-  // 日本語見出しの右側に薄いグレーの英字（サイトと同じ意匠）。
-  // 見出しの末尾に少し重なる位置から右へ伸ばす。
-  const ghostRightX = paddingX + tableW * 0.66;
-  drawHeadingGhost(ctx, titleEn, ghostRightX, dividerY - bigPx * 0.1, bigPx * 1.0,
-    Math.max(160, tableW * 0.66 - (titleX - paddingX) + titleW * 0.35), 'right');
   ctx.fillStyle = heading.text;
   drawMixed(ctx, runs, titleX, baselineY, bigPx, smallPx, '900', '800');
   // 見出し全体の幅（右側の大会名の折り返し判定に使う）

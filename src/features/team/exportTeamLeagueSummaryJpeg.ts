@@ -1,7 +1,7 @@
 import type { TeamLeague, TeamLeagueStanding, MatchFormat } from './types';
 import { resolveClubPromotionStatus } from './teamLogic';
 import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
-import { COL, drawResultHeader, promotionBadgeStyle } from '../draw/resultCanvasKit';
+import { COL, drawResultFrame, drawResultHeader, promotionBadgeStyle } from '../draw/resultCanvasKit';
 
 // =============================================
 // リーグ結果「順位表サマリー」画像
@@ -69,7 +69,7 @@ export async function generateTeamLeagueSummaryDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110;
+  const headerH = 172; // 見出し + 大会名 + 「順位表」 + 会場ロゴ + 英字（ストライプ文字）
 
   const rankColW = 96;
   const teamColW = 300;
@@ -294,9 +294,8 @@ export async function generateTeamLeagueSummaryDataUrl(
     ctx.beginPath(); ctx.moveTo(x, tableY + colHeaderH); ctx.lineTo(x, tableY + tableH); ctx.stroke();
   }
 
-  // 表の外枠
-  drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, COL.gray300, 1.5);
-  drawRoundRect(tableX + 1.2, tableY + 1.2, tableW - 2.4, tableH - 2.4, 17, undefined, 'rgba(255,255,255,0.6)', 1);
+  // 表の外枠（ブランド赤の二重線）
+  drawResultFrame(ctx, tableX, tableY, tableW, tableH, 18);
 
   // フッター: TCTAロゴ
   if (tctaLogo) {

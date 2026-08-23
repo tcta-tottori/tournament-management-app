@@ -1,7 +1,7 @@
 import type { TeamPlacementBracket, TeamBracketMatch, TeamEntry, MatchType, PlacementCategory, MatchFormat } from './types';
 import { resolveBracketLabel, getMatchTypeOrder } from './teamLogic';
 import { buildResultFileName } from './resultFileName';
-import { COL, drawResultHeader, drawScorePair } from '../draw/resultCanvasKit';
+import { COL, drawResultFrame, drawResultHeader, drawScorePair } from '../draw/resultCanvasKit';
 
 const TYPE_LABEL: Record<MatchType, string> = {
   MIX: 'Mix', WD: 'WD', MD: 'MD',
@@ -77,7 +77,7 @@ export async function generateTeamBracketResultDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110;
+  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
   const matchW = 260;
   // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて高さを調整
   // 158 = チーム名2段 + サブマッチ3行 + ステータス
@@ -215,7 +215,7 @@ export async function generateTeamBracketResultDataUrl(
   ctx.shadowOffsetY = 6;
   drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
-  drawRoundRect(paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.gray200, 1.5);
+  drawResultFrame(ctx, paddingX, bracketAreaY, tableW, bracketH, 18);
 
   // 試合の中心Y座標
   const getMatchY = (ri: number, mi: number) => {

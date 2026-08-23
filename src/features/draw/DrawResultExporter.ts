@@ -24,6 +24,7 @@ import {
   getAssociationLogoEnabled,
   loadResultLogos,
   roundRect,
+  drawResultFrame,
   wrapItems,
 } from './resultCanvasKit';
 
@@ -413,7 +414,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ---- 全体レイアウト ----
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110;
+  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
   const sidePad = 22;
 
   const contentW = NAME_W * 2 + halfRounds * COL_W * 2 + CENTER_W;
@@ -479,7 +480,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
   ctx.restore();
-  roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, undefined, COL.gray200, 1.5);
+  drawResultFrame(ctx, paddingX, bracketAreaY, tableW, bracketH, 18);
 
   // ---- 座標計算 ----
   const contentX = paddingX + (tableW - contentW) / 2;
@@ -873,7 +874,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
 
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110;
+  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
   const sidePad = 22;
 
   const gridW = NAME_W + n * CELL_W + STAT_W + RANK_W;
@@ -921,7 +922,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, cardY, tableW, cardH, 18, COL.white);
   ctx.restore();
-  roundRect(ctx, paddingX, cardY, tableW, cardH, 18, undefined, COL.gray200, 1.5);
+  drawResultFrame(ctx, paddingX, cardY, tableW, cardH, 18);
 
   const gridX = paddingX + (tableW - gridW) / 2;
   const gridY = cardY + cardTopPad;

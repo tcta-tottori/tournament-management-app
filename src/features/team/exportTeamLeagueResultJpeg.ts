@@ -2,7 +2,7 @@ import type { TeamLeague, TeamEntry, TeamLeagueMatch, TeamLeagueStanding, MatchT
 import { getMatchTypeOrder, getDisplayNameParts, resolveClubPromotionStatus } from './teamLogic';
 import { buildResultFileName, leagueDivisionLabel } from './resultFileName';
 import {
-  COL, drawResultHeader, drawScorePair, promotionBadgeStyle,
+  COL, drawResultFrame, drawResultHeader, drawScorePair, promotionBadgeStyle,
 } from '../draw/resultCanvasKit';
 
 const TYPE_LABEL: Record<MatchType, string> = {
@@ -125,7 +125,7 @@ export async function generateTeamLeagueResultDataUrl(
   const scale = 2;
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110; // 角丸バッジ + 大会名 + 会場ロゴ
+  const headerH = 160; // 見出し + 大会名 + 会場ロゴ + 英字（ストライプ文字）
   const colHeaderH = 54;
   // 種目数（3 = ミックス大会, 5 = クラブ対抗戦）に応じて行高を調整
   const _subCountForRow = TYPE_ORDER.length;
@@ -306,11 +306,6 @@ export async function generateTeamLeagueResultDataUrl(
     const standing = standings.find(s => s.teamId === team.teamId);
     const rowTop = tableY + colHeaderH + rowH * rowIdx;
 
-    // 行のストライプ（1行おきにごく淡いグレーを敷く）
-    if (rowIdx % 2 === 1) {
-      ctx.fillStyle = COL.gray50;
-      ctx.fillRect(tableX + 1, rowTop, tableW - 2, rowH);
-    }
     if (rowIdx > 0) {
       drawLine(tableX, rowTop, tableX + tableW, rowTop, COL.gray200, 1);
     }
@@ -651,9 +646,8 @@ export async function generateTeamLeagueResultDataUrl(
     }
   }
 
-  // 表の外枠（やや太め + 内側に薄い反射ライン）
-  drawRoundRect(tableX, tableY, tableW, tableH, 18, undefined, COL.gray300, 1.5);
-  drawRoundRect(tableX + 1.2, tableY + 1.2, tableW - 2.4, tableH - 2.4, 17, undefined, 'rgba(255,255,255,0.6)', 1);
+  // 表の外枠（ブランド赤の二重線）
+  drawResultFrame(ctx, tableX, tableY, tableW, tableH, 18);
 
   // ---- フッター: TCTA公式ロゴを右下に最小余白で配置 ----
   if (tctaLogo) {
