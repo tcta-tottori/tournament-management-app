@@ -16,6 +16,13 @@ import { splitBigSmall, measureMixed, drawMixed } from '../team/mixedSizeText';
 export const FF = '"Inter", "Hiragino Sans", "Yu Gothic", sans-serif';
 
 /**
+ * 見出しの英字（背後に敷くストライプ文字）のフォント。
+ * サイトの見出しと同じ、太くて字幅の詰まったグロテスク体を優先する。
+ */
+export const GHOST_FF =
+  '"Helvetica Neue", Helvetica, Arial, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif';
+
+/**
  * 結果画像共通のカラーパレット。
  * 協会サイトのトンマナ（白ベース＋赤の差し色）に合わせている。
  * ベースは白とニュートラルグレーで組み、赤は見出し・勝者・決勝など
@@ -339,10 +346,11 @@ export function drawHeadingGhost(
   bg: string = COL.white,
 ): void {
   if (!text || maxW <= 0) return;
-  const tracking = px * 0.08;
+  // 太字・字間を詰めたグロテスク体（サイトの見出し英字に合わせる）
+  const tracking = -px * 0.012;
   ctx.save();
   ctx.fillStyle = COL.ghost;
-  ctx.font = fontOf('black', px);
+  ctx.font = `800 ${px}px ${GHOST_FF}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   // 文字間を足した実幅が maxW に収まるまで詰める
