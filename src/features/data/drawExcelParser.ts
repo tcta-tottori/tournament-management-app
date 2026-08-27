@@ -28,6 +28,13 @@ export interface RoundGameRule {
   games: number;
   /** 試合方式 */
   matchFormat?: MatchFormatType;
+  // --- 熱中症警戒アラート時のパターン（ドロー表に「※熱中症〜」の記載がある場合） ---
+  /** 熱中症時のルール文 */
+  heatRuleText?: string;
+  /** 熱中症時のゲーム数 */
+  heatGames?: number;
+  /** 熱中症時の試合方式 */
+  heatMatchFormat?: MatchFormatType;
 }
 
 export interface ParsedDrawEvent {
@@ -166,6 +173,37 @@ function timeValueToHM(v: unknown): string | null {
   return null;
 }
 
+/** 左山・右山それぞれの「ブラケット線が描かれる列範囲」 */
+interface HalfColRanges {
+  /** 左山と右山を分ける列 */
+  boundary: number;
+  left: { start: number; end: number };
+  right: { start: number; end: number };
+}
+
+/**
+ * 検出済みの列レイアウトから、左山・右山のブラケット領域（試合時刻が書かれる列）を
+ * 求める。左山はエントリー欄の右側、右山はエントリー欄の左側に線と時刻が描かれる。
+ *
+ * 固定列（左=F〜M, 右=N〜S）を前提にすると、氏名や所属が結合セルで幅広に置かれた
+ * ドロー表では時刻を1つも拾えず、1回戦のペアリングを誤判定してしまう。
+ */
+function computeHalfColRanges(left: ColumnLayout, right: ColumnLayout): HalfColRanges {
+  const leftEntryEnd =
+    left.closeParenCol >= 0 ? left.closeParenCol
+      : left.nameCol >= 0 ? left.nameCol + 3
+        : 4;
+  const rightEntryStart =
+    right.numCol >= 0 ? right.numCol : leftEntryEnd + 16;
+  // 端数は右山側に寄せる（従来の固定列 左=F〜M / 右=N〜S と同じ分割になる）
+  const boundary = Math.ceil((leftEntryEnd + rightEntryStart) / 2);
+  return {
+    boundary,
+    left: { start: leftEntryEnd, end: boundary },
+    right: { start: boundary + 1, end: rightEntryStart },
+  };
+}
+
 /**
  * ドロー表の試合開始時刻から、最早時刻と「同時進行できる試合数」を求める。
  *
@@ -240,9 +278,7 @@ function extractR1MatchTimes(
   const half = drawSize / 2;
   // 左右の時刻列を中央で分ける。左山ペアは左側の列、右山ペアは右側の列の時刻を使う。
   // （同じ行に左山・右山両方の時刻が書かれるため、半分で絞らないと誤取得する）
-  const leftNameCol = leftLayout.nameCol >= 0 ? leftLayout.nameCol : 1;
-  const rightNumCol = rightLayout.numCol >= 0 ? rightLayout.numCol : leftNameCol + 18;
-  const centerCol = Math.round((leftNameCol + rightNumCol) / 2);
+  const ranges = computeHalfColRanges(leftLayout, rightLayout);
 
   const result: Record<number, string> = {};
   for (let a = 1; a < drawSize; a += 2) {
@@ -255,15 +291,20 @@ function extractR1MatchTimes(
     if (hi - lo > 4) continue;
     // この試合が属する半分の列範囲だけ走査する
     const isLeft = a <= half;
-    const cStart = isLeft ? 0 : centerCol + 1;
-    const cEnd = isLeft ? centerCol - 1 : rightNumCol - 1;
+    const cStart = isLeft ? ranges.left.start : ranges.right.start;
+    const cEnd = isLeft ? ranges.left.end : ranges.right.end;
+    // 行帯の中に後続ラウンドの時刻が紛れることがあるため、最も外側の列
+    // （左山=小さい列 / 右山=大きい列）にある時刻を1回戦の時刻として採る。
     let time = '';
-    for (let r = lo; r <= hi && !time; r++) {
+    let bestCol = -1;
+    for (let r = lo; r <= hi; r++) {
       const row = rows[r];
       if (!row) continue;
-      for (let c = cStart; c <= cEnd && c < row.length; c++) {
+      for (let c = Math.max(0, cStart); c <= cEnd && c < row.length; c++) {
         const hm = timeValueToHM(row[c]);
-        if (hm) { time = hm; break; }
+        if (!hm) continue;
+        const better = bestCol < 0 || (isLeft ? c < bestCol : c > bestCol);
+        if (better) { bestCol = c; time = hm; }
       }
     }
     if (time) result[a] = time;
@@ -311,9 +352,7 @@ function extractLaterRoundMatchTimes(
   for (const p of real) rowByPos.set(p.position, p.row!);
 
   const half = drawSize / 2;
-  const leftNameCol = leftLayout.nameCol >= 0 ? leftLayout.nameCol : 1;
-  const rightNumCol = rightLayout.numCol >= 0 ? rightLayout.numCol : leftNameCol + 18;
-  const centerCol = Math.round((leftNameCol + rightNumCol) / 2);
+  const centerCol = computeHalfColRanges(leftLayout, rightLayout).boundary;
 
   // ドロー領域内の全時刻セルを収集
   const rowVals = real.map((p) => p.row!);
@@ -520,32 +559,30 @@ function extractEventStartTimeText(
  * Excelブラケットエリアのギャップ行（エントリー間の行）に
  * 試合時刻があるかどうかを調べ、R1ペアリングを検出する。
  *
+ * 時刻はその試合の縦線（ブラケットの結合線）の列に書かれるため、外側の列にある
+ * ものほど早い回戦を表す。ただし「その山で1回戦が何試合あるか」はエントリー数から
+ * 一意に決まる（残りはBYEとの不戦勝枠）ので、外側から expectedPairs 件だけ採用する。
+ * 山によっては1回戦が0試合（全員シード）のこともあり、その山の最外側の時刻を
+ * 無条件にR1とみなすと回戦がひとつずつズレてしまう。
+ *
  * @param rows - シートの全行データ
  * @param entryRows - 各エントリーの行インデックス（0-based, rows配列のインデックス）
  * @param side - 'left' | 'right'
+ * @param colRange - その山のブラケット領域の列範囲
+ * @param expectedPairs - その山で1回戦が成立する試合数
  * @returns R1で対戦するエントリーのインデックスペア配列 (entryRows内のインデックス)
  */
 function detectR1Pairings(
   rows: unknown[][],
   entryRows: number[],
   side: 'left' | 'right',
+  colRange: { start: number; end: number },
+  expectedPairs: number,
 ): number[] {
-  if (entryRows.length < 2) return [];
+  if (entryRows.length < 2 || expectedPairs <= 0) return [];
 
-  // ブラケットエリアの列範囲 (0-indexed)
-  const colRange = side === 'left'
-    ? { start: 5, end: 12 }  // cols F(5) to M(12)
-    : { start: 13, end: 18 }; // cols N(13) to S(18)
-
-  // 各ギャップ行で時刻セルを探し、最も外側の列（R1列）を特定
-  interface GapInfo {
-    entryIdx: number; // entryRows内のインデックス（上側エントリー）
-    gapRow: number;
-    timeCols: number[];
-  }
-
-  const gaps: GapInfo[] = [];
-  let allTimeCols = new Set<number>();
+  // 各ギャップ行で時刻セルを探し、最も外側の列を記録する
+  const gaps: { entryIdx: number; outerCol: number }[] = [];
 
   for (let i = 0; i < entryRows.length - 1; i++) {
     // エントリー間の全行をスキャン（ダブルスではパートナー行があるため+1だけでは不十分）
@@ -557,36 +594,47 @@ function detectR1Pairings(
       if (!row) continue;
 
       const timeCols: number[] = [];
-      for (let c = colRange.start; c <= colRange.end; c++) {
-        if (isTimeValue(row[c])) {
-          timeCols.push(c);
-          allTimeCols.add(c);
-        }
+      for (let c = Math.max(0, colRange.start); c <= colRange.end; c++) {
+        if (isTimeValue(row[c])) timeCols.push(c);
       }
 
       if (timeCols.length > 0) {
-        gaps.push({ entryIdx: i, gapRow, timeCols });
+        gaps.push({
+          entryIdx: i,
+          outerCol: side === 'left' ? Math.min(...timeCols) : Math.max(...timeCols),
+        });
         break; // このエントリーペア間で最初の時刻行を採用
       }
     }
   }
 
-  if (allTimeCols.size === 0) return [];
+  // 外側（左山=小さい列 / 右山=大きい列）から順に、エントリーが重複しないよう採用
+  gaps.sort((a, b) =>
+    side === 'left'
+      ? a.outerCol - b.outerCol || a.entryIdx - b.entryIdx
+      : b.outerCol - a.outerCol || a.entryIdx - b.entryIdx,
+  );
 
-  // R1列 = 左側は最小列、右側は最大列（ブラケットの最外側）
-  const r1Col = side === 'left'
-    ? Math.min(...allTimeCols)
-    : Math.max(...allTimeCols);
-
-  // R1列に時刻があるギャップ → そのエントリーペアがR1で対戦
-  const r1PairIndices: number[] = [];
+  const used = new Set<number>();
+  const picked: number[] = [];
   for (const gap of gaps) {
-    if (gap.timeCols.includes(r1Col)) {
-      r1PairIndices.push(gap.entryIdx);
-    }
+    if (picked.length >= expectedPairs) break;
+    if (used.has(gap.entryIdx) || used.has(gap.entryIdx + 1)) continue;
+    picked.push(gap.entryIdx);
+    used.add(gap.entryIdx);
+    used.add(gap.entryIdx + 1);
   }
 
-  return r1PairIndices;
+  // 時刻が読み取れずペアが足りない場合は、下側のエントリーから順に埋める
+  // （ドロー番号の若い＝シード側にBYEを寄せるのが一般的なため）
+  for (let i = entryRows.length - 2; i >= 0 && picked.length < expectedPairs; i -= 2) {
+    if (used.has(i) || used.has(i + 1)) continue;
+    picked.push(i);
+    used.add(i);
+    used.add(i + 1);
+  }
+
+  return picked.sort((a, b) => a - b);
 }
 
 /**
@@ -605,21 +653,28 @@ function detectR1Pairings(
 function assignPositionsFromR1Pairings(
   players: ParsedDrawPlayer[],
   entryRows: number[],
-  _halfSize: number,
+  halfSize: number,
   halfOffset: number,
   rows: unknown[][],
   side: 'left' | 'right',
+  colRange: { start: number; end: number },
 ): void {
   if (players.length === 0) return;
 
-  const r1PairIndices = detectR1Pairings(rows, entryRows, side);
+  // ペア枠（連続2ポジション）は halfSize/2 個。そのうち「エントリー同士が対戦する枠」の
+  // 数はエントリー数から一意に決まる（残りはBYEとの枠＝不戦勝）。
+  const slotPairs = Math.max(1, Math.floor(halfSize / 2));
+  const expectedPairs = Math.max(0, Math.min(slotPairs, players.length - slotPairs));
+
+  const r1PairIndices = detectR1Pairings(rows, entryRows, side, colRange, expectedPairs);
   const r1Set = new Set(r1PairIndices);
 
   // ブラケット位置を順番に割り当て
+  const maxPos = halfOffset + halfSize;
   let pos = halfOffset + 1; // 1-indexed
   let i = 0;
 
-  while (i < players.length) {
+  while (i < players.length && pos <= maxPos) {
     if (r1Set.has(i) && i + 1 < players.length) {
       // R1ペア: 2エントリーが同じペア枠
       players[i].position = pos;
@@ -632,6 +687,18 @@ function assignPositionsFromR1Pairings(
       // BYE is at pos + 1 (implicit, not stored)
       pos += 2;
       i += 1;
+    }
+  }
+
+  // ペア化が足りず枠から溢れた場合は、空いているスロットへ順に詰める
+  if (i < players.length) {
+    const taken = new Set(players.slice(0, i).map((p) => p.position));
+    let free = halfOffset + 1;
+    for (; i < players.length; i++) {
+      while (free <= maxPos && taken.has(free)) free++;
+      if (free > maxPos) break;
+      players[i].position = free;
+      taken.add(free);
     }
   }
 }
@@ -664,11 +731,47 @@ function extractGamesFromRuleText(text: string): number {
 }
 
 /**
+ * 1つのセルに複数のルールが書かれている場合に分割する。
+ * 例: "１･2回戦８ゲームマッチ（8-8タイブレ）準々決勝以降６ゲームマッチ（6-6タイブレ）"
+ *     → ["１･2回戦８ゲームマッチ（8-8タイブレ）", "準々決勝以降６ゲームマッチ（6-6タイブレ）"]
+ */
+function splitRuleChunks(text: string): string[] {
+  // 全角→半角変換は1文字1文字の置換なので、元テキストと文字位置が一致する
+  const norm = normalizeDigits(text);
+  const re = /[^（）()]*?\d+\s*ゲームマッチ(?:\s*[（(][^）)]*[）)])?/g;
+  const chunks: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(norm)) !== null) {
+    const chunk = text.slice(m.index, m.index + m[0].length).trim();
+    if (chunk) chunks.push(chunk);
+  }
+  return chunks.length > 0 ? chunks : [text.trim()];
+}
+
+/** 回戦ラベルらしさの判定（"準々決勝以降" "１～２回戦" "決勝・３位決定戦" 等） */
+const ROUND_LABEL_RE = /回戦|決勝|以降|以上/;
+
+/** ルール文の先頭に付いた回戦ラベルを切り出す */
+function splitRoundLabel(chunk: string): { roundLabel: string; ruleText: string } {
+  const norm = normalizeDigits(chunk);
+  const m = norm.match(/^([\s\S]*?)\d+\s*ゲームマッチ/);
+  if (m) {
+    const label = chunk.slice(0, m[1].length).trim();
+    if (label && ROUND_LABEL_RE.test(label)) {
+      return { roundLabel: label, ruleText: chunk.slice(m[1].length).trim() };
+    }
+  }
+  return { roundLabel: '全回戦', ruleText: chunk.trim() };
+}
+
+/**
  * イベントヘッダー周辺からゲームルールをパースする。
  * パターン:
  *   1) 同行の後方カラムにルール ("8ゲームマッチ（8-8タイブレーク）")
  *   2) 次行にルール ("8ゲームマッチ（8-8タイブレーク）")
  *   3) 同行または次行に回戦別ルール ("１～２回戦　8ゲームマッチ...") + その次行にも別ルール
+ *   4) 1セルに回戦別ルールが2つ ("１･2回戦8ゲームマッチ...準々決勝以降6ゲームマッチ...")
+ *   5) "※熱中症特別警報等発令時：6ゲームマッチ..." → 通常ルールではなく熱中症時パターン
  */
 function parseGameRules(
   rows: unknown[][],
@@ -677,79 +780,76 @@ function parseGameRules(
   headerMatchFormat: string,
 ): RoundGameRule[] {
   const rules: RoundGameRule[] = [];
-  const ruleRe = /(\d+)\s*ゲームマッチ/;
+  const ruleRe = /\d+\s*ゲームマッチ/;
   const setRe = /タイブレークセット|セットマッチ/;
   const superTbRe = /ファイナル.*タイブレーク|10\s*ポイント/;
-  const roundPrefixRe = /^(.*(?:回戦|決勝|以降))\s+/;
+  const heatRe = /熱中症/;
+
+  let heat: { ruleText: string; games: number; matchFormat: MatchFormatType } | null = null;
+  let pendingSetRule: RoundGameRule | null = null;
+
+  /** 1セル分のテキストを解釈してルールへ反映する */
+  const consume = (val: string): void => {
+    if (!val) return;
+    const norm = normalizeDigits(val);
+
+    // "※熱中症特別警報等発令時：6ゲームマッチ（6-6タイブレ）"
+    // 通常の回戦ルールではなく、警戒時に差し替える形式なので分けて保持する
+    if (heatRe.test(norm)) {
+      if (!ruleRe.test(norm) && !setRe.test(norm)) return;
+      const body = val.split(/[：:]/).slice(1).join(':').trim() || val.trim();
+      heat = {
+        ruleText: body,
+        games: extractGamesFromRuleText(body),
+        matchFormat: setRe.test(normalizeDigits(body)) ? 'twoSetsSuper10' : 'game',
+      };
+      return;
+    }
+
+    // "ファイナルセット10ポイントマッチタイブレーク" — 直前のセットルールに付加
+    if (superTbRe.test(norm)) {
+      if (pendingSetRule) {
+        pendingSetRule.ruleText += ' / ' + val;
+        pendingSetRule.matchFormat = 'twoSetsSuper10';
+      }
+      return;
+    }
+
+    // "２タイブレークセット（6-6タイブレークデュース有）" — セットマッチ
+    if (setRe.test(norm)) {
+      const { roundLabel, ruleText } = splitRoundLabel(val);
+      const rule: RoundGameRule = {
+        roundLabel,
+        ruleText,
+        games: extractGamesFromRuleText(val) || 6,
+        matchFormat: 'twoSetsSuper10', // デフォルト、ファイナル行で確定
+      };
+      rules.push(rule);
+      pendingSetRule = rule;
+      return;
+    }
+
+    // 通常のゲームマッチ（1セルに複数書かれている場合は分割する）
+    if (ruleRe.test(norm)) {
+      for (const chunk of splitRuleChunks(val)) {
+        const { roundLabel, ruleText } = splitRoundLabel(chunk);
+        rules.push({ roundLabel, ruleText, games: extractGamesFromRuleText(chunk) });
+      }
+      pendingSetRule = null;
+    }
+  };
 
   // ヘッダー行の matchFormat に含まれるルール
-  if (headerMatchFormat) {
-    const normHdr = normalizeDigits(headerMatchFormat);
-    if (ruleRe.test(normHdr)) {
-      const roundMatch = roundPrefixRe.exec(headerMatchFormat);
-      rules.push({
-        roundLabel: roundMatch ? roundMatch[1] : '全回戦',
-        ruleText: headerMatchFormat,
-        games: extractGamesFromRuleText(headerMatchFormat),
-      });
-    } else if (setRe.test(normHdr)) {
-      // セットマッチ形式（ヘッダー行に含まれるケース）
-      rules.push({
-        roundLabel: '全回戦',
-        ruleText: headerMatchFormat,
-        games: extractGamesFromRuleText(headerMatchFormat) || 6,
-        matchFormat: 'twoSetsSuper10',
-      });
-    }
-  }
+  consume(headerMatchFormat);
 
   // ヘッダー行の後続行をスキャン（最大5行）
-  let pendingSetRule: RoundGameRule | null = null;
   for (let r = headerRow + 1; r < Math.min(headerRow + 6, endRow); r++) {
     const row = rows[r];
     if (!row) continue;
 
     // 全カラムを結合してルールテキストを探す
     for (let c = 0; c < Math.min(row.length, 30); c++) {
-      const val = cellStr(row, c);
-      if (!val) continue;
-      const norm = normalizeDigits(val);
-
-      // "ファイナルセット10ポイントマッチタイブレーク" — 直前のセットルールに付加
-      if (superTbRe.test(norm)) {
-        if (pendingSetRule) {
-          pendingSetRule.ruleText += ' / ' + val;
-          pendingSetRule.matchFormat = 'twoSetsSuper10';
-        }
-        continue;
-      }
-
-      // "２タイブレークセット（6-6タイブレークデュース有）" — セットマッチ
-      if (setRe.test(norm)) {
-        const roundMatch = roundPrefixRe.exec(val);
-        const ruleText = roundMatch ? val.replace(roundMatch[1], '').trim() : val;
-        const rule: RoundGameRule = {
-          roundLabel: roundMatch ? roundMatch[1] : '全回戦',
-          ruleText: ruleText,
-          games: extractGamesFromRuleText(val) || 6,
-          matchFormat: 'twoSetsSuper10', // デフォルト、ファイナル行で確定
-        };
-        rules.push(rule);
-        pendingSetRule = rule;
-        continue;
-      }
-
-      // 通常のゲームマッチ
-      if (ruleRe.test(norm)) {
-        const roundMatch = roundPrefixRe.exec(val);
-        const ruleText = roundMatch ? val.replace(roundMatch[1], '').trim() : val;
-        rules.push({
-          roundLabel: roundMatch ? roundMatch[1] : '全回戦',
-          ruleText: ruleText,
-          games: extractGamesFromRuleText(val),
-        });
-        pendingSetRule = null;
-      }
+      consume(cellStr(row, c));
     }
 
     // ドロー番号行に到達したら終了（選手データが始まった）
@@ -761,37 +861,71 @@ function parseGameRules(
 
   // 重複除去（同じruleTextは除く）
   const seen = new Set<string>();
-  return rules.filter(r => {
+  const deduped = rules.filter(r => {
     const key = `${r.roundLabel}::${r.ruleText}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+
+  // ドロー表に熱中症時の記載があれば全ルールへ付与する
+  if (heat) {
+    const h: { ruleText: string; games: number; matchFormat: MatchFormatType } = heat;
+    for (const r of deduped) {
+      r.heatRuleText = h.ruleText;
+      r.heatGames = h.games;
+      r.heatMatchFormat = h.matchFormat;
+    }
+  }
+
+  return deduped;
 }
 
 // ---------------------------------------------------------------------------
 // Seed parsing
 // ---------------------------------------------------------------------------
 
+/** シード表記1件（"1. 岸本・安田" → seed=1, tokens=["岸本","安田"]） */
+interface SeedEntry {
+  seed: number;
+  tokens: string[];
+}
+
 /**
- * Parse seed text like "シード　1.PlayerA 2.PlayerB 3.PlayerC"
- * Returns a Map<name, seedNumber>.
+ * シード行を解析する。
+ * 例: "シード 1.PlayerA 2.PlayerB"（シングルス）
+ *     "シード 1. 岸本・安田 2. 小山・平木"（ダブルスは姓を「・」で連結）
+ *     "シード 1.[全角スペース]森本・白石"（番号の後に全角スペースが入る書き方もある）
  */
-function parseSeedText(text: string): Map<string, number> {
-  const seeds = new Map<string, number>();
-  // Match patterns like "1.Name" or "１．Name"
-  const re = /(\d+)[.．]([^\s\d.．]+(?:\s+[^\s\d.．]+)?)/g;
-  // Normalise full-width digits to half-width
-  const normalised = text.replace(/[０-９]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30),
-  );
+function parseSeedText(text: string): SeedEntry[] {
+  const entries: SeedEntry[] = [];
+  // "1." の後の空白を許容し、次の番号（数字）の手前までを名前とみなす
+  const re = /(\d+)\s*[.．]\s*([^\s\d.．][^\d.．]*)/g;
+  const normalised = normalizeDigits(text);
   let m: RegExpExecArray | null;
   while ((m = re.exec(normalised)) !== null) {
-    const seedNum = parseInt(m[1], 10);
-    const name = normalizeName(m[2]);
-    if (name) seeds.set(name, seedNum);
+    const seed = parseInt(m[1], 10);
+    // 所属などの括弧書きは落とす
+    const raw = normalizeName(m[2]).replace(/[（(][^）)]*[）)]?/g, '').trim();
+    if (!raw) continue;
+    const tokens = raw.split(/[・･／/]+/).map((t) => t.trim()).filter(Boolean);
+    if (tokens.length > 0) entries.push({ seed, tokens });
   }
-  return seeds;
+  return entries;
+}
+
+/** シード表記のトークンが選手名と一致するか（"岸本" ↔ "岸本 健悟"） */
+function seedTokenMatches(token: string, name: string): boolean {
+  if (!token || !name) return false;
+  const compactName = name.replace(/\s+/g, '');
+  const compactToken = token.replace(/\s+/g, '');
+  if (!compactToken) return false;
+  if (compactName === compactToken) return true;
+  // "岸本 健悟" に対して姓の "岸本" だけが書かれているケース
+  if (name.split(/\s+/)[0] === compactToken) return true;
+  // 姓名を区切らない表記（"吉識功太郎"）向けの前方一致。
+  // 1文字だけの前方一致は誤判定しやすいので2文字以上に限る。
+  return compactToken.length >= 2 && compactName.startsWith(compactToken);
 }
 
 // ---------------------------------------------------------------------------
@@ -854,29 +988,63 @@ function asDrawNumber(v: unknown): number | null {
   return null;
 }
 
-/** 氏名列の次以降から所属列を検出（括弧のみのセルは除外して実テキストが最多の列） */
-function detectAffiliationCol(
+/**
+ * 氏名列の次以降から「(」「所属」「)」の列を検出する。
+ *
+ * ドロー表によっては氏名・所属がセル結合で幅広に置かれ、所属がドロー番号列から
+ * 8列も離れる（例: 番号=B, 氏名=C:H, "("=I, 所属=J:M, ")"=N）。番号列+2〜+4しか
+ * 見ないと所属が全て空になるため、まず括弧だけが入った列を広めに探し、その直後の
+ * 実テキスト列を所属列とみなす。括弧が無いドロー表では従来どおりの近傍探索に戻す。
+ */
+function detectEntryTextCols(
   rows: unknown[][],
   startRow: number,
   endRow: number,
   numCol: number,
-): number {
-  let best = numCol + 3;
-  let bestScore = -1;
-  for (const c of [numCol + 2, numCol + 3, numCol + 4]) {
-    let score = 0;
+  limitCol: number,
+): { openParenCol: number; affiliationCol: number; closeParenCol: number } {
+  const searchEnd = Math.min(limitCol, numCol + 16);
+  const openCount: Record<number, number> = {};
+  const closeCount: Record<number, number> = {};
+  const textCount: Record<number, number> = {};
+  for (let c = numCol + 2; c < searchEnd; c++) {
     for (let r = startRow; r < endRow; r++) {
       const v = cellStr(rows[r], c);
       if (!v) continue;
-      if (/^[（）()]$/.test(v)) continue; // 括弧のみのセルは所属ではない
-      score++;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      best = c;
+      if (/^[（(]$/.test(v)) openCount[c] = (openCount[c] ?? 0) + 1;
+      else if (/^[）)]$/.test(v)) closeCount[c] = (closeCount[c] ?? 0) + 1;
+      else textCount[c] = (textCount[c] ?? 0) + 1;
     }
   }
-  return best;
+
+  // 「(」だけが入った列が見つかれば、その直後の実テキスト列が所属列
+  let openParenCol = -1;
+  for (const key of Object.keys(openCount)) {
+    const c = Number(key);
+    if (openParenCol < 0 || openCount[c] > openCount[openParenCol]) openParenCol = c;
+  }
+  if (openParenCol >= 0) {
+    let affiliationCol = -1;
+    for (let c = openParenCol + 1; c < searchEnd; c++) {
+      if ((textCount[c] ?? 0) > 0) { affiliationCol = c; break; }
+    }
+    if (affiliationCol < 0) affiliationCol = openParenCol + 1;
+    let closeParenCol = -1;
+    for (let c = affiliationCol + 1; c < searchEnd; c++) {
+      if ((closeCount[c] ?? 0) > 0) { closeParenCol = c; break; }
+    }
+    if (closeParenCol < 0) closeParenCol = affiliationCol + 1;
+    return { openParenCol, affiliationCol, closeParenCol };
+  }
+
+  // フォールバック: 氏名列の直後から実テキストが最多の列を所属とみなす
+  let best = numCol + 3;
+  let bestScore = -1;
+  for (const c of [numCol + 2, numCol + 3, numCol + 4]) {
+    const score = textCount[c] ?? 0;
+    if (score > bestScore) { bestScore = score; best = c; }
+  }
+  return { openParenCol: numCol + 2, affiliationCol: best, closeParenCol: best + 1 };
 }
 
 /**
@@ -889,40 +1057,50 @@ function detectDrawColumns(
   startRow: number,
   endRow: number,
 ): { left: ColumnLayout | null; right: ColumnLayout | null } {
-  const MAX_COL = 40;
-  const intCounts: number[] = new Array(MAX_COL).fill(0);
+  const MAX_COL = 42;
+  // ドロー番号列は必ず右隣（結合セルなら+2まで）に氏名が入る。この条件を課すことで
+  // 勝敗数・順位などの数字列を拾わずに済み、番号が1個しか無い右山も検出できる。
+  const numCounts: number[] = new Array(MAX_COL).fill(0);
   for (let r = startRow; r < endRow; r++) {
     const row = rows[r];
     if (!row) continue;
     for (let c = 0; c < MAX_COL; c++) {
-      if (asDrawNumber(row[c]) != null) intCounts[c]++;
+      if (asDrawNumber(row[c]) == null) continue;
+      const name = cellStr(row, c + 1) || cellStr(row, c + 2);
+      if (!name || asDrawNumber(name) != null) continue;
+      numCounts[c]++;
     }
   }
 
-  // 整数が3個以上入っている列を候補とする
   const candidates: number[] = [];
   for (let c = 0; c < MAX_COL; c++) {
-    if (intCounts[c] >= 3) candidates.push(c);
+    if (numCounts[c] >= 1) candidates.push(c);
   }
   if (candidates.length === 0) return { left: null, right: null };
 
-  // 整数の多い上位2列を左右のドロー番号列とみなす（列インデックス昇順で左→右）
-  candidates.sort((a, b) => intCounts[b] - intCounts[a]);
-  const top = candidates.slice(0, 2).sort((a, b) => a - b);
-  const leftNumCol = top[0];
-  const rightNumCol = top.length > 1 ? top[1] : null;
+  // 左山 = 番号が最も多い列（同数なら左端）。
+  // 右山 = 左山から十分離れた列のうち番号が最も多い列。
+  // 「3個以上」で足切りすると、右山が2ペアしか無い種目（決勝のみ等）を丸ごと
+  // 取りこぼすため、氏名を伴う番号が1個でもあれば候補とする。
+  let leftNumCol = candidates[0];
+  for (const c of candidates) {
+    if (numCounts[c] > numCounts[leftNumCol]) leftNumCol = c;
+  }
+  const MIN_HALF_GAP = 6;
+  let rightNumCol: number | null = null;
+  for (const c of candidates) {
+    if (c < leftNumCol + MIN_HALF_GAP) continue;
+    if (rightNumCol == null || numCounts[c] > numCounts[rightNumCol]) rightNumCol = c;
+  }
 
-  const makeLayout = (numCol: number): ColumnLayout => ({
-    numCol,
-    nameCol: numCol + 1,
-    openParenCol: numCol + 2,
-    affiliationCol: detectAffiliationCol(rows, startRow, endRow, numCol),
-    closeParenCol: numCol + 4,
-  });
+  const makeLayout = (numCol: number, limitCol: number): ColumnLayout => {
+    const cols = detectEntryTextCols(rows, startRow, endRow, numCol, limitCol);
+    return { numCol, nameCol: numCol + 1, ...cols };
+  };
 
   return {
-    left: makeLayout(leftNumCol),
-    right: rightNumCol != null ? makeLayout(rightNumCol) : null,
+    left: makeLayout(leftNumCol, rightNumCol ?? MAX_COL),
+    right: rightNumCol != null ? makeLayout(rightNumCol, MAX_COL) : null,
   };
 }
 
@@ -1117,7 +1295,6 @@ export function parseDrawExcel(
       0,
     );
     const leftPlayers = leftResult.players;
-    const leftEntryRows = leftResult.entryRows;
 
     // Extract players from right half
     const rightResult = extractPlayersFromHalf(
@@ -1129,7 +1306,19 @@ export function parseDrawExcel(
       0,
     );
     const rightPlayers = rightResult.players;
-    const rightEntryRows = rightResult.entryRows;
+
+    // 左山・右山のブラケット領域（試合時刻が書かれる列範囲）
+    const halfRanges = computeHalfColRanges(leftLayout, rightLayout);
+
+    // 右山のドロー番号が左山と重複する（＝右山も1から振り直されている）ドロー表では、
+    // 左山の最大番号だけずらして通し番号に揃える。
+    if (leftPlayers.length > 0 && rightPlayers.length > 0) {
+      const leftNums = new Set(leftPlayers.map((p) => p.position));
+      if (rightPlayers.some((p) => leftNums.has(p.position))) {
+        const leftMax = Math.max(...leftNums);
+        for (const p of rightPlayers) p.position += leftMax;
+      }
+    }
 
     // ------------------------------------------------------------------
     // Calculate draw size and map entries to proper bracket positions
@@ -1155,10 +1344,11 @@ export function parseDrawExcel(
 
       // 明示的BYEエントリー（"ｂｙｅ"等）を除外してからR1検出・位置割り当て
       // 除外しないとBYEがペア枠を消費してスロットが溢れる
+      // 行番号は各エントリーが保持している row をそのまま使う（並べ替えても崩れない）
       const leftReal = leftPlayers.filter(p => !p.isBye);
-      const leftRealRows = leftEntryRows.filter((_, idx) => !leftPlayers[idx]?.isBye);
+      const leftRealRows = leftReal.map(p => p.row ?? 0);
       const rightReal = rightPlayers.filter(p => !p.isBye);
-      const rightRealRows = rightEntryRows.filter((_, idx) => !rightPlayers[idx]?.isBye);
+      const rightRealRows = rightReal.map(p => p.row ?? 0);
 
       // 各半分のBYE数を計算（実選手数ベース）
       const leftByeCount = Math.max(0, halfSize - leftReal.length);
@@ -1179,7 +1369,7 @@ export function parseDrawExcel(
       } else if (leftByeCount > 0) {
         // Excelの試合時刻からR1ペアリングを検出してブラケット位置を割り当て
         assignPositionsFromR1Pairings(
-          leftReal, leftRealRows, halfSize, 0, rows, 'left',
+          leftReal, leftRealRows, halfSize, 0, rows, 'left', halfRanges.left,
         );
       } else {
         // BYE不要の場合: 連番でそのまま配置
@@ -1193,7 +1383,7 @@ export function parseDrawExcel(
         // 抽出済み位置(halfSize+1..drawSize)をそのまま使用。
       } else if (rightByeCount > 0) {
         assignPositionsFromR1Pairings(
-          rightReal, rightRealRows, halfSize, halfSize, rows, 'right',
+          rightReal, rightRealRows, halfSize, halfSize, rows, 'right', halfRanges.right,
         );
       } else {
         for (let i = 0; i < rightReal.length; i++) {
@@ -1216,7 +1406,7 @@ export function parseDrawExcel(
     // ------------------------------------------------------------------
     // Parse seeds
     // ------------------------------------------------------------------
-    const seedMap = new Map<string, number>();
+    const seedEntries: SeedEntry[] = [];
     for (let r = startRow; r < endRow; r++) {
       const row = rows[r];
       if (!row) continue;
@@ -1226,23 +1416,27 @@ export function parseDrawExcel(
         if (val.startsWith('シード')) {
           // Combine all cells on this row for the full seed text
           const fullText = row.map((cell) => (cell != null ? String(cell) : '')).join(' ');
-          const parsed = parseSeedText(fullText);
-          for (const [name, num] of parsed) {
-            seedMap.set(name, num);
-          }
+          seedEntries.push(...parseSeedText(fullText));
           break;
         }
       }
     }
 
-    // Apply seeds to players
+    // Apply seeds to players.
+    // ダブルスのシード表記は「姓・姓」なので、ペアの2名の姓が両方一致したときだけ採用する。
     for (const player of allPlayers) {
-      if (player.name && seedMap.has(player.name)) {
-        player.seed = seedMap.get(player.name)!;
-      }
-      // Also check for doubles first player name
-      if (player.partnerName && seedMap.has(player.partnerName)) {
-        // In doubles, seeds apply to the pair; use the draw entry player
+      if (player.isBye || !player.name) continue;
+      const names = [player.name, player.partnerName].filter(
+        (n): n is string => !!n,
+      );
+      for (const entry of seedEntries) {
+        if (entry.tokens.length >= 2 && names.length < 2) continue;
+        const matched = entry.tokens.every((tok) =>
+          names.some((n) => seedTokenMatches(tok, n)),
+        );
+        if (!matched) continue;
+        player.seed = entry.seed;
+        break;
       }
     }
 
@@ -1340,9 +1534,13 @@ export function parseDrawExcel(
     if (rowLabel === 'venue' && rowValue) {
       // 会場と予備日会場が1セルの場合を分割
       // 例: "ヤマタスポーツパーク・テニスコート\n予備日:千代コート"
+      // 例: "ヤマタ･スポーツパーク（予備日:千代コート）" のように括弧内に予備日会場が
+      // 書かれる場合があるため、分割後に余った括弧を落とす
       const venueParts = rowValue.split(/予備日[：:]?\s*/);
-      if (!venue) venue = venueParts[0].replace(/\n/g, ' ').trim();
-      if (!reserveVenue && venueParts[1]) reserveVenue = venueParts[1].replace(/\n/g, ' ').trim();
+      const cleanVenue = (v: string) =>
+        v.replace(/\n/g, ' ').replace(/^[\s（(]+/, '').replace(/[\s（()）]+$/, '').trim();
+      if (!venue) venue = cleanVenue(venueParts[0]);
+      if (!reserveVenue && venueParts[1]) reserveVenue = cleanVenue(venueParts[1]);
       continue;
     }
 
@@ -1388,11 +1586,26 @@ export function parseDrawExcel(
     }
   }
 
-  // ドロー表の開始時刻から、最早時刻と同時進行試合数（＝コート数の目安）を算出
-  const { earliestStartTime, suggestedCourtCount } = analyzeStartTimes(
-    rows,
-    sections.map((s) => s.headerRow),
-  );
+  // ドロー表の開始時刻から、最早時刻と同時進行試合数（＝コート数の目安）を算出。
+  // 種目ごとに抽出済みの試合時刻が使える場合は、そちらを数えたほうが正確。
+  // （時刻セルを総当りで数えると、注意事項などに書かれた時刻まで拾ってしまう）
+  let earliestStartTime = '';
+  let suggestedCourtCount = 0;
+  const allMatchTimes: string[] = [];
+  for (const ev of events) {
+    allMatchTimes.push(...Object.values(ev.matchTimes));
+    allMatchTimes.push(...Object.values(ev.roundMatchTimes));
+  }
+  if (allMatchTimes.length > 0) {
+    earliestStartTime = allMatchTimes.reduce((a, b) => (b < a ? b : a));
+    // 全種目は同じ会場で並行して進むため、最早時刻に始まる試合数の合計が必要コート数
+    suggestedCourtCount = allMatchTimes.filter((t) => t === earliestStartTime).length;
+  } else {
+    ({ earliestStartTime, suggestedCourtCount } = analyzeStartTimes(
+      rows,
+      sections.map((s) => s.headerRow),
+    ));
+  }
 
   return {
     fileName,
