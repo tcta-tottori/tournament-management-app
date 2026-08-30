@@ -153,6 +153,39 @@ interface Seg { x1: number; y1: number; x2: number; y2: number; win: boolean }
 interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win: boolean; size?: number }
 
 /**
+ * ブラケットのスコアを「左側の獲得ゲーム − 右側の獲得ゲーム」の並びに直す。
+ * タイブレークの得点と Ret / W.O は負けた側のものなので、
+ * 負けた側の外側へ添えられるよう note / noteLeft も返す。
+ */
+function bracketScoreParts(
+  match: Match | undefined,
+  leftEntryId: string | null | undefined,
+): { main: string; note: string; noteLeft: boolean } {
+  const empty = { main: '', note: '', noteLeft: false };
+  if (!match) return empty;
+  if (!match.score) {
+    return match.status === 'walkover' ? { ...empty, main: 'W.O' } : empty;
+  }
+  const raw = match.score.trim();
+  const m = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
+  if (!m) return { ...empty, main: raw };
+  const [, p1Games, p2Games, tb, note] = m;
+  // player1 が左側とは限らないので entryId で判定する
+  const p1IsLeft = !!match.player1EntryId && match.player1EntryId === leftEntryId;
+  const leftGames = p1IsLeft ? p1Games : p2Games;
+  const rightGames = p1IsLeft ? p2Games : p1Games;
+  const parts = [
+    tb ? `(${tb})` : '',
+    note ? note.toUpperCase().replace('RET', 'Ret') : '',
+  ].filter(Boolean);
+  return {
+    main: `${leftGames}-${rightGames}`,
+    note: parts.join(' '),
+    noteLeft: Number(leftGames) < Number(rightGames),  // 負けた側が左なら左端へ
+  };
+}
+
+/**
  * トーナメント表の結果を Canvas に描画して返す。
  *
  * ドローを上半分（左の山）と下半分（右の山）に分け、中央で決勝を突き合わせる
@@ -375,30 +408,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // （例: 右山の選手が 8-4 で勝った場合は「4-8」）
   // タイブレークの得点と Ret / W.O は負けた側のものなので、
   // 負けた側の外側（スコアの左端／右端）に小さく添える。
-  const finalScore = (() => {
-    const empty = { main: '', note: '', noteLeft: false };
-    if (!finalMatch) return empty;
-    if (!finalMatch.score) {
-      return finalMatch.status === 'walkover' ? { ...empty, main: 'W.O' } : empty;
-    }
-    const raw = finalMatch.score.trim();
-    const m = raw.match(/^(\d+)\s*-\s*(\d+)(?:\s*\((\d+)\))?(?:\s*(Ret\.?|W\.?O\.?))?$/i);
-    if (!m) return { ...empty, main: raw };
-    const [, p1Games, p2Games, tb, note] = m;
-    // player1 が左山とは限らないので entryId で判定する
-    const p1IsLeft = !!finalMatch.player1EntryId && finalMatch.player1EntryId === finL?.entryId;
-    const leftGames = p1IsLeft ? p1Games : p2Games;
-    const rightGames = p1IsLeft ? p2Games : p1Games;
-    const parts = [
-      tb ? `(${tb})` : '',
-      note ? note.toUpperCase().replace('RET', 'Ret') : '',
-    ].filter(Boolean);
-    return {
-      main: `${leftGames}-${rightGames}`,
-      note: parts.join(' '),
-      noteLeft: Number(leftGames) < Number(rightGames),  // 負けた側が左なら左端へ
-    };
-  })();
+  const finalScore = bracketScoreParts(finalMatch, finL?.entryId);
   const finalScoreText = finalScore.main;
 
   meas.font = fontOf('black', CHAMP_NAME_PX);
@@ -444,20 +454,51 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const bracketBottomPad = Math.max(16, Math.ceil(centerLogo.h + 24 - spaceBelowApex));
   const bracketH = bracketTopPad + bracketBodyH + bracketBottomPad;
 
-  // ---- 3位決定戦の結果（行っている種目のみ） ----
-  const thirdPlaceText = (() => {
+  // ---- 3位決定戦（決勝と同じ形式を少し小さくして表の下に置く） ----
+  // 左右に選手を並べ、中央の横線の上に勝者（＝3位）を出す。
+  const T = {
+    labelPx: 11,        // 「3位決定戦」の見出し
+    chipH: 17, chipPx: 10.5,
+    namePx: 16, affPx: 11, scorePx: 15, notePx: 11,
+    rowNamePx: 12, rowAffPx: 10, numPx: 10,
+    tick: 8,
+  };
+  const thirdBlock = (() => {
     const third = matches.find(isThirdPlaceMatch);
-    if (!third?.winnerEntryId) return '';
-    const nameById = new Map<string, string>();
-    for (const info of slotMap.values()) {
-      if (info.entryId) nameById.set(info.entryId, info.name);
+    if (!third?.winnerEntryId) return null;
+    if (!third.player1EntryId || !third.player2EntryId) return null;
+    const posByEntry = new Map<string, number>();
+    const nameByEntry = new Map<string, string>();
+    for (const [pos, info] of slotMap) {
+      if (!info.entryId) continue;
+      posByEntry.set(info.entryId, pos);
+      nameByEntry.set(info.entryId, info.name);
     }
-    const name = nameById.get(third.winnerEntryId) || '';
-    if (!name) return '';
-    const aff = affById.get(third.winnerEntryId) || '';
-    return `3位\u3000${name}${aff ? `（${aff}）` : ''}`;
+    const sideOf = (entryId: string) => ({
+      entryId,
+      number: posByEntry.get(entryId) ?? 0,
+      name: nameByEntry.get(entryId) || '',
+      affiliation: affById.get(entryId) || '',
+    });
+    const a = sideOf(third.player1EntryId);
+    const b = sideOf(third.player2EntryId);
+    if (!a.name || !b.name) return null;
+    // ドロー番号が小さい方を左に置く（表の並びと同じ感覚で読める）
+    const [left, right] = a.number <= b.number ? [a, b] : [b, a];
+    return {
+      left, right,
+      winnerEntryId: third.winnerEntryId,
+      score: bracketScoreParts(third, left.entryId),
+    };
   })();
-  const thirdPx = 13;
+  // ブロックの高さ（見出し → 勝者 → 横線 → 選手行）
+  const thirdBlockH = thirdBlock
+    ? T.labelPx + 10
+      + T.chipH + 5 + T.namePx
+      + (thirdBlock.left.affiliation || thirdBlock.right.affiliation ? T.affPx + 5 : 0)
+      + (thirdBlock.score.main ? T.scorePx + 4 : 0)
+      + T.tick + 2 + T.rowNamePx + 12
+    : 0;
 
   // ---- フッター（シード一覧） ----
   const seedItems = draw.slots
@@ -467,8 +508,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     .filter(t => !t.endsWith('.'));
   const seedPx = 12;
   const seedLines = wrapItems(meas, 'シード　', seedItems, tableW - 24, seedPx, 2);
-  const footerH = (seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4)
-    + (thirdPlaceText ? thirdPx + 8 : 0);
+  const footerH = (seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4) + thirdBlockH;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + bracketH + footerH + 14;
@@ -770,15 +810,108 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     );
   }
 
-  // ---- フッター（3位決定戦の結果・シード一覧） ----
-  {
-    let y = bracketAreaY + bracketH + 8 + seedPx / 2 + 4;
-    if (thirdPlaceText) {
-      drawText(ctx, thirdPlaceText, paddingX + 4, y, thirdPx, 'left', COL.gray700, 'bold');
-      y += thirdPx + 8;
+  // ---- 3位決定戦（表の下・決勝と同じ形式を少し小さく） ----
+  let footerTopY = bracketAreaY + bracketH + 8;
+  if (thirdBlock) {
+    const { left, right, winnerEntryId, score } = thirdBlock;
+    const leftWins = left.entryId === winnerEntryId;
+
+    // 見出し
+    const labelY = footerTopY + T.labelPx / 2 + 2;
+    drawText(ctx, '3位決定戦', centerX, labelY, T.labelPx, 'center', COL.gray500, 'bold');
+
+    // 勝者ブロック（チップ → 氏名 → 所属 → スコア）と、その下の横線
+    const chipY = labelY + T.labelPx / 2 + 8;
+    const winner = leftWins ? left : right;
+    let cursor = chipY + T.chipH + 5;
+    const nameY = cursor + T.namePx / 2;
+    cursor = nameY + T.namePx / 2;
+    const affY = winner.affiliation ? cursor + 5 : cursor;
+    if (winner.affiliation) cursor = affY + 5;
+    const scoreY = score.main ? cursor + 4 + T.scorePx / 2 : cursor;
+    if (score.main) cursor = scoreY + T.scorePx / 2;
+    const rowY = cursor + T.tick + 2 + T.rowNamePx / 2;
+
+    // 3位バッジ（決勝の WINNER と同じ意匠）
+    const chipLabel = '3位';
+    meas.font = fontOf('black', T.chipPx);
+    const chipW = Math.ceil(meas.measureText(chipLabel).width) + 24;
+    const chipX = centerX - chipW / 2;
+    const chipGrad = ctx.createLinearGradient(chipX, chipY, chipX, chipY + T.chipH);
+    chipGrad.addColorStop(0, COL.champ1);
+    chipGrad.addColorStop(1, COL.champ3);
+    roundRect(ctx, chipX, chipY, chipW, T.chipH, T.chipH / 2, chipGrad);
+    drawText(ctx, chipLabel, centerX, chipY + T.chipH / 2 + 0.5, T.chipPx, 'center', COL.white, 'black');
+
+    const winnerMaxW = Math.min(tableW - 80, 460);
+    drawText(ctx, winner.name, centerX, nameY, T.namePx, 'center', COL.gray900, 'black', winnerMaxW);
+    if (winner.affiliation) {
+      drawText(ctx, `（${winner.affiliation}）`, centerX, affY, T.affPx, 'center', COL.gray500, 'normal', winnerMaxW);
     }
+    if (score.main) {
+      drawText(ctx, score.main, centerX, scoreY, T.scorePx, 'center', COL.win, 'black');
+      if (score.note) {
+        meas.font = fontOf('black', T.scorePx);
+        const mainW = meas.measureText(score.main).width;
+        const nx = score.noteLeft ? centerX - mainW / 2 - 5 : centerX + mainW / 2 + 5;
+        drawText(ctx, score.note, nx, scoreY, T.notePx, score.noteLeft ? 'right' : 'left', COL.gray500, 'medium');
+      }
+    }
+
+    // 左右の選手（番号 → 氏名 → 所属）。右側はブロックごと右端に寄せる。
+    const sideInset = Math.min(60, tableW * 0.06);
+    const xLeftStart = paddingX + sideInset;
+    const xRightEnd = paddingX + tableW - sideInset;
+    const halfMaxW = centerX - xLeftStart - 26;
+
+    const measureSide = (p: typeof left) => {
+      meas.font = fontOf('black', T.rowNamePx);
+      const nameW = Math.min(meas.measureText(p.name).width, halfMaxW * 0.72);
+      let affW = 0;
+      if (p.affiliation) {
+        meas.font = fontOf('normal', T.rowAffPx);
+        affW = Math.min(meas.measureText(`（${p.affiliation}）`).width, halfMaxW * 0.34);
+      }
+      const numW = p.number ? 16 : 0;
+      return { nameW, affW, numW, total: numW + nameW + (affW ? affW + 5 : 0) };
+    };
+    const drawSide = (p: typeof left, startX: number, isWinner: boolean) => {
+      const m = measureSide(p);
+      let x = startX;
+      if (p.number) {
+        drawText(ctx, String(p.number), x + m.numW - 5, rowY, T.numPx, 'right', COL.gray400, 'medium');
+        x += m.numW;
+      }
+      drawText(ctx, p.name, x, rowY, T.rowNamePx, 'left',
+        isWinner ? COL.win : COL.gray800, isWinner ? 'black' : 'bold', m.nameW);
+      x += m.nameW;
+      if (p.affiliation) {
+        drawText(ctx, `（${p.affiliation}）`, x + 5, rowY + 0.5, T.rowAffPx, 'left', COL.gray500, 'normal', m.affW);
+        x += 5 + m.affW;
+      }
+      return x;
+    };
+    const leftEndX = drawSide(left, xLeftStart, leftWins);
+    const rightW = measureSide(right).total;
+    drawSide(right, Math.max(centerX + 26, xRightEnd - rightW), !leftWins);
+
+    // 横線（勝った側は赤・太め）＋ 勝者へ立ち上がる縦線
+    const lineL1 = leftEndX + 10;
+    const lineR2 = Math.max(centerX + 26, xRightEnd - rightW) - 10;
+    ctx.lineCap = 'round';
+    drawLine(ctx, lineL1, rowY, centerX, rowY, leftWins ? COL.win : COL.gray300, leftWins ? 2.6 : 1.4);
+    drawLine(ctx, centerX, rowY, lineR2, rowY, leftWins ? COL.gray300 : COL.win, leftWins ? 1.4 : 2.6);
+    drawLine(ctx, centerX, rowY, centerX, rowY - T.tick, COL.win, 2.6);
+    ctx.lineCap = 'butt';
+
+    footerTopY += thirdBlockH;
+  }
+
+  // ---- フッター（シード一覧・中央揃え） ----
+  {
+    let y = footerTopY + seedPx / 2 + 4;
     for (const line of seedLines) {
-      drawText(ctx, line, paddingX + 4, y, seedPx, 'left', COL.gray500, 'medium');
+      drawText(ctx, line, paddingX + tableW / 2, y, seedPx, 'center', COL.gray500, 'medium');
       y += seedPx + 6;
     }
   }
