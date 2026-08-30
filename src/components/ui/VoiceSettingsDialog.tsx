@@ -131,7 +131,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between shrink-0">
+        <div className="px-5 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Volume2 className="w-5 h-5" />
             <h3 className="font-black">音声設定</h3>
@@ -151,8 +151,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 disabled={!browserSupported}
                 className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                   engine === 'browser'
-                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                    ? 'bg-primary-50 border-primary-400 text-primary-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-200'
                 }`}
               >
                 <Laptop className="w-4 h-4 shrink-0 mt-0.5" />
@@ -167,8 +167,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 onClick={() => { setEngine('gemini'); persist({ engine: 'gemini' }); }}
                 className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
                   engine === 'gemini'
-                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                    ? 'bg-primary-50 border-primary-400 text-primary-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-200'
                 }`}
               >
                 <Cloud className="w-4 h-4 shrink-0 mt-0.5" />
@@ -181,12 +181,12 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               </button>
             </div>
             {!browserSupported && (
-              <p className="text-[10px] text-amber-700 mt-1.5">
+              <p className="text-[10px] text-primary-700 mt-1.5">
                 この端末（ブラウザ）は内蔵音声に対応していないため、Gemini TTS をご利用ください。
               </p>
             )}
             {engine === 'gemini' && browserSupported && !geminiReady && (
-              <p className="text-[10px] text-amber-700 mt-1.5">
+              <p className="text-[10px] text-primary-700 mt-1.5">
                 {mode === 'direct' ? 'API キー' : '中継サーバー URL'}が未設定のため、実際にはブラウザ内蔵音声でコールします。
               </p>
             )}
@@ -195,7 +195,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
           {/* --- ブラウザ内蔵音声の設定 --- */}
           {engine === 'browser' && (
             <>
-              <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-snug">
+              <div className="px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-[11px] text-primary-800 leading-snug">
                 端末に入っている音声で読み上げます。通信しないため、会場の電波が悪くても
                 ボタンを押した瞬間にコールできます。
               </div>
@@ -205,7 +205,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 <select
                   value={browserVoiceURI}
                   onChange={e => { setBrowserVoiceURI(e.target.value); persist({ browserVoiceURI: e.target.value }); }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                 >
                   <option value="">自動（日本語の音声を優先）</option>
                   {browserVoices.map(v => (
@@ -233,7 +233,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                       setBrowserRate(v);
                       persist({ browserRate: v });
                     }}
-                    className="w-full accent-emerald-500"
+                    className="w-full accent-primary-500"
                   />
                 </div>
                 <div>
@@ -248,7 +248,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                       setBrowserPitch(v);
                       persist({ browserPitch: v });
                     }}
-                    className="w-full accent-emerald-500"
+                    className="w-full accent-primary-500"
                   />
                 </div>
               </div>
@@ -260,7 +260,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
           <>
           {/* ビルド時埋め込みの説明（API キーがロック済み） */}
           {IS_KEY_LOCKED && (
-            <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-snug">
+            <div className="px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-[11px] text-primary-800 leading-snug">
               ✨ このアプリは API キーとモデルがビルド時に設定済みです。音声・話し方の指示のみ変更できます。
             </div>
           )}
@@ -274,8 +274,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 onClick={() => { setMode('direct'); persist({ mode: 'direct' }); }}
                 className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
                   mode === 'direct'
-                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                    ? 'bg-primary-50 border-primary-400 text-primary-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-200'
                 }`}
               >
                 <Key className="w-4 h-4 shrink-0 mt-0.5" />
@@ -288,8 +288,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 onClick={() => { setMode('proxy'); persist({ mode: 'proxy' }); }}
                 className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
                   mode === 'proxy'
-                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                    ? 'bg-primary-50 border-primary-400 text-primary-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-200'
                 }`}
               >
                 <Server className="w-4 h-4 shrink-0 mt-0.5" />
@@ -304,7 +304,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
 
           {/* 接続ステータス（ロック時は簡略表示） */}
           <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${
-            status?.available ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+            status?.available ? 'bg-primary-50 border-primary-200' : 'bg-red-50 border-red-200'
           }`}>
             <span className="text-lg">{status?.available ? '\u2728' : '\u26A0\uFE0F'}</span>
             <div className="flex-1 text-xs">
@@ -312,8 +312,8 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 <span className="text-gray-500">接続確認中...</span>
               ) : status.available ? (
                 <>
-                  <div className="font-bold text-emerald-700">設定OK</div>
-                  <div className="text-emerald-600">{status.model || 'Gemini TTS'}</div>
+                  <div className="font-bold text-primary-700">設定OK</div>
+                  <div className="text-primary-600">{status.model || 'Gemini TTS'}</div>
                 </>
               ) : (
                 <>
@@ -346,7 +346,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                   onBlur={() => persist({ apiKey })}
                   placeholder="AIzaSy..."
                   autoComplete="off"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white font-mono focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                 />
                 <button
                   onClick={() => setShowApiKey(v => !v)}
@@ -360,13 +360,13 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                   href="https://aistudio.google.com/app/apikey"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-emerald-600 underline"
+                  className="text-primary-600 underline"
                 >
                   Google AI Studio
                 </a>
                 で取得した API キーを入力してください。キーはこの端末の localStorage に保存されます。
               </p>
-              <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 leading-snug">
+              <div className="px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-[10px] text-primary-800 leading-snug">
                 ⚠ API キーはブラウザに保存されます。共有PC・他人の端末では設定しないでください。
               </div>
             </div>
@@ -379,7 +379,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 onChange={e => setServerUrl(e.target.value)}
                 onBlur={() => persist({ serverUrl })}
                 placeholder="http://192.168.1.100:8787"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
               />
               <p className="text-[10px] text-gray-500 leading-snug">
                 GEMINI_API_KEY を設定した sync-server の HTTP URL を指定します。
@@ -402,7 +402,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                     setModel(e.target.value);
                     persist({ model: e.target.value });
                   }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                 >
                   {GEMINI_TTS_MODELS.map(m => (
                     <option key={m.id} value={m.id}>{m.label}</option>
@@ -415,7 +415,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                   onChange={e => setModel(e.target.value)}
                   onBlur={() => persist({ model })}
                   placeholder="gemini-3.1-flash-preview-tts"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white font-mono focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white font-mono focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                 />
               </div>
               <p className="text-[10px] text-gray-500 mt-1">
@@ -427,7 +427,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 <button
                   onClick={handleListModels}
                   disabled={!apiKey || listingModels}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-xs font-medium hover:bg-primary-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Search className={`w-3 h-3 ${listingModels ? 'animate-spin' : ''}`} />
                   APIキーで使えるモデルを一覧
@@ -445,13 +445,13 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                       <button
                         key={m.id}
                         onClick={() => { setModel(m.id); persist({ model: m.id }); }}
-                        className={`w-full px-3 py-2 text-left text-[11px] hover:bg-emerald-50 transition-colors ${
-                          m.id === model ? 'bg-emerald-100' : ''
+                        className={`w-full px-3 py-2 text-left text-[11px] hover:bg-primary-50 transition-colors ${
+                          m.id === model ? 'bg-primary-100' : ''
                         }`}
                       >
                         <div className="flex items-center gap-1">
                           {m.ttsLikely && (
-                            <span className="px-1.5 py-0.5 bg-emerald-500 text-white rounded text-[9px] font-bold shrink-0">
+                            <span className="px-1.5 py-0.5 bg-primary-500 text-white rounded text-[9px] font-bold shrink-0">
                               TTS
                             </span>
                           )}
@@ -478,7 +478,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
             <select
               value={voiceName}
               onChange={e => { setVoiceName(e.target.value); persist({ voiceName: e.target.value }); }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
             >
               {GEMINI_VOICES.map(v => (
                 <option key={v.name} value={v.name}>{v.label}</option>
@@ -495,7 +495,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               onBlur={() => persist({ styleInstruction })}
               rows={3}
               placeholder="例: 落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-y"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-y"
             />
             <p className="text-[10px] text-gray-500 mt-1">
               感情・話速・トーンなどを自然言語で指定できます（例:「明るく元気に」）。
@@ -508,7 +508,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               type="checkbox"
               checked={fallbackToBrowser}
               onChange={e => { setFallbackToBrowser(e.target.checked); persist({ fallbackToBrowser: e.target.checked }); }}
-              className="mt-0.5 accent-emerald-500"
+              className="mt-0.5 accent-primary-500"
             />
             <span className="text-[11px] text-gray-700 leading-snug">
               <span className="font-bold">失敗したらブラウザ内蔵音声でコールする</span>
@@ -530,7 +530,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
                 <div className="text-gray-500">生成にかかった時間: {(lastLatencyMs / 1000).toFixed(1)} 秒</div>
               )}
               {lastFallbackReason && (
-                <div className="text-amber-700 mt-1 break-all">
+                <div className="text-primary-700 mt-1 break-all">
                   Gemini に失敗したためブラウザ内蔵音声で読み上げました: {lastFallbackReason}
                 </div>
               )}
@@ -573,7 +573,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
               <button
                 onClick={handleTest}
                 disabled={testDisabled}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary-500 text-white rounded-lg text-sm font-bold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Mic className="w-4 h-4" />
                 音声テスト

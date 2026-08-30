@@ -19,10 +19,10 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
 
 /** カテゴリタブのリッチカラー文字 */
 const CATEGORY_TAB_COLORS: Record<PlacementCategory, { active: string; inactive: string }> = {
-  '1st': { active: '#d97706', inactive: '#f59e0b' }, // amber
-  '2nd': { active: '#475569', inactive: '#94a3b8' }, // slate
-  '3rd': { active: '#ea580c', inactive: '#fb923c' }, // orange
-  '4th': { active: '#2563eb', inactive: '#60a5fa' }, // blue
+  '1st': { active: '#c63834', inactive: '#e49f9c' }, // ブランド赤
+  '2nd': { active: '#404040', inactive: '#a6a6a6' }, // 墨
+  '3rd': { active: '#5a5a5a', inactive: '#a6a6a6' }, // グレー
+  '4th': { active: '#767676', inactive: '#d6d6d6' }, // 淡いグレー
 };
 
 /**
@@ -39,10 +39,10 @@ function renderCategoryShortLabel(label: string): React.ReactNode {
 }
 
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
-  '1st': { grad: 'from-yellow-400 to-amber-500', bg: 'bg-yellow-50', text: 'text-yellow-700', icon: Trophy },
-  '2nd': { grad: 'from-slate-400 to-slate-500', bg: 'bg-slate-50', text: 'text-slate-700', icon: Medal },
-  '3rd': { grad: 'from-orange-400 to-orange-500', bg: 'bg-orange-50', text: 'text-orange-700', icon: Award },
-  '4th': { grad: 'from-blue-400 to-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', icon: Sparkles },
+  '1st': { grad: 'from-primary-400 to-primary-500', bg: 'bg-primary-50', text: 'text-primary-700', icon: Trophy },
+  '2nd': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Medal },
+  '3rd': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Award },
+  '4th': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Sparkles },
 };
 
 /**
@@ -50,33 +50,33 @@ const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; tex
  * インデックス順にリーグへ割り当てる。
  */
 const LEAGUE_BADGE_STYLES = [
-  { bg: 'bg-blue-100',    text: 'text-blue-700',    border: 'border-blue-200' },
-  { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
-  { bg: 'bg-purple-100',  text: 'text-purple-700',  border: 'border-purple-200' },
-  { bg: 'bg-rose-100',    text: 'text-rose-700',    border: 'border-rose-200' },
-  { bg: 'bg-amber-100',   text: 'text-amber-700',   border: 'border-amber-200' },
-  { bg: 'bg-cyan-100',    text: 'text-cyan-700',    border: 'border-cyan-200' },
-  { bg: 'bg-lime-100',    text: 'text-lime-700',    border: 'border-lime-200' },
-  { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
+  { bg: 'bg-primary-100', text: 'text-primary-700', border: 'border-primary-200' },
+  { bg: 'bg-gray-100',  text: 'text-gray-700',  border: 'border-gray-200' },
+  { bg: 'bg-primary-100',    text: 'text-primary-700',    border: 'border-primary-200' },
+  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
+  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
+  { bg: 'bg-primary-100',    text: 'text-primary-700',    border: 'border-primary-200' },
+  { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
 ];
 
-const FALLBACK_LEAGUE_STYLE = { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+const FALLBACK_LEAGUE_STYLE = { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' };
 
 /** 種目カラー（予選リーグと統一） */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  MIX: { bg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-200' },
-  WD:  { bg: 'bg-pink-100',   text: 'text-pink-700',   border: 'border-pink-200' },
-  MD:  { bg: 'bg-sky-100',    text: 'text-sky-700',    border: 'border-sky-200' },
+  MIX: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
+  WD:  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
+  MD:  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
   // 団体戦（クラブ対抗）の種目。未定義だと配色参照でクラッシュするため必須。
-  D3:  { bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-200' },
-  D2:  { bg: 'bg-cyan-100',   text: 'text-cyan-700',   border: 'border-cyan-200' },
-  D1:  { bg: 'bg-teal-100',   text: 'text-teal-700',   border: 'border-teal-200' },
-  S2:  { bg: 'bg-amber-100',  text: 'text-amber-700',  border: 'border-amber-200' },
+  D3:  { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-200' },
+  D2:  { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-200' },
+  D1:  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
+  S2:  { bg: 'bg-primary-100',  text: 'text-primary-700',  border: 'border-primary-200' },
   S1:  { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-200' },
 };
 
 /** 未知の種目でも落ちないためのフォールバック配色 */
-const FALLBACK_TYPE_COLOR = { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+const FALLBACK_TYPE_COLOR = { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' };
 
 /** "9コート" や "5番コート" から数字のみを抽出 */
 function extractCourtNumberShort(courtName: string): string {
@@ -197,11 +197,11 @@ export default function TeamBracketView() {
 
   if (!currentBracket || brackets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
           <Trophy className="w-8 h-8" />
         </div>
-        <p className="text-base font-bold text-slate-500">決勝トーナメント未生成</p>
+        <p className="text-base font-bold text-gray-500">決勝トーナメント未生成</p>
         <p className="text-sm mt-1">予選リーグ順位表から生成してください</p>
       </div>
     );
@@ -211,13 +211,13 @@ export default function TeamBracketView() {
     <div className="space-y-4 pb-20">
       {/* モバイル: メインタブ: トーナメント / 控えリスト（セグメント切替） */}
       <div className="flex justify-center lg:hidden">
-        <div className="inline-flex bg-slate-100 rounded-xl p-1 gap-1">
+        <div className="inline-flex bg-gray-100 rounded-xl p-1 gap-1">
           <button
             onClick={() => setViewMode('bracket')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               viewMode === 'bracket'
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-white text-gray-800 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <Trophy className="w-3.5 h-3.5" />
@@ -227,14 +227,14 @@ export default function TeamBracketView() {
             onClick={() => setViewMode('waiting')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               viewMode === 'waiting'
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-white text-gray-800 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <ClipboardList className="w-3.5 h-3.5" />
             控えリスト
             {waitingMatches.length > 0 && (
-              <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
+              <span className="bg-primary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
             )}
           </button>
         </div>
@@ -259,10 +259,10 @@ export default function TeamBracketView() {
         <div className="hidden lg:block lg:w-1/3 lg:shrink-0">
           <div className="sticky top-0">
             <div className="flex items-center gap-2 mb-3 px-1">
-              <ClipboardList className="w-4 h-4 text-slate-500" />
-              <span className="text-sm font-black text-slate-700">控えリスト</span>
+              <ClipboardList className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-black text-gray-700">控えリスト</span>
               {waitingMatches.length > 0 && (
-                <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
+                <span className="bg-primary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{waitingMatches.length}</span>
               )}
             </div>
             <TeamWaitingList
@@ -342,7 +342,7 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST
         </button>
@@ -369,7 +369,7 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST（ALL）
         </button>
@@ -408,7 +408,7 @@ export default function TeamBracketView() {
             const r1count = bRoundMatches[0]?.length || 0;
             const svgHeight = r1count * GRID_UNIT + 36;
             const catGradColors: Record<string, string> = {
-              '1st': '#f59e0b', '2nd': '#94a3b8', '3rd': '#f97316', '4th': '#3b82f6',
+              '1st': '#c63834', '2nd': '#a6a6a6', '3rd': '#5a5a5a', '4th': '#767676',
             };
             const lineColor = catGradColors[cat] || '#c9cdd3';
 
@@ -421,7 +421,7 @@ export default function TeamBracketView() {
             const bracketDone = headerTotal > 0 && headerFinished === headerTotal;
 
             return (
-              <div key={cat} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={cat} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 {/* 一体型ヘッダー（アイコン削除、右側に進捗ゲージ） */}
                 <div className={`px-4 py-3 flex items-center gap-3 bg-gradient-to-r ${cfg.grad} text-white`}>
                   <div className="flex-1 min-w-0">
@@ -441,7 +441,7 @@ export default function TeamBracketView() {
                             }
                           }}
                           placeholder={CATEGORY_LABELS[cat]}
-                          className="flex-1 min-w-0 px-2 py-1 text-sm font-bold text-slate-800 bg-white/95 rounded border border-white/40 focus:outline-none focus:ring-2 focus:ring-white/60"
+                          className="flex-1 min-w-0 px-2 py-1 text-sm font-bold text-gray-800 bg-white/95 rounded border border-white/40 focus:outline-none focus:ring-2 focus:ring-white/60"
                         />
                         <button
                           type="button"
@@ -486,7 +486,7 @@ export default function TeamBracketView() {
                         onClick={() => setReorderingCategory(prev => prev === cat ? null : cat)}
                         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
                           reorderingCategory === cat
-                            ? 'bg-white text-slate-700 shadow-sm'
+                            ? 'bg-white text-gray-700 shadow-sm'
                             : 'bg-white/20 text-white hover:bg-white/30'
                         }`}
                         title="トーナメントの並べ替え"
@@ -522,14 +522,14 @@ export default function TeamBracketView() {
 
                 {/* 1位トーナメント抽選パネル */}
                 {!showAllBrackets && cat === '1st' && showDrawPanel && (
-                  <div className="p-3 border-b border-slate-100">
+                  <div className="p-3 border-b border-gray-100">
                     <TeamRouletteDrawPanel bracket={bracket} onRebuild={rebuildBracketFromSlots} />
                   </div>
                 )}
 
                 {/* 並べ替えパネル（任意のカテゴリで利用可） */}
                 {!showAllBrackets && reorderingCategory === cat && (
-                  <div className="p-3 border-b border-slate-100">
+                  <div className="p-3 border-b border-gray-100">
                     <TeamBracketReorderPanel
                       bracket={bracket}
                       allBrackets={brackets}
@@ -541,7 +541,7 @@ export default function TeamBracketView() {
                 )}
 
                 {/* ブラケット本体 */}
-                <div className="overflow-x-auto bg-gradient-to-br from-slate-50/80 via-white to-slate-50/50">
+                <div className="overflow-x-auto bg-gradient-to-br from-gray-50/80 via-white to-gray-50/50">
                   <div className="relative p-4" style={{ minWidth: (MATCH_WIDTH + ROUND_GAP) * bTotalRounds, height: svgHeight }}>
                     {/* 接続線SVG */}
                     <svg className="absolute inset-0 pointer-events-none" style={{ width: (MATCH_WIDTH + ROUND_GAP) * bTotalRounds, height: svgHeight }}>
@@ -582,7 +582,7 @@ export default function TeamBracketView() {
                                   ? `bg-gradient-to-r ${cfg.grad} text-white`
                                   : round === bTotalRounds - 1
                                   ? `${cfg.bg} ${cfg.text} border border-current/20`
-                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  : 'bg-gray-100 text-gray-600 border border-gray-200'
                               }`}>
                                 {bGetRoundName(round)}
                               </span>
@@ -604,59 +604,59 @@ export default function TeamBracketView() {
                               const byeStyle = getLeagueStyle(byeLeague);
                               return (
                                 <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - 24, width: MATCH_WIDTH, zIndex: 1 }}>
-                                  <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-slate-200 bg-white/80">
+                                  <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-gray-200 bg-white/80">
                                     {byeLeague && (
                                       <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${byeStyle.bg} ${byeStyle.text} text-[9px] font-black shrink-0`}>
                                         {byeLeague}
                                       </span>
                                     )}
-                                    <span className="text-sm font-bold text-slate-700 truncate flex-1">{byeName}</span>
+                                    <span className="text-sm font-bold text-gray-700 truncate flex-1">{byeName}</span>
                                   </div>
                                 </div>
                               );
                             }
 
                             const borderStyle = isFinished
-                              ? 'border-emerald-300 shadow-sm'
+                              ? 'border-primary-300 shadow-sm'
                               : isPlaying
-                              ? 'border-green-400 shadow-md bracket-playing-blink'
+                              ? 'border-primary-400 shadow-md bracket-playing-blink'
                               : isReady && match.team1Id && match.team2Id
-                              ? 'border-blue-300 hover:shadow-md'
-                              : 'border-slate-200';
+                              ? 'border-gray-300 hover:shadow-md'
+                              : 'border-gray-200';
 
                             return (
                               <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
                                 <div className={`rounded-xl border-2 overflow-hidden transition-all bg-white ${borderStyle}`} style={{ height: MATCH_HEIGHT }}>
                                   {/* ステータスバー（経過時間は下段に移動） */}
                                   <div className={`flex items-center justify-between px-2 py-0.5 border-b text-[10px] ${
-                                    isPlaying ? 'bg-green-50 border-green-100' :
-                                    isFinished ? 'bg-emerald-50/50 border-emerald-100' :
-                                    `${cfg.bg} border-slate-100`
+                                    isPlaying ? 'bg-primary-50 border-primary-100' :
+                                    isFinished ? 'bg-primary-50/50 border-primary-100' :
+                                    `${cfg.bg} border-gray-100`
                                   }`}>
                                     <div className="flex items-center gap-1 min-w-0">
                                       {court ? (
-                                        <span className="flex items-center gap-0.5 text-blue-600 font-bold truncate">
+                                        <span className="flex items-center gap-0.5 text-gray-600 font-bold truncate">
                                           <MapPin className="w-3 h-3 shrink-0" />
                                           <span className="truncate tabular-nums">{court.courtNames.map(extractCourtNumberShort).join('・')}</span>
                                         </span>
                                       ) : (
-                                        <span className="text-slate-400 font-medium">#{match.position}</span>
+                                        <span className="text-gray-400 font-medium">#{match.position}</span>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-1">
                                       {isFinished && (
-                                        <span className="flex items-center gap-0.5 text-emerald-600 font-bold">
+                                        <span className="flex items-center gap-0.5 text-primary-600 font-bold">
                                           <Check className="w-2.5 h-2.5" />完了
                                         </span>
                                       )}
                                       {isPlaying && (
-                                        <span className="flex items-center gap-1 text-green-600 font-bold animate-pulse">
-                                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                                        <span className="flex items-center gap-1 text-primary-600 font-bold animate-pulse">
+                                          <span className="w-2 h-2 rounded-full bg-primary-500" />
                                           対戦中
                                         </span>
                                       )}
                                       {!isFinished && !isPlaying && match.team1Id && match.team2Id && (
-                                        <span className="text-amber-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />控え</span>
+                                        <span className="text-primary-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-primary-400" />控え</span>
                                       )}
                                     </div>
                                   </div>
@@ -665,9 +665,9 @@ export default function TeamBracketView() {
                                   <button
                                     onClick={() => match.team1Id && match.team2Id && setEditingMatch(match)}
                                     disabled={!match.team1Id || !match.team2Id}
-                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 transition-colors text-left border-b border-slate-100 ${
-                                      match.winnerId === match.team1Id ? 'bg-blue-50/80' : ''
-                                    } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
+                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 transition-colors text-left border-b border-gray-100 ${
+                                      match.winnerId === match.team1Id ? 'bg-gray-50/80' : ''
+                                    } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-gray-50 active:bg-gray-100' : ''} disabled:cursor-default`}
                                   >
                                     {match.team1League && (() => {
                                       const s = getLeagueStyle(match.team1League);
@@ -678,12 +678,12 @@ export default function TeamBracketView() {
                                       );
                                     })()}
                                     <span className={`flex-1 text-xs truncate ${
-                                      match.team1Name === 'BYE' ? 'text-slate-300 italic' :
-                                      match.winnerId === match.team1Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
+                                      match.team1Name === 'BYE' ? 'text-gray-300 italic' :
+                                      match.winnerId === match.team1Id ? 'font-black text-gray-700' : 'text-gray-700 font-medium'
                                     }`}>{match.team1Name || '---'}</span>
                                     {isFinished && (
                                       <span className={`text-sm font-black tabular-nums ${
-                                        match.winnerId === match.team1Id ? 'text-blue-600' : 'text-slate-300'
+                                        match.winnerId === match.team1Id ? 'text-gray-600' : 'text-gray-300'
                                       }`}>{match.winsTeam1}</span>
                                     )}
                                   </button>
@@ -693,8 +693,8 @@ export default function TeamBracketView() {
                                     onClick={() => match.team1Id && match.team2Id && setEditingMatch(match)}
                                     disabled={!match.team1Id || !match.team2Id}
                                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 transition-colors text-left ${
-                                      match.winnerId === match.team2Id ? 'bg-blue-50/80' : ''
-                                    } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-blue-50 active:bg-blue-100' : ''} disabled:cursor-default`}
+                                      match.winnerId === match.team2Id ? 'bg-gray-50/80' : ''
+                                    } ${isReady && match.team1Id && match.team2Id ? 'hover:bg-gray-50 active:bg-gray-100' : ''} disabled:cursor-default`}
                                   >
                                     {match.team2League && (() => {
                                       const s = getLeagueStyle(match.team2League);
@@ -705,21 +705,21 @@ export default function TeamBracketView() {
                                       );
                                     })()}
                                     <span className={`flex-1 text-xs truncate ${
-                                      match.team2Name === 'BYE' ? 'text-slate-300 italic' :
-                                      match.winnerId === match.team2Id ? 'font-black text-blue-700' : 'text-slate-700 font-medium'
+                                      match.team2Name === 'BYE' ? 'text-gray-300 italic' :
+                                      match.winnerId === match.team2Id ? 'font-black text-gray-700' : 'text-gray-700 font-medium'
                                     }`}>{match.team2Name || '---'}</span>
                                     {isFinished && (
                                       <span className={`text-sm font-black tabular-nums ${
-                                        match.winnerId === match.team2Id ? 'text-blue-600' : 'text-slate-300'
+                                        match.winnerId === match.team2Id ? 'text-gray-600' : 'text-gray-300'
                                       }`}>{match.winsTeam2}</span>
                                     )}
                                   </button>
 
                                   {/* スコア詳細 + アクション（左下: コート/コール / 右下: 経過時間 or 勝者進出） */}
                                   <div className={`flex items-center justify-between gap-1 px-2 py-0.5 border-t text-[9px] ${
-                                    isPlaying ? 'bg-green-50/50 border-green-100' :
-                                    isFinished ? 'bg-slate-50/50 border-slate-100' :
-                                    'bg-slate-50/30 border-slate-100'
+                                    isPlaying ? 'bg-primary-50/50 border-primary-100' :
+                                    isFinished ? 'bg-gray-50/50 border-gray-100' :
+                                    'bg-gray-50/30 border-gray-100'
                                   }`}>
                                     {/* 左下: コート入力/変更 + コールボタン（すべて同じサイズのリッチボタン） */}
                                     <div className="flex items-center gap-1 shrink-0">
@@ -771,14 +771,14 @@ export default function TeamBracketView() {
                                                   {MATCH_TYPE_SHORT[sm.type]}
                                                 </span>
                                                 <span className={`font-mono font-black tabular-nums ${
-                                                  isTerminated ? 'text-slate-400 line-through decoration-rose-400' :
-                                                  sm.winnerId === match.team1Id ? 'text-blue-600' :
-                                                  sm.winnerId === match.team2Id ? 'text-red-400' : 'text-slate-400'
+                                                  isTerminated ? 'text-gray-400 line-through decoration-primary-400' :
+                                                  sm.winnerId === match.team1Id ? 'text-gray-600' :
+                                                  sm.winnerId === match.team2Id ? 'text-red-400' : 'text-gray-400'
                                                 }`}>{sm.score1}-{sm.score2}</span>
                                                 {isTerminated && (
-                                                  <span className="text-[8px] font-black text-rose-500">打</span>
+                                                  <span className="text-[8px] font-black text-primary-500">打</span>
                                                 )}
-                                                {sm.tiebreakScore !== null && <span className="text-slate-400 font-mono">({sm.tiebreakScore})</span>}
+                                                {sm.tiebreakScore !== null && <span className="text-gray-400 font-mono">({sm.tiebreakScore})</span>}
                                               </span>
                                             );
                                           })}
@@ -793,7 +793,7 @@ export default function TeamBracketView() {
                                         const h = Math.floor(el / 60);
                                         const m = el % 60;
                                         return (
-                                          <span className="font-mono text-[10px] font-black text-green-600 tabular-nums">
+                                          <span className="font-mono text-[10px] font-black text-primary-600 tabular-nums">
                                             {h}:{String(m).padStart(2, '0')}
                                           </span>
                                         );
@@ -801,7 +801,7 @@ export default function TeamBracketView() {
                                       {isFinished && match.winnerId && match.nextMatchId && (
                                         <button
                                           onClick={e => { e.stopPropagation(); advanceWinner(match.matchId); }}
-                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold text-gray-600 hover:bg-gray-100 transition-colors"
                                         >
                                           勝者進出<ChevronRight className="w-2.5 h-2.5" />
                                         </button>
@@ -826,8 +826,8 @@ export default function TeamBracketView() {
         {/* 点滅アニメーション */}
         <style>{`
           @keyframes bracket-playing {
-            0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
-            50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.3); }
+            0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(212,106,102, 0); }
+            50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(198,56,52, 0.3); }
           }
           .bracket-playing-blink { animation: bracket-playing 2s ease-in-out infinite; }
         `}</style>
@@ -840,26 +840,26 @@ export default function TeamBracketView() {
       {courtAssignMatch && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setCourtAssignMatch(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-5 py-4 text-white">
+            <div className="bg-gradient-to-br from-gray-500 to-gray-600 px-5 py-4 text-white">
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
                 <h3 className="font-black">コート割当（複数選択可）</h3>
               </div>
             </div>
             <div className="p-5">
-              <div className="bg-slate-50 rounded-xl p-3 mb-4 text-xs">
+              <div className="bg-gray-50 rounded-xl p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
-                  {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-slate-200 text-[8px] font-bold text-slate-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
+                  {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
                   <span className="font-bold truncate">{courtAssignMatch.team1Name}</span>
                 </div>
-                <div className="text-slate-400 text-[9px] my-0.5">vs</div>
+                <div className="text-gray-400 text-[9px] my-0.5">vs</div>
                 <div className="flex items-center gap-2">
-                  {courtAssignMatch.team2League && <span className="w-4 h-4 rounded bg-slate-200 text-[8px] font-bold text-slate-600 flex items-center justify-center">{courtAssignMatch.team2League}</span>}
+                  {courtAssignMatch.team2League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team2League}</span>}
                   <span className="font-bold truncate">{courtAssignMatch.team2Name}</span>
                 </div>
               </div>
-              <label className="text-xs font-bold text-slate-600 block mb-2">
-                コートを選択 <span className="text-slate-400 font-normal">（複数選択可・使用中は選択不可）</span>
+              <label className="text-xs font-bold text-gray-600 block mb-2">
+                コートを選択 <span className="text-gray-400 font-normal">（複数選択可・使用中は選択不可）</span>
               </label>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {Array.from({ length: 16 }, (_, i) => `${i + 1}コート`).map(c => {
@@ -890,32 +890,32 @@ export default function TeamBracketView() {
                       }}
                       disabled={isUsed}
                       className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
-                        ${isUsed ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' :
-                          isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
-                          'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
+                          isSelected ? 'border-primary-500 bg-primary-50 text-primary-700' :
+                          'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >
                       {c.replace('コート', '')}
-                      {isUsed && <span className="block text-[7px] text-slate-300">使用中</span>}
+                      {isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}
                     </button>
                   );
                 })}
               </div>
               {courtAssignSelected.length > 0 && (
-                <div className="mb-3 text-[10px] text-slate-500 text-center">
-                  選択中: <span className="font-bold text-emerald-600">{courtAssignSelected.sort((a, b) => parseInt(a) - parseInt(b)).join('・')}</span>
+                <div className="mb-3 text-[10px] text-gray-500 text-center">
+                  選択中: <span className="font-bold text-primary-600">{courtAssignSelected.sort((a, b) => parseInt(a) - parseInt(b)).join('・')}</span>
                 </div>
               )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setCourtAssignMatch(null)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   onClick={confirmCourtAssign}
                   disabled={courtAssignSelected.length === 0}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   決定
                 </button>
@@ -1073,7 +1073,7 @@ function TeamCallDialog({
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-br from-primary-500 to-primary-600 px-5 py-4 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Volume2 className="w-5 h-5" />
             <h3 className="font-black">試合コール</h3>
@@ -1083,22 +1083,22 @@ function TeamCallDialog({
           </button>
         </div>
         <div className="p-5 space-y-4">
-          <div className="text-[10px] text-slate-500">
+          <div className="text-[10px] text-gray-500">
             内容を確認・編集してから「コール」を押してください。
           </div>
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
             rows={8}
-            className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500 resize-y"
+            className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary-500 resize-y"
           />
-          <div className="text-[10px] text-slate-400 leading-snug">
+          <div className="text-[10px] text-gray-400 leading-snug">
             ※コール中はダイアログを閉じても画面右下に進行状況が表示されます。
           </div>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
             >
               閉じる
             </button>
@@ -1114,7 +1114,7 @@ function TeamCallDialog({
               <button
                 onClick={handleSpeak}
                 disabled={!text.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
                 <Volume2 className="w-4 h-4" />
                 コール
@@ -1155,7 +1155,7 @@ function TeamWaitingList({
 
   if (waitingMatches.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-gray-400">
         <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
         <p className="text-sm">対戦控えはありません</p>
         <p className="text-[11px] mt-1">両チームが確定した試合がここに表示されます</p>
@@ -1176,8 +1176,8 @@ function TeamWaitingList({
         return (
           <div key={match.matchId} className={`rounded-xl border overflow-hidden transition-all ${
             hasCourtAssigned
-              ? 'border-blue-200 shadow-md ring-1 ring-blue-100/50'
-              : 'border-slate-200/80 shadow-sm'
+              ? 'border-gray-200 shadow-md ring-1 ring-gray-100/50'
+              : 'border-gray-200/80 shadow-sm'
           }`}>
             {/* ヘッダー: カテゴリ + ラウンド */}
             <div className={`flex items-center gap-2 px-3 py-2 bg-gradient-to-r ${cfg.grad} text-white`}>
@@ -1186,14 +1186,14 @@ function TeamWaitingList({
             </div>
             {/* チーム情報 */}
             <div className="px-3 py-2 bg-white">
-              <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
                 {match.team1League && (
                   <span className={`w-5 h-5 rounded-md ${s1.bg} ${s1.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team1League}</span>
                 )}
                 <span className="truncate flex-1">{match.team1Name}</span>
               </div>
-              <div className="text-[9px] text-slate-300 font-black pl-6.5 my-0.5">VS</div>
-              <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+              <div className="text-[9px] text-gray-300 font-black pl-6.5 my-0.5">VS</div>
+              <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
                 {match.team2League && (
                   <span className={`w-5 h-5 rounded-md ${s2.bg} ${s2.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team2League}</span>
                 )}
@@ -1201,14 +1201,14 @@ function TeamWaitingList({
               </div>
             </div>
             {/* フッター: コート + ボタン */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/80 border-t border-slate-100">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/80 border-t border-gray-100">
               {hasCourtAssigned ? (
-                <span className="flex items-center gap-1 text-[11px] font-bold text-blue-600 tabular-nums">
+                <span className="flex items-center gap-1 text-[11px] font-bold text-gray-600 tabular-nums">
                   <MapPin className="w-3.5 h-3.5" />
                   {ca.courtNames.map(extractCourtNumberShort).join('・')}
                 </span>
               ) : (
-                <span className="text-[10px] text-slate-400 italic">コート未割当</span>
+                <span className="text-[10px] text-gray-400 italic">コート未割当</span>
               )}
               <div className="ml-auto flex items-center gap-2">
                 {hasCourtAssigned && (
@@ -1225,8 +1225,8 @@ function TeamWaitingList({
                   onClick={() => onAssignCourt(match)}
                   className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-black rounded-lg active:scale-95 transition-all ${
                     hasCourtAssigned
-                      ? 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm'
-                      : 'text-white bg-gradient-to-b from-emerald-500 to-emerald-600 shadow-sm hover:from-emerald-600 hover:to-emerald-700'
+                      ? 'text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 shadow-sm'
+                      : 'text-white bg-gradient-to-b from-primary-500 to-primary-600 shadow-sm hover:from-primary-600 hover:to-primary-700'
                   }`}
                 >
                   <MapPin className="w-3.5 h-3.5" />
@@ -1348,13 +1348,13 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
   useEffect(() => () => { if (spinTimerRef.current) clearTimeout(spinTimerRef.current); }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-2.5 border-b border-yellow-100 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-          <Shuffle size={14} className="text-yellow-600" />
+    <div className="bg-white rounded-2xl shadow-sm border border-primary-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-2.5 border-b border-primary-100 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-primary-800 flex items-center gap-2">
+          <Shuffle size={14} className="text-primary-600" />
           1位トーナメント 抽選
         </h3>
-        <button onClick={resetDraw} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+        <button onClick={resetDraw} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
           <RotateCcw size={12} />リセット
         </button>
       </div>
@@ -1364,7 +1364,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
           <>
             {/* チーム選択 */}
             <div className="mb-3">
-              <div className="text-[10px] text-slate-500 mb-1.5">チームを選択してスロットに配置</div>
+              <div className="text-[10px] text-gray-500 mb-1.5">チームを選択してスロットに配置</div>
               <div className="flex flex-wrap gap-1">
                 {teams.map(t => {
                   const isAssigned = assignedTeamIds.has(t.teamId);
@@ -1375,9 +1375,9 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
                       onClick={() => !isAssigned && setSelectedTeamId(t.teamId)}
                       disabled={isAssigned || spinning}
                       className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
-                        isAssigned ? 'bg-emerald-50 border-emerald-200 text-emerald-500 line-through opacity-60' :
-                        isSelected ? 'bg-yellow-100 border-yellow-400 text-yellow-800 ring-1 ring-yellow-300' :
-                        'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                        isAssigned ? 'bg-primary-50 border-primary-200 text-primary-500 line-through opacity-60' :
+                        isSelected ? 'bg-primary-100 border-primary-400 text-primary-800 ring-1 ring-primary-300' :
+                        'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                       }`}
                     >
                       {t.leagueId} {t.teamName}
@@ -1389,20 +1389,20 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
 
             {/* ルーレットボタン */}
             {activeTeam && !spinning && (
-              <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <span className="text-[10px] text-yellow-700 flex-1 truncate">
+              <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded-lg">
+                <span className="text-[10px] text-primary-700 flex-1 truncate">
                   <span className="font-bold">{activeTeam.leagueId}</span> {activeTeam.teamName}
                 </span>
                 <button
                   onClick={spinRoulette}
-                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-yellow-500 text-white hover:bg-yellow-600 shrink-0"
+                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-primary-500 text-white hover:bg-primary-600 shrink-0"
                 >
                   🎲 ルーレット
                 </button>
               </div>
             )}
             {spinning && (
-              <div className="mb-3 py-2 bg-yellow-100 border border-yellow-300 rounded-lg text-center text-xs font-bold text-yellow-700 animate-pulse">
+              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-primary-700 animate-pulse">
                 抽選中...
               </div>
             )}
@@ -1427,31 +1427,31 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
                   <div
                     onClick={() => canPlace && manualAssign(si)}
                     className={`flex items-center gap-1.5 px-2 py-1.5 text-[10px] transition-all ${
-                      isBye ? 'bg-slate-100 text-slate-400' :
-                      hl ? 'bg-yellow-200' :
-                      team ? 'bg-emerald-50' :
-                      canPlace ? 'bg-yellow-50 cursor-pointer hover:bg-yellow-100' : 'bg-white'
+                      isBye ? 'bg-gray-100 text-gray-400' :
+                      hl ? 'bg-primary-200' :
+                      team ? 'bg-primary-50' :
+                      canPlace ? 'bg-primary-50 cursor-pointer hover:bg-primary-100' : 'bg-white'
                     }`}
                   >
-                    <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
+                    <span className="text-gray-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
                     {isBye ? (
-                      <span className="text-slate-300 italic">BYE</span>
+                      <span className="text-gray-300 italic">BYE</span>
                     ) : team ? (
-                      <span className="font-bold text-slate-800 truncate">
-                        <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                      <span className="font-bold text-gray-800 truncate">
+                        <span className="text-gray-400">{team.leagueId}</span> {team.teamName}
                       </span>
                     ) : canPlace ? (
-                      <span className="text-yellow-500">← タップ</span>
+                      <span className="text-primary-500">← タップ</span>
                     ) : (
-                      <span className="text-slate-300">―</span>
+                      <span className="text-gray-300">―</span>
                     )}
                   </div>
                 );
 
                 return (
-                  <div key={matchIdx} className="rounded border border-slate-200 overflow-hidden">
+                  <div key={matchIdx} className="rounded border border-gray-200 overflow-hidden">
                     {renderSlot(s1, isBye1, t1, hl1, canPlace1)}
-                    <div className="border-t border-slate-100" />
+                    <div className="border-t border-gray-100" />
                     {renderSlot(s2, isBye2, t2, hl2, canPlace2)}
                   </div>
                 );
@@ -1462,14 +1462,14 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
             <div className="flex gap-2">
               <button
                 onClick={autoDrawAll}
-                className="flex-1 py-2 bg-yellow-500 text-white rounded-lg text-xs font-bold hover:bg-yellow-600"
+                className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-xs font-bold hover:bg-primary-600"
               >
                 🎲 全自動抽選
               </button>
               {unassignedTeams.length === 0 && (
                 <button
                   onClick={confirmDraw}
-                  className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600"
+                  className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-xs font-bold hover:bg-primary-600"
                 >
                   ✓ 確定
                 </button>
@@ -1478,8 +1478,8 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
           </>
         ) : (
           <div className="text-center py-4">
-            <div className="text-emerald-600 font-bold text-sm mb-2">抽選完了</div>
-            <p className="text-xs text-slate-500">トーナメント表に反映されました</p>
+            <div className="text-primary-600 font-bold text-sm mb-2">抽選完了</div>
+            <p className="text-xs text-gray-500">トーナメント表に反映されました</p>
           </div>
         )}
       </div>
@@ -1686,23 +1686,23 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
   const drawSize = bracket.drawSize;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-2.5 border-b border-indigo-100 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
-          <ArrowLeftRight size={14} className="text-indigo-600" />
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-gray-50 to-white px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+          <ArrowLeftRight size={14} className="text-gray-600" />
           並べ替え
         </h3>
         <div className="flex items-center gap-1">
           <button
             onClick={reset}
             disabled={!dirty}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCcw size={12} />リセット
           </button>
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
           >
             <X size={12} />閉じる
           </button>
@@ -1710,13 +1710,13 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
       </div>
 
       <div className="p-3">
-        <div className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+        <div className="text-[10px] text-gray-500 mb-2 leading-relaxed">
           スロット2つタップで入れ替え。右の「BYE/解除」でBYE化／解除。
           未配置チームをタップ後、配置先スロットをタップで移動。
         </div>
 
         {(hasInProgress || hasFinished) && (
-          <div className="mb-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 font-bold">
+          <div className="mb-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded text-[10px] text-primary-700 font-bold">
             ⚠ 確定すると{hasInProgress ? '対戦中の試合と' : ''}入力済みのスコアがリセットされます。
           </div>
         )}
@@ -1726,7 +1726,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
           {Array.from({ length: drawSize / 2 }, (_, matchIdx) => {
             const indices = [matchIdx * 2, matchIdx * 2 + 1];
             return (
-              <div key={matchIdx} className="rounded border border-slate-200 overflow-hidden">
+              <div key={matchIdx} className="rounded border border-gray-200 overflow-hidden">
                 {indices.map((si, k) => {
                   const isBye = byes.has(si);
                   const teamId = slots[si];
@@ -1741,40 +1741,40 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
 
                   return (
                     <div key={si}>
-                      {k === 1 && <div className="border-t border-slate-100" />}
+                      {k === 1 && <div className="border-t border-gray-100" />}
                       <div className={`w-full flex items-stretch text-[10px] transition-all ${
-                        isSelected ? 'bg-indigo-200 ring-2 ring-indigo-400' :
-                        canPlaceTeam ? 'bg-yellow-50' :
-                        moved ? 'bg-emerald-50' :
-                        isBye ? 'bg-slate-50' :
+                        isSelected ? 'bg-gray-200 ring-2 ring-gray-400' :
+                        canPlaceTeam ? 'bg-primary-50' :
+                        moved ? 'bg-primary-50' :
+                        isBye ? 'bg-gray-50' :
                         'bg-white'
                       }`}>
                         <button
                           type="button"
                           onClick={() => handleSlotClick(si)}
                           className={`flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 text-left ${
-                            canPlaceTeam ? 'hover:bg-yellow-100 cursor-pointer' :
-                            'hover:bg-indigo-50'
+                            canPlaceTeam ? 'hover:bg-primary-100 cursor-pointer' :
+                            'hover:bg-gray-50'
                           }`}
                         >
-                          <span className="text-slate-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
+                          <span className="text-gray-400 font-bold w-4 text-center shrink-0">{si + 1}</span>
                           {isBye ? (
-                            <span className="text-slate-400 italic">BYE</span>
+                            <span className="text-gray-400 italic">BYE</span>
                           ) : team ? (
                             <>
-                              <span className="font-bold text-slate-800 truncate">
-                                <span className="text-slate-400">{team.leagueId}</span> {team.teamName}
+                              <span className="font-bold text-gray-800 truncate">
+                                <span className="text-gray-400">{team.leagueId}</span> {team.teamName}
                               </span>
                               {isImported && (
-                                <span className="ml-1 px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-bold shrink-0">
+                                <span className="ml-1 px-1 py-0.5 rounded bg-gray-100 text-gray-700 text-[8px] font-bold shrink-0">
                                   ←{shortOf(importSource!)}
                                 </span>
                               )}
                             </>
                           ) : canPlaceTeam ? (
-                            <span className="text-yellow-600">← ここに配置</span>
+                            <span className="text-primary-600">← ここに配置</span>
                           ) : (
-                            <span className="text-slate-300">―</span>
+                            <span className="text-gray-300">―</span>
                           )}
                         </button>
                         <button
@@ -1782,8 +1782,8 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
                           onClick={() => toggleBye(si)}
                           className={`px-1.5 text-[9px] font-bold border-l shrink-0 transition-colors ${
                             isBye
-                              ? 'border-slate-200 text-indigo-500 hover:bg-indigo-100'
-                              : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-rose-500'
+                              ? 'border-gray-200 text-gray-500 hover:bg-gray-100'
+                              : 'border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-primary-500'
                           }`}
                           title={isBye ? 'BYE解除' : 'BYE化'}
                         >
@@ -1800,8 +1800,8 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
 
         {/* 未配置チームプール（自カテゴリ） */}
         {localUnassigned.length > 0 && (
-          <div className="mb-2 p-2 rounded-lg border border-amber-200 bg-amber-50/50">
-            <div className="text-[9px] text-amber-700 font-bold mb-1.5">
+          <div className="mb-2 p-2 rounded-lg border border-primary-200 bg-primary-50/50">
+            <div className="text-[9px] text-primary-700 font-bold mb-1.5">
               未配置チーム（タップ → 配置先スロットをタップ）
             </div>
             <div className="flex flex-wrap gap-1">
@@ -1817,11 +1817,11 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
                     }}
                     className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                       isSelected
-                        ? 'bg-yellow-200 border-yellow-500 text-yellow-900 ring-2 ring-yellow-300'
-                        : 'bg-white border-slate-200 text-slate-700 hover:border-amber-300'
+                        ? 'bg-primary-200 border-primary-500 text-primary-900 ring-2 ring-primary-300'
+                        : 'bg-white border-gray-200 text-gray-700 hover:border-primary-300'
                     }`}
                   >
-                    <span className="text-slate-400">{t.leagueId}</span> {t.teamName}
+                    <span className="text-gray-400">{t.leagueId}</span> {t.teamName}
                   </button>
                 );
               })}
@@ -1831,8 +1831,8 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
 
         {/* 他カテゴリから取り込み候補 */}
         {externalCandidates.length > 0 && (
-          <div className="mb-3 p-2 rounded-lg border border-violet-200 bg-violet-50/50">
-            <div className="text-[9px] text-violet-700 font-bold mb-1.5">
+          <div className="mb-3 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
+            <div className="text-[9px] text-gray-700 font-bold mb-1.5">
               他カテゴリから取り込み（選択 → スロットをタップで移籍）
             </div>
             <div className="flex flex-wrap gap-1">
@@ -1857,14 +1857,14 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
                     }}
                     className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                       isSelected
-                        ? 'bg-violet-200 border-violet-500 text-violet-900 ring-2 ring-violet-300'
-                        : 'bg-white border-slate-200 text-slate-700 hover:border-violet-300'
+                        ? 'bg-gray-200 border-gray-500 text-gray-900 ring-2 ring-gray-300'
+                        : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                   >
-                    <span className="px-1 rounded bg-violet-100 text-violet-700 text-[8px] font-bold">
+                    <span className="px-1 rounded bg-gray-100 text-gray-700 text-[8px] font-bold">
                       {shortOf(t.fromCategory)}
                     </span>
-                    <span><span className="text-slate-400">{t.leagueId}</span> {t.teamName}</span>
+                    <span><span className="text-gray-400">{t.leagueId}</span> {t.teamName}</span>
                   </button>
                 );
               })}
@@ -1875,14 +1875,14 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
+            className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200"
           >
             キャンセル
           </button>
           <button
             onClick={apply}
             disabled={!dirty}
-            className="flex-1 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-2 bg-gray-500 text-white rounded-lg text-xs font-bold hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ✓ 確定
           </button>

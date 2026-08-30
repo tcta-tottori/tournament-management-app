@@ -46,20 +46,20 @@ function getWinningGamesFromRules(rules: string[]): number {
 
 /** リーグバッジの色（エントリーページと統一） */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-emerald-100 text-emerald-700', 'B': 'bg-blue-100 text-blue-700',
-  'C': 'bg-purple-100 text-purple-700', 'D': 'bg-rose-100 text-rose-700',
-  'E': 'bg-amber-100 text-amber-700', 'F': 'bg-cyan-100 text-cyan-700',
-  'G': 'bg-lime-100 text-lime-700', 'H': 'bg-fuchsia-100 text-fuchsia-700',
-  'I': 'bg-emerald-100 text-emerald-700', 'J': 'bg-blue-100 text-blue-700',
-  'K': 'bg-purple-100 text-purple-700', 'L': 'bg-rose-100 text-rose-700',
-  'M': 'bg-amber-100 text-amber-700',
+  'A': 'bg-primary-100 text-primary-700', 'B': 'bg-gray-100 text-gray-700',
+  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-primary-700',
+  'E': 'bg-primary-100 text-primary-700', 'F': 'bg-gray-100 text-gray-700',
+  'G': 'bg-primary-100 text-primary-700', 'H': 'bg-gray-100 text-gray-700',
+  'I': 'bg-primary-100 text-primary-700', 'J': 'bg-gray-100 text-gray-700',
+  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-primary-700',
+  'M': 'bg-primary-100 text-primary-700',
 };
 
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
-  { id: '1st', label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
+  { id: '1st', label: '1位', icon: Trophy, color: 'from-primary-500 to-primary-600' },
   { id: '2nd', label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
-  { id: '3rd', label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
-  { id: '4th', label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
+  { id: '3rd', label: '3位', icon: Award, color: 'from-gray-400 to-gray-500' },
+  { id: '4th', label: '4・5位', icon: Users, color: 'from-gray-400 to-gray-500' },
 ];
 
 /** 審判用紙を印刷（B5横・Excel原本と同じ構成） */
@@ -496,7 +496,7 @@ export default function MixedBracketView() {
               onClick={() => setDrawEditMode(!drawEditMode)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm active:scale-95 transition-all whitespace-nowrap ${
                 drawEditMode
-                  ? 'bg-blue-600 text-white border border-blue-600'
+                  ? 'bg-gray-600 text-white border border-gray-600'
                   : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
               }`}
             >
@@ -560,8 +560,8 @@ export default function MixedBracketView() {
                     onClick={() => updateBracketGameRule(preset)}
                     className={`px-3 py-2 text-xs text-left rounded-xl border transition-colors ${
                       bracketGameRule === preset
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                        ? 'bg-gray-500 text-white border-gray-500'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     {preset}
@@ -573,7 +573,7 @@ export default function MixedBracketView() {
                 value={bracketGameRule}
                 onChange={e => updateBracketGameRule(e.target.value)}
                 placeholder="上記から選択、または直接入力"
-                className="w-full text-xs border border-gray-300 rounded-lg px-2 py-2 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                className="w-full text-xs border border-gray-300 rounded-lg px-2 py-2 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 outline-none"
               />
               <button
                 onClick={() => setRuleDialogOpen(false)}
@@ -665,11 +665,11 @@ export default function MixedBracketView() {
                       disabled={isUsed}
                       className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
                         ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
-                          courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                          courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-primary-700' :
                           'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >{c.replace('コート', '')}
                       {isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}
-                      {c === currentCourt && <span className="block text-[7px] text-emerald-500">現在</span>}
+                      {c === currentCourt && <span className="block text-[7px] text-primary-500">現在</span>}
                     </button>
                   );
                 })}
@@ -677,7 +677,7 @@ export default function MixedBracketView() {
               <div className="flex gap-2">
                 <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
                 <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue || courtAssignValue === currentCourt}
-                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  className="flex-1 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-bold hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >{currentCourt ? '変更' : '決定'}</button>
               </div>
               {currentCourt && (
@@ -719,12 +719,12 @@ export default function MixedBracketView() {
 
             <div className={`flex-1 min-h-0 overflow-y-auto px-5 ${keyboardOpen ? 'py-1' : 'py-2'}`}>
             <div className={`flex items-center gap-4 ${keyboardOpen ? 'mb-3' : 'mb-5'}`}>
-              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'border-transparent'}`}>
+              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 1 ? 'bg-primary-50 border-primary-300' : 'border-transparent'}`}>
                 <div className="font-medium text-sm">{editingMatch.team1Name}</div>
                 <div className="text-xs text-gray-400">{editingMatch.team1League}</div>
               </div>
               <span className="text-gray-300 font-bold">VS</span>
-              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'border-transparent'}`}>
+              <div className={`flex-1 text-center p-2 rounded-xl border-2 transition-all ${winnerSide === 2 ? 'bg-primary-50 border-primary-300' : 'border-transparent'}`}>
                 <div className="font-medium text-sm">{editingMatch.team2Name}</div>
                 <div className="text-xs text-gray-400">{editingMatch.team2League}</div>
               </div>
@@ -733,7 +733,7 @@ export default function MixedBracketView() {
             <div className={`flex items-center justify-center gap-2 ${keyboardOpen ? 'mb-3' : 'mb-5'}`}>
               {isTiebreak && loserSide === 1 && (
                 <div className="flex flex-col items-center">
-                  <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                  <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                   <input
                     ref={tiebreakRef}
                     type="text"
@@ -742,7 +742,7 @@ export default function MixedBracketView() {
                     value={tiebreakInput}
                     onChange={handleTiebreakChange}
                     onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
-                    className="w-10 h-12 text-center text-lg font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-blue-50 transition-all"
+                    className="w-10 h-12 text-center text-lg font-bold border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400 bg-gray-50 transition-all"
                   />
                 </div>
               )}
@@ -752,7 +752,7 @@ export default function MixedBracketView() {
                 maxLength={1}
                 value={score1Input}
                 onChange={handleScore1Change}
-                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${winnerSide === 1 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300' : 'border-emerald-300'}`}
+                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all ${winnerSide === 1 ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300' : 'border-primary-300'}`}
                 autoFocus
               />
               <span className="text-2xl font-bold text-gray-300">-</span>
@@ -764,11 +764,11 @@ export default function MixedBracketView() {
                 value={score2Input}
                 onChange={handleScore2Change}
                 onKeyDown={e => { if (e.key === 'Enter' && !isTiebreak) saveScore(); }}
-                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${winnerSide === 2 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300' : 'border-emerald-300'}`}
+                className={`w-14 h-12 text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all ${winnerSide === 2 ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300' : 'border-primary-300'}`}
               />
               {isTiebreak && loserSide === 2 && (
                 <div className="flex flex-col items-center">
-                  <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                  <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                   <input
                     ref={tiebreakRef}
                     type="text"
@@ -777,7 +777,7 @@ export default function MixedBracketView() {
                     value={tiebreakInput}
                     onChange={handleTiebreakChange}
                     onKeyDown={e => { if (e.key === 'Enter') saveScore(); }}
-                    className="w-10 h-12 text-center text-lg font-bold border-2 border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-blue-50 transition-all"
+                    className="w-10 h-12 text-center text-lg font-bold border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400 bg-gray-50 transition-all"
                   />
                 </div>
               )}
@@ -787,7 +787,7 @@ export default function MixedBracketView() {
             <div className={`grid grid-cols-2 gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
               <button
                 onClick={() => editingMatch.team2Id && handleDEF(editingMatch.team2Id)}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
               >
                 <Ban size={14} />
                 <span className="truncate">{editingMatch.team1Name}</span>
@@ -795,7 +795,7 @@ export default function MixedBracketView() {
               </button>
               <button
                 onClick={() => editingMatch.team1Id && handleDEF(editingMatch.team1Id)}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
               >
                 <Ban size={14} />
                 <span className="truncate">{editingMatch.team2Name}</span>
@@ -819,7 +819,7 @@ export default function MixedBracketView() {
               </button>
               {/* コートを間違えた・移動したときにここから直せる */}
               <button onClick={() => openCourtAssign(editingMatch)}
-                className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs hover:bg-emerald-100 active:scale-[0.98] transition-all">
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-50 border border-primary-200 rounded-xl text-primary-700 text-xs hover:bg-primary-100 active:scale-[0.98] transition-all">
                 <MapPin size={12} />
                 {bracketCourtAssignments[editingMatch.matchId] ? 'コート変更' : 'コート決定'}
               </button>
@@ -830,7 +830,7 @@ export default function MixedBracketView() {
                 setCallCourt(ca ? ca.courtName : '');
                 setCallTime('');
               }}
-                className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 text-xs hover:bg-blue-100 active:scale-[0.98] transition-all">
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 <Volume2 size={12} />コール
               </button>
             </div>
@@ -841,7 +841,7 @@ export default function MixedBracketView() {
             <div className={`shrink-0 border-t border-gray-100 bg-white px-5 ${keyboardOpen ? 'py-2 space-y-1.5' : 'py-3 space-y-2'}`}>
               <button
                 onClick={saveScore}
-                className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 text-sm font-bold active:scale-[0.98] transition-all shadow-md ${keyboardOpen ? 'py-2.5 min-h-[44px]' : 'py-3 min-h-[48px]'}`}
+                className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl hover:from-primary-700 hover:to-primary-800 text-sm font-bold active:scale-[0.98] transition-all shadow-md ${keyboardOpen ? 'py-2.5 min-h-[44px]' : 'py-3 min-h-[48px]'}`}
               >
                 <Save size={14} />保存
               </button>
@@ -947,12 +947,12 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
-        <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2">
-          <RotateCcw size={16} className="text-blue-600" />
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-gray-50 to-white px-4 py-3 border-b border-gray-100">
+        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+          <RotateCcw size={16} className="text-gray-600" />
           ドロー編集
-          <span className="text-[10px] font-normal text-blue-500">（スロットをタップして入れ替え）</span>
+          <span className="text-[10px] font-normal text-gray-500">（スロットをタップして入れ替え）</span>
         </h3>
       </div>
       <div className="p-4">
@@ -979,8 +979,8 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                     }
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
-                    isSelected ? 'bg-blue-100 border-2 border-blue-400 ring-2 ring-blue-200' :
-                    dragIdx !== null ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 cursor-pointer' :
+                    isSelected ? 'bg-gray-100 border-2 border-gray-400 ring-2 ring-gray-200' :
+                    dragIdx !== null ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100 cursor-pointer' :
                     slot.isBye || slot.teamName === 'BYE' ? 'bg-gray-50 border border-gray-200 text-gray-400' :
                     'bg-white border border-gray-200 hover:bg-gray-50'
                   }`}
@@ -1005,7 +1005,7 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
           })}
         </div>
         {dragIdx !== null && (
-          <div className="mt-3 text-center text-xs text-blue-600 font-medium animate-pulse">
+          <div className="mt-3 text-center text-xs text-gray-600 font-medium animate-pulse">
             入れ替え先のスロットをタップしてください
           </div>
         )}
@@ -1139,10 +1139,10 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-yellow-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-2 border-b border-yellow-100 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-          <Shuffle size={14} className="text-yellow-600" />
+    <div className="bg-white rounded-xl shadow-sm border border-primary-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-2 border-b border-primary-100 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-primary-800 flex items-center gap-2">
+          <Shuffle size={14} className="text-primary-600" />
           1位トーナメント 抽選
         </h3>
         <button onClick={resetDraw} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
@@ -1164,8 +1164,8 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
                     <button key={t.teamId} onClick={() => !isAssigned && setSelectedTeamId(t.teamId)}
                       disabled={isAssigned || spinning}
                       className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
-                        isAssigned ? 'bg-emerald-50 border-emerald-200 text-emerald-500 line-through opacity-60' :
-                        isSelected ? 'bg-yellow-100 border-yellow-400 text-yellow-800 ring-1 ring-yellow-300' :
+                        isAssigned ? 'bg-primary-50 border-primary-200 text-primary-500 line-through opacity-60' :
+                        isSelected ? 'bg-primary-100 border-primary-400 text-primary-800 ring-1 ring-primary-300' :
                         'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
                     >
                       {t.leagueId} {t.teamName}
@@ -1177,18 +1177,18 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
 
             {/* ルーレットボタン */}
             {activeTeam && !spinning && (
-              <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <span className="text-[10px] text-yellow-700 flex-1 truncate">
+              <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded-lg">
+                <span className="text-[10px] text-primary-700 flex-1 truncate">
                   <span className="font-bold">{activeTeam.leagueId}</span> {activeTeam.teamName}
                 </span>
                 <button onClick={spinRoulette}
-                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-yellow-500 text-white hover:bg-yellow-600 shrink-0">
+                  className="px-3 py-1 rounded-lg text-[10px] font-bold bg-primary-500 text-white hover:bg-primary-600 shrink-0">
                   🎲 ルーレット
                 </button>
               </div>
             )}
             {spinning && (
-              <div className="mb-3 py-2 bg-yellow-100 border border-yellow-300 rounded-lg text-center text-xs font-bold text-yellow-700 animate-pulse">抽選中...</div>
+              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-primary-700 animate-pulse">抽選中...</div>
             )}
 
             {/* ドロー表形式スロット（対戦ペアで2列表示） */}
@@ -1212,9 +1212,9 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
                     onClick={() => canPlace && manualAssign(si)}
                     className={`flex items-center gap-1.5 px-2 py-1.5 text-[10px] transition-all ${
                       isBye ? 'bg-gray-100 text-gray-400' :
-                      hl ? 'bg-yellow-200' :
-                      team ? 'bg-emerald-50' :
-                      canPlace ? 'bg-yellow-50 cursor-pointer hover:bg-yellow-100' : 'bg-white'
+                      hl ? 'bg-primary-200' :
+                      team ? 'bg-primary-50' :
+                      canPlace ? 'bg-primary-50 cursor-pointer hover:bg-primary-100' : 'bg-white'
                     }`}
                   >
                     <span className="text-gray-400 font-bold w-4 text-center shrink-0">
@@ -1225,7 +1225,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
                     ) : team ? (
                       <span className="font-bold text-gray-800 truncate"><span className="text-gray-400">{team.leagueId}</span> {team.teamName}</span>
                     ) : canPlace ? (
-                      <span className="text-yellow-500">← タップ</span>
+                      <span className="text-primary-500">← タップ</span>
                     ) : (
                       <span className="text-gray-300">―</span>
                     )}
@@ -1245,12 +1245,12 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
             {/* ボタン群 */}
             <div className="flex gap-2">
               <button onClick={autoDrawAll}
-                className="flex-1 py-2 bg-yellow-500 text-white rounded-lg text-xs font-bold hover:bg-yellow-600">
+                className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-xs font-bold hover:bg-primary-600">
                 🎲 全自動抽選
               </button>
               {unassignedTeams.length === 0 && (
                 <button onClick={confirmDraw}
-                  className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-600">
+                  className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-xs font-bold hover:bg-primary-600">
                   ✓ 確定
                 </button>
               )}
@@ -1258,7 +1258,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
           </>
         ) : (
           <div className="text-center py-4">
-            <div className="text-emerald-600 font-bold text-sm mb-2">抽選完了</div>
+            <div className="text-primary-600 font-bold text-sm mb-2">抽選完了</div>
             <p className="text-xs text-gray-500">トーナメント表に反映されました</p>
           </div>
         )}
@@ -1450,8 +1450,8 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
               <div className="absolute" style={{ left: colX, top: 4, width: MATCH_WIDTH }}>
                 <div className="text-center">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
-                    ${round === totalRounds ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white' :
-                      round === totalRounds - 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                    ${round === totalRounds ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white' :
+                      round === totalRounds - 1 ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}>
                     {getRoundLabel(round, totalRounds)}
                   </span>
                 </div>
@@ -1486,7 +1486,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                     <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - byeBoxH / 2, width: MATCH_WIDTH }}>
                       <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white" style={{ height: byeBoxH }}>
                         {byeSlotNum && (
-                          <span className="text-sm text-amber-500 shrink-0 w-5 text-center">{byeSlotNum}</span>
+                          <span className="text-sm text-primary-500 shrink-0 w-5 text-center">{byeSlotNum}</span>
                         )}
                         {winnerLeague && (
                           <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
@@ -1523,10 +1523,10 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                   }
                   return (
                     <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
-                      ${slot.isWinner ? 'bg-emerald-50 font-bold text-emerald-800' : 'bg-white text-gray-700'}
+                      ${slot.isWinner ? 'bg-primary-50 font-bold text-primary-800' : 'bg-white text-gray-700'}
                     `} style={{ height: SLOT_HEIGHT }}>
                       {slot.slotNum && (
-                        <span className="text-sm text-amber-500 shrink-0 mr-1 w-5 text-center">{slot.slotNum}</span>
+                        <span className="text-sm text-primary-500 shrink-0 mr-1 w-5 text-center">{slot.slotNum}</span>
                       )}
                       {slot.league ? (() => {
                         const badge = getLeagueBadge(slot.teamId, slot.league);
@@ -1548,8 +1548,8 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                           </div>
                         ) : slot.ph?.leagueId ? (
                           <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
-                            <span className="text-[10px] text-blue-400">{slot.ph.rank}位</span>
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
+                            <span className="text-[10px] text-gray-400">{slot.ph.rank}位</span>
                           </span>
                         ) : slot.ph ? <span className="text-[10px] text-gray-400">{slot.ph.text}</span>
                         : slot.name ? <span className="text-[11px] truncate">{slot.name}</span>
@@ -1560,10 +1560,10 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                           {slot.defLabel}
                         </span>
                       ) : slot.score !== null && (
-                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-primary-600' : 'text-gray-500'}`}>
                           {slot.score}
                           {slot.isLoser && slot.tiebreakScore != null && (
-                            <span className="text-[9px] text-blue-500 align-super ml-0.5">({slot.tiebreakScore})</span>
+                            <span className="text-[9px] text-gray-500 align-super ml-0.5">({slot.tiebreakScore})</span>
                           )}
                         </span>
                       )}
@@ -1576,9 +1576,9 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                     <div
                       onClick={() => onMatchClick(match)}
                       className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all
-                        ${isPlaying ? 'border-green-400 shadow-md bracket-playing-blink' :
-                          match.status === 'finished' ? 'border-emerald-300 shadow-sm' :
-                          match.team1Id && match.team2Id ? 'border-blue-300 hover:shadow-md' :
+                        ${isPlaying ? 'border-primary-400 shadow-md bracket-playing-blink' :
+                          match.status === 'finished' ? 'border-primary-300 shadow-sm' :
+                          match.team1Id && match.team2Id ? 'border-gray-300 hover:shadow-md' :
                           'border-gray-200 hover:border-gray-300'}
                       `}
                       style={{ height: MATCH_HEIGHT }}
@@ -1601,28 +1601,28 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
                         <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
-                          ${isPlaying ? 'bg-green-50 text-green-700' :
+                          ${isPlaying ? 'bg-primary-50 text-primary-700' :
                             match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
-                            'bg-amber-50/50 text-amber-600'}
+                            'bg-primary-50/50 text-primary-600'}
                         `} style={{ height: STATUS_HEIGHT }}>
                           {isPlaying ? (
                             <>
                               {/* コート表示をタップするとコートを変更・解除できる */}
                               <button
                                 onClick={e => { if (onCourtClick) { e.stopPropagation(); onCourtClick(match); } }}
-                                className="flex items-center gap-1 shrink-0 rounded px-1 -ml-1 hover:bg-green-100 transition-colors"
+                                className="flex items-center gap-1 shrink-0 rounded px-1 -ml-1 hover:bg-primary-100 transition-colors"
                                 title={onCourtClick ? 'コートを変更する' : undefined}
                               >
-                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                <span className="font-bold text-green-700">{ca.courtName.replace('コート', '')}コート</span>
-                                {onCourtClick && <MapPin size={9} className="text-green-500" />}
+                                <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                                <span className="font-bold text-primary-700">{ca.courtName.replace('コート', '')}コート</span>
+                                {onCourtClick && <MapPin size={9} className="text-primary-500" />}
                               </button>
-                              <span className="ml-auto font-mono text-green-600">{elapsedStr}</span>
+                              <span className="ml-auto font-mono text-primary-600">{elapsedStr}</span>
                             </>
                           ) : match.status === 'finished' ? (
                             <span className="mx-auto text-gray-400">完了</span>
                           ) : (
-                            <span className="mx-auto flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />控え中</span>
+                            <span className="mx-auto flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-primary-400" />控え中</span>
                           )}
                         </div>
                       )}
@@ -1638,8 +1638,8 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
       {/* 点滅アニメーション */}
       <style>{`
         @keyframes bracket-playing {
-          0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
-          50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.3); }
+          0%, 100% { border-color: rgb(74, 222, 128); box-shadow: 0 0 0 0 rgba(212,106,102, 0); }
+          50% { border-color: rgb(34, 197, 94); box-shadow: 0 0 8px 2px rgba(198,56,52, 0.3); }
         }
         .bracket-playing-blink { animation: bracket-playing 2s ease-in-out infinite; }
       `}</style>
@@ -1794,21 +1794,21 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
   return (
     <>
       <button onClick={openDialog}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 shadow-sm hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
-        <Printer size={12} className="text-amber-600" /> 賞状印刷
+        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-primary-700 bg-primary-50 border border-primary-200 shadow-sm hover:bg-primary-100 active:scale-95 transition-all whitespace-nowrap">
+        <Printer size={12} className="text-primary-600" /> 賞状印刷
       </button>
 
       {isOpen && createPortal(
         <div className="fixed inset-0 bg-black/50 z-[200]" onClick={() => setIsOpen(false)}>
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-[210]" onClick={e => e.stopPropagation()}>
             {/* ヘッダー */}
-            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between shrink-0">
+            <div className="px-4 py-2.5 bg-primary-50 border-b border-primary-200 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                <Printer size={16} className="text-amber-600" /> 賞状印刷
+                <Printer size={16} className="text-primary-600" /> 賞状印刷
               </h3>
               <div className="flex items-center gap-2">
                 <button onClick={handlePrint} disabled={selectedEntries.length === 0}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg shadow hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-95">
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-500 text-white text-xs font-bold rounded-lg shadow hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-95">
                   <Printer size={14} /> {selectedEntries.length}枚を印刷
                 </button>
                 <button onClick={() => setIsOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-colors">
@@ -1826,10 +1826,10 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
                   <div key={idx}
                     onClick={() => setPreviewIdx(idx)}
                     className={`border rounded-lg p-2.5 cursor-pointer transition-all ${
-                      previewIdx === idx ? 'ring-2 ring-amber-400 border-amber-300' : ''
-                    } ${entry.selected ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                      previewIdx === idx ? 'ring-2 ring-primary-400 border-primary-300' : ''
+                    } ${entry.selected ? 'border-primary-200 bg-primary-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <input type="checkbox" checked={entry.selected} onChange={e => { e.stopPropagation(); toggleEntry(idx); }} className="accent-amber-500" />
+                      <input type="checkbox" checked={entry.selected} onChange={e => { e.stopPropagation(); toggleEntry(idx); }} className="accent-primary-500" />
                       <select value={entry.rank} onChange={e => updateEntry(idx, 'rank', e.target.value)} onClick={e => e.stopPropagation()} className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 font-bold bg-white">
                         <option value="優勝">優勝</option><option value="準優勝">準優勝</option><option value="第3位">第3位</option>
                       </select>
@@ -1841,7 +1841,7 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
                       placeholder="氏名（例: 田中・山本）" className="w-full text-xs border border-gray-200 rounded px-2 py-1 font-bold" />
                   </div>
                 ))}
-                <button onClick={addEntry} className="w-full py-1.5 border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-colors">
+                <button onClick={addEntry} className="w-full py-1.5 border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors">
                   + 手動で追加
                 </button>
               </div>
@@ -1851,15 +1851,15 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
                 {previewEntry ? (
                   <div className="bg-white shadow-lg border border-gray-300" style={{ width: '280px', height: '396px', position: 'relative' }}>
                     {/* 賞状の外枠イメージ */}
-                    <div className="absolute inset-2 border-2 border-amber-300/40 rounded" />
-                    <div className="absolute inset-3 border border-amber-200/30 rounded" />
+                    <div className="absolute inset-2 border-2 border-primary-300/40 rounded" />
+                    <div className="absolute inset-3 border border-primary-200/30 rounded" />
                     {/* 上部: 表彰状（印刷済み模擬） */}
                     <div className="absolute top-[10%] left-0 right-0 text-center">
                       <span className="text-gray-300 text-lg tracking-[0.5em]" style={{ fontFamily: '"Yuji Mai", serif' }}>表　彰　状</span>
                     </div>
                     {/* 印刷対象エリア: A4中央より少し上、約3cm幅 */}
                     <div className="absolute left-0 right-0 flex flex-col items-center justify-center px-4" style={{ top: '35%', height: '11%' }}>
-                      <div className="border-y-2 border-dashed border-amber-300/50 py-2 w-full flex flex-col items-center justify-center">
+                      <div className="border-y-2 border-dashed border-primary-300/50 py-2 w-full flex flex-col items-center justify-center">
                         <div className="text-sm text-black tracking-[0.3em] mb-1.5" style={{ fontFamily: '"Yuji Mai", serif' }}>
                           {previewEntry.category || '（クラス未入力）'}
                         </div>
@@ -1872,7 +1872,7 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
                       </div>
                     </div>
                     {/* 印刷エリア注釈 */}
-                    <div className="absolute right-1 text-[6px] text-amber-400" style={{ top: '34%' }}>印刷範囲↓</div>
+                    <div className="absolute right-1 text-[6px] text-primary-400" style={{ top: '34%' }}>印刷範囲↓</div>
                     {/* 下部: 鳥取市テニス協会（印刷済み模擬） */}
                     <div className="absolute bottom-[10%] left-0 right-0 text-center">
                       <span className="text-gray-300 text-[8px] tracking-[0.2em]" style={{ fontFamily: '"Yuji Mai", serif' }}>鳥取市テニス協会</span>

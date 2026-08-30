@@ -607,7 +607,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
           <div className="flex-1 min-w-0 text-center">
             <h2 className="text-base font-bold text-gray-800 truncate">
-              <Trophy className="w-4 h-4 inline-block mr-1 text-amber-500" />
+              <Trophy className="w-4 h-4 inline-block mr-1 text-primary-500" />
               {selectedEvent?.name || '種目を選択'}
             </h2>
             {selectedEvent && (
@@ -615,10 +615,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                 <button
                   onClick={() => setRulesDialogOpen(true)}
                   title="ゲームルールを修正"
-                  className="mt-0.5 max-w-full inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                  className="mt-0.5 max-w-full inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-primary-700 hover:bg-primary-50 rounded px-1 -mx-1 py-0.5 transition-colors"
                 >
                   <span className="truncate">{getGameRulesText(selectedEvent)}</span>
-                  <Pencil className="w-2.5 h-2.5 shrink-0 text-amber-500" />
+                  <Pencil className="w-2.5 h-2.5 shrink-0 text-primary-500" />
                 </button>
               ) : (
                 <p className="text-[10px] text-gray-500 truncate mt-0.5">
@@ -650,7 +650,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             </span>
           </div>
           {progress.playing > 0 && (
-            <span className="flex items-center gap-0.5 text-green-600 font-bold">
+            <span className="flex items-center gap-0.5 text-primary-600 font-bold">
               <Timer className="w-3 h-3" />
               {progress.playing}試合中
             </span>
@@ -716,7 +716,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                   onClick={() => void toggleThirdPlace()}
                   className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
                     hasThirdPlace
-                      ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                      ? 'bg-primary-50 text-primary-700 border-primary-300 hover:bg-primary-100'
                       : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
                   title="準決勝で負けた2組で3位決定戦を行う場合に追加します"
@@ -730,7 +730,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                 onClick={() => setNameEditMode(v => !v)}
                 className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
                   nameEditMode
-                    ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
+                    ? 'bg-primary-500 text-white border-primary-500 hover:bg-primary-600'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                 }`}
                 title="氏名・ふりがな・所属を直します（エントリー確定後でも修正できます）"
@@ -862,8 +862,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                         key={c.courtId}
                         className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                           isFree
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                            : 'bg-green-600 text-white border-green-600'
+                            ? 'bg-primary-50 text-primary-700 border-primary-300'
+                            : 'bg-primary-600 text-white border-primary-600'
                         }`}
                       >
                         {c.name}番コート{isFree ? '（空き）' : '（試合中）'}
@@ -910,7 +910,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                       onClick={() => enableScoreInput && setSelectedMatchKey(`${m.round}-${m.position}`)}
                       disabled={!enableScoreInput}
                       className={`w-full text-left rounded-lg border p-2 transition-all ${
-                        isPlaying ? 'bg-green-50 border-2 border-green-500'
+                        isPlaying ? 'bg-primary-50 border-2 border-primary-500'
                         : isFinished ? 'bg-gray-50 border-gray-200'
                         : 'bg-white border-gray-200 hover:border-primary-300'} ${enableScoreInput ? 'cursor-pointer' : ''}`}
                     >
@@ -921,7 +921,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                         <div className="shrink-0 text-center min-w-[52px]">
                           {isFinished && m.score
                             ? <span className="text-xs font-mono font-bold text-gray-700">{m.score}</span>
-                            : <span className="text-[11px] font-bold text-blue-300">vs</span>}
+                            : <span className="text-[11px] font-bold text-gray-300">vs</span>}
                         </div>
                         <div className="flex-1 min-w-0 text-center">
                           <span className={`text-sm truncate ${w2 ? 'font-bold text-primary-700' : 'font-semibold text-gray-900'}`}>{m.player2Name}</span>
@@ -929,10 +929,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                       </div>
                       <div className="flex items-center justify-center gap-2 mt-1">
                         {court && (isPlaying || isFinished) && (
-                          <span className="text-[10px] font-bold text-green-700">{court.name}番コート</span>
+                          <span className="text-[10px] font-bold text-primary-700">{court.name}番コート</span>
                         )}
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                          isPlaying ? 'bg-green-100 text-green-700'
+                          isPlaying ? 'bg-primary-100 text-primary-700'
                           : isFinished ? 'bg-gray-200 text-gray-500'
                           : 'bg-gray-100 text-gray-500'}`}>
                           {isPlaying ? '試合中' : isFinished ? '終了' : '待機'}
@@ -950,7 +950,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                             className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${
                               freeAssignedCourts.length === 0
                                 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-green-600 text-white border-green-600 hover:bg-green-700 cursor-pointer'
+                                : 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700 cursor-pointer'
                             }`}
                           >
                             <Play className="w-3 h-3" />

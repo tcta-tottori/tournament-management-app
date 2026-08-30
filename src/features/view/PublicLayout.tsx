@@ -242,7 +242,7 @@ export default function PublicLayout() {
               <button key={item.path}
                 className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
                 onClick={() => go(item.path)}>
-                <item.icon className="shrink-0" style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined }} />
+                <item.icon className="shrink-0" style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 3px rgba(198,56,52,0.35))' : undefined }} />
                 <span>{item.label}</span>
               </button>
             );
@@ -251,7 +251,7 @@ export default function PublicLayout() {
         <div className="hamburger-drawer-footer">
           <div className="drawer-action-row">
             {sync.hasRoom && <SyncBadge sync={sync} />}
-            <span className="text-[10px] bg-white/10 border border-white/15 rounded-full px-2.5 py-1 font-bold text-white/80">観戦用ページ</span>
+            <span className="text-[10px] bg-primary-50 border border-primary-200 rounded-full px-2.5 py-1 font-bold text-primary-700">観戦用ページ</span>
           </div>
           <img src={`${import.meta.env.BASE_URL}logo-tcta.png`} alt="鳥取市テニス協会"
             className="hamburger-drawer-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -330,7 +330,7 @@ function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
       <button
         onClick={handleRetry}
         disabled={retrying}
-        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-60 transition-colors"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
         再読み込み
@@ -344,9 +344,10 @@ function SyncBadge({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
   const connecting = sync.connectionState === 'connecting' || sync.connectionState === 'reconnecting';
   const label = connected ? 'ライブ受信中' : connecting ? '接続中...' : sync.serverConfigured ? '切断' : 'ローカル同期';
   const Icon = connected ? Wifi : WifiOff;
+  // 白地のヘッダーに合わせ、受信中だけ赤、それ以外は無彩色にする
   const color = connected
-    ? 'bg-emerald-500/25 border-emerald-300/60 text-emerald-50'
-    : connecting ? 'bg-amber-500/25 border-amber-300/60 text-amber-50' : 'bg-white/15 border-white/20 text-white/80';
+    ? 'bg-primary-50 border-primary-200 text-primary-700'
+    : connecting ? 'bg-gray-50 border-gray-200 text-gray-600' : 'bg-white border-gray-200 text-gray-500';
   return (
     <span className={`flex items-center gap-1 text-[10px] md:text-xs rounded-full px-2 py-1 font-bold border ${color}`} title={`ルーム: ${sync.roomCode}`}>
       <Icon className="w-3 h-3" />{label}

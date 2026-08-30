@@ -21,8 +21,8 @@ export default function CourtSelector({ value, onChange }: { value: string; onCh
   const btn = (active: boolean) =>
     `flex-1 px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
       active
-        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50'
+        ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
+        : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:bg-primary-50'
     }`;
 
   return (
@@ -48,7 +48,7 @@ export default function CourtSelector({ value, onChange }: { value: string; onCh
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder="例: 5,6,7,8,9,10,11,12,13,14,15,16"
-          className="w-full mt-2 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+          className="w-full mt-2 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all"
         />
       )}
     </div>

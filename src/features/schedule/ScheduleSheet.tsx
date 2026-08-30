@@ -67,14 +67,14 @@ function getMatchFormat(evt: Event | undefined, round: number, totalRounds: numb
 }
 
 const EVENT_COLORS = [
-  { bg: 'bg-blue-100', text: 'text-blue-800' },
-  { bg: 'bg-orange-100', text: 'text-orange-800' },
-  { bg: 'bg-green-100', text: 'text-green-800' },
-  { bg: 'bg-pink-100', text: 'text-pink-800' },
-  { bg: 'bg-purple-100', text: 'text-purple-800' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-800' },
-  { bg: 'bg-amber-100', text: 'text-amber-800' },
-  { bg: 'bg-stone-100', text: 'text-stone-800' },
+  { bg: 'bg-gray-100', text: 'text-gray-800' },
+  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-gray-100', text: 'text-gray-800' },
+  { bg: 'bg-gray-100', text: 'text-gray-800' },
+  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-gray-100', text: 'text-gray-800' },
 ];
 
 /** 種目名から時間割Excelの色分けに対応する背景色・文字色を返す */
@@ -1069,7 +1069,7 @@ export default function ScheduleSheet() {
             className={`mt-3 p-3 rounded-md text-sm ${
               statusMessage.includes('失敗') || statusMessage.includes('ありません')
                 ? 'bg-red-50 text-red-700 border border-red-200'
-                : 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-primary-50 text-primary-700 border border-primary-200'
             }`}
           >
             {statusMessage}
@@ -1105,12 +1105,12 @@ export default function ScheduleSheet() {
               100% { background-position: 200% 0; }
             }
             @keyframes glow-pulse {
-              0%, 100% { box-shadow: inset 0 0 0 2px rgba(34,197,94,0.5); }
-              50% { box-shadow: inset 0 0 12px 2px rgba(34,197,94,0.35), inset 0 0 0 2px rgba(34,197,94,0.6); }
+              0%, 100% { box-shadow: inset 0 0 0 2px rgba(198,56,52,0.5); }
+              50% { box-shadow: inset 0 0 12px 2px rgba(198,56,52,0.35), inset 0 0 0 2px rgba(198,56,52,0.6); }
             }
             .cell-playing {
               animation: glow-pulse 2s ease-in-out infinite, shimmer 2.5s linear infinite;
-              background-image: linear-gradient(90deg, transparent 20%, rgba(34,197,94,0.12) 50%, transparent 80%) !important;
+              background-image: linear-gradient(90deg, transparent 20%, rgba(198,56,52,0.12) 50%, transparent 80%) !important;
               background-size: 200% 100%;
               background-color: #dcfce7 !important;
               position: relative;
@@ -1120,14 +1120,14 @@ export default function ScheduleSheet() {
               position: absolute;
               top: 1px; left: 1px;
               width: 6px; height: 6px;
-              background: #22c55e;
+              background: #c63834;
               border-radius: 50%;
               animation: playing-dot-ping 1.5s ease-in-out infinite;
               z-index: 2;
             }
             @keyframes playing-dot-ping {
-              0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
-              50% { opacity: 0.8; transform: scale(1.3); box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+              0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(198,56,52,0.6); }
+              50% { opacity: 0.8; transform: scale(1.3); box-shadow: 0 0 0 4px rgba(198,56,52,0); }
             }
             .cell-waiting {
               position: relative;
@@ -1144,8 +1144,8 @@ export default function ScheduleSheet() {
                 -45deg,
                 transparent,
                 transparent 4px,
-                rgba(56,189,248,0.06) 4px,
-                rgba(56,189,248,0.06) 8px
+                rgba(166,166,166,0.06) 4px,
+                rgba(166,166,166,0.06) 8px
               );
               pointer-events: none;
               z-index: 1;
@@ -1160,15 +1160,15 @@ export default function ScheduleSheet() {
               bottom: 0;
               right: -1px;
               width: 3px;
-              background: linear-gradient(180deg, #ef4444, #f97316);
+              background: linear-gradient(180deg, #c63834, #5a5a5a);
               z-index: 5;
               border-radius: 2px;
-              box-shadow: 0 0 8px rgba(239,68,68,0.5);
+              box-shadow: 0 0 8px rgba(198,56,52,0.5);
               animation: pulse-line 2s ease-in-out infinite;
             }
             @keyframes pulse-line {
-              0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
-              50% { opacity: 0.7; box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+              0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(198,56,52,0.5); }
+              50% { opacity: 0.7; box-shadow: 0 0 4px rgba(198,56,52,0.3); }
             }
             .time-now-header {
               position: relative;
@@ -1179,7 +1179,7 @@ export default function ScheduleSheet() {
               bottom: -2px;
               right: -4px;
               font-size: 8px;
-              color: #ef4444;
+              color: #c63834;
               z-index: 5;
             }
           `}</style>
@@ -1268,10 +1268,10 @@ export default function ScheduleSheet() {
                       let statusBg = '';
                       let cellStatusClass = '';
                       if (isPlaying) {
-                        statusBg = 'bg-green-100';
+                        statusBg = 'bg-primary-100';
                         cellStatusClass = 'cell-playing';
                       } else if (isFinished) {
-                        statusBg = 'bg-sky-50/60';
+                        statusBg = 'bg-gray-50/60';
                         cellStatusClass = 'cell-finished';
                       } else {
                         statusBg = color?.bg || 'bg-gray-50';
@@ -1295,20 +1295,20 @@ export default function ScheduleSheet() {
                         >
                           <div className="flex items-center justify-center gap-0.5 relative z-[2]">
                             <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
-                            <span className={`text-[9px] leading-tight ${isFinished ? 'text-sky-500' : isPlaying ? 'text-green-700' : 'opacity-70'}`}>{roundLabelToJapanese(item.roundLabel)}</span>
+                            <span className={`text-[9px] leading-tight ${isFinished ? 'text-gray-500' : isPlaying ? 'text-primary-700' : 'opacity-70'}`}>{roundLabelToJapanese(item.roundLabel)}</span>
                           </div>
                           {playerLabel && (
-                            <div className={`text-[8px] leading-tight truncate relative z-[2] ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'text-sky-600/70' : isPlaying ? 'text-green-800' : 'opacity-80'}`}>
+                            <div className={`text-[8px] leading-tight truncate relative z-[2] ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'text-gray-600/70' : isPlaying ? 'text-primary-800' : 'opacity-80'}`}>
                               {playerLabel}
                             </div>
                           )}
                           {dbMatch?.score && isFinished && (
-                            <div className="text-[7px] leading-tight truncate font-mono text-sky-500 font-bold relative z-[2]">
+                            <div className="text-[7px] leading-tight truncate font-mono text-gray-500 font-bold relative z-[2]">
                               {dbMatch.score}
                             </div>
                           )}
                           {isPlaying && !dbMatch?.score && (
-                            <div className="text-[7px] leading-tight font-bold text-green-600 relative z-[2]">
+                            <div className="text-[7px] leading-tight font-bold text-primary-600 relative z-[2]">
                               試合中
                             </div>
                           )}
@@ -1625,8 +1625,8 @@ export default function ScheduleSheet() {
                         disabled={driveLoading}
                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-primary-50 border border-transparent hover:border-primary-200 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                          <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+                          <FileSpreadsheet className="w-5 h-5 text-primary-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-900 truncate">{file.name}</div>

@@ -18,7 +18,7 @@ export type EmbedTheme = 'light' | 'dark' | 'transparent';
 
 const THEME: Record<EmbedTheme, { wrap: string; text: string }> = {
   light: { wrap: 'bg-white', text: 'text-gray-500' },
-  dark: { wrap: 'bg-[#0f3326]', text: 'text-white/60' },
+  dark: { wrap: 'bg-[#262626]', text: 'text-white/60' },
   transparent: { wrap: 'bg-transparent', text: 'text-gray-500' },
 };
 

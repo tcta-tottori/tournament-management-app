@@ -58,7 +58,7 @@ export default function CallStatusPopup({
     <div className="fixed inset-x-0 bottom-0 z-[9998] flex justify-center px-3 pb-3 pointer-events-none">
       {/* 枠のみ点滅・背景は半透明・赤ベース */}
       <div className="pointer-events-auto w-full max-w-lg rounded-xl border-2 bg-white/80 backdrop-blur-sm shadow-2xl overflow-hidden call-popup-blink">
-        <div className="flex items-center gap-3 bg-gradient-to-r from-red-600/90 to-rose-600/90 px-4 py-2">
+        <div className="flex items-center gap-3 bg-gradient-to-r from-red-600/90 to-primary-600/90 px-4 py-2">
           <div className="relative shrink-0">
             {loading
               ? <Loader2 className="w-5 h-5 text-white animate-spin" />

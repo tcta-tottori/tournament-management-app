@@ -17,16 +17,13 @@ export interface LeagueColor {
   badge: string;
 }
 
-/** リーグバッジカラー（Blue先頭で全ページ統一） */
+/**
+ * リーグバッジカラー。
+ * 協会サイトのトンマナ（白ベース＋赤の差し色）に合わせ、リーグごとの
+ * 色分けは廃止し、全リーグ共通の無彩色にしている。
+ */
 export const LEAGUE_COLORS: LeagueColor[] = [
-  { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
-  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
-  { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
-  { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700' },
-  { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
-  { from: 'from-cyan-600', to: 'to-sky-700', light: 'from-cyan-50 to-sky-50', border: 'border-cyan-200', badge: 'bg-cyan-100 text-cyan-700' },
-  { from: 'from-lime-600', to: 'to-green-700', light: 'from-lime-50 to-green-50', border: 'border-lime-200', badge: 'bg-lime-100 text-lime-700' },
-  { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700' },
+  { from: 'from-gray-600', to: 'to-gray-700', light: 'from-gray-50 to-white', border: 'border-gray-200', badge: 'bg-gray-100 text-gray-700' },
 ];
 
 /** リーグの並び順に対応する配色を取得する */

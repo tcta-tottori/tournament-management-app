@@ -382,7 +382,7 @@ export default function ResultsPage() {
           <button
             onClick={handleBatchExcel}
             disabled={events.length === 0}
-            className="flex items-center gap-1.5 bg-teal-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+            className="flex items-center gap-1.5 bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4" />
             全種目Excel出力
@@ -390,7 +390,7 @@ export default function ResultsPage() {
           <button
             onClick={handleBatchJpeg}
             disabled={events.length === 0}
-            className="flex items-center gap-1.5 bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+            className="flex items-center gap-1.5 bg-primary-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
           >
             <Image className="w-4 h-4" />
             全種目JPEG出力
@@ -473,14 +473,14 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
           {previewOpts && <EventResultPreview opts={previewOpts} />}
           <button
             onClick={onExcel}
-            className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-teal-700 shadow-sm transition-colors"
+            className="flex items-center gap-1 bg-primary-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-primary-700 shadow-sm transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excel
           </button>
           <button
             onClick={onJpeg}
-            className="flex items-center gap-1 bg-orange-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-orange-600 shadow-sm transition-colors"
+            className="flex items-center gap-1 bg-primary-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-primary-600 shadow-sm transition-colors"
           >
             <Image className="w-3.5 h-3.5" />
             JPEG
@@ -493,14 +493,14 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
         <div className="space-y-3">
           {/* Champion */}
           {result.winner && (
-            <div className="flex items-center gap-3 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-3 bg-gradient-to-r from-primary-50 to-white border border-primary-200 rounded-lg px-4 py-3">
               <span className="text-2xl">🥇</span>
-              <Crown className="w-5 h-5 text-amber-500 shrink-0" />
+              <Crown className="w-5 h-5 text-primary-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-amber-600 uppercase tracking-wider">優勝</div>
+                <div className="text-xs font-semibold text-primary-600 uppercase tracking-wider">優勝</div>
                 <div className="text-base font-bold text-gray-900 truncate">{result.winner}</div>
                 {result.winnerAffiliation && (
-                  <div className="text-xs text-amber-700">{result.winnerAffiliation}</div>
+                  <div className="text-xs text-primary-700">{result.winnerAffiliation}</div>
                 )}
               </div>
             </div>
@@ -508,7 +508,7 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
 
           {/* Runner-up */}
           {result.runnerUp && (
-            <div className="flex items-center gap-3 bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-lg px-4 py-2.5">
+            <div className="flex items-center gap-3 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg px-4 py-2.5">
               <span className="text-xl">🥈</span>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">準優勝</div>
@@ -522,10 +522,10 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
 
           {/* Semi-finalists */}
           {result.semiFinalists.length > 0 && (
-            <div className="flex items-start gap-3 bg-gradient-to-r from-orange-50/50 to-amber-50/30 border border-orange-200/60 rounded-lg px-4 py-2.5">
+            <div className="flex items-start gap-3 bg-gradient-to-r from-primary-50/50 to-primary-50/30 border border-primary-200/60 rounded-lg px-4 py-2.5">
               <span className="text-lg mt-0.5">🥉</span>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-orange-600/80 uppercase tracking-wider mb-1">ベスト4</div>
+                <div className="text-xs font-semibold text-primary-600/80 uppercase tracking-wider mb-1">ベスト4</div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {result.semiFinalists.map((sf, i) => (
                     <div key={i} className="text-sm text-gray-700">
@@ -561,7 +561,7 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
               className="h-full rounded-full transition-all duration-500 ease-out"
               style={{
                 width: `${completionPct}%`,
-                backgroundColor: completionPct === 100 ? '#059669' : '#6366f1',
+                backgroundColor: completionPct === 100 ? '#c63834' : '#767676',
               }}
             />
           </div>
@@ -593,9 +593,9 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
     : 0;
 
   const rankBg = (rank: number) => {
-    if (rank === 1) return 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200';
-    if (rank === 2) return 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200';
-    if (rank === 3) return 'bg-gradient-to-r from-orange-50/50 to-amber-50/30 border-orange-200/60';
+    if (rank === 1) return 'bg-gradient-to-r from-primary-50 to-white border-primary-200';
+    if (rank === 2) return 'bg-gradient-to-r from-gray-50 to-white border-gray-200';
+    if (rank === 3) return 'bg-gradient-to-r from-gray-50/50 to-primary-50/30 border-gray-200/60';
     return 'bg-white border-gray-100';
   };
 
@@ -621,14 +621,14 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
           {previewOpts && <EventResultPreview opts={previewOpts} />}
           <button
             onClick={onExcel}
-            className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-teal-700 shadow-sm transition-colors"
+            className="flex items-center gap-1 bg-primary-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-primary-700 shadow-sm transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excel
           </button>
           <button
             onClick={onJpeg}
-            className="flex items-center gap-1 bg-orange-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-orange-600 shadow-sm transition-colors"
+            className="flex items-center gap-1 bg-primary-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-primary-600 shadow-sm transition-colors"
           >
             <Image className="w-3.5 h-3.5" />
             JPEG
@@ -658,7 +658,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
                     </td>
                     <td className="px-3 py-2.5 font-bold text-gray-900">{s.name}</td>
                     <td className="px-3 py-2.5 text-gray-500 text-xs">{s.affiliation}</td>
-                    <td className="px-3 py-2.5 text-center font-semibold text-green-600">{s.wins}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold text-primary-600">{s.wins}</td>
                     <td className="px-3 py-2.5 text-center font-semibold text-red-500">{s.losses}</td>
                   </tr>
                 ))}
@@ -685,7 +685,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
               className="h-full rounded-full transition-all duration-500 ease-out"
               style={{
                 width: `${completionPct}%`,
-                backgroundColor: completionPct === 100 ? '#059669' : '#6366f1',
+                backgroundColor: completionPct === 100 ? '#c63834' : '#767676',
               }}
             />
           </div>

@@ -322,7 +322,7 @@ export default function PlayerDataList() {
       {/* ステータス */}
       {status && (
         <div className={`mb-3 p-2.5 rounded-md text-sm flex items-center gap-2 ${
-          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary-50 text-primary-700 border border-primary-200'
         }`}>
           {status.isError ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
           <span>{status.message}</span>
@@ -343,7 +343,7 @@ export default function PlayerDataList() {
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 shadow-sm transition-colors"
           title="Excelインポート"
         >
           <FileSpreadsheet className="w-4 h-4" />
@@ -352,7 +352,7 @@ export default function PlayerDataList() {
         </button>
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 shadow-sm transition-colors"
           title="Excelエクスポート"
         >
           <FileSpreadsheet className="w-4 h-4" />
@@ -400,7 +400,7 @@ export default function PlayerDataList() {
                         <div className="w-2/12 flex justify-center gap-1">
                           <button
                             onClick={() => handleAffFuriganaSave(aff.name)}
-                            className="p-1 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
+                            className="p-1 text-primary-600 hover:bg-primary-100 rounded transition-colors"
                             title="保存"
                           >
                             <Check className="w-4 h-4" />
@@ -421,7 +421,7 @@ export default function PlayerDataList() {
                           {aff.furigana ? (
                             <span className="text-gray-600">{aff.furigana}</span>
                           ) : (
-                            <span className="text-amber-500 text-xs italic">未登録</span>
+                            <span className="text-primary-500 text-xs italic">未登録</span>
                           )}
                         </div>
                         <div className="w-2/12 text-center">
@@ -451,8 +451,8 @@ export default function PlayerDataList() {
           {affiliationList.length > 0 && (
             <div className="bg-gray-50 border-t px-4 py-2 flex items-center gap-4 text-xs text-gray-500">
               <span>全{affiliationList.length}件</span>
-              <span className="text-emerald-600">登録済: {affRegisteredCount}</span>
-              <span className="text-amber-600">未登録: {affUnregisteredCount}</span>
+              <span className="text-primary-600">登録済: {affRegisteredCount}</span>
+              <span className="text-primary-600">未登録: {affUnregisteredCount}</span>
             </div>
           )}
         </div>
@@ -489,7 +489,7 @@ export default function PlayerDataList() {
                         <div className="w-1/12 flex justify-center gap-1">
                           <button
                             onClick={() => handleFuriganaSave(p.playerId)}
-                            className="p-1 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
+                            className="p-1 text-primary-600 hover:bg-primary-100 rounded transition-colors"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -504,7 +504,7 @@ export default function PlayerDataList() {
                     ) : (
                       <>
                         <div className="w-4/12 text-gray-600 truncate">
-                          {p.furigana || <span className="text-amber-500 text-xs italic">未登録</span>}
+                          {p.furigana || <span className="text-primary-500 text-xs italic">未登録</span>}
                         </div>
                         <div className="w-3/12 text-xs text-gray-400 truncate">{p.affiliation}</div>
                         <div className="w-1/12 flex justify-center">
@@ -531,8 +531,8 @@ export default function PlayerDataList() {
           {furiganaList.length > 0 && (
             <div className="bg-gray-50 border-t px-4 py-2 flex items-center gap-4 text-xs text-gray-500">
               <span>全{furiganaList.length}名</span>
-              <span className="text-emerald-600">登録済: {furiganaList.filter(p => p.furigana).length}</span>
-              <span className="text-amber-600">未登録: {furiganaList.filter(p => !p.furigana).length}</span>
+              <span className="text-primary-600">登録済: {furiganaList.filter(p => p.furigana).length}</span>
+              <span className="text-primary-600">未登録: {furiganaList.filter(p => !p.furigana).length}</span>
             </div>
           )}
         </div>
