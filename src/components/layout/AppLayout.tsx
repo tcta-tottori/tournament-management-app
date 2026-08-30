@@ -3,8 +3,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, BarChart2,
-  HelpCircle, ExternalLink, HardDrive, Eye,
-  AlertTriangle, Network, Menu, X, Volume2,
+  HelpCircle, Settings,
+  AlertTriangle, Network, Menu, X,
   PanelLeftClose, PanelLeftOpen, Radio, Printer, ArrowRight
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,12 +12,9 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../../features/mixed/mixedStore';
 import { useTeamStore } from '../../features/team/teamStore';
-import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../../features/sync/syncStore';
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
-import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
 import VoiceLoadingIndicator from '../ui/VoiceLoadingIndicator';
-import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
 import HeaderBackdrop from './HeaderBackdrop';
 import { callTts } from '../../features/broadcast/callTts';
 
@@ -35,8 +32,12 @@ const ALL_MAIN_TABS = [
   { id: 'S-09b', path: '/broadcast', label: 'ライブ配信', icon: Radio },
   { id: 'S-10', path: '/print', label: '印刷', icon: Printer },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
-  { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
+  // 同期・観戦用ページ・音声・バックアップは設定ページに集約している
+  { id: 'S-12', path: '/settings', label: '設定', icon: Settings },
 ];
+
+/** 協会HP（メニュー下部のロゴから開く） */
+const ASSOCIATION_URL = 'https://www.tottori-tenis.net/';
 
 /** 抽選・ドロー表タブを非表示にするパス */
 const DRAW_TAB_PATHS = ['/draw-lot', '/draw-table'];
@@ -58,7 +59,6 @@ export default function AppLayout() {
   const teamLeagues = useTeamStore((s) => s.leagues);
   const teamBrackets = useTeamStore((s) => s.brackets);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
-  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // PC表示：左側の常設サイドバー。デフォルト展開、アイコンのみ表示に折りたたみ可能。
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -231,10 +231,10 @@ export default function AppLayout() {
   const allTabs = useMemo(() => {
     let tabs = ALL_MAIN_TABS;
 
-    // 大会データ未読み込み時: データ・マニュアル・バックアップのみ表示
+    // 大会データ未読み込み時: データ・印刷・マニュアル・設定のみ表示
     if (!currentTournamentId && !isMixedImported && !isTeamImported) {
       // 賞状印刷は大会データが無くても（手入力で）使えるので常に出す
-      return tabs.filter(t => ['/data', '/print', '/manual', '/backup'].includes(t.path));
+      return tabs.filter(t => ['/data', '/print', '/manual', '/settings'].includes(t.path));
     }
 
     // ミックスダブルス or 団体戦 読込時: 不要なタブを非表示 + ラベル変更
@@ -330,36 +330,23 @@ export default function AppLayout() {
           })}
         </nav>
 
-        {/* フッター：操作ボタン・バージョン */}
-        <div className="border-t border-white/20 p-2 flex flex-col gap-1.5 shrink-0">
+        {/* フッター：左下に協会ロゴ（押すと協会HP）・右下にバージョン */}
+        <div className="border-t border-white/20 px-2.5 py-2.5 shrink-0">
           {sidebarCollapsed ? (
-            <>
-              <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/75 hover:text-white hover:bg-white/20 rounded" title="音声設定">
-                <Volume2 className="w-4 h-4" />
-              </button>
-              <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-white/80 hover:text-white text-center py-1" title="バージョン情報">
+            <div className="flex flex-col items-center gap-2">
+              <AssociationLogoLink className="menu-logo-link menu-logo-link-sm" />
+              <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-white/85 hover:text-white text-center" title="バージョン情報">
                 2.4
               </button>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="flex items-center flex-wrap gap-1.5">
-                <SyncStatusIndicator />
-                <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定" aria-label="音声設定">
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>音声</span>
-                </button>
-                <PublicViewHeaderLink />
-                <a href="https://www.tottori-tenis.net/" target="_blank" rel="noopener noreferrer" className="header-link" title="鳥取県テニス協会HPを開く">
-                  <span>テニス協会HP</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
+            <div className="menu-bottom-row">
+              <AssociationLogoLink className="menu-logo-link" />
               <button onClick={() => setVersionModalOpen(true)} className="drawer-version-btn" title="バージョン情報・更新履歴">
                 <span className="header-version">Ver 2.4</span>
                 <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </aside>
@@ -449,58 +436,29 @@ export default function AppLayout() {
           })}
         </div>
 
-        {/* 下部: 操作ボタン → バージョン情報 → 協会ロゴ */}
+        {/* 下部: 左に協会ロゴ（押すと協会HP）・右にバージョン */}
         <div
           className="fullmenu-footer"
           style={{ '--footer-delay': `${allTabs.length * 45}ms` } as React.CSSProperties}
         >
-          <div className="drawer-action-row">
-            <SyncStatusIndicator />
+          <div className="menu-bottom-row">
+            <AssociationLogoLink className="menu-logo-link" />
+
+            {/* バージョン情報（ver.と更新日） */}
             <button
-              onClick={() => setVoiceSettingsOpen(true)}
-              className="header-link"
-              title="音声設定"
-              aria-label="音声設定"
+              onClick={() => setVersionModalOpen(true)}
+              className="drawer-version-btn"
+              title="バージョン情報・更新履歴"
             >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>音声</span>
+              <span className="header-version">Ver 2.4</span>
+              <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
             </button>
-            <PublicViewHeaderLink />
-            <a
-              href="https://www.tottori-tenis.net/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="header-link"
-              title="鳥取県テニス協会HPを開く"
-            >
-              <ExternalLink className="w-3 h-3" />
-              <span>テニス協会HP</span>
-            </a>
           </div>
-
-          {/* バージョン情報（ver.と更新日） */}
-          <button
-            onClick={() => setVersionModalOpen(true)}
-            className="drawer-version-btn"
-            title="バージョン情報・更新履歴"
-          >
-            <span className="header-version">Ver 2.4</span>
-            <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
-          </button>
-
-          {/* 協会ロゴ */}
-          <img
-            src={`${import.meta.env.BASE_URL}logo-tcta-white.png`}
-            alt="鳥取市テニス協会"
-            className="fullmenu-logo"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
         </div>
       </div>
 
       {/* バージョン情報モーダル */}
       <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />
-      <VoiceSettingsDialog open={voiceSettingsOpen} onClose={() => setVoiceSettingsOpen(false)} />
 
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />
@@ -512,45 +470,24 @@ export default function AppLayout() {
 }
 
 /**
- * ヘッダーの「観戦用」リンク
- * 同期ルーム接続中なら ?room=XXX&server=YYY を付与し、
- * 別端末からアクセスしても観戦者として同じ大会データを受信できる。
+ * メニュー下部の協会ロゴ。押すと鳥取市テニス協会のHPを別タブで開く。
+ * （以前あった「テニス協会HP」ボタンはこのロゴに置き換えて廃止した）
  */
-function PublicViewHeaderLink() {
-  const roomCode = useSyncStore((s) => s.roomCode);
-  const serverUrl = useSyncStore((s) => s.serverUrl);
-  const syncEnabled = useSyncStore((s) => s.syncEnabled);
-  const isMixedImported = useMixedStore((s) => s.isImported);
-  const isTeamImported = useTeamStore((s) => s.isImported);
-
-  // 団体戦/ミックスは予選リーグ、個人戦はドローを既定タブにする
-  const viewPath = isMixedImported || isTeamImported ? '/view/league' : '/view/draw';
-
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  let href = `${base}${viewPath}`;
-  if (syncEnabled && roomCode) {
-    // 既定サーバー/固定公開ルームと同じ値ならクエリを省略し、固定URLにする
-    const qs = new URLSearchParams();
-    if (roomCode && roomCode !== PUBLIC_ROOM) qs.set('room', roomCode);
-    if (serverUrl && serverUrl !== DEFAULT_SERVER_URL) qs.set('server', serverUrl);
-    const q = qs.toString();
-    href = `${base}${viewPath}${q ? `?${q}` : ''}`;
-  }
-
+function AssociationLogoLink({ className = '' }: { className?: string }) {
   return (
     <a
-      href={href}
+      href={ASSOCIATION_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="header-link"
-      title={
-        syncEnabled && roomCode
-          ? `参加者・HP向け公開ビューを別タブで開く（ルーム ${roomCode}）`
-          : '参加者・HP向け公開ビューを別タブで開く'
-      }
+      className={className}
+      title="鳥取市テニス協会HPを開く"
+      aria-label="鳥取市テニス協会HPを開く"
     >
-      <Eye className="w-3 h-3" />
-      <span>観戦用</span>
+      <img
+        src={`${import.meta.env.BASE_URL}logo-tcta-white.png`}
+        alt="鳥取市テニス協会"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+      />
     </a>
   );
 }

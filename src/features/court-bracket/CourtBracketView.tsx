@@ -2,6 +2,7 @@ import React from 'react';
 import { Trophy, Play } from 'lucide-react';
 import type { DrawSlotData, MatchResult } from '../draw/DrawBoard';
 import { parseScoreParts } from '../score/scoreDisplay';
+import { pairDisplayLines } from '../draw/pairLabel';
 
 /** 経過時間を H:MM 形式 */
 function formatElapsed(startedAt: number): string {
@@ -51,11 +52,16 @@ interface CourtBracketViewProps {
 }
 
 const SLOT_HEIGHT = 36;
+// ダブルスはペアを1人ずつ2行（氏名＋所属）で表示するので枠を高くする。
+const SLOT_HEIGHT_DOUBLES = 52;
 const Y_SPACING = 64;
+const Y_SPACING_DOUBLES = 80;
 const OFFSET_Y = 40;
 // vs表示（両者確定）のカードは氏名＋所属を上下2段で表示するため背が高い。
 // コート番号を左側に大きく表示し、氏名・所属も読みやすい大きさにするため背を高くする。
 const CARD_H_VS = 66;
+// ダブルスは1組が2行になるので、vsカードは合計4行ぶんの高さが要る。
+const CARD_H_VS_DOUBLES = 96;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(
@@ -85,6 +91,10 @@ export default function CourtBracketView({
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
+  // ダブルスはペアを1人ずつ2行で書くため、枠・間隔・カード高さを1段大きくする。
+  const slotH = isDoubles ? SLOT_HEIGHT_DOUBLES : SLOT_HEIGHT;
+  const ySpacing = isDoubles ? Y_SPACING_DOUBLES : Y_SPACING;
+  const cardHVs = isDoubles ? CARD_H_VS_DOUBLES : CARD_H_VS;
   // 所属を省略せず表示しつつ、幅は最適化（広すぎない）
   const slotW = isDoubles ? (isMobile ? 220 : 285) : (isMobile ? 185 : 205);
   const xSpacing = isMobile ? 56 : 78;
@@ -140,13 +150,13 @@ export default function CourtBracketView({
       const botBye = isSlotBye(botIdx);
 
       if (matchIdx === halfSize / 2 && nextCompactY > OFFSET_Y) {
-        nextCompactY += Y_SPACING * 0.8;
+        nextCompactY += ySpacing * 0.8;
       }
 
       // 修正モードでは空き枠も入れ替え先として並べるので、全ての枠に行を割り当てる。
       // 2回戦の相手が決まる「4枠ずつのまとまり」が分かるよう、2試合ごとに余白を空ける。
       if (editMode) {
-        const EDIT_SPACING = SLOT_HEIGHT + 10;
+        const EDIT_SPACING = slotH + 10;
         if (matchIdx > 0 && matchIdx % 2 === 0) nextCompactY += 18;
         leafY[topIdx] = nextCompactY;
         leafY[botIdx] = nextCompactY + EDIT_SPACING;
@@ -160,21 +170,21 @@ export default function CourtBracketView({
       } else if (topBye) {
         leafY[topIdx] = nextCompactY;
         leafY[botIdx] = nextCompactY;
-        nextCompactY += Y_SPACING;
+        nextCompactY += ySpacing;
       } else if (botBye) {
         leafY[topIdx] = nextCompactY;
         leafY[botIdx] = nextCompactY;
-        nextCompactY += Y_SPACING;
+        nextCompactY += ySpacing;
       } else {
         leafY[topIdx] = nextCompactY;
-        leafY[botIdx] = nextCompactY + Y_SPACING;
-        nextCompactY += Y_SPACING * 2;
+        leafY[botIdx] = nextCompactY + ySpacing;
+        nextCompactY += ySpacing * 2;
       }
     }
   } else {
     // 隠した回戦の分だけ縦に詰める。先頭列は対戦カード（背の高いvs表示）に
     // なりうるので、カード高さ分の間隔を確保する。
-    const LEAF_SPACING = CARD_H_VS + 16;
+    const LEAF_SPACING = cardHVs + 16;
     for (let i = 0; i < leafCount; i++) {
       // 上半分と下半分の間に軽い区切りを入れる
       if (i > 0 && i === leafCount / 2) nextCompactY += LEAF_SPACING * 0.4;
@@ -199,7 +209,7 @@ export default function CourtBracketView({
 
   const visibleColumns = roundsCount - leafRound;
   const containerWidth = offsetX * 2 + visibleColumns * (slotW + xSpacing) + slotW;
-  const baseHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
+  const baseHeight = nextCompactY + slotH + OFFSET_Y;
 
   // entryId → ドロー情報（番号・氏名・所属）。全選手は1回戦スロットに存在するので
   // 2回戦以降でも entryId から氏名・所属を引ける。
@@ -224,6 +234,45 @@ export default function CourtBracketView({
   };
   const affiliationOf = (entryId: string | null): string =>
     (entryId ? entryInfo.get(entryId)?.affiliation : '') || '';
+
+  /**
+   * 氏名＋所属の表示ブロック。
+   * ダブルスは「A / B」をペアの1人ずつ2行に分け、所属もその行の右に並べる。
+   * 2人が同じ所属で1つしか入っていないときは、2行の縦中央に1つだけ置く。
+   * シングルスはこれまで通り「氏名（左）＋所属（右）」の1行。
+   */
+  const nameBlock = (
+    name: string,
+    affiliation: string,
+    opt: { nameCls: string; affCls: string },
+  ) => {
+    const { names, affiliations } = isDoubles
+      ? pairDisplayLines(name, affiliation)
+      : { names: [name], affiliations: affiliation ? [affiliation] : [] };
+    const multi = names.length > 1;
+    return (
+      <div className="flex-1 flex items-center gap-1.5 min-w-0">
+        <div className="flex-1 min-w-0 leading-tight">
+          {names.map((n, i) => (
+            <div key={i} className={`truncate ${opt.nameCls}`} title={n}>{n}</div>
+          ))}
+        </div>
+        {affiliations.length > 0 && (
+          <div className={`leading-tight text-right ${multi ? 'shrink min-w-0 max-w-[46%]' : 'shrink-0'}`}>
+            {affiliations.map((a, i) => (
+              <div
+                key={i}
+                className={`${multi ? 'truncate' : 'whitespace-nowrap'} ${opt.affCls}`}
+                title={a}
+              >
+                {a}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // --- 回戦ヘッダー ---
   const roundHeaders: React.ReactNode[] = [];
@@ -253,9 +302,9 @@ export default function CourtBracketView({
       const xNext = getX(r + 1);
       const xMid = (x + xNext) / 2;
 
-      const yTop = getCompactY(r, m * 2) + SLOT_HEIGHT / 2;
-      const yBottom = getCompactY(r, m * 2 + 1) + SLOT_HEIGHT / 2;
-      const yMid = getCompactY(r + 1, m) + SLOT_HEIGHT / 2;
+      const yTop = getCompactY(r, m * 2) + slotH / 2;
+      const yBottom = getCompactY(r, m * 2 + 1) + slotH / 2;
+      const yMid = getCompactY(r + 1, m) + slotH / 2;
 
       // BYE だけの枝は描かず、相手のラインをそのまま次の回戦へ通す（全回戦共通）
       const topEmpty = isEmptySubtree(r, m * 2);
@@ -355,9 +404,9 @@ export default function CourtBracketView({
       // それ以外は開始時刻(予定)を表示する。カード高さ（vsは背高）に合わせて位置調整。
       const nextBothPlayers = !!(matchResult?.player1Name && matchResult?.player2Name);
       const nextIsVs = nextBothPlayers && !isFinished;
-      const nextCardH = nextIsVs ? CARD_H_VS : SLOT_HEIGHT;
+      const nextCardH = nextIsVs ? cardHVs : slotH;
       const cardCenterX = xNext + slotW / 2;
-      const cardBottomY = getCompactY(r + 1, m) + (SLOT_HEIGHT + nextCardH) / 2 + 10;
+      const cardBottomY = getCompactY(r + 1, m) + (slotH + nextCardH) / 2 + 10;
       // 開始時刻（scheduledTime）はドロー表には既定で表示しない（「9:00」等の既定値を出さない）。
       // 試合中のみ経過時間を表示する。
       const bottomText = isPlaying
@@ -407,7 +456,7 @@ export default function CourtBracketView({
         className={`absolute flex items-center px-1.5 gap-1 border rounded select-none transition-all${editCls} ${
           isEmpty ? 'bg-gray-50 border-dashed border-gray-300' : 'bg-white border-gray-400'
         }`}
-        style={{ left: x, top: y, width: slotW, height: SLOT_HEIGHT }}
+        style={{ left: x, top: y, width: slotW, height: slotH }}
       >
         <div className="w-5 text-[10px] font-mono font-bold text-gray-600 border-r border-gray-300 pr-1 text-center shrink-0">
           {editMode ? slot.position : visibleIndex}
@@ -417,28 +466,36 @@ export default function CourtBracketView({
             {slot.seed}
           </div>
         )}
-        <div className="flex-1 truncate font-semibold text-gray-900 text-[13px]" title={slot.name}>
-          {isEmpty
-            ? <span className="text-gray-400 font-normal">空き</span>
-            : slot.isBye ? <span className="text-gray-400">BYE</span> : slot.name}
-        </div>
-        {!slot.isBye && slot.affiliation && (
-          <div className="text-[10px] text-gray-500 whitespace-nowrap shrink-0" title={slot.affiliation}>
-            {slot.affiliation}
-          </div>
+        {isEmpty ? (
+          <div className="flex-1 truncate text-[13px] text-gray-400">空き</div>
+        ) : slot.isBye ? (
+          <div className="flex-1 truncate text-[13px] text-gray-400">BYE</div>
+        ) : (
+          nameBlock(slot.name, slot.affiliation, {
+            nameCls: 'font-semibold text-gray-900 text-[13px]',
+            affCls: 'text-[10px] text-gray-500',
+          })
         )}
       </div>
     );
   }
 
-  // 対戦カード（vs）用の選手1行：番号＋フルネーム、所属は下段（改行）に表示。
-  // 氏名・所属は読みやすいよう十分な大きさで表示する。
+  // 対戦カード（vs）用の選手1行：番号＋フルネームと所属。
+  // シングルスは氏名の下に所属、ダブルスはペアを1人ずつ2行にして各行の右に所属を出す。
   const playerRow = (entryId: string | null, name: string, key: string, dim: boolean) => {
     const full = numberedFullName(entryId, name);
     const aff = affiliationOf(entryId);
+    const nameCls = `text-[13px] font-bold ${dim ? 'text-gray-600' : 'text-gray-900'}`;
+    if (isDoubles) {
+      return (
+        <div key={key} className="flex min-w-0">
+          {nameBlock(full || '—', aff, { nameCls, affCls: 'text-[10px] text-gray-500' })}
+        </div>
+      );
+    }
     return (
       <div key={key} className="min-w-0 leading-tight">
-        <div className={`text-[13px] font-bold truncate ${dim ? 'text-gray-600' : 'text-gray-900'}`} title={full}>
+        <div className={`truncate ${nameCls}`} title={full}>
           {full || '—'}
         </div>
         {aff && <div className="text-[10px] text-gray-500 truncate" title={aff}>{aff}</div>}
@@ -514,9 +571,9 @@ export default function CourtBracketView({
       const isVs = bothPlayers && !isFinished; // 両者確定・未確定 → vs 表示（背高カード）
 
       // カード高さ：vs表示のみ氏名＋所属を2段で見せるため背を高くし、
-      // 取り付き位置（中心）は SLOT_HEIGHT 基準の合流点に合わせる。
-      const cardH = isVs ? CARD_H_VS : SLOT_HEIGHT;
-      const top = y + (SLOT_HEIGHT - cardH) / 2;
+      // 取り付き位置（中心）は slotH 基準の合流点に合わせる。
+      const cardH = isVs ? cardHVs : slotH;
+      const top = y + (slotH - cardH) / 2;
 
       // 空きコートに入れる状態（enterCourtName付き・未試合）は、タップでコート投入。
       const isEnterable = !!(matchResult?.enterCourtName && bothPlayers && !isPlaying && !isFinished);
@@ -553,18 +610,18 @@ export default function CourtBracketView({
 
       let content: React.ReactNode;
       if (isFinished) {
-        // 勝者：番号＋フルネーム＋所属（1行）
+        // 勝者：番号＋フルネーム＋所属（ダブルスは1人ずつ2行）
         const winnerFull = numberedFullName(matchResult.winnerEntryId, getWinnerName(matchResult));
         const winnerAff = affiliationOf(matchResult.winnerEntryId);
         content = (
           <div className="flex items-center gap-1 w-full min-w-0 px-2">
             {isFinal && <Trophy className="w-4 h-4 text-primary-500 shrink-0" />}
-            <span className={`truncate flex-1 ${isFinal ? 'text-[13px] font-bold text-primary-700' : 'text-[12px] font-semibold text-gray-800'}`} title={winnerFull}>
-              {winnerFull}
-            </span>
-            {winnerAff && (
-              <span className="text-[10px] text-gray-500 whitespace-nowrap shrink-0">{winnerAff}</span>
-            )}
+            {nameBlock(winnerFull, winnerAff, {
+              nameCls: isFinal
+                ? 'text-[13px] font-bold text-primary-700'
+                : 'text-[12px] font-semibold text-gray-800',
+              affCls: 'text-[10px] text-gray-500',
+            })}
           </div>
         );
       } else if (isVs) {
@@ -638,14 +695,14 @@ export default function CourtBracketView({
   let thirdPlaceTop = 0;
   if (thirdPlaceMatch) {
     const finalY = getCompactY(roundsCount, 0);
-    thirdPlaceTop = Math.max(finalY + CARD_H_VS + 56, nextCompactY - CARD_H_VS);
+    thirdPlaceTop = Math.max(finalY + cardHVs + 56, nextCompactY - cardHVs);
     matchElements.push(
       <div
         key="third-place-label"
         className="absolute text-[10px] font-bold text-gray-500 text-center"
         // カードは vs 表示のとき上に伸びる（中心を thirdPlaceTop に合わせる）ので、
         // その分を見込んで見出しを置く
-        style={{ left: getX(roundsCount), top: thirdPlaceTop - CARD_H_VS / 2 - 14, width: slotW }}
+        style={{ left: getX(roundsCount), top: thirdPlaceTop - cardHVs / 2 - 14, width: slotW }}
       >
         3位決定戦
       </div>,
@@ -659,7 +716,7 @@ export default function CourtBracketView({
 
   // 3位決定戦の枠が下にはみ出さないよう高さを確保する
   const containerHeight = thirdPlaceMatch
-    ? Math.max(baseHeight, thirdPlaceTop + CARD_H_VS + OFFSET_Y)
+    ? Math.max(baseHeight, thirdPlaceTop + cardHVs + OFFSET_Y)
     : baseHeight;
 
   return (

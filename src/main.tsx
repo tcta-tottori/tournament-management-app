@@ -56,7 +56,7 @@ import LiveDashboard from './features/live/LiveDashboard'
 
 import Manual from './features/manual/Manual'
 import PrintCenter from './features/print/PrintCenter'
-import BackupPage from './features/backup/BackupPage';
+import SettingsPage from './features/settings/SettingsPage';
 // ResultsPage は結果タブ削除に伴い廃止
 import CourtBracketPage from './features/court-bracket/CourtBracketPage';
 import LiveBroadcastPage from './features/livescore/LiveBroadcastPage';
@@ -116,7 +116,9 @@ createRoot(document.getElementById('root')!).render(
 
           <Route path="print" element={<PrintCenter />} />
           <Route path="manual" element={<Manual />} />
-          <Route path="backup" element={<BackupPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          {/* バックアップは設定ページに集約。古いリンク・ブックマーク向けに残す */}
+          <Route path="backup" element={<Navigate to="/settings" replace />} />
         </Route>
       </Routes>
       {/* 団体戦コール中の右下ステータスバブル（全ルート共通） */}
