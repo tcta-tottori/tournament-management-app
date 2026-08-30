@@ -184,6 +184,17 @@ function pairAffiliationLines(affiliation: string, parts: string[] | undefined, 
  * タイブレークの得点と Ret / W.O は負けた側のものなので、
  * 負けた側の外側へ添えられるよう note / noteLeft も返す。
  */
+/**
+ * 星取表の横軸（列見出し）用に、氏名を苗字だけにする。
+ * ダブルスは「苗字・苗字」。苗字と名前が空白で区切られていない氏名は
+ * 切り出せないためそのまま返す。
+ */
+function surnameLabel(name: string): string {
+  const parts = name.split(/\s*[/／・]\s*/).map(t => t.trim()).filter(Boolean);
+  if (parts.length === 0) return name;
+  return parts.map(t => t.split(/[\s\u3000]+/)[0]).join('・');
+}
+
 function bracketScoreParts(
   match: Match | undefined,
   leftEntryId: string | null | undefined,
@@ -1094,21 +1105,27 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   rankings.forEach((pi, ri) => rankMap.set(pi, ri + 1));
 
   // ---- レイアウト ----
+  // ダブルスは氏名・所属をペアの1人ずつ2行で表示する（トーナメント表と同じ体裁）
+  const isDoubles = event.type === 'Doubles';
   const meas = document.createElement('canvas').getContext('2d')!;
   let maxNameW = 0;
   for (const p of playerSlots) {
+    const lines = pairNameLines(p.name, isDoubles);
     meas.font = fontOf('bold', 14);
-    let w = meas.measureText(p.name).width;
-    if (p.affiliation) {
+    let w = Math.max(...lines.map(t => meas.measureText(t).width));
+    const affLines = pairAffiliationLines(p.affiliation, p.affiliationParts, lines.length);
+    if (affLines.length > 0) {
       meas.font = fontOf('normal', 11.5);
-      w += 5 + meas.measureText(`（${p.affiliation}）`).width;
+      w += 5 + Math.max(...affLines.map(t => meas.measureText(`（${t}）`).width));
     }
     if (w > maxNameW) maxNameW = w;
   }
 
   const CELL_W = 96;
-  const NAME_W = clamp(maxNameW + 46, 220, 420);
-  const ROW_H = 46;
+  const NAME_W = clamp(maxNameW + 46, 220, 460);
+  const NAME_PX = 14;
+  const NAME_LINE_STEP = NAME_PX + 3;
+  const ROW_H = isDoubles ? 56 : 46;
   const STAT_W = 88;
   const RANK_W = 72;
 
@@ -1157,6 +1174,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     headerH,
     logos,
     titleEnFallback: 'LEAGUE',
+    // 外枠のすぐ上に横線が重なって二重線に見えるため、罫線は引かない
+    headerRule: false,
   });
 
   // ---- カード ----
@@ -1219,7 +1238,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   // ヘッダーテキスト（列名 = 選手名）
   for (let i = 0; i < n; i++) {
     const cx = gridX + NAME_W + i * CELL_W + CELL_W / 2;
-    drawText(ctx, playerSlots[i].name, cx, gridY + HDR_H / 2, 12, 'center', COL.gray800, 'bold', CELL_W - 8);
+    drawText(ctx, surnameLabel(playerSlots[i].name), cx, gridY + HDR_H / 2, 12, 'center', COL.gray800, 'bold', CELL_W - 8);
   }
   drawText(ctx, '勝敗', statX + STAT_W / 2, gridY + HDR_H / 2, 12, 'center', COL.gray800, 'black');
   drawText(ctx, '順位', rankX + RANK_W / 2, gridY + HDR_H / 2, 12, 'center', COL.gray800, 'black');
@@ -1249,16 +1268,29 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
 
     // 番号
     drawText(ctx, String(row + 1), gridX + 20, cy, 11, 'right', COL.gray400, 'medium');
-    // 選手名 + 所属
+    // 選手名 + 所属（ダブルスは1人ずつ2行）
     const nameX = gridX + 28;
-    ctx.font = fontOf('bold', 14);
-    const nameW = Math.min(ctx.measureText(p.name).width, NAME_W - 40);
-    drawText(ctx, p.name, nameX, cy, 14, 'left', COL.gray800, 'bold', NAME_W - 40);
-    if (p.affiliation) {
+    const nameMaxW = NAME_W - 40;
+    const lines = pairNameLines(p.name, isDoubles);
+    ctx.font = fontOf('bold', NAME_PX);
+    const nameW = Math.min(Math.max(...lines.map(t => ctx.measureText(t).width)), nameMaxW);
+    const topY = cy - ((lines.length - 1) * NAME_LINE_STEP) / 2;
+    lines.forEach((line, i) => {
+      drawText(ctx, line, nameX, topY + i * NAME_LINE_STEP, NAME_PX, 'left', COL.gray800, 'bold', nameMaxW);
+    });
+    const affLines = pairAffiliationLines(p.affiliation, p.affiliationParts, lines.length);
+    if (affLines.length > 0) {
       const affX = nameX + nameW + 5;
       const affMaxW = gridX + NAME_W - 10 - affX;
       if (affMaxW > 16) {
-        drawText(ctx, `（${p.affiliation}）`, affX, cy + 0.5, 11.5, 'left', COL.gray500, 'normal', affMaxW);
+        // 所属も2行のときは氏名の各行に合わせて並べる（1つだけなら氏名の中央）
+        const affTop = affLines.length === lines.length
+          ? topY
+          : cy - ((affLines.length - 1) * NAME_LINE_STEP) / 2;
+        affLines.forEach((t, i) => {
+          if (!t) return;
+          drawText(ctx, `（${t}）`, affX, affTop + i * NAME_LINE_STEP + 0.5, 11.5, 'left', COL.gray500, 'normal', affMaxW);
+        });
       }
     }
 
@@ -1293,7 +1325,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     if (rank && played) {
       const isTop = rank === 1;
       drawText(ctx, `${rank}位`, rankX + RANK_W / 2, cy, isTop ? 15 : 14, 'center',
-        isTop ? COL.gray900 : COL.gray600, isTop ? 'black' : 'bold');
+        isTop ? COL.red600 : COL.gray600, isTop ? 'black' : 'bold');
     }
   }
 
