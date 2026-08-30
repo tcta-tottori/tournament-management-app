@@ -195,6 +195,18 @@ function surnameLabel(name: string): string {
   return parts.map(t => t.split(/[\s\u3000]+/)[0]).join('・');
 }
 
+/**
+ * 優勝・3位の表示用。氏名を「岸本・安田」の1行にするのに合わせて、
+ * ダブルスの所属も「気高電機・doMe」の1行にまとめる。
+ */
+function joinedAffiliation(affiliation: string, parts: string[] | undefined): string[] {
+  if (parts && parts.length === 2) {
+    const joined = parts.filter(Boolean).join('・');
+    return joined ? [joined] : [];
+  }
+  return affiliation ? [affiliation] : [];
+}
+
 function bracketScoreParts(
   match: Match | undefined,
   leftEntryId: string | null | undefined,
@@ -458,9 +470,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const finalScore = bracketScoreParts(finalMatch, finL?.entryId);
   const finalScoreText = finalScore.main;
 
-  // 優勝ペアは苗字のみの1行（例:「岸本・安田」）。所属はその下に1人ずつ並べる。
+  // 優勝ペアは苗字のみの1行（例:「岸本・安田」）。所属もその下に「A・B」の1行で置く。
   const champLines = champName ? [isDoubles ? surnameLabel(champName) : champName] : [];
-  const champAffLines = pairAffiliationLines(champAff, champAffParts, isDoubles ? 2 : 1);
+  const champAffLines = joinedAffiliation(champAff, champAffParts);
   const CHAMP_LINE_STEP = CHAMP_NAME_PX + 3;
   const CHAMP_AFF_PX = 12;
   const CHAMP_AFF_STEP = CHAMP_AFF_PX + 3;
@@ -549,7 +561,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     : null;
   const thirdNameLines = thirdWinner ? 1 : 0;
   const thirdAffLines = thirdWinner
-    ? pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, isDoubles ? 2 : 1).length
+    ? joinedAffiliation(thirdWinner.affiliation, thirdWinner.affiliationParts).length
     : 0;
   const thirdRowLines = isDoubles ? 2 : 1;
   const thirdBlockH = thirdBlock && thirdWinner
@@ -850,7 +862,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     let cursor = apexY - CHAMP_TICK - 2;
     const scoreY = cursor - CHAMP_SCORE_PX / 2;
     if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 4;
-    // 所属は氏名の下に積む（ダブルスは1人ずつ2行）。下から上へ。
+    // 所属は氏名の下に置く（ダブルスは「A・B」の1行）。下から上へ積む。
     const affYs = champAffLines.map((_, i) =>
       cursor - 5 - CHAMP_AFF_PX / 2 - (champAffLines.length - 1 - i) * CHAMP_AFF_STEP);
     if (affYs.length > 0) cursor = affYs[0] - CHAMP_AFF_PX / 2 - 5;
@@ -921,8 +933,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     let cursor = labelY + T.labelPx / 2 + 8;
     const nameYs = winnerLines.map((_, i) => cursor + T.namePx / 2 + i * (T.namePx + 3));
     cursor = nameYs[nameYs.length - 1] + T.namePx / 2;
-    // 所属（ダブルスは1人ずつ2行）
-    const winnerAffLines = pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, isDoubles ? 2 : 1);
+    // 所属（ダブルスは「A・B」の1行）
+    const winnerAffLines = joinedAffiliation(thirdWinner.affiliation, thirdWinner.affiliationParts);
     const affYs = winnerAffLines.map((_, i) => cursor + 6 + T.affPx / 2 + i * (T.affPx + 3));
     if (affYs.length > 0) cursor = affYs[affYs.length - 1] + T.affPx / 2;
     const scoreY = score.main ? cursor + 4 + T.scorePx / 2 : cursor;
