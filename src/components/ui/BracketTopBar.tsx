@@ -126,10 +126,12 @@ export default function BracketTopBar({
         )}
       </div>
 
-      {/* 表示回戦の絞り込み（回戦が進むと表示を縮小）と、右側のボタン群。
-          ボタンが増えても横にはみ出さないよう、狭い画面では折り返す。 */}
+      {/* 表示回戦の絞り込み（左寄せ）と、右側のボタン群。
+          「3回戦以降」など文字数が変わっても右のボタンが動かないよう、
+          左のまとまりだけを伸縮させて右は固定で置く。 */}
       {(canAdjustRounds || right) && (
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-1.5">
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <div className="flex-1 min-w-0 flex items-center">
           {canAdjustRounds && onStartRoundChange ? (
             <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-1 py-0.5">
               <button
@@ -161,8 +163,9 @@ export default function BracketTopBar({
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          ) : <span />}
-          {right}
+          ) : null}
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5">{right}</div>
         </div>
       )}
 

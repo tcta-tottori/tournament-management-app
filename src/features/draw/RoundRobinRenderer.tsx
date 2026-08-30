@@ -1,11 +1,6 @@
 import type { DrawSlotData, MatchResult } from './DrawBoard';
+import { pairDisplayLines } from './pairLabel';
 import { sideScoreText } from '../score/scoreDisplay';
-
-/** ダブルスの「A / B」表記を1人ずつの2行に分ける（分けられなければ1行） */
-function pairLines(text: string): string[] {
-  const parts = text.split(/\s*[/／・]\s*/).map(t => t.trim()).filter(Boolean);
-  return parts.length === 2 ? parts : [text];
-}
 
 /** 星取表の列見出し用に苗字だけにする（ダブルスは「苗字・苗字」） */
 function surnameLabel(name: string): string {
@@ -169,10 +164,8 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
             </thead>
             <tbody>
               {players.map((player, rowIdx) => {
-                const nameLines = pairLines(player.name);
-                const affLines = player.affiliation
-                  ? (nameLines.length === 2 ? pairLines(player.affiliation) : [player.affiliation])
-                  : [];
+                const { names: nameLines, affiliations: affLines } =
+                  pairDisplayLines(player.name, player.affiliation);
                 const rank = rankMap.get(rowIdx);
                 return (
                   <tr key={`row-${rowIdx}`} className={rowIdx % 2 === 1 ? 'bg-gray-50/70' : ''}>
