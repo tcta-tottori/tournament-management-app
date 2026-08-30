@@ -37,7 +37,7 @@ export function fillBodyText(template: string, entry: CertEntry): string {
  * 氏名の位置を「上下位置」に固定し、賞位・クラス名・所属はその上へ積み上げる。
  * 項目を増やしても氏名が下にずれないので、賞状用紙に合わせた位置合わせが崩れない。
  */
-function pageHtml(entry: CertEntry, layout: CertLayout): string {
+function pageHtml(entry: CertEntry, layout: CertLayout, preview = false): string {
   // 氏名以外は「印刷する項目」で選ばれているものだけ出す（既定は氏名のみ）
   const above: string[] = [];
   if (layout.showCategory && entry.category.trim()) above.push(`<div class="cert-line cert-category">${esc(entry.category)}</div>`);
@@ -51,24 +51,36 @@ function pageHtml(entry: CertEntry, layout: CertLayout): string {
     : `<div class="cert-block cert-block-flow">${above.join('')}</div>`;
 
   if (layout.overlay) {
-    // 賞状用紙に文字だけ重ねる
-    return `<div class="page">${block}</div>`;
+    // 賞状用紙に文字だけ重ねる。
+    // プレビューでは用紙の刷り込み部分を薄く敷いて、どのあたりに入るかを見せる。
+    const mock = preview && layout.showPaperMock
+      ? `<div class="paper-mock">${paperHtml(entry, layout)}</div>`
+      : '';
+    return `<div class="page">${mock}${block}</div>`;
   }
 
   // 枠・題字・本文まで含めて1枚に仕上げる
+  return `<div class="page">${paperHtml(entry, layout)}${block}</div>`;
+}
+
+/**
+ * 賞状用紙にあらかじめ刷り込まれている部分（枠・題字・本文・日付・主催者）。
+ *
+ * 「枠つき」で印刷するときはこれをそのまま刷り、
+ * 「文字のみ印刷」のときはプレビューだけに薄く出して位置合わせの目安にする。
+ */
+function paperHtml(entry: CertEntry, layout: CertLayout): string {
   const body = fillBodyText(layout.bodyText, entry);
-  return `<div class="page">
-    <div class="frame-outer"></div>
+  return `<div class="frame-outer"></div>
     <div class="frame-inner"></div>
     <div class="cert-title">${esc(layout.title)}</div>
     ${layout.eventName.trim() ? `<div class="cert-event">${esc(layout.eventName)}</div>` : ''}
-    ${block}
     <div class="cert-body">${nl2br(body)}</div>
     <div class="cert-footer">
       ${layout.dateText.trim() ? `<div class="cert-date">${esc(layout.dateText)}</div>` : ''}
       ${layout.organizer.trim() ? `<div class="cert-organizer">${esc(layout.organizer)}</div>` : ''}
-    </div>
-  </div>`;
+      ${layout.signerName.trim() ? `<div class="cert-signer">${esc(layout.signerName)}</div>` : ''}
+    </div>`;
 }
 
 /** レイアウトからCSSを組み立てる */
@@ -147,26 +159,29 @@ function styleHtml(layout: CertLayout): string {
   /* 枠・題字（overlay=false のときだけ使う） */
   .frame-outer { position: absolute; inset: 10mm; border: 2.5mm double #b08b2e; }
   .frame-inner { position: absolute; inset: 14mm; border: 0.4mm solid #d9c07a; }
+  /* 賞状用紙の刷り込み部分。市販の用紙に近い位置に置いてある
+     （題字は上から2割、本文は氏名の下、日付・主催者はさらに下） */
   .cert-title {
-    position: absolute; top: 8%; left: 0; right: 0; text-align: center;
+    position: absolute; top: 18%; left: 0; right: 0; text-align: center;
     font-size: ${Math.round(layout.nameSize * 1.15)}pt; ${spacing(0.5)}
     ${strokeRule}
   }
   .cert-event {
-    position: absolute; top: 20%; left: 0; right: 0; text-align: center;
+    position: absolute; top: 29%; left: 0; right: 0; text-align: center;
     font-size: ${Math.round(layout.categorySize * 0.6)}pt; letter-spacing: 0.25em; color: #333;
   }
   .cert-body {
-    position: absolute; bottom: 26%; left: 14%; right: 14%;
-    text-align: center; line-height: 2;
-    font-size: ${Math.round(layout.categorySize * 0.55)}pt; letter-spacing: 0.12em;
+    position: absolute; top: 56%; left: 13%; right: 13%;
+    text-align: center; line-height: 1.9;
+    font-size: ${Math.round(layout.categorySize * 0.6)}pt; letter-spacing: 0.1em;
   }
   .cert-footer {
-    position: absolute; bottom: 12%; left: 0; right: 0; text-align: center;
+    position: absolute; top: 70%; left: 0; right: 0; text-align: center;
     line-height: 2.1;
   }
   .cert-date { font-size: ${Math.round(layout.categorySize * 0.5)}pt; letter-spacing: 0.2em; color: #333; }
-  .cert-organizer { font-size: ${Math.round(layout.categorySize * 0.65)}pt; letter-spacing: 0.35em; }
+  .cert-organizer { font-size: ${Math.round(layout.categorySize * 0.6)}pt; letter-spacing: 0.3em; }
+  .cert-signer { font-size: ${Math.round(layout.categorySize * 0.8)}pt; letter-spacing: 0.4em; }
 
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -174,7 +189,7 @@ function styleHtml(layout: CertLayout): string {
 }
 
 /** 印刷用の完全なHTMLを組み立てる */
-export function buildCertificateHtml(entries: CertEntry[], layout: CertLayout): string {
+export function buildCertificateHtml(entries: CertEntry[], layout: CertLayout, preview = false): string {
   const font = getCertFont(layout.fontId);
   const fontUrls = certFontCssUrls(font);
   // 会場のネット回線が細い／オフラインのときに読み込みで画面が真っ白にならないよう、
@@ -186,7 +201,7 @@ export function buildCertificateHtml(entries: CertEntry[], layout: CertLayout): 
        ${fontUrls.map(u => `<link rel="stylesheet" href="${u}" media="print" onload="this.media='all'">
        <noscript><link rel="stylesheet" href="${u}"></noscript>`).join('\n       ')}`
     : '';
-  const pages = entries.map(e => pageHtml(e, layout)).join('\n');
+  const pages = entries.map(e => pageHtml(e, layout, preview)).join('\n');
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>賞状印刷</title>
 ${fontLink}
 <style>${styleHtml(layout)}</style>
@@ -195,19 +210,40 @@ ${fontLink}
 
 /**
  * プレビュー用HTML（1枚だけ）。
- * 用紙の縁が分かるように薄い枠を足し、iframe に収まるよう縮小する。
+ *
+ * 賞状用紙の刷り込み部分（題字・本文・日付・主催者）を薄く敷いて、
+ * 実際に刷ったときに文字がどのあたりに入るかを見られるようにしている。
+ *
+ * @param paperImage 実物の賞状用紙を撮った画像（data URL）。あれば下地として敷く
  */
-export function buildCertificatePreviewHtml(entry: CertEntry, layout: CertLayout): string {
-  const base = buildCertificateHtml([entry], layout);
+export function buildCertificatePreviewHtml(
+  entry: CertEntry,
+  layout: CertLayout,
+  paperImage?: string,
+): string {
+  const base = buildCertificateHtml([entry], layout, true);
+  // 実物の写真があるときは、そちらを下地にして作り物の再現は出さない
+  const photo = paperImage
+    ? `.page::before {
+         content: ''; position: absolute; inset: 0;
+         background-image: url("${paperImage}");
+         background-size: 100% 100%; background-repeat: no-repeat;
+         opacity: 0.55; pointer-events: none;
+       }
+       .paper-mock { display: none; }`
+    : '';
   return base.replace(
     '</style>',
     `
   html, body { background: #f4f4f4; }
   .page { box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
+  ${photo}
+  /* 賞状用紙の刷り込み部分の再現。印刷には出ないので薄く敷くだけ */
+  .paper-mock { position: absolute; inset: 0; opacity: 0.3; pointer-events: none; }
   /* 印字位置が分かるよう、プレビューだけ薄いガイドを出す（氏名と、その上の行） */
   .cert-block::before, .cert-above::before {
     content: ''; position: absolute; inset: -3mm -4mm;
-    border: 0.3mm dashed rgba(217,119,6,0.45); border-radius: 2mm;
+    border: 0.3mm dashed rgba(190,30,45,0.5); border-radius: 2mm;
     pointer-events: none;
   }
 

@@ -73,6 +73,13 @@ export interface CertLayout {
   dateText: string;
   /** 主催者名 */
   organizer: string;
+  /** 主催者名の下に入れる代表者名（例: 会長名）。空なら出さない */
+  signerName: string;
+  /**
+   * プレビューに賞状用紙の下地（題字・本文・日付・主催者などの刷り込み部分）を
+   * 薄く表示する。印刷には出ない、位置合わせのための目安。
+   */
+  showPaperMock: boolean;
   /** 印字ブロックの上端位置（用紙高さに対する%） */
   blockTop: number;
   /** 左右方向の微調整(mm)。プラスで右へ */
@@ -116,6 +123,8 @@ export const DEFAULT_CERT_LAYOUT: CertLayout = {
   eventName: '',
   dateText: '',
   organizer: '鳥取市テニス協会',
+  signerName: '',
+  showPaperMock: true,
   blockTop: 43,
   offsetX: 0,
   categorySize: 28,

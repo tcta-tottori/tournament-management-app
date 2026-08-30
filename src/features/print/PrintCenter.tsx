@@ -16,6 +16,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Printer, Plus, Trash2, Copy, Search, Award, Settings2,
   ChevronUp, ChevronDown, Eye, RotateCcw, Users, ListChecks, ArrowLeftRight,
+  ImagePlus, X,
 } from 'lucide-react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -37,6 +38,36 @@ const RANK_PRESETS = ['優勝', '準優勝', '第3位', '第4位', '第5位', '�
 
 const LS_LAYOUT = 'certPrint.layout';
 const LS_ENTRIES = 'certPrint.entries';
+/**
+ * プレビューの下地に使う、実物の賞状用紙の写真（data URL）。
+ * レイアウトはスライダー操作のたびに保存するため、サイズの大きい画像は別のキーに分けている。
+ */
+const LS_PAPER_IMAGE = 'certPrint.paperImage';
+
+/** 賞状用紙の写真を、保存できる大きさ（長辺1400px・JPEG）に縮めて data URL にする */
+async function shrinkPaperImage(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('読み込みに失敗しました'));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('画像として読めませんでした'));
+    el.src = dataUrl;
+  });
+  const max = 1400;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.72);
+}
 
 /** 保存済みレイアウトを読む（壊れていたら既定値） */
 function loadLayout(): CertLayout {
@@ -69,6 +100,10 @@ export default function PrintCenter() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  // プレビューの下地に敷く、実物の賞状用紙の写真
+  const [paperImage, setPaperImage] = useState<string>(() => {
+    try { return localStorage.getItem(LS_PAPER_IMAGE) || ''; } catch { return ''; }
+  });
 
   // --- データ元（読み込まれている大会データから候補を出す） ---
   const isMixedImported = useMixedStore(s => s.isImported);
@@ -140,6 +175,23 @@ export default function PrintCenter() {
   // --- 保存 ---
   useEffect(() => { localStorage.setItem(LS_LAYOUT, JSON.stringify(layout)); }, [layout]);
   useEffect(() => { localStorage.setItem(LS_ENTRIES, JSON.stringify(entries)); }, [entries]);
+
+  /** 賞状用紙の写真を選んだとき（大きすぎて保存できない場合は下地なしに戻す） */
+  const handlePaperImage = useCallback(async (file: File | null) => {
+    if (!file) return;
+    try {
+      const shrunk = await shrinkPaperImage(file);
+      localStorage.setItem(LS_PAPER_IMAGE, shrunk);
+      setPaperImage(shrunk);
+    } catch {
+      alert('この画像は取り込めませんでした。別の画像で試してください。');
+    }
+  }, []);
+
+  const clearPaperImage = useCallback(() => {
+    try { localStorage.removeItem(LS_PAPER_IMAGE); } catch { /* 保存領域が使えない場合は無視 */ }
+    setPaperImage('');
+  }, []);
 
   // 選択中のフォントをプレビュー用に読み込む
   useEffect(() => { loadCertificateFont(layout.fontId); }, [layout.fontId]);
@@ -269,18 +321,21 @@ export default function PrintCenter() {
   }, [printPages, layout]);
 
   return (
-    <div className="p-2 sm:p-4 space-y-3">
-      {/* ===== ヘッダー ===== */}
-      <div className="bg-white rounded-2xl border border-primary-200/70 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Award className="w-5 h-5" />
-            <div>
-              <h1 className="text-base font-black leading-tight">賞状印刷</h1>
-              <p className="text-[10px] opacity-90 leading-tight">試合が決まっていなくても、選んで／手で入れて印刷できます</p>
+    // 左=設定と氏名の選択、右=常時表示のプレビュー。
+    // main が position:relative なので、absolute inset-0 で表示領域いっぱいに広げる。
+    <div className="absolute inset-0 flex flex-col lg:flex-row">
+      {/* ===== 左: 設定・選択・印刷リスト ===== */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-2 sm:p-3 space-y-3 pb-24">
+        {/* ===== ヘッダー ===== */}
+        <div className="bg-white rounded-2xl border border-primary-200/70 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              <div>
+                <h1 className="text-base font-black leading-tight">賞状印刷</h1>
+                <p className="text-[10px] opacity-90 leading-tight">試合が決まっていなくても、選んで／手で入れて印刷できます</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSettings(v => !v)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
@@ -289,28 +344,22 @@ export default function PrintCenter() {
             >
               <Settings2 className="w-3.5 h-3.5" />書式設定
             </button>
-            <button
-              onClick={handlePrint}
-              disabled={printPages.length === 0}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-white text-gray-800 text-xs font-black shadow disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-50 active:scale-95 transition-all"
-            >
-              <Printer className="w-4 h-4" />{printPages.length}枚を印刷
-            </button>
           </div>
+
+          {/* 書式設定パネル */}
+          {showSettings && (
+            <LayoutPanel
+              layout={layout}
+              onChange={patch => setLayout(prev => ({ ...prev, ...patch }))}
+              onReset={() => setLayout({ ...DEFAULT_CERT_LAYOUT, eventName: tournamentName })}
+              tournamentName={tournamentName}
+              paperImage={paperImage}
+              onPaperImage={handlePaperImage}
+              onClearPaperImage={clearPaperImage}
+            />
+          )}
         </div>
 
-        {/* 書式設定パネル */}
-        {showSettings && (
-          <LayoutPanel
-            layout={layout}
-            onChange={patch => setLayout(prev => ({ ...prev, ...patch }))}
-            onReset={() => setLayout({ ...DEFAULT_CERT_LAYOUT, eventName: tournamentName })}
-            tournamentName={tournamentName}
-          />
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3 items-start">
         <div className="space-y-3 min-w-0">
           {/* ===== 選択式：大会データから追加 ===== */}
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -438,23 +487,34 @@ export default function PrintCenter() {
             </div>
           </section>
         </div>
-
-        {/* ===== プレビュー ===== */}
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden lg:sticky lg:top-2">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2">
-            <Eye className="w-4 h-4 text-gray-400" />
-            <span className="text-xs font-bold text-gray-700">プレビュー</span>
-            <span className="ml-auto text-[10px] text-gray-400">
-              {PAPER_SIZE[layout.paper].label}／{layout.overlay ? '文字のみ' : '枠つき'}
-            </span>
-          </div>
-          <CertificatePreview entry={previewEntry} layout={layout} />
-          <p className="px-3 pb-3 text-[10px] leading-relaxed text-gray-400">
-            オレンジの点線は印字される範囲の目安です（印刷はされません）。
-            賞状用紙に重ねて刷るときは「文字のみ印刷」のまま、位置を上下左右で合わせてください。
-          </p>
-        </section>
       </div>
+
+      {/* ===== 右: プレビュー（常に表示） ===== */}
+      <aside className="order-first lg:order-none shrink-0 w-full lg:w-[360px] xl:w-[420px] h-[38vh] lg:h-auto flex flex-col border-b lg:border-b-0 lg:border-l border-gray-200 bg-white">
+        <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2 shrink-0">
+          <Eye className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-bold text-gray-700">プレビュー</span>
+          <span className="ml-auto text-[10px] text-gray-400">
+            {PAPER_SIZE[layout.paper].label}／{layout.overlay ? '文字のみ' : '枠つき'}
+          </span>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <CertificatePreview entry={previewEntry} layout={layout} paperImage={paperImage} />
+        </div>
+        <p className="px-3 py-2 text-[10px] leading-relaxed text-gray-400 border-t border-gray-100 shrink-0 pb-16">
+          濃い文字が実際に印刷される部分、薄い文字は賞状用紙にすでに刷り込まれている部分の目安です。
+          赤い点線の範囲に文字が入ります。
+        </p>
+      </aside>
+
+      {/* ===== 印刷ボタン（画面右下に常時表示） ===== */}
+      <button
+        onClick={handlePrint}
+        disabled={printPages.length === 0}
+        className="fixed bottom-5 right-5 z-30 flex items-center gap-2 px-5 py-3 rounded-full bg-primary-600 text-white text-sm font-black shadow-lg shadow-primary-600/30 hover:bg-primary-700 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+      >
+        <Printer className="w-4 h-4" />{printPages.length}枚を印刷
+      </button>
     </div>
   );
 }
@@ -558,12 +618,15 @@ function EntryRow({
 const FONT_GROUPS: CertFontGroup[] = ['毛筆', '楷書・手書き', '明朝', 'PCのフォント'];
 
 function LayoutPanel({
-  layout, onChange, onReset, tournamentName,
+  layout, onChange, onReset, tournamentName, paperImage, onPaperImage, onClearPaperImage,
 }: {
   layout: CertLayout;
   onChange: (patch: Partial<CertLayout>) => void;
   onReset: () => void;
   tournamentName: string;
+  paperImage: string;
+  onPaperImage: (file: File | null) => void;
+  onClearPaperImage: () => void;
 }) {
   // 選択肢にマウスを乗せた／表示した時点で読み込んでおくと、選んだ瞬間に反映される
   useEffect(() => { CERT_FONTS.slice(0, 3).forEach(f => loadCertificateFont(f.id)); }, []);
@@ -660,6 +723,34 @@ function LayoutPanel({
           <input type="checkbox" checked={layout.vertical} onChange={e => onChange({ vertical: e.target.checked })} className="accent-primary-500" />
           縦書き
         </label>
+        <label className="flex items-center gap-1.5 text-[11px] text-gray-600" title="賞状用紙にすでに刷り込まれている部分を、プレビューだけに薄く表示します（印刷はされません）">
+          <input type="checkbox" checked={layout.showPaperMock} onChange={e => onChange({ showPaperMock: e.target.checked })} className="accent-primary-500" />
+          プレビューに用紙の下地を表示
+        </label>
+      </div>
+
+      {/* 実物の賞状用紙をプレビューの下地にする */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-bold text-gray-600">用紙の写真</span>
+        <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 hover:bg-primary-100 cursor-pointer transition-colors">
+          <ImagePlus className="w-3.5 h-3.5" />
+          {paperImage ? '写真を選び直す' : '写真を選ぶ'}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => { onPaperImage(e.target.files?.[0] ?? null); e.target.value = ''; }}
+          />
+        </label>
+        {paperImage && (
+          <button onClick={onClearPaperImage} className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-primary-600 transition-colors">
+            <X className="w-3 h-3" />写真を外す
+          </button>
+        )}
+        <span className="text-[10px] text-gray-400">
+          実際の賞状用紙を撮った写真を入れると、それを下地にして位置を合わせられます。
+          用紙の外側が写らないように切り抜いた写真を使うと、より正確に合わせられます（この端末にだけ保存されます）
+        </span>
       </div>
 
       {/* 賞状に載せる項目。既定は氏名のみ（クラス名・賞位は賞状用紙に刷り込み済みのことが多い） */}
@@ -707,10 +798,14 @@ function LayoutPanel({
         足りないときは「太さ微調整」で輪郭を太らせてください。字間はマイナスにすると詰まります。
       </p>
 
-      {/* 全体レイアウト時だけ使う項目 */}
-      {!layout.overlay && (
+      {/* 枠つき印刷の内容。文字のみ印刷でも、プレビューの下地に使うので編集できる */}
+      {(!layout.overlay || layout.showPaperMock) && (
         <div className="space-y-2 pt-2 border-t border-primary-100">
-          <p className="text-[10px] text-gray-500">枠・題字ごと印刷するときの内容（白紙から1枚仕上げる場合）</p>
+          <p className="text-[10px] text-gray-500">
+            {layout.overlay
+              ? '賞状用紙に刷り込まれている内容（プレビューの下地に使います。印刷はされません）'
+              : '枠・題字ごと印刷するときの内容（白紙から1枚仕上げる場合）'}
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <TextField label="題字" value={layout.title} onChange={v => onChange({ title: v })} />
             <TextField
@@ -721,6 +816,7 @@ function LayoutPanel({
             />
             <TextField label="日付" value={layout.dateText} placeholder="令和8年8月30日" onChange={v => onChange({ dateText: v })} />
             <TextField label="主催者名" value={layout.organizer} onChange={v => onChange({ organizer: v })} />
+            <TextField label="代表者名" value={layout.signerName} placeholder="例: 西村 弥子" onChange={v => onChange({ signerName: v })} />
           </div>
           <label className="block">
             <span className="text-[10px] font-bold text-gray-500">本文（{'{rank}'} {'{category}'} {'{names}'} が差し替わります）</span>
@@ -778,14 +874,20 @@ function TextField({ label, value, placeholder, onChange }: {
 // ---------------------------------------------------------------------------
 const MM_TO_PX = 96 / 25.4;
 
-function CertificatePreview({ entry, layout }: { entry: CertEntry | null; layout: CertLayout }) {
+function CertificatePreview({ entry, layout, paperImage }: {
+  entry: CertEntry | null;
+  layout: CertLayout;
+  /** 実物の賞状用紙の写真（下地として敷く） */
+  paperImage?: string;
+}) {
   const boxRef = useRef<HTMLDivElement>(null);
-  const [boxWidth, setBoxWidth] = useState(320);
+  // 表示領域の幅と高さの両方に収まるよう縮小する（スマホでは高さ側が効く）
+  const [box, setBox] = useState({ w: 320, h: 460 });
 
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const update = () => setBoxWidth(el.clientWidth || 320);
+    const update = () => setBox({ w: el.clientWidth || 320, h: el.clientHeight || 460 });
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -795,15 +897,15 @@ function CertificatePreview({ entry, layout }: { entry: CertEntry | null; layout
   const paper = PAPER_SIZE[layout.paper];
   const pageW = paper.width * MM_TO_PX;
   const pageH = paper.height * MM_TO_PX;
-  const scale = Math.min(1, (boxWidth - 8) / pageW);
+  const scale = Math.min(1, (box.w - 16) / pageW, (box.h - 16) / pageH);
 
   const srcDoc = useMemo(
-    () => entry ? buildCertificatePreviewHtml(entry, layout) : '',
-    [entry, layout],
+    () => entry ? buildCertificatePreviewHtml(entry, layout, paperImage) : '',
+    [entry, layout, paperImage],
   );
 
   return (
-    <div ref={boxRef} className="p-2 bg-gray-100">
+    <div ref={boxRef} className="h-full min-h-[220px] p-2 bg-gray-100 flex items-start justify-center">
       {entry ? (
         <div className="mx-auto overflow-hidden" style={{ width: pageW * scale, height: pageH * scale }}>
           <iframe
