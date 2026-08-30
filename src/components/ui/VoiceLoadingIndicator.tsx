@@ -21,7 +21,7 @@ export default function VoiceLoadingIndicator() {
       role="status"
       aria-live="polite"
     >
-      <div className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-full shadow-lg text-sm font-medium">
+      <div className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-full shadow-lg text-sm font-medium">
         <Loader2 className="w-4 h-4 animate-spin" />
         <span>音声を準備中...</span>
       </div>

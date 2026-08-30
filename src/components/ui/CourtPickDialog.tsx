@@ -7,7 +7,7 @@
 // （以前はドロー側が自動で入るコートを決めてしまい、選べなかった）
 //
 // 表示はコート状況（コートマップ）に合わせて4面ごとのブロックで行を分け、
-// 会場の全コートを並べる。空きコートだけが緑のボタンで選択でき、
+// 会場の全コートを並べる。空きコートだけが赤のボタンで選択でき、
 // 試合中・使用しないコートはグレーで選択できない。
 // =============================================================================
 
@@ -94,8 +94,8 @@ export default function CourtPickDialog({
           ) : (
             <div className="space-y-2">
               {blocks.map((block, bi) => (
-                <div key={bi} className="border border-emerald-200 bg-emerald-50/40 rounded-lg p-2">
-                  <div className="text-[10px] font-bold text-emerald-700 mb-1.5 px-0.5">
+                <div key={bi} className="border border-primary-200 bg-primary-50/40 rounded-lg p-2">
+                  <div className="text-[10px] font-bold text-primary-700 mb-1.5 px-0.5">
                     {block.length > 1
                       ? `${block[0].name}〜${block[block.length - 1].name}番コート`
                       : `${block[0].name}番コート`}
@@ -110,7 +110,7 @@ export default function CourtPickDialog({
                           disabled={!selectable}
                           className={`flex flex-col items-center justify-center py-2 rounded-lg border transition-colors ${
                             selectable
-                              ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 shadow-sm'
+                              ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700 shadow-sm'
                               : 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed'
                           }`}
                         >

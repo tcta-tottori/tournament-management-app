@@ -355,7 +355,7 @@ function NormalEntryRegistration() {
       >
         <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center border ${
           isAbsent ? 'bg-red-50 border-red-300 text-red-500'
-            : isChecked ? 'bg-green-500 border-green-500 text-white'
+            : isChecked ? 'bg-primary-500 border-primary-500 text-white'
             : 'bg-white border-gray-300 text-transparent'
         }`}>
           {isAbsent ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
@@ -370,7 +370,7 @@ function NormalEntryRegistration() {
         </div>
         <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
           isAbsent ? 'bg-red-50 text-red-600'
-            : isChecked ? 'bg-green-50 text-green-700'
+            : isChecked ? 'bg-primary-50 text-primary-700'
             : 'bg-gray-100 text-gray-500'
         }`}>
           {isAbsent ? '欠場' : isChecked ? '受付済' : '未受付'}
@@ -942,7 +942,7 @@ function NormalEntryRegistration() {
     return (
       <div>
         {draw && (
-          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-white/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1.5 text-gray-600">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
               リーグ <strong className="text-gray-800">{playerSlots.length}人</strong>
@@ -964,15 +964,15 @@ function NormalEntryRegistration() {
 
             let borderClass = 'border-gray-300';
             let bgClass = 'bg-white';
-            if (isWithdrawn) { bgClass = 'bg-orange-50/60'; borderClass = 'border-orange-200'; }
-            else if (isConfirmed) { bgClass = 'bg-emerald-50/60'; borderClass = 'border-emerald-300'; }
+            if (isWithdrawn) { bgClass = 'bg-primary-50/60'; borderClass = 'border-primary-200'; }
+            else if (isConfirmed) { bgClass = 'bg-primary-50/60'; borderClass = 'border-primary-300'; }
 
             return (
               <div key={`league-card-${slot.drawPosition}`}
-                className={`flex items-center border rounded-lg shadow-sm transition-all h-[36px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+                className={`flex items-center border rounded-lg shadow-sm transition-all h-[36px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
                 style={{ width: 220 }}>
                 <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{idx + 1}</div>
-                {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+                {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
                 <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
                   {slot.entry ? (
                     <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
@@ -987,13 +987,13 @@ function NormalEntryRegistration() {
                   <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
                     {isWithdrawn ? (
                       <>
-                        <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
-                        <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                        <span className="text-[9px] font-bold text-primary-500 mr-0.5">DEF</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
                       </>
                     ) : (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                        <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                       </>
                     )}
                   </div>
@@ -1162,16 +1162,16 @@ function NormalEntryRegistration() {
             // 片方が全BYEサブツリー → 次ラウンドのY位置まで接続
             const pY = topEmpty ? yB : yT;
             if (Math.abs(pY - yM) < 1) {
-              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             } else {
-              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`${keyPrefix}-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             }
             continue;
           }
 
-          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`${keyPrefix}-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
         }
       }
 
@@ -1188,14 +1188,14 @@ function NormalEntryRegistration() {
         const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
         const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
         let borderCls = 'border-gray-300', bgCls = 'bg-white';
-        if (isWithdrawn) { bgCls = 'bg-orange-50/60'; borderCls = 'border-orange-200'; }
-        else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
+        if (isWithdrawn) { bgCls = 'bg-primary-50/60'; borderCls = 'border-primary-200'; }
+        else if (isConfirmed) { bgCls = 'bg-primary-50/60'; borderCls = 'border-primary-300'; }
         elems.push(
           <div key={`${keyPrefix}-slot-${slot.drawPosition}`}
-            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
             style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
             <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{vi}</div>
-            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
             <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
               {slot.entry ? (
                 <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
@@ -1210,13 +1210,13 @@ function NormalEntryRegistration() {
               <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
                 {isWithdrawn ? (
                   <>
-                    <span className="text-[9px] font-bold text-orange-500 mr-0.5">DEF</span>
-                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                    <span className="text-[9px] font-bold text-primary-500 mr-0.5">DEF</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
                   </>
                 ) : (
                   <>
-                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
@@ -1341,16 +1341,16 @@ function NormalEntryRegistration() {
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
             if (Math.abs(pY - yM) < 1) {
-              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             } else {
-              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`L-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             }
             continue;
           }
 
-          paths.push(<path key={`L-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`L-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`L-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`L-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`L-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`L-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
         }
       }
 
@@ -1379,16 +1379,16 @@ function NormalEntryRegistration() {
           if (topEmpty || botEmpty) {
             const pY = topEmpty ? yB : yT;
             if (Math.abs(pY - yM) < 1) {
-              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xN} ${pY}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             } else {
-              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+              paths.push(<path key={`R-r${r}-m${m}-bye`} d={`M ${xS} ${pY} L ${xM} ${pY} L ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
             }
             continue;
           }
 
-          paths.push(<path key={`R-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`R-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
-          paths.push(<path key={`R-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+          paths.push(<path key={`R-r${r}-m${m}-t`} d={`M ${xS} ${yT} L ${xM} ${yT} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`R-r${r}-m${m}-b`} d={`M ${xS} ${yB} L ${xM} ${yB} L ${xM} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
+          paths.push(<path key={`R-r${r}-m${m}-c`} d={`M ${xM} ${yM} L ${xN} ${yM}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
         }
       }
 
@@ -1400,10 +1400,10 @@ function NormalEntryRegistration() {
       // 左から水平にcenterXへ → 縦線 → 右から水平にcenterXへ（Excel標準ブラケットパターン）
       if (Math.abs(leftFinalY - rightFinalY) < 1) {
         // 左右同じ高さ → 一本の直線
-        paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
       } else {
         // 左から水平 → 中央で縦 → 右へ水平
-        paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${centerX} ${leftFinalY} L ${centerX} ${rightFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#1b4d3e" strokeWidth="1.5" />);
+        paths.push(<path key="final-line" d={`M ${leftEndX} ${leftFinalY} L ${centerX} ${leftFinalY} L ${centerX} ${rightFinalY} L ${rightFinalX} ${rightFinalY}`} fill="none" stroke="#a6a6a6" strokeWidth="1.5" />);
       }
       // 決勝の開始時刻
       {
@@ -1421,14 +1421,14 @@ function NormalEntryRegistration() {
         const isDimmed = hasSearch && slot.entry && !searchMatches.has(slot.drawPosition);
         const isHighlighted = hasSearch && searchMatches.has(slot.drawPosition);
         let borderCls = 'border-gray-300', bgCls = 'bg-white';
-        if (isWithdrawn) { bgCls = 'bg-orange-50/60'; borderCls = 'border-orange-200'; }
-        else if (isConfirmed) { bgCls = 'bg-emerald-50/60'; borderCls = 'border-emerald-300'; }
+        if (isWithdrawn) { bgCls = 'bg-primary-50/60'; borderCls = 'border-primary-200'; }
+        else if (isConfirmed) { bgCls = 'bg-primary-50/60'; borderCls = 'border-primary-300'; }
         return (
           <div key={`${keyPrefix}-slot-${slot.drawPosition}`}
-            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+            className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
             style={{ left: x, top: y, width: PC_SLOT_W, height: PC_SLOT_H }}>
             <div className="w-7 text-[11px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{viNum}</div>
-            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
             <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
               {slot.entry ? (
                 <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
@@ -1443,13 +1443,13 @@ function NormalEntryRegistration() {
               <div className="flex items-center gap-0.5 flex-shrink-0 mr-1">
                 {isWithdrawn ? (
                   <>
-                    <span className="text-[10px] font-bold text-orange-500 mr-0.5">DEF</span>
-                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
+                    <span className="text-[10px] font-bold text-primary-500 mr-0.5">DEF</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRestore(slot); }} className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors" title="復元する"><RotateCcw className="w-3.5 h-3.5" /></button>
                   </>
                 ) : (
                   <>
-                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-green-600 bg-green-100 hover:bg-green-200' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
@@ -1488,13 +1488,13 @@ function NormalEntryRegistration() {
 
     // 統計ヘッダー
     const statsHeader = draw ? (
-      <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-primary-50/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-white/30 border-b border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <span className="flex items-center gap-1.5 text-gray-600">
           <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
           ドロー <strong className="text-gray-800">{draw.drawSize}</strong>
         </span>
         <span className="flex items-center gap-1.5 text-gray-600">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
           エントリー <strong className="text-gray-800">{slots.filter(s => s.entry && !s.isBye).length}</strong>
         </span>
         <span className="flex items-center gap-1.5 text-gray-600">
@@ -1540,7 +1540,7 @@ function NormalEntryRegistration() {
           {renderBracketSection(leftSlots, halfSize, 0, 'left',
             { text: 'Left side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
           {renderBracketSection(rightSlots, halfSize, leftVisCount, 'right',
-            { text: 'Right side', colorClass: 'text-orange-600', borderClass: 'border-orange-500', bgClass: 'bg-orange-500/10' },
+            { text: 'Right side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' },
             halfSize)}
         </div>
       </div>
@@ -1909,12 +1909,12 @@ function NormalEntryRegistration() {
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {!isConfirmedEvent && (
               <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all min-h-[32px]">
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all min-h-[32px]">
                 <UserCheck className="w-3.5 h-3.5" />全員受付
               </button>
             )}
             <button onClick={(e) => { e.stopPropagation(); handleConfirmEvent(eventId); }}
-              className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100' : 'text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm hover:from-orange-600 hover:to-amber-600'}`}>
+              className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all min-h-[32px] ${isConfirmedEvent ? 'text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100' : 'text-white bg-gradient-to-r from-primary-500 to-primary-600 shadow-sm hover:from-primary-600 hover:to-primary-700'}`}>
               <Lock className="w-3.5 h-3.5" />{isConfirmedEvent ? '再確定' : '確定'}
             </button>
             {isConfirmedEvent && (
@@ -1943,10 +1943,10 @@ function NormalEntryRegistration() {
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
-            <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
+            <span className="bg-primary-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
             <span className="text-gray-500">/</span>
             <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
-            {stats.absent > 0 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} DEF</span>}
+            {stats.absent > 0 && <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} DEF</span>}
           </div>
         </div>
 
@@ -2119,13 +2119,13 @@ function NormalEntryRegistration() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 text-sm flex-wrap">
                   <div className="flex items-center gap-1"><span className="text-gray-500 text-xs">合計:</span><span className="font-bold text-gray-800">{overallStats.total}</span></div>
-                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /><span className="font-bold text-green-700">{overallStats.checkedIn}</span></div>
+                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary-500 inline-block" /><span className="font-bold text-primary-700">{overallStats.checkedIn}</span></div>
                   <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /><span className="font-bold text-red-600">{overallStats.absent}</span></div>
                   <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /><span className="font-bold text-gray-600">{overallStats.remaining}</span></div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all">
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all">
                     <UserCheck className="w-3.5 h-3.5" />全員受付済み
                   </button>
                   <button onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}
@@ -2133,7 +2133,7 @@ function NormalEntryRegistration() {
                     <RotateCcw className="w-3.5 h-3.5" />リセット
                   </button>
                   <button onClick={handleConfirmAll}
-                    className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-sm hover:from-orange-600 hover:to-amber-600 transition-all">
+                    className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-lg shadow-sm hover:from-primary-600 hover:to-primary-700 transition-all">
                     <Lock className="w-3.5 h-3.5" />全種目確定
                   </button>
                 </div>

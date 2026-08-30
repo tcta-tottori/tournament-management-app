@@ -36,20 +36,20 @@ export default function SyncStatusIndicator() {
         {isDisconnectedWarn ? (
           <AlertTriangle className="w-3.5 h-3.5 text-red-300 animate-pulse" />
         ) : isConnecting ? (
-          <Loader2 className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+          <Loader2 className="w-3.5 h-3.5 text-primary-300 animate-spin" />
         ) : isConnected ? (
-          <Wifi className="w-3.5 h-3.5 text-emerald-300" />
+          <Wifi className="w-3.5 h-3.5 text-primary-300" />
         ) : (
           <WifiOff className="w-3.5 h-3.5 text-white/40" />
         )}
         {isConnected && !hasPending && (
-          <span className="text-[10px] font-bold text-emerald-300">
+          <span className="text-[10px] font-bold text-primary-300">
             {peers.length + 1}
           </span>
         )}
         {/* 未送信件数バッジ */}
         {hasPending && (
-          <span className="text-[10px] font-bold text-amber-200">
+          <span className="text-[10px] font-bold text-primary-200">
             {pendingChanges}
           </span>
         )}

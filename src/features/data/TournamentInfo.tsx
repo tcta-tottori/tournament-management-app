@@ -174,7 +174,7 @@ export default function TournamentInfo() {
                   <td className="px-3 py-1.5 text-right text-gray-500">{s.drawSize}</td>
                   <td className="px-3 py-1.5 text-center">
                     {s.confirmed ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600 inline" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary-600 inline" />
                     ) : (
                       <span className="text-warning text-[10px]">未確定</span>
                     )}

@@ -49,7 +49,7 @@ export default function MixedDrawView() {
         <div className="flex justify-end">
           <button
             onClick={() => { if (confirm('テスト用：全ての予選リーグ未完了試合を6-4で入力しますか？')) fillAllScoresForTest(); }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium bg-white text-purple-600 border border-purple-200 hover:bg-purple-50 hover:border-purple-300 transition-all active:scale-95 shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95 shadow-sm"
           >
             <FlaskConical size={14} />
             テスト: 全6-4入力
@@ -96,15 +96,15 @@ function RankEditButton({ standing, totalTeams, leagueId }: {
   const { setRankOverride } = useMixedStore();
   const [showPicker, setShowPicker] = useState(false);
 
-  const rankColors = standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+  const rankColors = standing.rank === 1 ? 'bg-primary-100 text-primary-700' :
     standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-    standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500';
+    standing.rank === 3 ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-500';
 
   return (
     <span className="relative">
       <button
         onClick={e => { e.stopPropagation(); setShowPicker(!showPicker); }}
-        className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${rankColors} hover:ring-2 hover:ring-blue-300 transition-all cursor-pointer`}
+        className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${rankColors} hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer`}
       >
         {standing.rank}
       </button>
@@ -125,8 +125,8 @@ function RankEditButton({ standing, totalTeams, leagueId }: {
                   }}
                   className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                     standing.rank === rank
-                      ? 'bg-blue-500 text-white ring-2 ring-blue-300'
-                      : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50'
+                      ? 'bg-gray-500 text-white ring-2 ring-gray-300'
+                      : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
                   {rank}
@@ -232,7 +232,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
     <>
       <button
         onClick={(e) => { e.stopPropagation(); setShowPicker(true); setLotteryResult(null); setManualRanks(new Map()); }}
-        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-amber-100 transition-colors"
+        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-primary-100 transition-colors"
       >
         🎲 抽選
       </button>
@@ -259,15 +259,15 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
             {spinning && spinDisplay && (
               <div className="mb-4">
                 <div className="text-center mb-3">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-100 to-white rounded-full">
                     <span className="text-lg animate-spin">🎲</span>
-                    <span className="text-sm font-bold text-amber-700">抽選中...</span>
+                    <span className="text-sm font-bold text-primary-700">抽選中...</span>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   {spinDisplay.sort((a, b) => a.rank - b.rank).map(r => (
-                    <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-amber-200 transition-all duration-75">
-                      <span className="w-7 h-7 rounded-full bg-amber-400 text-white flex items-center justify-center text-xs font-bold animate-pulse">{r.rank}</span>
+                    <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-primary-200 transition-all duration-75">
+                      <span className="w-7 h-7 rounded-full bg-primary-400 text-white flex items-center justify-center text-xs font-bold animate-pulse">{r.rank}</span>
                       <span className="font-bold text-gray-800 text-sm">{r.teamName}</span>
                     </div>
                   ))}
@@ -277,13 +277,13 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
 
             {/* ルーレット結果表示 */}
             {!spinning && lotteryResult && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                <div className="text-xs font-bold text-amber-700 mb-2 text-center">🎊 抽選結果</div>
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-4">
+                <div className="text-xs font-bold text-primary-700 mb-2 text-center">🎊 抽選結果</div>
                 <div className="space-y-2">
                   {lotteryResult.sort((a, b) => a.rank - b.rank).map(r => (
                     <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        r.rank === baseRank ? 'bg-yellow-400 text-white' :
+                        r.rank === baseRank ? 'bg-primary-400 text-white' :
                         r.rank === baseRank + 1 ? 'bg-gray-400 text-white' :
                         'bg-gray-200 text-gray-600'
                       }`}>{r.rank}</span>
@@ -293,13 +293,13 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                 </div>
                 <button
                   onClick={() => applyResult(lotteryResult)}
-                  className="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold text-sm hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-[0.98]"
+                  className="w-full mt-3 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-sm hover:from-primary-600 hover:to-primary-700 transition-all active:scale-[0.98]"
                 >
                   この結果で確定
                 </button>
                 <button
                   onClick={handleLottery}
-                  className="w-full mt-2 py-2 text-xs text-amber-600 hover:text-amber-700 transition-colors"
+                  className="w-full mt-2 py-2 text-xs text-primary-600 hover:text-primary-700 transition-colors"
                 >
                   もう一度ルーレット
                 </button>
@@ -312,7 +312,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                 <button
                   onClick={handleLottery}
                   disabled={spinning}
-                  className="w-full py-3 mb-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                  className="w-full py-3 mb-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-sm hover:from-primary-600 hover:to-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                 >
                   {spinning ? '🎲 抽選中...' : '🎲 ルーレットで決定'}
                 </button>
@@ -334,9 +334,9 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                               <button key={rank} onClick={() => handleManualSet(s.teamId, rank)}
                                 disabled={isTaken}
                                 className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                                  isSelected ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' :
+                                  isSelected ? 'bg-primary-500 text-white ring-2 ring-primary-300' :
                                   isTaken ? 'bg-gray-100 text-gray-300 cursor-not-allowed' :
-                                  'bg-gray-50 border border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50'
+                                  'bg-gray-50 border border-gray-200 text-gray-600 hover:border-primary-300 hover:bg-primary-50'
                                 }`}
                               >{rank}位</button>
                             );
@@ -348,7 +348,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                   {allManualAssigned && (
                     <button
                       onClick={() => applyResult([...manualRanks.entries()].map(([teamId, rank]) => ({ teamId, teamName: '', rank })))}
-                      className="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold text-sm hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-[0.98]"
+                      className="w-full mt-3 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-sm hover:from-primary-600 hover:to-primary-700 transition-all active:scale-[0.98]"
                     >
                       この順位で確定
                     </button>
@@ -380,8 +380,8 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
       {/* 点滅アニメーション */}
       <style>{`
         @keyframes cell-blink {
-          0%, 100% { background-color: rgba(253, 224, 71, 0.2); }
-          50% { background-color: rgba(253, 224, 71, 0.6); }
+          0%, 100% { background-color: rgba(212,106,102, 0.2); }
+          50% { background-color: rgba(212,106,102, 0.6); }
         }
         .cell-blink { animation: cell-blink 1.5s ease-in-out infinite; }
         @keyframes badge-blink {
@@ -432,14 +432,14 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
             const match = scoreMatrix.get(`${rowTeamId}-${colTeamId}`);
             const current = isCellCurrent(rowTeamId, colTeamId);
             if (!match || match.status !== 'finished') {
-              return { text: '', color: '', bg: current ? 'cell-blink cursor-pointer' : 'bg-white hover:bg-emerald-50 cursor-pointer' };
+              return { text: '', color: '', bg: current ? 'cell-blink cursor-pointer' : 'bg-white hover:bg-primary-50 cursor-pointer' };
             }
             const isTeam1 = match.team1Id === rowTeamId;
             const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
             return {
               text: formatScoreText(match, rowTeamId),
-              color: won ? 'text-emerald-700 font-bold' : 'text-red-600',
-              bg: won ? 'bg-emerald-50 cursor-pointer' : 'bg-red-50 cursor-pointer',
+              color: won ? 'text-primary-700 font-bold' : 'text-red-600',
+              bg: won ? 'bg-primary-50 cursor-pointer' : 'bg-red-50 cursor-pointer',
             };
           };
 
@@ -472,14 +472,14 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           if (e.key === 'Enter') { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }
                           if (e.key === 'Escape') setEditingCourtId(null);
                         }}
-                        className="px-1 py-0 text-xs border border-emerald-400 rounded focus:outline-none w-24"
+                        className="px-1 py-0 text-xs border border-primary-400 rounded focus:outline-none w-24"
                         autoFocus
                       />
                     </div>
                   ) : (
                     <button
                       onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                      className="flex items-center gap-0.5 text-[11px] text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="flex items-center gap-0.5 text-[11px] text-gray-400 hover:text-primary-600 transition-colors"
                     >
                       <MapPin size={10} />
                       {league.courtName || '(コート未設定)'}
@@ -499,7 +499,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                     />
                   )}
                   <span className="text-xs text-gray-500">{finishedCount}/{totalCount}</span>
-                  {isComplete && <Check size={14} className="text-emerald-500" />}
+                  {isComplete && <Check size={14} className="text-primary-500" />}
                   <div className="w-12 sm:w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-gradient-to-r ${colors.from} ${colors.to} rounded-full transition-all`}
@@ -569,7 +569,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                                 }}
                               >
                                 {cell.text === '__DIAG__' ? (
-                                  <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" /></svg>
+                                  <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d6d6d6" strokeWidth="1" /></svg>
                                 ) : cell.text || (team.teamId !== colTeam.teamId && <span className="text-gray-300 text-[9px]">-</span>)}
                               </td>
                             );
@@ -590,7 +590,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                             <td className="px-1 sm:px-2 py-1.5 text-center border-l border-gray-200">
                               {standing?.tiebreakReason && (
                                 standing.tiebreakReason.startsWith('ゲーム率') ? (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     <Info size={9} className="shrink-0" />
                                     <GameRatioCell
                                       gamesWon={standing.gamesWon}
@@ -617,7 +617,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                                     leagueId={league.leagueId}
                                   />
                                 ) : (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                     <Info size={9} className="shrink-0" />
                                     {standing.tiebreakReason}
                                   </span>
@@ -646,7 +646,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           key={mo.matchNumber}
                           className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium
                             ${isFinished ? `${colors.badge}` :
-                              isCurrent ? 'bg-yellow-200 text-yellow-800 font-bold badge-blink' :
+                              isCurrent ? 'bg-primary-200 text-primary-800 font-bold badge-blink' :
                               'bg-white text-gray-400 border border-gray-200'}
                           `}
                         >

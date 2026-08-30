@@ -15,27 +15,27 @@ import type {
 } from '../team/types';
 
 const CATEGORY_META: Record<PlacementCategory, { label: string; icon: React.ElementType; color: string }> = {
-  '1st': { label: '1位', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
+  '1st': { label: '1位', icon: Trophy, color: 'from-primary-500 to-primary-600' },
   '2nd': { label: '2位', icon: Medal, color: 'from-gray-400 to-gray-500' },
-  '3rd': { label: '3位', icon: Award, color: 'from-orange-400 to-orange-500' },
-  '4th': { label: '4・5位', icon: Users, color: 'from-slate-400 to-slate-500' },
+  '3rd': { label: '3位', icon: Award, color: 'from-gray-400 to-gray-500' },
+  '4th': { label: '4・5位', icon: Users, color: 'from-gray-400 to-gray-500' },
 };
 const CATEGORY_ORDER: PlacementCategory[] = ['1st', '2nd', '3rd', '4th'];
 
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  A: 'bg-emerald-100 text-emerald-700',
-  B: 'bg-blue-100 text-blue-700',
-  C: 'bg-purple-100 text-purple-700',
-  D: 'bg-rose-100 text-rose-700',
-  E: 'bg-amber-100 text-amber-700',
-  F: 'bg-cyan-100 text-cyan-700',
-  G: 'bg-lime-100 text-lime-700',
-  H: 'bg-fuchsia-100 text-fuchsia-700',
-  I: 'bg-emerald-100 text-emerald-700',
-  J: 'bg-blue-100 text-blue-700',
-  K: 'bg-purple-100 text-purple-700',
-  L: 'bg-rose-100 text-rose-700',
-  M: 'bg-amber-100 text-amber-700',
+  A: 'bg-primary-100 text-primary-700',
+  B: 'bg-gray-100 text-gray-700',
+  C: 'bg-gray-100 text-gray-700',
+  D: 'bg-primary-100 text-primary-700',
+  E: 'bg-primary-100 text-primary-700',
+  F: 'bg-gray-100 text-gray-700',
+  G: 'bg-primary-100 text-primary-700',
+  H: 'bg-gray-100 text-gray-700',
+  I: 'bg-primary-100 text-primary-700',
+  J: 'bg-gray-100 text-gray-700',
+  K: 'bg-gray-100 text-gray-700',
+  L: 'bg-primary-100 text-primary-700',
+  M: 'bg-primary-100 text-primary-700',
 };
 
 function getRoundLabel(round: number, total: number): string {
@@ -194,9 +194,9 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                   <span
                     className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
                       round === totalRounds
-                        ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white'
+                        ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white'
                         : round === totalRounds - 1
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-primary-100 text-primary-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
@@ -264,11 +264,11 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                     <div
                       className={`rounded-lg border-2 overflow-hidden ${
                         match.status === 'playing'
-                          ? 'border-green-400 shadow-md'
+                          ? 'border-primary-400 shadow-md'
                           : match.status === 'finished'
-                          ? 'border-emerald-300 shadow-sm'
+                          ? 'border-primary-300 shadow-sm'
                           : match.team1Id && match.team2Id
-                          ? 'border-blue-300'
+                          ? 'border-gray-300'
                           : 'border-gray-200'
                       }`}
                       style={{ height: MATCH_HEIGHT }}
@@ -280,15 +280,15 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                         <div
                           className={`flex items-center justify-center text-[10px] font-medium border-t border-gray-100 py-0.5 ${
                             match.status === 'playing'
-                              ? 'bg-green-50 text-green-700'
+                              ? 'bg-primary-50 text-primary-700'
                               : match.status === 'finished'
                               ? 'bg-gray-50 text-gray-500'
-                              : 'bg-amber-50/50 text-amber-600'
+                              : 'bg-primary-50/50 text-primary-600'
                           }`}
                         >
                           {match.status === 'playing' && (
                             <>
-                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-1.5" />
+                              <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse mr-1.5" />
                               試合中
                             </>
                           )}
@@ -342,7 +342,7 @@ function MixedSlot({
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 min-h-[42px] ${
-        isWinner ? 'bg-emerald-50' : 'bg-white'
+        isWinner ? 'bg-primary-50' : 'bg-white'
       }`}
     >
       {league && (
@@ -356,7 +356,7 @@ function MixedSlot({
       )}
       <span
         className={`flex-1 truncate text-sm ${
-          isWinner ? 'font-bold text-emerald-800' : 'text-gray-700'
+          isWinner ? 'font-bold text-primary-800' : 'text-gray-700'
         }`}
       >
         {teamId || name ? name || '―' : <span className="text-gray-300 text-xs">未配置</span>}
@@ -368,12 +368,12 @@ function MixedSlot({
       ) : score !== null ? (
         <span
           className={`font-mono font-bold text-base shrink-0 ${
-            isWinner ? 'text-emerald-600' : 'text-gray-500'
+            isWinner ? 'text-primary-600' : 'text-gray-500'
           }`}
         >
           {score}
           {isLoser && tb != null && (
-            <span className="text-[9px] text-blue-500 align-super ml-0.5">({tb})</span>
+            <span className="text-[9px] text-gray-500 align-super ml-0.5">({tb})</span>
           )}
         </span>
       ) : null}
@@ -450,9 +450,9 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                   <span
                     className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
                       round === totalRounds
-                        ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white'
+                        ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white'
                         : round === totalRounds - 1
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-primary-100 text-primary-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
@@ -507,11 +507,11 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                     <div
                       className={`rounded-lg border-2 overflow-hidden ${
                         match.status === 'playing'
-                          ? 'border-green-400 shadow-md'
+                          ? 'border-primary-400 shadow-md'
                           : match.status === 'finished'
-                          ? 'border-emerald-300 shadow-sm'
+                          ? 'border-primary-300 shadow-sm'
                           : match.team1Id && match.team2Id
-                          ? 'border-blue-300'
+                          ? 'border-gray-300'
                           : 'border-gray-200'
                       }`}
                       style={{ height: MATCH_HEIGHT }}
@@ -523,15 +523,15 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                         <div
                           className={`flex items-center justify-center text-[10px] font-medium border-t border-gray-100 py-0.5 ${
                             match.status === 'playing'
-                              ? 'bg-green-50 text-green-700'
+                              ? 'bg-primary-50 text-primary-700'
                               : match.status === 'finished'
                               ? 'bg-gray-50 text-gray-500'
-                              : 'bg-amber-50/50 text-amber-600'
+                              : 'bg-primary-50/50 text-primary-600'
                           }`}
                         >
                           {match.status === 'playing' && (
                             <>
-                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-1.5" />
+                              <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse mr-1.5" />
                               試合中
                             </>
                           )}
@@ -570,7 +570,7 @@ function TeamSlot({
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 min-h-[42px] ${
-        isWinner ? 'bg-emerald-50' : 'bg-white'
+        isWinner ? 'bg-primary-50' : 'bg-white'
       }`}
     >
       {league && (
@@ -584,7 +584,7 @@ function TeamSlot({
       )}
       <span
         className={`flex-1 truncate text-sm ${
-          isWinner ? 'font-bold text-emerald-800' : 'text-gray-700'
+          isWinner ? 'font-bold text-primary-800' : 'text-gray-700'
         }`}
       >
         {teamId || name ? name || '―' : <span className="text-gray-300 text-xs">未配置</span>}
@@ -592,7 +592,7 @@ function TeamSlot({
       {showScore && (
         <span
           className={`font-mono font-bold text-base shrink-0 ${
-            isWinner ? 'text-emerald-600' : 'text-gray-500'
+            isWinner ? 'text-primary-600' : 'text-gray-500'
           }`}
         >
           {wins}

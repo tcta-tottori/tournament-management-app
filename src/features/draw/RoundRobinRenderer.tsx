@@ -161,7 +161,7 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                 <td
                   onClick={onPlayerSelect && player.entryId ? () => onPlayerSelect(player.entryId!) : undefined}
                   className={`border-2 border-gray-900 px-3 py-3 font-medium whitespace-nowrap ${
-                    onPlayerSelect && player.entryId ? 'cursor-pointer hover:bg-amber-50' : ''
+                    onPlayerSelect && player.entryId ? 'cursor-pointer hover:bg-primary-50' : ''
                   }`}
                 >
                   <span className="text-gray-500 mr-2">{rowIdx + 1}</span>
@@ -181,14 +181,14 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                       onClick={clickable ? () => onCellSelect!(cell.match!.round, cell.match!.position) : undefined}
                       className={`border-2 border-gray-900 px-2 py-3 text-center relative ${
                         isSelf ? 'bg-gray-200' : ''
-                      } ${cell.isWin ? 'text-red-600 font-bold' : ''} ${cell.isLoss ? 'text-blue-600' : ''} ${
+                      } ${cell.isWin ? 'text-red-600 font-bold' : ''} ${cell.isLoss ? 'text-gray-600' : ''} ${
                         clickable ? 'cursor-pointer hover:bg-primary-50' : ''
                       }`}
                     >
                       {isSelf ? (
                         /* 対角線（自分 vs 自分） */
                         <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                          <line x1="0" y1="0" x2="100%" y2="100%" stroke="#374151" strokeWidth="1.5" />
+                          <line x1="0" y1="0" x2="100%" y2="100%" stroke="#404040" strokeWidth="1.5" />
                         </svg>
                       ) : cell.text ? (
                         cell.text
@@ -221,7 +221,7 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
 
         {/* 補足: 順位表示条件・並び替えルール */}
         <div className="mt-2 text-[11px] text-gray-500">
-          {!allFinished && <span className="text-amber-600 font-medium">※順位は全対戦終了後に表示されます。</span>}
+          {!allFinished && <span className="text-primary-600 font-medium">※順位は全対戦終了後に表示されます。</span>}
           <span className="block mt-0.5">勝率＝取得ゲーム率。同勝数は「直接対戦（2者同率時）→ 勝率 → 得失ゲーム差」で順位を決定します。</span>
         </div>
 

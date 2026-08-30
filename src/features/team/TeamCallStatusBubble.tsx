@@ -22,8 +22,8 @@ export default function TeamCallStatusBubble() {
       role="status"
       aria-live="polite"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border-2 border-emerald-400 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 flex items-center gap-2 text-white">
+      <div className="bg-white rounded-2xl shadow-2xl border-2 border-primary-400 overflow-hidden">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-4 py-2 flex items-center gap-2 text-white">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
@@ -39,22 +39,22 @@ export default function TeamCallStatusBubble() {
           </button>
         </div>
         <div className="px-4 py-3 space-y-1.5">
-          <div className="text-[10px] font-bold text-emerald-700">
+          <div className="text-[10px] font-bold text-primary-700">
             {resolveBracketLabel(content.category, customLabels)} {content.roundLabel}
           </div>
-          <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-            <span className="text-slate-400 font-mono text-xs shrink-0">{content.team1Number}番</span>
+          <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
+            <span className="text-gray-400 font-mono text-xs shrink-0">{content.team1Number}番</span>
             <span className="truncate">{content.team1Name}</span>
           </div>
-          <div className="text-[9px] font-bold text-slate-300 pl-1">VS</div>
-          <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-            <span className="text-slate-400 font-mono text-xs shrink-0">{content.team2Number}番</span>
+          <div className="text-[9px] font-bold text-gray-300 pl-1">VS</div>
+          <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
+            <span className="text-gray-400 font-mono text-xs shrink-0">{content.team2Number}番</span>
             <span className="truncate">{content.team2Name}</span>
           </div>
           {content.courtNames.length > 0 && (
-            <div className="flex items-center gap-1 pt-1.5 border-t border-slate-100 mt-1.5">
-              <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
-              <span className="text-[11px] font-bold text-blue-600 truncate">
+            <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100 mt-1.5">
+              <MapPin className="w-3 h-3 text-gray-500 shrink-0" />
+              <span className="text-[11px] font-bold text-gray-600 truncate">
                 {content.courtNames.map(toCourtCallName).join('と')}
               </span>
             </div>

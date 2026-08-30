@@ -20,12 +20,12 @@ export default function MixedExcelViewer() {
     <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 hover:from-blue-100 hover:to-indigo-100 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 hover:from-gray-100 hover:to-white transition-colors"
       >
-        {open ? <ChevronDown size={16} className="text-blue-600" /> : <ChevronRight size={16} className="text-blue-600" />}
-        <FileSpreadsheet size={16} className="text-blue-600" />
-        <span className="font-semibold text-blue-700 text-sm">読込Excelデータ</span>
-        <span className="text-xs text-blue-400 ml-1">{rawExcelSheets.length}シート</span>
+        {open ? <ChevronDown size={16} className="text-gray-600" /> : <ChevronRight size={16} className="text-gray-600" />}
+        <FileSpreadsheet size={16} className="text-gray-600" />
+        <span className="font-semibold text-gray-700 text-sm">読込Excelデータ</span>
+        <span className="text-xs text-gray-400 ml-1">{rawExcelSheets.length}シート</span>
       </button>
 
       {open && (
@@ -38,7 +38,7 @@ export default function MixedExcelViewer() {
                 onClick={() => setActiveSheet(i)}
                 className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                   activeSheet === i
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-gray-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -62,7 +62,7 @@ export default function MixedExcelViewer() {
               </thead>
               <tbody>
                 {trimmedData.map((row, ri) => (
-                  <tr key={ri} className="hover:bg-blue-50/30">
+                  <tr key={ri} className="hover:bg-gray-50/30">
                     <td className="px-1.5 py-0.5 text-gray-400 font-mono border-r border-b border-gray-100 text-center bg-gray-50">{ri + 1}</td>
                     {row.map((cell, ci) => (
                       <td key={ci} className="px-1.5 py-0.5 border-r border-b border-gray-100 whitespace-nowrap text-gray-700 max-w-[200px] truncate" title={cell}>

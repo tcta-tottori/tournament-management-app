@@ -30,8 +30,8 @@ const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
       ],
       conclusion: '→ 取得ポイントが多いチームAが上位',
     },
-    grad: 'from-amber-500 to-orange-600',
-    iconBg: 'bg-amber-100 text-amber-700',
+    grad: 'from-primary-500 to-primary-600',
+    iconBg: 'bg-primary-100 text-primary-700',
   },
   gameRatio: {
     title: 'ゲーム率',
@@ -45,8 +45,8 @@ const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
       ],
       conclusion: '→ ゲーム率が高いチームAが上位',
     },
-    grad: 'from-emerald-500 to-teal-600',
-    iconBg: 'bg-emerald-100 text-emerald-700',
+    grad: 'from-primary-500 to-primary-600',
+    iconBg: 'bg-primary-100 text-primary-700',
   },
   headToHead: {
     title: '直接対決',
@@ -59,8 +59,8 @@ const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
       ],
       conclusion: '→ 直接対戦で勝ったチームAが上位',
     },
-    grad: 'from-indigo-500 to-blue-600',
-    iconBg: 'bg-indigo-100 text-indigo-700',
+    grad: 'from-gray-500 to-gray-600',
+    iconBg: 'bg-gray-100 text-gray-700',
   },
 };
 
@@ -83,24 +83,24 @@ function RuleDetailPopup({ rule, onClose }: { rule: TiebreakRuleId; onClose: () 
           <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg shrink-0"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <div className={`text-sm font-bold text-slate-800 ${d.iconBg} px-3 py-2 rounded-lg`}>
+          <div className={`text-sm font-bold text-gray-800 ${d.iconBg} px-3 py-2 rounded-lg`}>
             {d.summary}
           </div>
-          <div className="text-xs text-slate-600 leading-relaxed">
+          <div className="text-xs text-gray-600 leading-relaxed">
             {d.description}
           </div>
-          <div className="border-t border-slate-100 pt-3">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">{d.example.title}</div>
-            <div className="space-y-1 bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="border-t border-gray-100 pt-3">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">{d.example.title}</div>
+            <div className="space-y-1 bg-gray-50 rounded-lg p-3 border border-gray-200">
               {d.example.lines.map((l, i) => (
-                <div key={i} className="text-xs text-slate-700 font-medium tabular-nums">{l}</div>
+                <div key={i} className="text-xs text-gray-700 font-medium tabular-nums">{l}</div>
               ))}
-              <div className="text-xs font-black text-slate-900 pt-1.5 mt-1.5 border-t border-slate-200">
+              <div className="text-xs font-black text-gray-900 pt-1.5 mt-1.5 border-t border-gray-200">
                 {d.example.conclusion}
               </div>
             </div>
           </div>
-          <div className="text-[10px] text-slate-400 text-center">
+          <div className="text-[10px] text-gray-400 text-center">
             ※ 勝数（対戦勝利数）は常にこれらより優先されます
           </div>
         </div>
@@ -110,24 +110,24 @@ function RuleDetailPopup({ rule, onClose }: { rule: TiebreakRuleId; onClose: () 
   );
 }
 
-/** リーグカラー */
-const LEAGUE_COLORS = [
-  { grad: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', soft: 'bg-blue-100', ring: 'ring-blue-500/20' },
-  { grad: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', soft: 'bg-emerald-100', ring: 'ring-emerald-500/20' },
-  { grad: 'from-purple-500 to-violet-600', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', soft: 'bg-purple-100', ring: 'ring-purple-500/20' },
-  { grad: 'from-rose-500 to-pink-600', bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', soft: 'bg-rose-100', ring: 'ring-rose-500/20' },
-  { grad: 'from-amber-500 to-orange-600', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', soft: 'bg-amber-100', ring: 'ring-amber-500/20' },
-  { grad: 'from-cyan-500 to-sky-600', bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', soft: 'bg-cyan-100', ring: 'ring-cyan-500/20' },
-  { grad: 'from-lime-500 to-green-600', bg: 'bg-lime-50', border: 'border-lime-200', text: 'text-lime-700', soft: 'bg-lime-100', ring: 'ring-lime-500/20' },
-  { grad: 'from-fuchsia-500 to-purple-600', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', soft: 'bg-fuchsia-100', ring: 'ring-fuchsia-500/20' },
-];
+/**
+ * リーグカラー。
+ * 協会サイトのトンマナ（白ベース＋赤の差し色）に合わせ、リーグごとの
+ * 色分けは廃止して全リーグ共通の無彩色にしている。赤は選択中のリーグや
+ * 勝者など「要点」だけに使う。
+ */
+const LEAGUE_NEUTRAL = {
+  grad: 'from-gray-600 to-gray-700', bg: 'bg-gray-50', border: 'border-gray-200',
+  text: 'text-gray-700', soft: 'bg-gray-100', ring: 'ring-gray-500/20',
+};
+const LEAGUE_COLORS = [LEAGUE_NEUTRAL];
 
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
 
-/** タブドット用ソリッドカラー */
+/** タブドット用ソリッドカラー（無彩色の濃淡で並び順だけ分かるようにする） */
 const LEAGUE_SOLID_COLORS = [
-  '#3b82f6', '#10b981', '#8b5cf6', '#f43f5e',
-  '#f59e0b', '#06b6d4', '#84cc16', '#d946ef',
+  '#262626', '#404040', '#5a5a5a', '#767676',
+  '#8f8f8f', '#a6a6a6', '#bdbdbd', '#d6d6d6',
 ];
 
 /** チーム名を最大6文字に制限（6文字超は5文字+...） */
@@ -168,7 +168,7 @@ function PlayerListDisplay({ players }: { players: string[] }) {
     <span className="inline-flex items-baseline gap-0.5">
       {players.map((p, i) => (
         <span key={i} className="inline-flex items-baseline">
-          {i > 0 && <span className="text-slate-300 mx-[1px]">/</span>}
+          {i > 0 && <span className="text-gray-300 mx-[1px]">/</span>}
           <PlayerDisplay name={p} />
         </span>
       ))}
@@ -206,19 +206,19 @@ function getTestPlayersForTeam(
 
 /** 種目カラー */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  MIX: { bg: 'bg-violet-100', text: 'text-violet-700' },
-  WD:  { bg: 'bg-pink-100',   text: 'text-pink-700' },
-  MD:  { bg: 'bg-sky-100',    text: 'text-sky-700' },
-  D3:  { bg: 'bg-blue-100',   text: 'text-blue-700' },
-  D2:  { bg: 'bg-cyan-100',   text: 'text-cyan-700' },
-  D1:  { bg: 'bg-teal-100',   text: 'text-teal-700' },
-  S2:  { bg: 'bg-amber-100',  text: 'text-amber-700' },
+  MIX: { bg: 'bg-gray-100', text: 'text-gray-700' },
+  WD:  { bg: 'bg-primary-100',   text: 'text-primary-700' },
+  MD:  { bg: 'bg-gray-100',    text: 'text-gray-700' },
+  D3:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
+  D2:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
+  D1:  { bg: 'bg-primary-100',   text: 'text-primary-700' },
+  S2:  { bg: 'bg-primary-100',  text: 'text-primary-700' },
   S1:  { bg: 'bg-red-100',    text: 'text-red-700' },
 };
 
 /** 順位（プレーンテキスト） */
 function RankText({ rank }: { rank: number }) {
-  return <span className="text-sm font-black text-slate-700 tabular-nums">{rank}位</span>;
+  return <span className="text-sm font-black text-gray-700 tabular-nums">{rank}位</span>;
 }
 
 /** 判定ルール設定パネル */
@@ -236,42 +236,42 @@ function TiebreakRuleSettings() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-[0_2px_16px_-4px_rgba(20,20,20,0.10)] overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-slate-50/80 transition-colors bg-gradient-to-r from-slate-50/60 via-white to-slate-50/40"
+        className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50/80 transition-colors bg-gradient-to-r from-gray-50/60 via-white to-gray-50/40"
       >
-        <Settings2 className="w-4 h-4 text-slate-400" />
-        <span className="text-sm font-bold text-slate-700">判定ルール（優先順）</span>
-        <span className="ml-auto text-[10px] text-slate-400 truncate">
+        <Settings2 className="w-4 h-4 text-gray-400" />
+        <span className="text-sm font-bold text-gray-700">判定ルール（優先順）</span>
+        <span className="ml-auto text-[10px] text-gray-400 truncate">
           {tiebreakOrder.map(r => TIEBREAK_RULE_LABELS[r].split('（')[0]).join(' → ')}
         </span>
       </button>
       {open && (
-        <div className="px-4 py-3 border-t border-slate-100 space-y-1.5 bg-slate-50/40">
-          <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+        <div className="px-4 py-3 border-t border-gray-100 space-y-1.5 bg-gray-50/40">
+          <div className="text-[10px] text-gray-500 mb-1.5 flex items-center gap-1">
             <Info className="w-3 h-3" />
             ルール名をタップすると詳細と例が表示されます
           </div>
           {tiebreakOrder.map((rule, i) => (
-            <div key={rule} className="flex items-center gap-2 px-2 py-1.5 bg-white rounded-lg border border-slate-200">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-black shrink-0">{i + 1}</span>
+            <div key={rule} className="flex items-center gap-2 px-2 py-1.5 bg-white rounded-lg border border-gray-200">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-700 text-white text-[10px] font-black shrink-0">{i + 1}</span>
               <button
                 onClick={() => setDetailRule(rule)}
-                className="flex-1 flex items-center gap-1.5 text-left px-2 py-1 rounded-md hover:bg-indigo-50 active:bg-indigo-100 transition-colors min-w-0"
+                className="flex-1 flex items-center gap-1.5 text-left px-2 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 transition-colors min-w-0"
               >
-                <span className="flex-1 text-xs font-bold text-slate-700 truncate">{TIEBREAK_RULE_LABELS[rule]}</span>
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="flex-1 text-xs font-bold text-gray-700 truncate">{TIEBREAK_RULE_LABELS[rule]}</span>
+                <HelpCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
               </button>
-              <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 shrink-0">
-                <ArrowUp className="w-3.5 h-3.5 text-slate-500" />
+              <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 shrink-0">
+                <ArrowUp className="w-3.5 h-3.5 text-gray-500" />
               </button>
-              <button onClick={() => move(i, 1)} disabled={i === tiebreakOrder.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 shrink-0">
-                <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
+              <button onClick={() => move(i, 1)} disabled={i === tiebreakOrder.length - 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 shrink-0">
+                <ArrowDown className="w-3.5 h-3.5 text-gray-500" />
               </button>
             </div>
           ))}
-          <div className="text-[10px] text-slate-400 pt-1">※ 勝数は常に最優先です</div>
+          <div className="text-[10px] text-gray-400 pt-1">※ 勝数は常に最優先です</div>
         </div>
       )}
       {detailRule && <RuleDetailPopup rule={detailRule} onClose={() => setDetailRule(null)} />}
@@ -305,14 +305,14 @@ function PromotionPickerPopup({
     return 'stay';
   };
   const colorOf = (k: ReturnType<typeof kindOf>) =>
-    k === 'champion' ? 'bg-amber-500 text-white' :
-    k === 'promote'  ? 'bg-emerald-600 text-white' :
-    k === 'relegate' ? 'bg-rose-600 text-white' :
-                       'bg-slate-500 text-white';
+    k === 'champion' ? 'bg-primary-500 text-white' :
+    k === 'promote'  ? 'bg-primary-600 text-white' :
+    k === 'relegate' ? 'bg-primary-600 text-white' :
+                       'bg-gray-500 text-white';
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 px-4 py-3 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-br from-gray-600 to-gray-700 px-4 py-3 text-white flex items-center justify-between">
           <div className="min-w-0">
             <div className="text-[10px] opacity-80 font-bold uppercase tracking-wider">昇降格バッジ</div>
             <div className="text-sm font-black truncate">{teamName}</div>
@@ -325,11 +325,11 @@ function PromotionPickerPopup({
             onClick={() => onSelect(null)}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
               override === undefined
-                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                ? 'bg-gray-50 border-gray-300 text-gray-700'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
-            <span className="inline-flex w-5 h-5 rounded-full bg-slate-100 text-slate-500 items-center justify-center text-[10px] font-black">自</span>
+            <span className="inline-flex w-5 h-5 rounded-full bg-gray-100 text-gray-500 items-center justify-center text-[10px] font-black">自</span>
             <span className="flex-1 text-left">自動（順位から判定）</span>
             {autoLabel && <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${colorOf(kindOf(autoLabel))}`}>{autoLabel}</span>}
           </button>
@@ -342,12 +342,12 @@ function PromotionPickerPopup({
                 onClick={() => onSelect(opt)}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
                   isActive
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'border-gray-400 bg-gray-50 text-gray-800'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-black ${colorOf(kindOf(opt))}`}>{opt}</span>
-                <span className="flex-1 text-left text-slate-500">として表示</span>
+                <span className="flex-1 text-left text-gray-500">として表示</span>
               </button>
             );
           })}
@@ -356,11 +356,11 @@ function PromotionPickerPopup({
             onClick={() => onSelect('')}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
               override === ''
-                ? 'border-slate-500 bg-slate-100 text-slate-700'
-                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'border-gray-500 bg-gray-100 text-gray-700'
+                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
             }`}
           >
-            <span className="inline-flex w-5 h-5 rounded-full bg-slate-200 text-slate-500 items-center justify-center text-[10px] font-black">×</span>
+            <span className="inline-flex w-5 h-5 rounded-full bg-gray-200 text-gray-500 items-center justify-center text-[10px] font-black">×</span>
             <span className="flex-1 text-left">バッジを非表示</span>
           </button>
         </div>
@@ -383,7 +383,7 @@ function WinRateDetailPopup({ standing, onClose }: { standing: TeamLeagueStandin
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 px-5 py-3 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-br from-gray-600 to-gray-700 px-5 py-3 text-white flex items-center justify-between">
           <div>
             <div className="text-[10px] opacity-80 font-bold uppercase tracking-wider">勝率の計算</div>
             <div className="text-base font-black">{standing.teamName}</div>
@@ -392,44 +392,44 @@ function WinRateDetailPopup({ standing, onClose }: { standing: TeamLeagueStandin
         </div>
         <div className="p-4 space-y-3">
           {/* 勝率本体 */}
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 text-center">
-            <div className="text-[10px] text-indigo-600 font-bold tracking-wider mb-1">勝率</div>
-            <div className="text-4xl font-black text-indigo-700 tabular-nums">{winRate.toFixed(3)}</div>
-            <div className="mt-2 text-[11px] text-slate-600 font-medium tabular-nums">
-              = 勝利した対戦チーム数 <span className="text-indigo-700 font-black">{standing.wins}</span>
-              <span className="mx-1 text-slate-400">÷</span>
-              総対戦チーム数 <span className="text-indigo-700 font-black">{totalMatches}</span>
+          <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl p-4 text-center">
+            <div className="text-[10px] text-gray-600 font-bold tracking-wider mb-1">勝率</div>
+            <div className="text-4xl font-black text-gray-700 tabular-nums">{winRate.toFixed(3)}</div>
+            <div className="mt-2 text-[11px] text-gray-600 font-medium tabular-nums">
+              = 勝利した対戦チーム数 <span className="text-gray-700 font-black">{standing.wins}</span>
+              <span className="mx-1 text-gray-400">÷</span>
+              総対戦チーム数 <span className="text-gray-700 font-black">{totalMatches}</span>
             </div>
           </div>
 
           {/* 参考統計 */}
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">対戦勝敗</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">対戦勝敗</div>
               <div className="text-base font-black tabular-nums">{standing.wins} - {standing.losses}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">取得ポイント</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">取得ポイント</div>
               <div className="text-base font-black tabular-nums">{standing.pointsWon} - {standing.pointsLost}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">取得ゲーム</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">取得ゲーム</div>
               <div className="text-base font-black tabular-nums">{standing.gamesWon} - {standing.gamesLost}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">取得ゲーム率</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">取得ゲーム率</div>
               <div className="text-base font-black tabular-nums">{gameRatio.toFixed(3)}</div>
             </div>
           </div>
 
           {/* クラブ対抗戦の順位決定方法（明示） */}
-          <div className="border-t border-slate-100 pt-3">
-            <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">クラブ対抗戦 順位決定方法</div>
-            <ol className="space-y-1 text-[11px] text-slate-700 leading-snug">
-              <li><span className="font-black text-indigo-700">①</span> 勝率（勝利した対戦チーム数 ÷ 総対戦チーム数）の高いチームを上位</li>
-              <li><span className="font-black text-indigo-700">②</span> 同率の場合、取得ポイント（対戦内勝利数）の多いチームを上位</li>
-              <li><span className="font-black text-indigo-700">③</span> 同率の場合、取得ゲーム率の高いチームを上位</li>
-              <li><span className="font-black text-indigo-700">④</span> 同率の場合、直接対決の勝者を上位</li>
+          <div className="border-t border-gray-100 pt-3">
+            <div className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-2">クラブ対抗戦 順位決定方法</div>
+            <ol className="space-y-1 text-[11px] text-gray-700 leading-snug">
+              <li><span className="font-black text-gray-700">①</span> 勝率（勝利した対戦チーム数 ÷ 総対戦チーム数）の高いチームを上位</li>
+              <li><span className="font-black text-gray-700">②</span> 同率の場合、取得ポイント（対戦内勝利数）の多いチームを上位</li>
+              <li><span className="font-black text-gray-700">③</span> 同率の場合、取得ゲーム率の高いチームを上位</li>
+              <li><span className="font-black text-gray-700">④</span> 同率の場合、直接対決の勝者を上位</li>
             </ol>
           </div>
         </div>
@@ -447,7 +447,7 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-slate-700 to-slate-900 px-5 py-3 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-br from-gray-700 to-gray-900 px-5 py-3 text-white flex items-center justify-between">
           <div>
             <div className="text-[10px] opacity-80 font-bold uppercase tracking-wider">判定詳細</div>
             <div className="text-base font-black">{standing.teamName}</div>
@@ -456,50 +456,50 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
         </div>
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">対戦勝敗</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">対戦勝敗</div>
               <div className="text-base font-black tabular-nums">{standing.wins} - {standing.losses}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">取得ポイント</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">取得ポイント</div>
               <div className="text-base font-black tabular-nums">{standing.pointsWon} - {standing.pointsLost}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">取得ゲーム</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">取得ゲーム</div>
               <div className="text-base font-black tabular-nums">{standing.gamesWon} - {standing.gamesLost}</div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2">
-              <div className="text-[10px] text-slate-400 font-bold">ゲーム率</div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-[10px] text-gray-400 font-bold">ゲーム率</div>
               <div className="text-base font-black tabular-nums">{ratio.toFixed(3)}</div>
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-slate-400 font-bold mb-1.5 flex items-center gap-1">
+            <div className="text-[10px] text-gray-400 font-bold mb-1.5 flex items-center gap-1">
               適用された判定順
-              <span className="text-slate-400 font-normal">（タップで詳細）</span>
+              <span className="text-gray-400 font-normal">（タップで詳細）</span>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-xs px-2 py-1.5 bg-amber-50 border border-amber-200 rounded">
-                <span className="inline-flex w-5 h-5 rounded-full bg-amber-500 text-white items-center justify-center text-[10px] font-black">0</span>
-                <span className="font-bold text-amber-800">対戦勝数</span>
+              <div className="flex items-center gap-2 text-xs px-2 py-1.5 bg-primary-50 border border-primary-200 rounded">
+                <span className="inline-flex w-5 h-5 rounded-full bg-primary-500 text-white items-center justify-center text-[10px] font-black">0</span>
+                <span className="font-bold text-primary-800">対戦勝数</span>
               </div>
               {tiebreakOrder.map((r, i) => (
                 <button
                   key={r}
                   onClick={() => setDetailRule(r)}
-                  className="w-full flex items-center gap-2 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded hover:bg-indigo-50 hover:border-indigo-200 active:scale-[0.98] transition-all"
+                  className="w-full flex items-center gap-2 text-xs px-2 py-1.5 bg-gray-50 border border-gray-200 rounded hover:bg-gray-50 hover:border-gray-200 active:scale-[0.98] transition-all"
                 >
-                  <span className="inline-flex w-5 h-5 rounded-full bg-slate-600 text-white items-center justify-center text-[10px] font-black">{i + 1}</span>
-                  <span className="flex-1 text-left font-bold text-slate-700">{TIEBREAK_RULE_LABELS[r]}</span>
-                  <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="inline-flex w-5 h-5 rounded-full bg-gray-600 text-white items-center justify-center text-[10px] font-black">{i + 1}</span>
+                  <span className="flex-1 text-left font-bold text-gray-700">{TIEBREAK_RULE_LABELS[r]}</span>
+                  <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
                 </button>
               ))}
             </div>
           </div>
           {standing.tiebreakReason && (
-            <div className="text-xs px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <span className="text-blue-800 font-bold">適用理由: </span>
-              <span className="text-blue-700">{standing.tiebreakReason}</span>
+            <div className="text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+              <span className="text-gray-800 font-bold">適用理由: </span>
+              <span className="text-gray-700">{standing.tiebreakReason}</span>
             </div>
           )}
         </div>
@@ -580,11 +580,11 @@ export default function TeamLeagueView() {
   const selectedLeague = leagues.find(l => l.leagueId === selectedLeagueId) || leagues[0];
   if (!selectedLeague) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-          <Trophy className="w-8 h-8 text-slate-400" />
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+          <Trophy className="w-8 h-8 text-gray-400" />
         </div>
-        <p className="text-base font-bold text-slate-500">データがありません</p>
+        <p className="text-base font-bold text-gray-500">データがありません</p>
       </div>
     );
   }
@@ -635,7 +635,7 @@ export default function TeamLeagueView() {
                 <Layers className="chrome-tab-icon" stroke="url(#rainbow-grad)" />
                 <span className="chrome-tab-label chrome-tab-label-rainbow">ALL</span>
                 {allLeaguesComplete && (
-                  <Check className="w-3 h-3 text-emerald-600" strokeWidth={3} />
+                  <Check className="w-3 h-3 text-primary-600" strokeWidth={3} />
                 )}
               </button>
             );
@@ -695,7 +695,7 @@ export default function TeamLeagueView() {
             }
 
             return (
-              <div key={league.leagueId} className="bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.08)] overflow-hidden lg:max-w-5xl lg:mx-auto">
+              <div key={league.leagueId} className="bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_12px_-4px_rgba(20,20,20,0.08)] overflow-hidden lg:max-w-5xl lg:mx-auto">
                 {/* コンパクトヘッダー */}
                 <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-r ${c.grad} text-white`}>
                   <div className="flex items-center gap-2">
@@ -752,7 +752,7 @@ export default function TeamLeagueView() {
                         const standing = leagueStandings.find(s => s.teamId === rowTeam.teamId);
                         return (
                           <tr key={rowTeam.teamId} className={`border-t ${c.border} ${rowIdx % 2 === 0 ? 'bg-white' : c.bg + '/30'}`}>
-                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
+                            <td className={`px-1 py-1 lg:px-2 lg:py-2.5 text-center align-middle border-r ${c.border} ${c.bg}/10 text-[9px] lg:text-[10px] font-bold text-gray-400 tabular-nums`}>
                               {rowTeam.teamNumber}
                             </td>
                             <td className={`px-2 py-1 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle border-r ${c.border} whitespace-nowrap ${c.bg}/20 relative`}>
@@ -768,17 +768,17 @@ export default function TeamLeagueView() {
                                       type="button"
                                       onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: league.leagueId })}
                                       title="昇降格バッジを設定"
-                                      className="absolute bottom-0 right-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                                      className="absolute bottom-0 right-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-colors"
                                     >＋</button>
                                   );
                                 }
                                 const cls = promo.kind === 'champion'
-                                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                  ? 'bg-primary-500 text-white hover:bg-primary-600'
                                   : promo.kind === 'promote'
-                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                  ? 'bg-primary-600 text-white hover:bg-primary-700'
                                   : promo.kind === 'relegate'
-                                  ? 'bg-rose-600 text-white hover:bg-rose-700'
-                                  : 'bg-slate-500 text-white hover:bg-slate-600';
+                                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                                  : 'bg-gray-500 text-white hover:bg-gray-600';
                                 return (
                                   <button
                                     type="button"
@@ -806,14 +806,14 @@ export default function TeamLeagueView() {
                             {league.teams.map(colTeam => {
                               if (rowTeam.teamId === colTeam.teamId) {
                                 return (
-                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom left, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                                <td key={colTeam.teamId} className="border-r border-gray-100 relative" style={{ background: 'linear-gradient(to bottom left, #fafafa 49.5%, #d6d6d6 49.5%, #d6d6d6 50.5%, #f4f4f4 50.5%)' }} />
                               );
                               }
                               const match = sm.get(`${rowTeam.teamId}-${colTeam.teamId}`);
                               if (!match) {
                                 // 変則リーグ等で対戦の無い組み合わせ
                                 return (
-                                  <td key={colTeam.teamId} className="border-r border-slate-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e2e8f0 49.6%, #e2e8f0 50.4%, #fcfcfd 50.4%)' }} />
+                                  <td key={colTeam.teamId} className="border-r border-gray-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e8e8e8 49.6%, #e8e8e8 50.4%, #fcfcfd 50.4%)' }} />
                                 );
                               }
                               const isTeam1 = match.team1Id === rowTeam.teamId;
@@ -823,16 +823,16 @@ export default function TeamLeagueView() {
                               return (
                                 <td
                                   key={colTeam.teamId}
-                                  className={`p-0 text-center cursor-pointer transition-all border-r border-slate-100 align-middle ${
-                                    cellWonAll ? 'bg-blue-50/80' : cellLostAll ? 'bg-rose-50/60' : 'hover:bg-slate-50'
+                                  className={`p-0 text-center cursor-pointer transition-all border-r border-gray-100 align-middle ${
+                                    cellWonAll ? 'bg-gray-50/80' : cellLostAll ? 'bg-primary-50/60' : 'hover:bg-gray-50'
                                   }`}
                                   onClick={() => setEditingMatch(match)}
                                 >
                                   <div className="flex flex-col gap-0.5 px-1 py-1 lg:px-2 lg:py-1.5">
                                     {isFinished && (
-                                      <div className={`text-[11px] lg:text-xs tabular-nums font-black leading-none text-center ${cellWonAll ? 'text-blue-700' : cellLostAll ? 'text-rose-500' : 'text-slate-600'}`}>
+                                      <div className={`text-[11px] lg:text-xs tabular-nums font-black leading-none text-center ${cellWonAll ? 'text-gray-700' : cellLostAll ? 'text-primary-500' : 'text-gray-600'}`}>
                                         {isTeam1 ? match.winsTeam1 : match.winsTeam2}
-                                        <span className="text-slate-300 mx-0.5">-</span>
+                                        <span className="text-gray-300 mx-0.5">-</span>
                                         {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                                       </div>
                                     )}
@@ -851,23 +851,23 @@ export default function TeamLeagueView() {
                                           className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-3.5 lg:h-5 leading-[14px]"
                                         >
                                           {hasScore || isTerminated ? (<>
-                                            <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                            <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-gray-500 font-medium overflow-hidden whitespace-nowrap">
                                               <PlayerListDisplay players={myPlayers} />
                                             </span>
                                             <span className={`col-start-2 font-black whitespace-nowrap text-center ${
-                                              isTerminated ? 'text-slate-400 line-through decoration-rose-400' :
-                                              won ? 'text-blue-700' : 'text-rose-500'
+                                              isTerminated ? 'text-gray-400 line-through decoration-primary-400' :
+                                              won ? 'text-gray-700' : 'text-primary-500'
                                             }`}>
                                               {hasScore ? `${myScore}-${oppScore}` : '打'}
                                               {isTerminated && hasScore && (
-                                                <span className="ml-0.5 text-[8px] text-rose-500 no-underline align-top font-black">打</span>
+                                                <span className="ml-0.5 text-[8px] text-primary-500 no-underline align-top font-black">打</span>
                                               )}
                                             </span>
-                                            <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                            <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-gray-500 font-medium overflow-hidden whitespace-nowrap">
                                               <PlayerListDisplay players={oppPlayers} />
                                             </span>
                                           </>) : (
-                                            <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
+                                            <span className="col-start-2 text-center text-gray-300 font-bold">-</span>
                                           )}
                                         </div>
                                       );
@@ -877,7 +877,7 @@ export default function TeamLeagueView() {
                               );
                             })}
                             <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center font-black text-sm lg:text-base align-middle ${c.bg}/20 tabular-nums border-l ${c.border}`}>
-                              {standing ? <><span className={c.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span></> : '-'}
+                              {standing ? <><span className={c.text}>{standing.wins}</span><span className="text-gray-300">-</span><span className="text-gray-400">{standing.losses}</span></> : '-'}
                             </td>
                             {complete && (
                               <td className={`px-1.5 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${c.bg}/20 border-l ${c.border}`}>
@@ -919,7 +919,7 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-amber-50 to-amber-100/60 text-amber-700 border border-amber-200/80 shadow-sm hover:shadow hover:border-amber-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST
         </button>
@@ -937,7 +937,7 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-orange-50 to-orange-100/60 text-orange-700 border border-orange-200/80 shadow-sm hover:shadow hover:border-orange-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST（ALL）
         </button>
@@ -947,7 +947,7 @@ export default function TeamLeagueView() {
       {(() => {
         const hasTiebreak = leagueComplete && standings.some(s => s.tiebreakReason);
         return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-[0_2px_16px_-4px_rgba(20,20,20,0.10)] overflow-hidden">
         {/* コンパクトヘッダー */}
         <div className={`flex items-center justify-between gap-2 px-3 py-1.5 lg:px-4 lg:py-2 bg-gradient-to-r ${color.grad} text-white`}>
           <div className="flex items-center gap-2">
@@ -1007,12 +1007,12 @@ export default function TeamLeagueView() {
               {selectedLeague.teams.map((rowTeam, rowIdx) => {
                 const standing = standings.find(s => s.teamId === rowTeam.teamId);
                 return (
-                  <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-slate-50/80 transition-colors`}>
-                    <td className={`sticky left-0 z-10 px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle shadow-[inset_-1px_0_0_0_rgb(226_232_240)] ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} text-[9px] lg:text-[10px] font-bold text-slate-400 tabular-nums`}>
+                  <tr key={rowTeam.teamId} className={`border-t ${color.border} ${rowIdx % 2 === 0 ? 'bg-white' : color.bg + '/30'} hover:bg-gray-50/80 transition-colors`}>
+                    <td className={`sticky left-0 z-10 px-1 py-1.5 lg:px-2 lg:py-2.5 text-center align-middle shadow-[inset_-1px_0_0_0_rgb(226_232_240)] ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} text-[9px] lg:text-[10px] font-bold text-gray-400 tabular-nums`}>
                       {rowTeam.teamNumber}
                     </td>
                     <td className={`sticky left-[28px] lg:left-[36px] z-10 px-2 py-1.5 lg:px-4 lg:py-2.5 font-bold text-xs lg:text-sm align-middle shadow-[inset_-1px_0_0_0_rgb(226_232_240)] whitespace-nowrap ${rowIdx % 2 === 0 ? 'bg-white' : color.bg} relative`}>
-                      <div className="truncate max-w-[180px] text-slate-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
+                      <div className="truncate max-w-[180px] text-gray-800" title={rowTeam.teamName}>{rowTeam.teamName}</div>
                       {/* 昇降格バッジ（クラブ対抗戦のみ）。クリックで手動切替ピッカーを開く */}
                       {(() => {
                         const override = promotionOverrides[rowTeam.teamId];
@@ -1027,19 +1027,19 @@ export default function TeamLeagueView() {
                               type="button"
                               onClick={() => setPromotionTarget({ teamId: rowTeam.teamId, leagueId: selectedLeague.leagueId })}
                               title="昇降格バッジを設定"
-                              className="absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center w-4 h-4 lg:w-5 lg:h-5 rounded-full text-[9px] lg:text-[10px] font-black text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                              className="absolute bottom-0 right-1 lg:right-2 inline-flex items-center justify-center w-4 h-4 lg:w-5 lg:h-5 rounded-full text-[9px] lg:text-[10px] font-black text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-colors"
                             >
                               ＋
                             </button>
                           );
                         }
                         const cls = promo.kind === 'champion'
-                          ? 'bg-amber-500 text-white hover:bg-amber-600'
+                          ? 'bg-primary-500 text-white hover:bg-primary-600'
                           : promo.kind === 'promote'
-                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          ? 'bg-primary-600 text-white hover:bg-primary-700'
                           : promo.kind === 'relegate'
-                          ? 'bg-rose-600 text-white hover:bg-rose-700'
-                          : 'bg-slate-500 text-white hover:bg-slate-600';
+                          ? 'bg-primary-600 text-white hover:bg-primary-700'
+                          : 'bg-gray-500 text-white hover:bg-gray-600';
                         return (
                           <button
                             type="button"
@@ -1068,14 +1068,14 @@ export default function TeamLeagueView() {
                     {selectedLeague.teams.map(colTeam => {
                       if (rowTeam.teamId === colTeam.teamId) {
                         return (
-                                <td key={colTeam.teamId} className="border-r border-slate-100 relative" style={{ background: 'linear-gradient(to bottom left, #f8fafc 49.5%, #cbd5e1 49.5%, #cbd5e1 50.5%, #f1f5f9 50.5%)' }} />
+                                <td key={colTeam.teamId} className="border-r border-gray-100 relative" style={{ background: 'linear-gradient(to bottom left, #fafafa 49.5%, #d6d6d6 49.5%, #d6d6d6 50.5%, #f4f4f4 50.5%)' }} />
                               );
                       }
                       const match = getMatchBetween(rowTeam.teamId, colTeam.teamId);
                       if (!match) {
                         // 変則リーグ等で対戦の無い組み合わせ
                         return (
-                          <td key={colTeam.teamId} className="border-r border-slate-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e2e8f0 49.6%, #e2e8f0 50.4%, #fcfcfd 50.4%)' }} />
+                          <td key={colTeam.teamId} className="border-r border-gray-100" style={{ background: 'linear-gradient(to bottom left, #ffffff 49.6%, #e8e8e8 49.6%, #e8e8e8 50.4%, #fcfcfd 50.4%)' }} />
                         );
                       }
                       const isTeam1 = match.team1Id === rowTeam.teamId;
@@ -1087,26 +1087,26 @@ export default function TeamLeagueView() {
                       return (
                         <td
                           key={colTeam.teamId}
-                          className={`p-0 text-center cursor-pointer transition-all border-r border-slate-100 align-top group ${
-                            cellWonAll ? 'bg-gradient-to-b from-blue-50/80 to-indigo-50/40' :
-                            cellLostAll ? 'bg-gradient-to-b from-rose-50/50 to-white' :
+                          className={`p-0 text-center cursor-pointer transition-all border-r border-gray-100 align-top group ${
+                            cellWonAll ? 'bg-gradient-to-b from-gray-50/80 to-gray-50/40' :
+                            cellLostAll ? 'bg-gradient-to-b from-primary-50/50 to-white' :
                             isCurrent ? 'league-match-blink' :
-                            'hover:bg-slate-50 active:bg-slate-100'
+                            'hover:bg-gray-50 active:bg-gray-100'
                           }`}
                           onClick={() => setEditingMatch(match)}
                         >
-                          <div className="flex flex-col px-1 py-1 lg:px-2 lg:py-1.5 ring-inset group-hover:ring-1 group-hover:ring-slate-300/60 rounded-md min-w-[68px]">
+                          <div className="flex flex-col px-1 py-1 lg:px-2 lg:py-1.5 ring-inset group-hover:ring-1 group-hover:ring-gray-300/60 rounded-md min-w-[68px]">
                             {/* 対戦全体の勝敗バッジ */}
                             {isFinished && (
                               <div className={`mx-auto mb-0.5 lg:mb-1 px-2.5 py-0.5 lg:px-3 lg:py-1 rounded-full text-[11px] lg:text-xs tabular-nums font-black leading-none ${
                                 cellWonAll
-                                  ? 'bg-blue-600 text-white'
+                                  ? 'bg-gray-600 text-white'
                                   : cellLostAll
-                                  ? 'bg-rose-100 text-rose-400 border border-rose-200'
-                                  : 'bg-slate-200 text-slate-600'
+                                  ? 'bg-primary-100 text-primary-400 border border-primary-200'
+                                  : 'bg-gray-200 text-gray-600'
                               }`}>
                                 {isTeam1 ? match.winsTeam1 : match.winsTeam2}
-                                <span className={cellWonAll ? 'text-blue-200 mx-0.5' : 'text-slate-300 mx-0.5'}>-</span>
+                                <span className={cellWonAll ? 'text-gray-200 mx-0.5' : 'text-gray-300 mx-0.5'}>-</span>
                                 {isTeam1 ? match.winsTeam2 : match.winsTeam1}
                               </div>
                             )}
@@ -1125,17 +1125,17 @@ export default function TeamLeagueView() {
                                   className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[10px] lg:text-[11px] tabular-nums h-4 lg:h-5 leading-none"
                                 >
                                   {hasScore ? (<>
-                                    <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                    <span className="col-start-1 hidden lg:flex justify-end items-baseline text-[10px] text-gray-500 font-medium overflow-hidden whitespace-nowrap">
                                       <PlayerListDisplay players={myPlayers} />
                                     </span>
-                                    <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-blue-700' : 'text-rose-400'}`}>
+                                    <span className={`col-start-2 font-black whitespace-nowrap text-center ${won ? 'text-gray-700' : 'text-primary-400'}`}>
                                       {myScore}-{oppScore}
                                     </span>
-                                    <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-slate-500 font-medium overflow-hidden whitespace-nowrap">
+                                    <span className="col-start-3 hidden lg:flex justify-start items-baseline text-[10px] text-gray-500 font-medium overflow-hidden whitespace-nowrap">
                                       <PlayerListDisplay players={oppPlayers} />
                                     </span>
                                   </>) : (
-                                    <span className="col-start-2 text-center text-slate-300 font-bold">-</span>
+                                    <span className="col-start-2 text-center text-gray-300 font-bold">-</span>
                                   )}
                                 </div>
                               );
@@ -1147,13 +1147,13 @@ export default function TeamLeagueView() {
                     <td className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center font-black text-sm lg:text-base align-middle ${color.bg}/30 border-l ${color.border}`}>
                       {standing ? (
                         <div className="tabular-nums">
-                          <span className={color.text}>{standing.wins}</span><span className="text-slate-300">-</span><span className="text-slate-400">{standing.losses}</span>
+                          <span className={color.text}>{standing.wins}</span><span className="text-gray-300">-</span><span className="text-gray-400">{standing.losses}</span>
                         </div>
                       ) : '-'}
                     </td>
                     {/* 勝率列：クリックで詳細ポップアップ */}
                     <td
-                      className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border} cursor-pointer hover:bg-slate-100/60 transition-colors`}
+                      className={`px-2 py-1 lg:px-3 lg:py-2.5 text-center align-middle ${color.bg}/30 border-l ${color.border} cursor-pointer hover:bg-gray-100/60 transition-colors`}
                       onClick={() => standing && setWinRateTarget(standing)}
                     >
                       {standing ? (() => {
@@ -1161,8 +1161,8 @@ export default function TeamLeagueView() {
                         const rate = total === 0 ? 0 : standing.wins / total;
                         return (
                           <div className="inline-flex flex-col items-center gap-0.5">
-                            <span className="text-xs lg:text-sm font-black text-slate-800 tabular-nums">{rate.toFixed(3)}</span>
-                            <Info className="w-2.5 h-2.5 text-slate-400" />
+                            <span className="text-xs lg:text-sm font-black text-gray-800 tabular-nums">{rate.toFixed(3)}</span>
+                            <Info className="w-2.5 h-2.5 text-gray-400" />
                           </div>
                         );
                       })() : '-'}
@@ -1178,12 +1178,12 @@ export default function TeamLeagueView() {
                         onClick={() => standing && setJudgementTarget(standing)}
                       >
                         {standing?.tiebreakReason ? (
-                          <div className="inline-flex items-center gap-0.5 text-[9px] text-slate-600 font-medium">
+                          <div className="inline-flex items-center gap-0.5 text-[9px] text-gray-600 font-medium">
                             <Info className="w-2.5 h-2.5" />
                             <span className="truncate max-w-[80px]">{standing.tiebreakReason}</span>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-slate-300">—</span>
+                          <span className="text-[10px] text-gray-300">—</span>
                         )}
                       </td>
                     )}
@@ -1221,12 +1221,12 @@ export default function TeamLeagueView() {
       })()}
 
       {/* 対戦順 */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-[0_2px_16px_-4px_rgba(20,20,20,0.10)] overflow-hidden">
         <div className={`px-4 py-2.5 lg:py-3 border-b flex items-center gap-2 bg-gradient-to-r ${color.grad} text-white`}>
           <ListOrdered className="w-4 h-4 text-white/80" />
           <span className="text-sm font-bold tracking-wide">対戦順</span>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-gray-100">
           {selectedLeague.matchOrder.map(mo => {
             const match = leagueMatchList.find(m => m.matchNumber === mo.matchNumber);
             const team1 = selectedLeague.teams[mo.team1Index - 1];
@@ -1246,14 +1246,14 @@ export default function TeamLeagueView() {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingMatch(match); } }}
                 className={`w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-2.5 text-left cursor-pointer transition-colors ${
                   isFinished
-                    ? 'bg-emerald-50/40 hover:bg-emerald-50/80'
+                    ? 'bg-primary-50/40 hover:bg-primary-50/80'
                     : isCurrent
-                    ? 'bg-blue-50/60 hover:bg-blue-50'
-                    : 'hover:bg-slate-50'
+                    ? 'bg-gray-50/60 hover:bg-gray-50'
+                    : 'hover:bg-gray-50'
                 }`}
               >
                 {/* # */}
-                <span className="text-[10px] lg:text-[11px] font-black text-slate-400 w-5 lg:w-6 text-center shrink-0">#{mo.matchNumber}</span>
+                <span className="text-[10px] lg:text-[11px] font-black text-gray-400 w-5 lg:w-6 text-center shrink-0">#{mo.matchNumber}</span>
 
                 {/* OP由来のラウンド・使用コート。タップするとコートを変更・修正できる */}
                 <button
@@ -1269,8 +1269,8 @@ export default function TeamLeagueView() {
                   title="使用コートを変更する"
                   className={`shrink-0 flex items-center gap-0.5 text-[9px] lg:text-[10px] font-bold rounded px-1 py-0.5 whitespace-nowrap tabular-nums border transition-colors ${
                     mo.courts && mo.courts.length > 0
-                      ? 'text-slate-500 bg-slate-100 border-slate-200 hover:bg-slate-200'
-                      : 'text-slate-300 bg-white border-dashed border-slate-200 hover:text-emerald-600 hover:border-emerald-300'
+                      ? 'text-gray-500 bg-gray-100 border-gray-200 hover:bg-gray-200'
+                      : 'text-gray-300 bg-white border-dashed border-gray-200 hover:text-primary-600 hover:border-primary-300'
                   }`}
                 >
                   <MapPin className="w-2.5 h-2.5" />
@@ -1281,7 +1281,7 @@ export default function TeamLeagueView() {
                 </button>
 
                 {/* チーム1 */}
-                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate ${match.winnerId === team1.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
+                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate ${match.winnerId === team1.teamId ? 'text-gray-700 font-black' : 'text-gray-800'}`}>
                   {team1.teamName}
                 </div>
 
@@ -1289,32 +1289,32 @@ export default function TeamLeagueView() {
                 <div className="shrink-0 text-center w-12 lg:w-14">
                   {isFinished ? (
                     <span className="text-sm lg:text-base font-black tabular-nums">
-                      <span className={match.winnerId === team1.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam1}</span>
-                      <span className="text-slate-300 mx-0.5">-</span>
-                      <span className={match.winnerId === team2.teamId ? 'text-blue-600' : 'text-slate-400'}>{match.winsTeam2}</span>
+                      <span className={match.winnerId === team1.teamId ? 'text-gray-600' : 'text-gray-400'}>{match.winsTeam1}</span>
+                      <span className="text-gray-300 mx-0.5">-</span>
+                      <span className={match.winnerId === team2.teamId ? 'text-gray-600' : 'text-gray-400'}>{match.winsTeam2}</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] text-slate-400 font-bold">vs</span>
+                    <span className="text-[10px] text-gray-400 font-bold">vs</span>
                   )}
                 </div>
 
                 {/* チーム2 */}
-                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate text-right ${match.winnerId === team2.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
+                <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate text-right ${match.winnerId === team2.teamId ? 'text-gray-700 font-black' : 'text-gray-800'}`}>
                   {team2.teamName}
                 </div>
 
                 {/* ステータス */}
                 <div className="shrink-0 w-10 lg:w-12 flex justify-end">
                   {isFinished ? (
-                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] lg:text-[9px] font-black">
+                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-primary-500 text-white text-[8px] lg:text-[9px] font-black">
                       <Check className="w-2.5 h-2.5" />完了
                     </span>
                   ) : isCurrent ? (
-                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[8px] lg:text-[9px] font-black animate-pulse">
+                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-500 text-white text-[8px] lg:text-[9px] font-black animate-pulse">
                       <Play className="w-2.5 h-2.5" />
                     </span>
                   ) : (
-                    <Circle className="w-3 h-3 text-slate-300" />
+                    <Circle className="w-3 h-3 text-gray-300" />
                   )}
                 </div>
               </div>

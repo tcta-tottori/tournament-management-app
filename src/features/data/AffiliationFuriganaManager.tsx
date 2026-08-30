@@ -229,7 +229,7 @@ export default function AffiliationFuriganaManager() {
             登録: {affiliationFurigana.filter(a => a.furigana).length} / {uniqueAffiliations.length}件
           </span>
           {unregisteredCount > 0 && (
-            <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+            <span className="text-xs font-semibold bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
               未登録: {unregisteredCount}件
             </span>
           )}
@@ -241,7 +241,7 @@ export default function AffiliationFuriganaManager() {
           className={`mb-4 p-3 rounded-md text-sm flex items-start gap-2 ${
             status.isError
               ? 'bg-red-50 text-red-700 border border-red-200'
-              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-primary-50 text-primary-700 border border-primary-200'
           }`}
         >
           {status.isError ? (
@@ -258,24 +258,24 @@ export default function AffiliationFuriganaManager() {
         <button
           onClick={handleAutoCollect}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100 rounded-lg transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-gray-50 to-white hover:from-gray-100 hover:to-white border border-gray-100 rounded-lg transition-colors disabled:opacity-50"
         >
-          <FolderSearch className="w-6 h-6 text-indigo-600" />
-          <span className="text-sm font-semibold text-indigo-900">一括収集</span>
-          <span className="text-xs text-indigo-600 text-center">選手データから所属名を自動収集</span>
+          <FolderSearch className="w-6 h-6 text-gray-600" />
+          <span className="text-sm font-semibold text-gray-900">一括収集</span>
+          <span className="text-xs text-gray-600 text-center">選手データから所属名を自動収集</span>
         </button>
 
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-100 rounded-lg transition-colors disabled:opacity-50 relative"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-primary-50 to-white hover:from-primary-100 hover:to-white border border-primary-100 rounded-lg transition-colors disabled:opacity-50 relative"
         >
           <div className="flex items-center gap-1">
-            <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
-            <Upload className="w-4 h-4 text-emerald-600" />
+            <FileSpreadsheet className="w-6 h-6 text-primary-600" />
+            <Upload className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-emerald-900">Excelインポート</span>
-          <span className="text-xs text-emerald-600 text-center">所属名・ふりがなをExcelから読込</span>
+          <span className="text-sm font-semibold text-primary-900">Excelインポート</span>
+          <span className="text-xs text-primary-600 text-center">所属名・ふりがなをExcelから読込</span>
           <input
             type="file"
             accept=".xlsx, .xls"
@@ -288,14 +288,14 @@ export default function AffiliationFuriganaManager() {
         <button
           onClick={handleExport}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-100 rounded-lg transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-primary-50 to-white hover:from-primary-100 hover:to-white border border-primary-100 rounded-lg transition-colors disabled:opacity-50"
         >
           <div className="flex items-center gap-1">
-            <FileSpreadsheet className="w-6 h-6 text-orange-600" />
-            <Download className="w-4 h-4 text-orange-600" />
+            <FileSpreadsheet className="w-6 h-6 text-primary-600" />
+            <Download className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-orange-900">エクスポート</span>
-          <span className="text-xs text-orange-600 text-center">所属ふりがなをExcelに出力</span>
+          <span className="text-sm font-semibold text-primary-900">エクスポート</span>
+          <span className="text-xs text-primary-600 text-center">所属ふりがなをExcelに出力</span>
         </button>
       </div>
 
@@ -376,7 +376,7 @@ export default function AffiliationFuriganaManager() {
                       <div className="w-2/12 flex justify-center gap-1">
                         <button
                           onClick={handleEditSave}
-                          className="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600 transition-colors"
+                          className="px-2 py-1 bg-primary-500 text-white rounded text-xs hover:bg-primary-600 transition-colors"
                         >
                           保存
                         </button>
@@ -393,7 +393,7 @@ export default function AffiliationFuriganaManager() {
                       <div className="w-5/12 font-medium text-gray-800">{item.name}</div>
                       <div className="w-5/12 text-gray-600">
                         {item.furigana || (
-                          <span className="text-amber-500 text-xs italic">未入力</span>
+                          <span className="text-primary-500 text-xs italic">未入力</span>
                         )}
                       </div>
                       <div className="w-2/12 flex justify-center gap-1">

@@ -62,7 +62,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
       <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-3 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
             <div>
@@ -86,7 +86,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
                     value={rule.roundLabel}
                     onChange={e => patch(i, { roundLabel: e.target.value })}
                     placeholder="例: 全回戦, 1～2回戦, 準決勝以降"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-primary-400 focus:ring-2 focus:ring-primary-200 outline-none"
                   />
                 </div>
                 <div>
@@ -99,7 +99,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
                       patch(i, { ruleText: text, games: gamesFromText(text) ?? rule.games });
                     }}
                     placeholder="例: 8ゲームマッチ（8-8タイブレーク）"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-primary-400 focus:ring-2 focus:ring-primary-200 outline-none"
                   />
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -111,7 +111,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
                       max={12}
                       value={rule.games}
                       onChange={e => patch(i, { games: parseInt(e.target.value) || 6 })}
-                      className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
+                      className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-primary-400 outline-none"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -119,7 +119,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
                     <select
                       value={rule.matchFormat || 'game'}
                       onChange={e => patch(i, { matchFormat: e.target.value as MatchFormatType })}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:border-primary-400 outline-none"
                     >
                       <option value="game">ゲームマッチ</option>
                       <option value="twoSetsSuper10">2セット+STB</option>
@@ -192,7 +192,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
 
           <button
             onClick={() => setRules([...rules, { roundLabel: '', ruleText: '', games: 6 }])}
-            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-amber-600 border border-dashed border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-primary-600 border border-dashed border-primary-300 rounded-xl hover:bg-primary-50 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             ルールを追加
@@ -214,7 +214,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
           <button
             onClick={() => void handleSave()}
             disabled={saving}
-            className="px-4 py-2 text-xs font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 shadow-sm disabled:opacity-50"
+            className="px-4 py-2 text-xs font-bold text-white bg-primary-500 rounded-lg hover:bg-primary-600 shadow-sm disabled:opacity-50"
           >
             保存
           </button>

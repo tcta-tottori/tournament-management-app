@@ -113,29 +113,29 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
 
   return (
     <>
-      {/* プレビュー呼び出しボタン (水色ベース) */}
+      {/* プレビュー呼び出しボタン（無彩色ベース） */}
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 shadow-sm hover:shadow hover:bg-sky-100 hover:border-sky-300 transition-all active:scale-95 whitespace-nowrap"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:shadow hover:bg-gray-100 hover:border-gray-300 transition-all active:scale-95 whitespace-nowrap"
       >
-        <ImageIcon size={14} className="text-sky-600" />
+        <ImageIcon size={14} className="text-gray-600" />
         結果画像
       </button>
 
       {/* モーダル表示 */}
       {isOpen && createPortal(
         <div
-          className="fixed inset-0 bg-sky-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-5xl max-h-[90vh] border border-sky-100"
+            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-5xl max-h-[90vh] border border-gray-100"
             onClick={e => e.stopPropagation()}
           >
-            {/* モーダルヘッダー (水色グラデ) */}
-            <div className="px-4 py-3 bg-gradient-to-r from-sky-50 to-white border-b border-sky-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-sky-900 text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-sky-400 to-sky-600 text-white shadow-sm">
+            {/* モーダルヘッダー（無彩色グラデ） */}
+            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm">
                   <ImageIcon size={13} />
                 </span>
                 {leagueDivisionLabel(league.leagueId)} 予選結果プレビュー
@@ -147,15 +147,15 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                     onClick={() => setShowEdit(v => !v)}
                     className={`relative flex items-center justify-center w-9 h-9 rounded-lg shadow transition-colors active:scale-95 border ${
                       showEdit
-                        ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-                        : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
+                        ? 'bg-primary-100 text-primary-800 border-primary-300 hover:bg-primary-200'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
                     title="選手名を手動編集"
                     aria-label="選手名を手動編集"
                   >
                     <Pencil size={15} />
                     {Object.keys(playerOverrides).length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">
+                      <span className="absolute -top-1 -right-1 bg-primary-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full leading-none">
                         {Object.keys(playerOverrides).length}
                       </span>
                     )}
@@ -164,7 +164,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 {currentUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg shadow hover:from-sky-600 hover:to-sky-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow hover:from-gray-600 hover:to-gray-700 transition-colors active:scale-95"
                     title={view === 'summary' ? '順位表を保存' : '総当たり表を保存'}
                     aria-label="表示中の画像を保存"
                   >
@@ -174,7 +174,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 {summaryUrl && detailUrl && (
                   <button
                     onClick={handleDownloadBoth}
-                    className="hidden sm:flex items-center gap-1 px-3 h-9 bg-white text-sky-700 border border-sky-200 rounded-lg shadow-sm hover:bg-sky-50 transition-colors active:scale-95 text-xs font-bold"
+                    className="hidden sm:flex items-center gap-1 px-3 h-9 bg-white text-gray-700 border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors active:scale-95 text-xs font-bold"
                     title="順位表と総当たり表の両方を保存"
                   >
                     <Download size={14} />2枚保存
@@ -182,7 +182,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 text-sky-500 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   aria-label="閉じる"
                   title="閉じる"
                 >
@@ -192,12 +192,12 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
             </div>
 
             {/* 表示切替タブ: サマリー（順位表） / 詳細（総当たり表） */}
-            <div className="px-4 py-2 bg-white border-b border-sky-100 shrink-0 flex items-center gap-2">
-              <div className="inline-flex p-0.5 bg-sky-50 border border-sky-200 rounded-lg">
+            <div className="px-4 py-2 bg-white border-b border-gray-100 shrink-0 flex items-center gap-2">
+              <div className="inline-flex p-0.5 bg-gray-50 border border-gray-200 rounded-lg">
                 <button
                   onClick={() => { setView('summary'); setShowEdit(false); }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                    view === 'summary' ? 'bg-white text-sky-700 shadow-sm' : 'text-sky-500 hover:text-sky-700'
+                    view === 'summary' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   <ListOrdered size={14} />順位表
@@ -205,28 +205,28 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 <button
                   onClick={() => setView('detail')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                    view === 'detail' ? 'bg-white text-sky-700 shadow-sm' : 'text-sky-500 hover:text-sky-700'
+                    view === 'detail' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   <LayoutGrid size={14} />総当たり表
                 </button>
               </div>
-              <span className="text-[10px] text-sky-500/80 hidden sm:inline">
+              <span className="text-[10px] text-gray-500/80 hidden sm:inline">
                 {view === 'summary' ? '見やすい順位一覧（共有向き）' : '対戦ごとの詳細スコア'}
               </span>
             </div>
 
             {/* 選手名編集パネル（詳細表示時のみ・トグル） */}
             {showEdit && view === 'detail' && (
-              <div className="border-b border-amber-200 bg-amber-50/50 shrink-0">
+              <div className="border-b border-primary-200 bg-primary-50/50 shrink-0">
                 <div className="px-4 py-3 flex items-center justify-between">
-                  <div className="text-xs font-bold text-amber-800">
+                  <div className="text-xs font-bold text-primary-800">
                     表示名を編集（空欄またはデフォルトで自動短縮: 苗字最大3文字）
                   </div>
                   <button
                     onClick={resetOverrides}
                     disabled={Object.keys(playerOverrides).length === 0}
-                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-amber-700 bg-white border border-amber-300 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-primary-700 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <RotateCcw size={11} />
                     すべてリセット
@@ -234,7 +234,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 </div>
                 <div className="px-4 pb-3 max-h-48 overflow-y-auto">
                   {allPlayerNames.length === 0 ? (
-                    <div className="text-[11px] text-amber-700/70 italic">選手名が登録されていません</div>
+                    <div className="text-[11px] text-primary-700/70 italic">選手名が登録されていません</div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                       {allPlayerNames.map(name => {
@@ -243,7 +243,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                         const isOverridden = playerOverrides[name] !== undefined;
                         return (
                           <label key={name} className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-amber-900/70 truncate" title={name}>
+                            <span className="text-[9px] font-bold text-primary-900/70 truncate" title={name}>
                               {name}
                             </span>
                             <input
@@ -252,8 +252,8 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                               onChange={e => updateOverride(name, e.target.value)}
                               placeholder={autoValue}
                               className={`px-2 py-1 text-[11px] font-bold bg-white rounded border ${
-                                isOverridden ? 'border-amber-400 ring-1 ring-amber-300' : 'border-amber-200'
-                              } focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400`}
+                                isOverridden ? 'border-primary-400 ring-1 ring-primary-300' : 'border-primary-200'
+                              } focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-400`}
                             />
                           </label>
                         );
@@ -267,7 +267,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
             {/* プレビュー画像本体 (白背景) */}
             <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
               {showLoading && (
-                <div className="flex flex-col items-center gap-2 text-sky-400">
+                <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Loader2 size={32} className="animate-spin" />
                   <span className="text-sm font-medium">画像を生成中...</span>
                 </div>
@@ -276,7 +276,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 <img
                   src={currentUrl}
                   alt={`${league.leagueId}リーグ${view === 'summary' ? '順位表' : '結果'}`}
-                  className="max-w-full h-auto object-contain shadow-sm border border-sky-100 bg-white rounded"
+                  className="max-w-full h-auto object-contain shadow-sm border border-gray-100 bg-white rounded"
                   style={{ maxHeight: '100%' }}
                 />
               )}

@@ -67,17 +67,17 @@ function MixedTournamentInfoSection() {
   const defCount = allTeams.filter(t => t.status === 'def').length;
 
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3 border-b border-emerald-100">
+    <section className="bg-white rounded-xl shadow-sm border border-primary-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-3 border-b border-primary-100">
         <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-emerald-600" />
-          <h2 className="font-semibold text-emerald-700">ミックス大会情報</h2>
+          <Trophy className="w-5 h-5 text-primary-600" />
+          <h2 className="font-semibold text-primary-700">ミックス大会情報</h2>
         </div>
       </div>
       <div className="p-4 space-y-3">
         {/* 大会名 */}
         <div className="flex items-start gap-3">
-          <Trophy className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <Trophy className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">大会名</div>
             {editingField === 'name' ? (
@@ -87,11 +87,11 @@ function MixedTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-2 py-1 text-sm border border-primary-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-emerald-600 transition-colors">
+              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-primary-600 transition-colors">
                 {tournamentInfo.name}
                 <Pencil size={10} className="opacity-40" />
               </button>
@@ -101,7 +101,7 @@ function MixedTournamentInfoSection() {
 
         {/* 日付 */}
         <div className="flex items-start gap-3">
-          <Calendar className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <Calendar className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">開催日</div>
             {editingField === 'date' ? (
@@ -111,12 +111,12 @@ function MixedTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-2 py-1 text-sm border border-primary-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
                 autoFocus
               />
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-primary-600 transition-colors">
                   {tournamentInfo.date || '(未設定)'}
                   <Pencil size={10} className="opacity-40" />
                 </button>
@@ -124,7 +124,7 @@ function MixedTournamentInfoSection() {
                   <select
                     onChange={e => { if (e.target.value) updateTournamentInfo('date', e.target.value); }}
                     defaultValue=""
-                    className="text-xs border border-amber-300 bg-amber-50 text-amber-700 rounded-lg px-2 py-1 cursor-pointer"
+                    className="text-xs border border-primary-300 bg-primary-50 text-primary-700 rounded-lg px-2 py-1 cursor-pointer"
                   >
                     <option value="" disabled>予備日を除去...</option>
                     {dateOptions.map((opt, i) => (
@@ -139,7 +139,7 @@ function MixedTournamentInfoSection() {
 
         {/* 会場 */}
         <div className="flex items-start gap-3">
-          <MapPin className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <MapPin className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">会場</div>
             {editingField === 'venue' ? (
@@ -149,12 +149,12 @@ function MixedTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-2 py-1 text-sm border border-primary-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
                 autoFocus
               />
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-emerald-600 transition-colors">
+                <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-primary-600 transition-colors">
                   {tournamentInfo.venue || '(未設定)'}
                   <Pencil size={10} className="opacity-40" />
                 </button>
@@ -162,7 +162,7 @@ function MixedTournamentInfoSection() {
                   <select
                     onChange={e => { if (e.target.value) updateTournamentInfo('venue', e.target.value); }}
                     defaultValue=""
-                    className="text-xs border border-amber-300 bg-amber-50 text-amber-700 rounded-lg px-2 py-1 cursor-pointer"
+                    className="text-xs border border-primary-300 bg-primary-50 text-primary-700 rounded-lg px-2 py-1 cursor-pointer"
                   >
                     <option value="" disabled>予備日を除去...</option>
                     {venueOptions.map((opt, i) => (
@@ -177,22 +177,22 @@ function MixedTournamentInfoSection() {
 
         {/* 統計 */}
         <div className="flex items-start gap-3">
-          <Users className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <Users className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
           <div className="flex-1">
             <div className="text-[10px] text-gray-400 font-medium">参加状況</div>
             <div className="text-sm text-gray-700">
               {allTeams.length}ペア / {leagues.length}リーグ
-              {entryCount > 0 && <span className="text-emerald-600 ml-2">Entry {entryCount}</span>}
-              {defCount > 0 && <span className="text-orange-500 ml-2">DEF {defCount}</span>}
+              {entryCount > 0 && <span className="text-primary-600 ml-2">Entry {entryCount}</span>}
+              {defCount > 0 && <span className="text-primary-500 ml-2">DEF {defCount}</span>}
             </div>
           </div>
         </div>
 
         {/* ルール */}
         {tournamentInfo.rules.length > 0 && (
-          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="text-[10px] font-medium text-amber-600 mb-1">ゲームルール</div>
-            <div className="text-xs text-amber-700">
+          <div className="mt-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
+            <div className="text-[10px] font-medium text-primary-600 mb-1">ゲームルール</div>
+            <div className="text-xs text-primary-700">
               {tournamentInfo.rules.map((r, i) => <div key={i}>{r}</div>)}
             </div>
           </div>
@@ -226,17 +226,17 @@ function TeamTournamentInfoSection() {
   const defCount = allTeams.filter(t => t.status === 'def').length;
 
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-100">
+    <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-gray-50 to-white px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-blue-600" />
-          <h2 className="font-semibold text-blue-700">団体戦 大会情報</h2>
+          <Trophy className="w-5 h-5 text-gray-600" />
+          <h2 className="font-semibold text-gray-700">団体戦 大会情報</h2>
         </div>
       </div>
       <div className="p-4 space-y-3">
         {/* 大会名 */}
         <div className="flex items-start gap-3">
-          <Trophy className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+          <Trophy className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">大会名</div>
             {editingField === 'name' ? (
@@ -246,11 +246,11 @@ function TeamTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-blue-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1 text-sm border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-500"
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors">
+              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-gray-600 transition-colors">
                 {tournamentInfo.name}
                 <Pencil size={10} className="opacity-40" />
               </button>
@@ -260,7 +260,7 @@ function TeamTournamentInfoSection() {
 
         {/* 日付 */}
         <div className="flex items-start gap-3">
-          <Calendar className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+          <Calendar className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">開催日</div>
             {editingField === 'date' ? (
@@ -270,11 +270,11 @@ function TeamTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-blue-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1 text-sm border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-500"
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+              <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-600 transition-colors">
                 {tournamentInfo.date || '(未設定)'}
                 <Pencil size={10} className="opacity-40" />
               </button>
@@ -284,7 +284,7 @@ function TeamTournamentInfoSection() {
 
         {/* 会場 */}
         <div className="flex items-start gap-3">
-          <MapPin className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+          <MapPin className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-gray-400 font-medium">会場</div>
             {editingField === 'venue' ? (
@@ -294,11 +294,11 @@ function TeamTournamentInfoSection() {
                 onChange={e => setEditValue(e.target.value)}
                 onBlur={saveEdit}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingField(null); }}
-                className="w-full px-2 py-1 text-sm border border-blue-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1 text-sm border border-gray-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-500"
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+              <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-600 transition-colors">
                 {tournamentInfo.venue || '(未設定)'}
                 <Pencil size={10} className="opacity-40" />
               </button>
@@ -308,22 +308,22 @@ function TeamTournamentInfoSection() {
 
         {/* 統計 */}
         <div className="flex items-start gap-3">
-          <Users className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+          <Users className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
           <div className="flex-1">
             <div className="text-[10px] text-gray-400 font-medium">参加状況</div>
             <div className="text-sm text-gray-700">
               {allTeams.length}チーム / {leagues.length}リーグ
-              {entryCount > 0 && <span className="text-blue-600 ml-2">Entry {entryCount}</span>}
-              {defCount > 0 && <span className="text-orange-500 ml-2">DEF {defCount}</span>}
+              {entryCount > 0 && <span className="text-gray-600 ml-2">Entry {entryCount}</span>}
+              {defCount > 0 && <span className="text-primary-500 ml-2">DEF {defCount}</span>}
             </div>
           </div>
         </div>
 
         {/* ルール */}
         {tournamentInfo.rules.length > 0 && (
-          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="text-[10px] font-medium text-amber-600 mb-1">ゲームルール</div>
-            <div className="text-xs text-amber-700">
+          <div className="mt-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
+            <div className="text-[10px] font-medium text-primary-600 mb-1">ゲームルール</div>
+            <div className="text-xs text-primary-700">
               {tournamentInfo.rules.map((r, i) => <div key={i}>{r}</div>)}
             </div>
           </div>
@@ -599,10 +599,10 @@ export default function DataManagement() {
 
       {/* テスト用スコア一括入力（動作確認用・観戦用ページには表示しない） */}
       {hasIndividualMatches && (
-        <section className="rounded-xl overflow-hidden border border-indigo-200/70 bg-gradient-to-r from-indigo-50/70 to-sky-50/40">
+        <section className="rounded-xl overflow-hidden border border-gray-200/70 bg-gradient-to-r from-gray-50/70 to-gray-50/40">
           <div className="px-5 py-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 shadow-sm flex items-center justify-center shrink-0">
-              <FlaskConical className="w-5 h-5 text-indigo-400" />
+            <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center shrink-0">
+              <FlaskConical className="w-5 h-5 text-gray-400" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-bold text-gray-800">テスト用スコア一括入力</h3>
@@ -613,7 +613,7 @@ export default function DataManagement() {
             <button
               onClick={() => setShowTestScoreConfirm(true)}
               disabled={testScoreRunning || !currentTournamentId}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-indigo-600 bg-white border border-indigo-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FlaskConical className="w-3.5 h-3.5" />
               {testScoreRunning ? '入力中...' : 'テストスコア入力'}
@@ -621,9 +621,9 @@ export default function DataManagement() {
           </div>
           {testScoreResult && (
             <div className="px-5 pb-3 -mt-1">
-              <div className="flex items-start gap-2 px-3 py-2 bg-white rounded-lg border border-indigo-200">
-                <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0 mt-1.5" />
-                <p className="text-xs text-indigo-700 font-medium leading-relaxed">{testScoreResult}</p>
+              <div className="flex items-start gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+                <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0 mt-1.5" />
+                <p className="text-xs text-gray-700 font-medium leading-relaxed">{testScoreResult}</p>
               </div>
             </div>
           )}
@@ -632,10 +632,10 @@ export default function DataManagement() {
 
       {/* シート別データクリア */}
       {clearItems.length > 0 && (
-        <section className="rounded-xl overflow-hidden border border-amber-200/70 bg-gradient-to-r from-amber-50/70 to-orange-50/40">
-          <div className="px-5 py-3.5 border-b border-amber-200/60 flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white border border-amber-200 shadow-sm flex items-center justify-center shrink-0">
-              <Eraser className="w-4.5 h-4.5 text-amber-500" />
+        <section className="rounded-xl overflow-hidden border border-primary-200/70 bg-gradient-to-r from-primary-50/70 to-primary-50/40">
+          <div className="px-5 py-3.5 border-b border-primary-200/60 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-white border border-primary-200 shadow-sm flex items-center justify-center shrink-0">
+              <Eraser className="w-4.5 h-4.5 text-primary-500" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-800">シート別データクリア</h3>
@@ -644,14 +644,14 @@ export default function DataManagement() {
           </div>
           <div className="p-4 grid gap-2.5 sm:grid-cols-2">
             {clearItems.map(item => (
-              <div key={item.key} className="flex items-center gap-3 px-3.5 py-3 bg-white rounded-xl border border-amber-100">
+              <div key={item.key} className="flex items-center gap-3 px-3.5 py-3 bg-white rounded-xl border border-primary-100">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-gray-800">{item.label}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{item.desc}</p>
                 </div>
                 <button
                   onClick={() => setPendingClear({ title: item.label, message: item.message, run: item.run })}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-all shrink-0"
+                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-all shrink-0"
                 >
                   <Trash2 className="w-3 h-3" />
                   クリア
@@ -661,9 +661,9 @@ export default function DataManagement() {
           </div>
           {clearDoneLabel && (
             <div className="px-5 pb-3">
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                <p className="text-xs text-green-700 font-medium">「{clearDoneLabel}」をクリアしました</p>
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
+                <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" />
+                <p className="text-xs text-primary-700 font-medium">「{clearDoneLabel}」をクリアしました</p>
               </div>
             </div>
           )}
@@ -671,7 +671,7 @@ export default function DataManagement() {
       )}
 
       {/* 全データリセット */}
-      <section className="rounded-xl overflow-hidden border border-red-200/60 bg-gradient-to-r from-red-50/80 to-orange-50/50">
+      <section className="rounded-xl overflow-hidden border border-red-200/60 bg-gradient-to-r from-red-50/80 to-primary-50/50">
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-white border border-red-200 shadow-sm flex items-center justify-center shrink-0">
             <Trash2 className="w-5 h-5 text-red-400" />
@@ -690,9 +690,9 @@ export default function DataManagement() {
         </div>
         {resetDone && (
           <div className="px-5 pb-3 -mt-1">
-            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-              <p className="text-xs text-green-700 font-medium">全データをリセットしました</p>
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
+              <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" />
+              <p className="text-xs text-primary-700 font-medium">全データをリセットしました</p>
             </div>
           </div>
         )}
