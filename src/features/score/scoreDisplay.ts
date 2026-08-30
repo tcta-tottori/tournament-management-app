@@ -15,7 +15,18 @@ export interface ScoreParts {
   /** player2（ドロー下側）のゲーム表示 */
   p2: string;
   /** セットごとの表示（"6-4 6-7(3)" のように組で並べたいとき用） */
-  sets: { p1: string; p2: string; stb?: boolean }[];
+  sets: {
+    /** player1 のゲーム表示（落とした側にはタイブレークの得点が付く） */
+    p1: string;
+    /** player2 のゲーム表示 */
+    p2: string;
+    /** スーパータイブレークのセットか */
+    stb?: boolean;
+    /** タイブレークの得点（落とした側の得点。無ければ undefined） */
+    tb?: string;
+    /** タイブレークの得点を添える側 */
+    tbOn?: 'p1' | 'p2';
+  }[];
   /** Ret / W.O の注記（無ければ空文字）。負けた側に添えて表示する。 */
   note: string;
   /** ゲームスコアが1つでもあるか（"W.O" のみのときは false） */
@@ -45,7 +56,7 @@ export function parseScoreParts(score: string | null | undefined): ScoreParts | 
 
   const p1Parts: string[] = [];
   const p2Parts: string[] = [];
-  const sets: { p1: string; p2: string; stb?: boolean }[] = [];
+  const sets: ScoreParts['sets'] = [];
   for (const part of rest.split(/\s+/).filter(Boolean)) {
     // スーパータイブレーク [10-5]
     const stb = part.match(/^\[(\d+)\s*-\s*(\d+)\]$/);
@@ -66,7 +77,12 @@ export function parseScoreParts(score: string | null | undefined): ScoreParts | 
     const v2 = tbOnP2 ? `${g2}(${tb})` : g2;
     p1Parts.push(v1);
     p2Parts.push(v2);
-    sets.push({ p1: v1, p2: v2 });
+    sets.push({
+      p1: v1,
+      p2: v2,
+      tb: tb || undefined,
+      tbOn: tbOnP1 ? 'p1' : tbOnP2 ? 'p2' : undefined,
+    });
   }
 
   if (p1Parts.length === 0 && !note) return null;
@@ -92,8 +108,20 @@ export function sideScoreText(
   if (!parts) return null;
   const games = parts.sets
     .map(s => {
-      const pair = isPlayer1 ? `${s.p1}-${s.p2}` : `${s.p2}-${s.p1}`;
-      return s.stb ? `[${pair}]` : pair;
+      if (s.stb) {
+        const pair = isPlayer1 ? `${s.p1}-${s.p2}` : `${s.p2}-${s.p1}`;
+        return `[${pair}]`;
+      }
+      // タイブレークの得点は落とした側の「外側」に置く。
+      // 左が落とした側なら左端（"(4)6-7"）、右なら右端（"7-6(4)"）に添えて、
+      // 2つのゲーム数の間に割り込まないようにする。
+      const g1 = s.tbOn === 'p1' ? s.p1.replace(/\(\d+\)$/, '') : s.p1;
+      const g2 = s.tbOn === 'p2' ? s.p2.replace(/\(\d+\)$/, '') : s.p2;
+      const left = isPlayer1 ? g1 : g2;
+      const right = isPlayer1 ? g2 : g1;
+      const tbLeft = s.tb && (isPlayer1 ? s.tbOn === 'p1' : s.tbOn === 'p2');
+      const tbRight = s.tb && (isPlayer1 ? s.tbOn === 'p2' : s.tbOn === 'p1');
+      return `${tbLeft ? `(${s.tb})` : ''}${left}-${right}${tbRight ? `(${s.tb})` : ''}`;
     })
     .join(' ');
   return [games, parts.note].filter(Boolean).join(' ');
