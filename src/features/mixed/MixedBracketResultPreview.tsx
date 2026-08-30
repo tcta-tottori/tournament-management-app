@@ -135,6 +135,16 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                 <span className="truncate">{categoryLabel} 結果プレビュー</span>
               </h3>
               <div className="flex items-center gap-2 shrink-0">
+                {/* 操作はこのバーに集約する（ロゴの有無・保存・閉じる） */}
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-sky-700 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={showLogo}
+                    onChange={e => toggleLogo(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-sky-600 cursor-pointer"
+                  />
+                  協会ロゴを入れる
+                </label>
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
@@ -204,26 +214,6 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
               )}
             </div>
 
-            <div className="px-4 py-2.5 border-t border-sky-100 bg-sky-50/50 text-[11px] text-sky-700 flex items-center justify-between gap-2 shrink-0">
-              <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 font-medium">
-                <input
-                  type="checkbox"
-                  checked={showLogo}
-                  onChange={e => toggleLogo(e.target.checked)}
-                  className="w-3.5 h-3.5 accent-sky-600 cursor-pointer"
-                />
-                協会ロゴを入れる
-              </label>
-              {dataUrl && (
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold hover:bg-sky-700 transition-colors active:scale-95 shrink-0"
-                >
-                  <Download size={13} />
-                  JPEGで保存
-                </button>
-              )}
-            </div>
           </div>
         </div>,
         document.body
