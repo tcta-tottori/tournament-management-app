@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers } from 'lucide-react';
+import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers, Pencil } from 'lucide-react';
+import CourtChangeDialog from '../../components/ui/CourtChangeDialog';
 import { useTeamStore } from './teamStore';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
 import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, resolveClubPromotionStatus, listClubPromotionOptions } from './teamLogic';
@@ -509,9 +510,59 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
   );
 }
 
+/**
+ * リーグのコート名（"5〜8番コート" 等）をその場で直せる表示。
+ * 当日の急なコート変更に対応するため、リーグ表示のどこからでも編集できるようにしている。
+ */
+function LeagueCourtNameEditor({
+  courtName, editing, value, onValueChange, onStart, onCommit, onCancel,
+}: {
+  courtName: string;
+  editing: boolean;
+  value: string;
+  onValueChange: (v: string) => void;
+  onStart: () => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={value}
+        onChange={e => onValueChange(e.target.value)}
+        onBlur={onCommit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') onCommit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        placeholder="例: 5～8番コート"
+        className="w-28 px-1.5 py-0.5 text-[10px] rounded bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:bg-white/30"
+      />
+    );
+  }
+  return (
+    <button
+      onClick={onStart}
+      className="text-[10px] opacity-70 hover:opacity-100 flex items-center gap-0.5 transition-opacity"
+      title="このリーグのコートを変更する"
+    >
+      <MapPin className="w-2.5 h-2.5" />
+      {courtName || 'コート未設定'}
+      <Pencil className="w-2 h-2" />
+    </button>
+  );
+}
+
 export default function TeamLeagueView() {
-  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo, promotionOverrides, setPromotionOverride } = useTeamStore();
+  const { leagues, leagueMatches, selectedLeagueId, setSelectedLeagueId, tiebreakOrder, updateSubMatchScore, updateSubMatchPlayers, allTeams, tournamentInfo, promotionOverrides, setPromotionOverride, updateCourtName, updateMatchOrderCourts } = useTeamStore();
   const [editingMatch, setEditingMatch] = useState<TeamLeagueMatch | null>(null);
+  // リーグのコート名（"5～8番コート" 等）の編集。編集中のリーグIDを持つ
+  const [editingCourtLeagueId, setEditingCourtLeagueId] = useState<string | null>(null);
+  const [courtNameInput, setCourtNameInput] = useState('');
+  // 対戦ごとのコート変更（対戦順の №1・2 をタップして開く）
+  const [courtEditTarget, setCourtEditTarget] = useState<{ matchNumber: number; label: string } | null>(null);
+  const [courtEditSelected, setCourtEditSelected] = useState<string[]>([]);
   const [judgementTarget, setJudgementTarget] = useState<TeamLeagueStanding | null>(null);
   const [winRateTarget, setWinRateTarget] = useState<TeamLeagueStanding | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -650,9 +701,15 @@ export default function TeamLeagueView() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-black leading-none">{league.leagueId}</span>
                     <span className="text-[10px] font-bold opacity-80">リーグ</span>
-                    {league.courtName && (
-                      <span className="text-[10px] opacity-70 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{league.courtName}</span>
-                    )}
+                    <LeagueCourtNameEditor
+                      courtName={league.courtName}
+                      editing={editingCourtLeagueId === league.leagueId}
+                      value={courtNameInput}
+                      onValueChange={setCourtNameInput}
+                      onStart={() => { setCourtNameInput(league.courtName || ''); setEditingCourtLeagueId(league.leagueId); }}
+                      onCommit={() => { updateCourtName(league.leagueId, courtNameInput.trim()); setEditingCourtLeagueId(null); }}
+                      onCancel={() => setEditingCourtLeagueId(null)}
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     {complete && (
@@ -896,9 +953,16 @@ export default function TeamLeagueView() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-black leading-none">{selectedLeague.leagueId}</span>
             <span className="text-[10px] font-bold opacity-80">リーグ</span>
-            {selectedLeague.courtName && (
-              <span className="text-[10px] opacity-70 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{selectedLeague.courtName}</span>
-            )}
+            {/* コート名はタップで直せる（当日のコート変更に対応） */}
+            <LeagueCourtNameEditor
+              courtName={selectedLeague.courtName}
+              editing={editingCourtLeagueId === selectedLeague.leagueId}
+              value={courtNameInput}
+              onValueChange={setCourtNameInput}
+              onStart={() => { setCourtNameInput(selectedLeague.courtName || ''); setEditingCourtLeagueId(selectedLeague.leagueId); }}
+              onCommit={() => { updateCourtName(selectedLeague.leagueId, courtNameInput.trim()); setEditingCourtLeagueId(null); }}
+              onCancel={() => setEditingCourtLeagueId(null)}
+            />
           </div>
           <div className="flex items-center gap-2">
             {leagueComplete && (
@@ -1173,10 +1237,14 @@ export default function TeamLeagueView() {
             const isCurrent = mo.matchNumber === currentMatchNumber;
 
             return (
-              <button
+              // コート変更ボタンを内側に置くため、行はボタン要素ではなく div にしている
+              <div
                 key={mo.matchNumber}
+                role="button"
+                tabIndex={0}
                 onClick={() => setEditingMatch(match)}
-                className={`w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-2.5 text-left transition-colors ${
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingMatch(match); } }}
+                className={`w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-2.5 text-left cursor-pointer transition-colors ${
                   isFinished
                     ? 'bg-emerald-50/40 hover:bg-emerald-50/80'
                     : isCurrent
@@ -1187,13 +1255,30 @@ export default function TeamLeagueView() {
                 {/* # */}
                 <span className="text-[10px] lg:text-[11px] font-black text-slate-400 w-5 lg:w-6 text-center shrink-0">#{mo.matchNumber}</span>
 
-                {/* OP由来のラウンド・コート */}
-                {(mo.round || (mo.courts && mo.courts.length > 0)) && (
-                  <span className="shrink-0 text-[9px] lg:text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5 whitespace-nowrap tabular-nums">
-                    {mo.round ? `${mo.round}R` : ''}
-                    {mo.courts && mo.courts.length > 0 ? `${mo.round ? ' ' : ''}№${mo.courts.join('・')}` : ''}
-                  </span>
-                )}
+                {/* OP由来のラウンド・使用コート。タップするとコートを変更・修正できる */}
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setCourtEditTarget({
+                      matchNumber: mo.matchNumber,
+                      label: `#${mo.matchNumber}　${team1.teamName} vs ${team2.teamName}`,
+                    });
+                    setCourtEditSelected(mo.courts ? [...mo.courts] : []);
+                  }}
+                  title="使用コートを変更する"
+                  className={`shrink-0 flex items-center gap-0.5 text-[9px] lg:text-[10px] font-bold rounded px-1 py-0.5 whitespace-nowrap tabular-nums border transition-colors ${
+                    mo.courts && mo.courts.length > 0
+                      ? 'text-slate-500 bg-slate-100 border-slate-200 hover:bg-slate-200'
+                      : 'text-slate-300 bg-white border-dashed border-slate-200 hover:text-emerald-600 hover:border-emerald-300'
+                  }`}
+                >
+                  <MapPin className="w-2.5 h-2.5" />
+                  {mo.round ? `${mo.round}R` : ''}
+                  {mo.courts && mo.courts.length > 0
+                    ? `${mo.round ? ' ' : ''}№${mo.courts.join('・')}`
+                    : mo.round ? '' : 'コート'}
+                </button>
 
                 {/* チーム1 */}
                 <div className={`flex-1 min-w-0 text-xs lg:text-sm font-bold truncate ${match.winnerId === team1.teamId ? 'text-blue-700 font-black' : 'text-slate-800'}`}>
@@ -1232,13 +1317,39 @@ export default function TeamLeagueView() {
                     <Circle className="w-3 h-3 text-slate-300" />
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
 
       </>}
+
+      {/* 対戦ごとのコート変更 */}
+      {courtEditTarget && (
+        <CourtChangeDialog
+          title="使用コートを変更"
+          subtitle={courtEditTarget.label}
+          multi
+          selected={courtEditSelected}
+          onToggle={c => setCourtEditSelected(prev =>
+            prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+          )}
+          onConfirm={courts => {
+            updateMatchOrderCourts(
+              selectedLeague.leagueId,
+              courtEditTarget.matchNumber,
+              [...courts].sort((a, b) => parseInt(a) - parseInt(b)),
+            );
+            setCourtEditTarget(null);
+          }}
+          onClear={() => {
+            updateMatchOrderCourts(selectedLeague.leagueId, courtEditTarget.matchNumber, []);
+            setCourtEditTarget(null);
+          }}
+          onClose={() => setCourtEditTarget(null)}
+        />
+      )}
 
       {/* スコア入力ダイアログ */}
       {editingMatch && (() => {

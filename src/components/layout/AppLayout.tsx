@@ -5,7 +5,7 @@ import {
   ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X, Volume2,
-  PanelLeftClose, PanelLeftOpen, Radio
+  PanelLeftClose, PanelLeftOpen, Radio, Printer
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -33,6 +33,7 @@ const ALL_MAIN_TABS = [
   { id: 'S-07b', path: '/court-bracket', label: 'ドロー', icon: Network },
   { id: 'S-09', path: '/dashboard', label: 'ダッシュボード', icon: BarChart2 },
   { id: 'S-09b', path: '/broadcast', label: 'ライブ配信', icon: Radio },
+  { id: 'S-10', path: '/print', label: '印刷', icon: Printer },
   { id: 'S-11', path: '/manual', label: 'マニュアル', icon: HelpCircle },
   { id: 'S-12', path: '/backup', label: 'バックアップ', icon: HardDrive },
 ];
@@ -241,7 +242,8 @@ export default function AppLayout() {
 
     // 大会データ未読み込み時: データ・マニュアル・バックアップのみ表示
     if (!currentTournamentId && !isMixedImported && !isTeamImported) {
-      return tabs.filter(t => ['/data', '/manual', '/backup'].includes(t.path));
+      // 賞状印刷は大会データが無くても（手入力で）使えるので常に出す
+      return tabs.filter(t => ['/data', '/print', '/manual', '/backup'].includes(t.path));
     }
 
     // ミックスダブルス or 団体戦 読込時: 不要なタブを非表示 + ラベル変更

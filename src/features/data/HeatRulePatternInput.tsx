@@ -4,7 +4,8 @@ import type { HeatRulePattern } from '../../stores/appStore';
 /**
  * 熱中症警戒時の試合形式を回戦ルール配列へ付与する。
  * - roundGameRules が空の場合は「全回戦」の既定ルールを1件作成してから付与する。
- * - pattern.enabled が false の場合は heat* を除去（元の通常ルールのみ）。
+ * - pattern.enabled が false の場合は何も付与しない（ドロー表から読み取った
+ *   種目ごとの heat* はそのまま残す）。
  */
 export function applyHeatToRules(
   base: RoundGameRule[] | undefined,
@@ -14,15 +15,9 @@ export function applyHeatToRules(
   let rules: RoundGameRule[] = base && base.length > 0 ? base.map(r => ({ ...r })) : [];
 
   if (!pattern.enabled) {
-    // 無効時は heat* を除去。元が空なら undefined のまま。
-    if (rules.length === 0) return base && base.length > 0 ? base : undefined;
-    return rules.map(r => {
-      const next = { ...r };
-      delete next.heatRuleText;
-      delete next.heatGames;
-      delete next.heatMatchFormat;
-      return next;
-    });
+    // 無効時はこの画面での一括付与を行わない。ドロー表に「※熱中症警戒時〜」と
+    // 書かれていて既に heat* を持つルールは、その種目固有の指定なので残す。
+    return rules.length > 0 ? rules : undefined;
   }
 
   if (rules.length === 0) {

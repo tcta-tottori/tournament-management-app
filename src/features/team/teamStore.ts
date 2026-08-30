@@ -203,6 +203,8 @@ interface TeamState {
   /** 順位トーナメントの表示名を更新（空文字で既定値に戻す） */
   updateBracketLabel: (category: PlacementCategory, label: string) => void;
   updateCourtName: (leagueId: string, courtName: string) => void;
+  /** 対戦順(OP)の1試合が使うコート番号を差し替える（当日のコート変更・修正用） */
+  updateMatchOrderCourts: (leagueId: string, matchNumber: number, courts: string[]) => void;
   updateTournamentInfo: (field: 'name' | 'date' | 'venue', value: string) => void;
 
   // Shuffle & rebuild
@@ -761,6 +763,21 @@ export const useTeamStore = create<TeamState>()(
         set(state => ({
           leagues: state.leagues.map(l =>
             l.leagueId === leagueId ? { ...l, courtName } : l
+          ),
+        }));
+      },
+
+      updateMatchOrderCourts: (leagueId, matchNumber, courts) => {
+        set(state => ({
+          leagues: state.leagues.map(l =>
+            l.leagueId !== leagueId ? l : {
+              ...l,
+              matchOrder: l.matchOrder.map(mo =>
+                mo.matchNumber === matchNumber
+                  ? { ...mo, courts: courts.length > 0 ? courts : undefined }
+                  : mo
+              ),
+            }
           ),
         }));
       },
