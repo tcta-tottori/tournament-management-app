@@ -5,7 +5,7 @@ import {
   ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X, Volume2,
-  PanelLeftClose, PanelLeftOpen, Radio, Printer
+  PanelLeftClose, PanelLeftOpen, Radio, Printer, ArrowRight
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -317,7 +317,7 @@ export default function AppLayout() {
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 title={item.label}
-                className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
+                className={`side-menu-item ${isActive ? 'side-menu-item-active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
                 style={sidebarCollapsed ? { padding: '12px 0' } : undefined}
               >
                 <item.icon
@@ -366,11 +366,11 @@ export default function AppLayout() {
 
       {/* ===== 右側: ヘッダー + 流れる表示バー + 本体 ===== */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* ===== ヘッダー（PCのみ・スマホは流れる表示バーに集約） ===== */}
-        <header className="header-main hidden lg:flex items-center gap-3 px-5 h-[56px] shrink-0 z-30">
+        {/* ===== ヘッダー（PC=ページ名+大会名 / スマホ=大会名+メニューボタン） ===== */}
+        <header className="header-main flex items-center gap-3 px-4 lg:px-5 h-[56px] shrink-0 z-30">
           <HeaderBackdrop />
 
-          {/* 左: 現在ページ名（メニューの開閉はサイドバー側のボタンで行う） */}
+          {/* 左: 現在ページ名（PCのみ。開閉はサイドバー側のボタンで行う） */}
           {currentPageLabel && (
             <div className="header-page-name min-w-0">
               {CurrentPageIcon && (
@@ -380,7 +380,7 @@ export default function AppLayout() {
             </div>
           )}
 
-          {/* 右: 協会名 + 大会名（右揃え・残り幅いっぱい） */}
+          {/* 協会名 + 大会名（スマホは左寄せ・PCは右寄せ） */}
           <div className="header-title-right">
             {(() => {
               const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
@@ -393,6 +393,18 @@ export default function AppLayout() {
               </>);
             })()}
           </div>
+
+          {/* 右: メニューボタン（スマホのみ・開くと × に変わる） */}
+          <button
+            className="header-menu-btn header-menu-btn-mobile-only"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label={menuOpen ? 'メニューを閉じる' : 'メニューを開く'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen
+              ? <X style={{ width: 26, height: 26 }} strokeWidth={2} />
+              : <Menu style={{ width: 26, height: 26 }} strokeWidth={2} />}
+          </button>
         </header>
 
         {/* ===== 流れる表示バー（ティッカー） ===== */}
@@ -404,14 +416,9 @@ export default function AppLayout() {
               : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
           const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
           return (
-            <div className="info-bar flex items-center shrink-0 h-11 lg:h-9 overflow-hidden text-xs sticky top-0 z-20">
+            <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
               <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
                 <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                  {/* スマホはヘッダーが無いので、先頭に大会名を流す */}
-                  <span className="info-ticker-item info-ticker-lead">
-                    <span>{displayName || '大会運営システム'}</span>
-                    <span className="info-ticker-dot" />
-                  </span>
                   {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
                     <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                       {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
@@ -419,30 +426,11 @@ export default function AppLayout() {
                       {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
                     </span>
                   )) : (
-                    <span className="info-ticker-item info-ticker-fallback">
+                    <span className="info-ticker-item">
                       <span>{displayName || '大会運営システム'}</span>
                     </span>
                   )}
                 </div>
-              </div>
-
-              {/* スマホ: 右端に現在ページ名とメニューボタン */}
-              <div className="flex lg:hidden items-center gap-1.5 shrink-0 pl-2 pr-2">
-                {currentPageLabel && (
-                  <div className="header-page-name info-bar-page-name min-w-0">
-                    {CurrentPageIcon && (
-                      <CurrentPageIcon style={{ width: 15, height: 15 }} className="shrink-0" />
-                    )}
-                    <span className="truncate">{currentPageLabel}</span>
-                  </div>
-                )}
-                <button
-                  className="header-hamburger-btn header-hamburger-btn-sm"
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  aria-label="メニューを開く"
-                >
-                  <Menu style={{ width: 20, height: 20 }} />
-                </button>
               </div>
             </div>
           );
@@ -456,45 +444,27 @@ export default function AppLayout() {
         </main>
       </div>
 
-      {/* ===== スライドメニュー（モバイル：右から展開）※PCは常設サイドバー ===== */}
-      {/* オーバーレイ */}
-      <div
-        className={`hamburger-overlay lg:hidden ${menuOpen ? 'hamburger-overlay-visible' : ''}`}
-        onClick={() => setMenuOpen(false)}
-      />
-      {/* ドロワー */}
-      <div className={`hamburger-drawer lg:hidden ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
-        <div className="hamburger-drawer-header">
-          <span>メニュー</span>
-          <button
-            className="hamburger-icon-btn"
-            onClick={() => setMenuOpen(false)}
-            aria-label="メニューを閉じる"
-          >
-            <X style={{ width: 20, height: 20 }} />
-          </button>
-        </div>
-        <div className="hamburger-drawer-list">
+      {/* ===== スマホ: 全画面メニュー（ヘッダーは出したまま、その下いっぱいに開く） ===== */}
+      <div className={`fullmenu fullmenu-mobile-only ${menuOpen ? 'fullmenu-open' : ''}`}>
+        <div className="fullmenu-list">
           {allTabs.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button
                 key={item.id}
-                className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
+                className={`fullmenu-item ${isActive ? 'fullmenu-item-active' : ''}`}
                 onClick={() => handleMenuItemClick(item.path)}
               >
-                <item.icon
-                  className="shrink-0"
-                  style={{ width: 18, height: 18 }}
-                />
+                <item.icon className="shrink-0" style={{ width: 20, height: 20 }} />
                 <span>{item.label}</span>
+                <ArrowRight className="fullmenu-arrow" style={{ width: 18, height: 18 }} />
               </button>
             );
           })}
         </div>
-        {/* 下部: 操作ボタン4つ → バージョン情報 → 協会ロゴ */}
-        <div className="hamburger-drawer-footer">
-          {/* 画面上部ボタン4つ */}
+
+        {/* 下部: 操作ボタン → バージョン情報 → 協会ロゴ */}
+        <div className="fullmenu-footer">
           <div className="drawer-action-row">
             <SyncStatusIndicator />
             <button
@@ -533,12 +503,11 @@ export default function AppLayout() {
           <img
             src={`${import.meta.env.BASE_URL}logo-tcta.png`}
             alt="鳥取市テニス協会"
-            className="hamburger-drawer-logo"
+            className="fullmenu-logo"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         </div>
       </div>
-
 
       {/* バージョン情報モーダル */}
       <VersionInfoModal open={versionModalOpen} onClose={() => setVersionModalOpen(false)} />

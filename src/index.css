@@ -164,6 +164,17 @@
   background: linear-gradient(100deg, #ffffff 0%, #ffffff 55%, var(--brand-red-soft) 100%);
 }
 
+/* 左右の端は白くフェードさせ、タイトルとメニューボタンを浮かせる */
+.header-motif::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.72) 16%, rgba(255, 255, 255, 0) 38%),
+    linear-gradient(270deg, #ffffff 0%, rgba(255, 255, 255, 0.85) 10%, rgba(255, 255, 255, 0) 30%);
+}
+
 /* 四角の集合だけを淡くする（下地のグラデーションはそのまま） */
 .header-motif-layer {
   position: absolute;
@@ -339,78 +350,82 @@
   letter-spacing: 0.08em;
 }
 
-/* ===== ヘッダー左: ハンバーガーボタン + 現在ページ名 ===== */
-.header-hamburger-btn {
+/* ===== ヘッダー右端のメニューボタン（スマホ） ===== */
+/* 協会サイトと同じく、白地に黒い線だけのボタン。開くと×に変わる */
+.header-menu-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  color: #ffffff;
-  background: var(--brand-red);
-  border: 1px solid var(--brand-red);
-  box-shadow: 0 1px 3px rgba(140, 34, 32, 0.25);
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  color: #141414;
+  background: transparent;
+  border: none;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
-.header-hamburger-btn:hover {
-  background: var(--brand-red-dark);
-  border-color: var(--brand-red-dark);
+@media (hover: hover) {
+  .header-menu-btn:hover {
+    color: var(--brand-red);
+  }
 }
-
-/* 流れる表示バーの中に置く小さめのメニューボタン（スマホ用） */
-.header-hamburger-btn-sm {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+.header-menu-btn:active {
+  opacity: 0.6;
 }
 
-/* 流れる表示バーの中に置くページ名。ヘッダー用の上限（46%）は狭すぎるので広げる */
-.header-page-name.info-bar-page-name {
-  max-width: 46vw;
-  text-shadow: none;
+/* 運営アプリはPCに常設メニューがあるので、PCではボタンを出さない */
+@media (min-width: 1024px) {
+  .header-menu-btn-mobile-only {
+    display: none;
+  }
 }
 
+/* ===== ヘッダー左: 現在ページ名（PCのみ。スマホは大会名を出す） ===== */
 .header-page-name {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   /* ページ名は省略せず表示する（極端に長い場合のみ上限で省略）。
      大会名側は残り幅に合わせて折り返すので重ならない。 */
   flex: 0 0 auto;
   max-width: 46%;
   min-width: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   text-shadow: 0 0 6px #fff, 0 0 12px #fff;
 }
 .header-page-name svg {
   color: var(--brand-red);
 }
 
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .header-page-name {
-    gap: 6px;
-    font-size: 15px;
-    letter-spacing: 0.03em;
+    display: flex;
   }
 }
 
-/* ===== ヘッダー右: 協会名 + 大会名（右揃え） ===== */
+/* ===== ヘッダーの大会名ブロック（スマホ=左寄せ / PC=右寄せ） ===== */
 .header-title-right {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  text-align: right;
+  text-align: left;
   /* 残り幅をすべて使い、はみ出さない（ページ名との重なり防止） */
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .header-title-right {
+    align-items: flex-end;
+    text-align: right;
+  }
 }
 
 /* ===== ドロワー下部: 操作ボタン4つ ===== */
@@ -503,117 +518,126 @@
 }
 
 /* ===========================================================
-   ハンバーガーメニュー
+   スマホ: 全画面メニュー
+   -----------------------------------------------------------
+   協会サイトと同じ構成。ヘッダーは出したままで、その下いっぱいに
+   メニューを開く（ヘッダーのボタンは × に変わる）。
    =========================================================== */
-
-/* info-bar左端に配置するインラインボタン */
-.hamburger-inline-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px 0 12px;
-  height: 100%;
-  background: #ffffff;
-  border: none;
-  border-right: 1px solid var(--border-main);
-  color: #404040;
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-  z-index: 1;
-  transition: background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.hamburger-inline-btn:hover {
-  background: #f4f4f4;
-}
-
-.hamburger-inline-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.03em;
-}
-
-.hamburger-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.85);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.hamburger-icon-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-/* オーバーレイ */
-.hamburger-overlay {
+.fullmenu {
   position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(20, 20, 20, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.hamburger-overlay-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* 左スライドドロワー — 赤背景・白文字 */
-.hamburger-drawer {
-  position: fixed;
-  top: 0;
+  top: 56px;
   left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 50;
-  width: 280px;
-  max-width: 80vw;
-  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
-  border-right: none;
-  box-shadow: none;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  z-index: 45;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
 }
 
-.hamburger-drawer-open {
-  transform: translateX(0);
-  box-shadow: 8px 0 32px rgba(20, 20, 20, 0.25);
+.fullmenu-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
-.hamburger-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+/* 運営アプリはPCに常設メニューがあるので、PCでは全画面メニューを出さない */
+@media (min-width: 1024px) {
+  .fullmenu-mobile-only {
+    display: none;
+  }
 }
 
-.hamburger-drawer-list {
+/* 観戦用ページはPCでも使うため、広い画面では右側のパネルにする */
+@media (min-width: 1024px) {
+  .fullmenu:not(.fullmenu-mobile-only) {
+    left: auto;
+    width: 380px;
+    box-shadow: -8px 0 32px rgba(20, 20, 20, 0.18);
+    transform: translateX(12px);
+  }
+  .fullmenu:not(.fullmenu-mobile-only).fullmenu-open {
+    transform: translateX(0);
+  }
+}
+
+.fullmenu-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 8px 24px;
+  padding: 4px 0 16px;
 }
 
-.hamburger-drawer-item {
+/* 一行ぶんの項目。左にアイコンと名前、右に矢印（サイトと同じ形） */
+.fullmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 17px 20px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.fullmenu-item:hover,
+.fullmenu-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 現在地は白地に赤文字で反転させる */
+.fullmenu-item-active {
+  color: var(--brand-red);
+  background: #ffffff;
+}
+
+.fullmenu-item-active:hover,
+.fullmenu-item-active:active {
+  background: #ffffff;
+}
+
+/* 右端の矢印 */
+.fullmenu-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.fullmenu-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+/* 協会ロゴ。画像は白地に黒文字＋赤のマークなので、
+   グレースケール→反転で「黒地に白文字」にし、screen 合成で黒を透かす。 */
+.fullmenu-logo {
+  max-width: 150px;
+  height: auto;
+  object-fit: contain;
+  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
+  mix-blend-mode: screen;
+}
+
+/* ===========================================================
+   PC: 常設サイドバーの項目
+   =========================================================== */
+.side-menu-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -630,42 +654,21 @@
   text-align: left;
 }
 
-.hamburger-drawer-item:hover {
+.side-menu-item:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.16);
 }
 
 /* 現在地は白地に赤文字で反転させる */
-.hamburger-drawer-item-active {
+.side-menu-item-active {
   color: var(--brand-red) !important;
   background: #ffffff;
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(20, 20, 20, 0.18);
 }
 
-.hamburger-drawer-item-active:hover {
+.side-menu-item-active:hover {
   background: #ffffff;
-}
-
-/* ドロワー下部ロゴ */
-.hamburger-drawer-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  flex-shrink: 0;
-}
-
-.hamburger-drawer-logo {
-  max-width: 160px;
-  height: auto;
-  object-fit: contain;
-  /* ロゴ画像（白地に黒文字＋赤のマーク）を白抜きにして赤地に載せる。
-     グレースケール→反転で「黒地に白文字」にし、screen 合成で黒を透かす。 */
-  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
-  mix-blend-mode: screen;
 }
 
 /* ===========================================================
@@ -764,21 +767,6 @@
   position: relative;
   z-index: 1;
   color: var(--brand-red);
-}
-
-/* スマホはヘッダーが無いので、先頭に大会名を流す（PCではヘッダーに出るので隠す） */
-.info-ticker-lead {
-  font-weight: 700;
-  color: var(--brand-red);
-}
-@media (min-width: 1024px) {
-  .info-ticker-lead { display: none; }
-}
-
-/* 流す項目が無いときの予備表示。スマホは先頭の大会名があるので出さない */
-.info-ticker-fallback { display: none; }
-@media (min-width: 1024px) {
-  .info-ticker-fallback { display: inline-flex; }
 }
 
 /* ティッカーエリア — 左右フェードアウト */
