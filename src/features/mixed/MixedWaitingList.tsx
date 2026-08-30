@@ -2,18 +2,18 @@ import { useState, useMemo } from 'react';
 import { ClipboardList, Printer, Volume2, VolumeX, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import CallPreviewDialog from './CallPreviewDialog';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-emerald-100 text-emerald-700', 'B': 'bg-blue-100 text-blue-700',
-  'C': 'bg-purple-100 text-purple-700', 'D': 'bg-rose-100 text-rose-700',
-  'E': 'bg-amber-100 text-amber-700', 'F': 'bg-cyan-100 text-cyan-700',
-  'G': 'bg-lime-100 text-lime-700', 'H': 'bg-fuchsia-100 text-fuchsia-700',
-  'I': 'bg-emerald-100 text-emerald-700', 'J': 'bg-blue-100 text-blue-700',
-  'K': 'bg-purple-100 text-purple-700', 'L': 'bg-rose-100 text-rose-700',
-  'M': 'bg-amber-100 text-amber-700',
+  'A': 'bg-primary-100 text-gray-800', 'B': 'bg-gray-100 text-gray-700',
+  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-gray-800',
+  'E': 'bg-primary-100 text-gray-800', 'F': 'bg-gray-100 text-gray-700',
+  'G': 'bg-primary-100 text-gray-800', 'H': 'bg-gray-100 text-gray-700',
+  'I': 'bg-primary-100 text-gray-800', 'J': 'bg-gray-100 text-gray-700',
+  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-gray-800',
+  'M': 'bg-primary-100 text-gray-800',
 };
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -22,10 +22,10 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
 
 
 const CATEGORY_COLORS: Record<PlacementCategory, string> = {
-  '1st': 'bg-yellow-100 text-yellow-700 border-yellow-300',
+  '1st': 'bg-primary-100 text-gray-800 border-primary-300',
   '2nd': 'bg-gray-100 text-gray-700 border-gray-300',
-  '3rd': 'bg-orange-100 text-orange-700 border-orange-300',
-  '4th': 'bg-slate-100 text-slate-600 border-slate-300',
+  '3rd': 'bg-primary-100 text-gray-800 border-primary-300',
+  '4th': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
 function getRoundLabel(round: number, totalRounds: number): string {
@@ -107,7 +107,7 @@ interface WaitingMatch {
 
 export default function MixedWaitingList() {
   const { brackets, allTeams, leagues, tournamentInfo, assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
-  const { speak, stop, isSpeaking } = useGeminiTts();
+  const { speak, stop, isSpeaking } = useCallTts();
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<Record<string, string>>({});
 
@@ -264,8 +264,8 @@ export default function MixedWaitingList() {
               <div className="flex gap-1.5">
                 <button onClick={() => handleOpenCourtAssign(wm)} disabled={isSpeaking}
                   className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                    isSpeakingThis ? 'bg-blue-600 text-white animate-pulse' :
-                    'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>
+                    isSpeakingThis ? 'bg-gray-600 text-white animate-pulse' :
+                    'bg-primary-50 border border-primary-200 text-gray-800 hover:bg-primary-100'}`}>
                   {isSpeakingThis ? <><Volume2 size={12} />コール中...</> : <><MapPin size={12} />コート入れ &amp; コール</>}
                 </button>
                 <button onClick={() => handlePrint(wm)}
@@ -310,7 +310,7 @@ export default function MixedWaitingList() {
                         disabled={isUsed}
                         className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
                           ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
-                            courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                            courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-gray-800' :
                             'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                       >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
                     );
@@ -319,7 +319,7 @@ export default function MixedWaitingList() {
                 <div className="flex gap-2">
                   <button onClick={() => setCourtAssignWm(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
                   <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue}
-                    className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="flex-1 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-bold hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >決定 &amp; コール</button>
                 </div>
               </div>

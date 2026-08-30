@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { sortEventsByClass } from '../data/eventOrder';
 import DrawRenderer from './DrawRenderer';
 import RoundRobinRenderer from './RoundRobinRenderer';
 import { exportDrawToExcel } from './DrawExporter';
@@ -71,7 +72,9 @@ function NormalDrawBoard() {
   const [viewMode, setViewMode] = useState<'tournament' | 'roundRobin'>('tournament');
   const [scoreMatch, setScoreMatch] = useState<ScoreInputMatch | null>(null);
 
-  const events = useLiveQuery(() => db.events.toArray()) || [];
+  const rawEvents = useLiveQuery(() => db.events.toArray()) || [];
+  // クラスは「男子→女子」「アルファベット→年齢」の順に並べる
+  const events = useMemo(() => sortEventsByClass(rawEvents), [rawEvents]);
   const entries = useLiveQuery(
     () => selectedEventId ? db.entries.where('eventId').equals(selectedEventId).toArray() : [],
     [selectedEventId]
@@ -408,7 +411,7 @@ function NormalDrawBoard() {
                      ドローサイズ: {drawData.drawSize}
                    </div>
                    {hasUnsavedChanges && (
-                     <div className="flex items-center gap-1.5 text-warning text-sm font-medium bg-amber-50 px-3 py-1.5 rounded-md">
+                     <div className="flex items-center gap-1.5 text-warning text-sm font-medium bg-primary-50 px-3 py-1.5 rounded-md">
                        <AlertCircle className="w-4 h-4" />
                        未保存の変更があります
                      </div>
@@ -467,7 +470,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleExportResultJpeg}
                 disabled={!drawData}
-                className="flex items-center gap-1.5 bg-orange-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Image className="w-4 h-4" />
                 <span className="hidden sm:inline">結果</span>JPEG
@@ -475,7 +478,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleExportResultExcel}
                 disabled={!drawData}
-                className="flex items-center gap-1.5 bg-teal-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span className="hidden sm:inline">結果</span>Excel
@@ -483,7 +486,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges || isSaving}
-                className="flex items-center gap-1.5 bg-green-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? '保存中...' : '保存'}
@@ -492,7 +495,7 @@ function NormalDrawBoard() {
           </div>
 
           {selectedPosition !== null && (
-            <div className="bg-primary-50 border border-primary-500/30 rounded-md px-4 py-2 text-sm text-primary-600 font-medium shrink-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-md px-4 py-2 text-sm text-gray-700 font-medium shrink-0">
               スロット #{selectedPosition} を選択中 -- 入れ替え先のスロットをタップしてください
             </div>
           )}

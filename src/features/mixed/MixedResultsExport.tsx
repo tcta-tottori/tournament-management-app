@@ -185,11 +185,11 @@ export default function MixedResultsExport() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* エクスポートヘッダー */}
-      <div className="bg-gradient-to-r from-emerald-700 to-teal-700 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-r from-primary-700 to-primary-800 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">大会結果</h2>
-            <p className="text-emerald-200 text-sm mt-1">{tournamentInfo?.name}</p>
+            <p className="text-primary-200 text-sm mt-1">{tournamentInfo?.name}</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -201,7 +201,7 @@ export default function MixedResultsExport() {
             </button>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-700 rounded-xl text-sm font-medium hover:bg-emerald-50 transition-colors shadow-md"
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-50 transition-colors shadow-md"
             >
               <FileDown size={16} />
               Excel出力
@@ -214,13 +214,13 @@ export default function MixedResultsExport() {
       <div className="flex gap-2">
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
           全体結果
         </button>
         <button
           onClick={() => setActiveTab('league')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'league' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'league' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
           個別リーグ結果
         </button>
@@ -237,7 +237,7 @@ export default function MixedResultsExport() {
                 return (
                   <div key={league.leagueId} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded text-white text-xs font-bold flex items-center justify-center">
+                      <span className="w-6 h-6 bg-gradient-to-br from-primary-500 to-primary-600 rounded text-white text-xs font-bold flex items-center justify-center">
                         {league.leagueId.trim()}
                       </span>
                       <span className="text-sm font-bold text-gray-700">{league.leagueId.trim()}リーグ</span>
@@ -245,7 +245,7 @@ export default function MixedResultsExport() {
                     {standings.map(s => (
                       <div key={s.teamId} className="flex items-center gap-1 text-xs py-0.5">
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold
-                          ${s.rank === 1 ? 'bg-yellow-400 text-white' : s.rank === 2 ? 'bg-gray-300 text-white' : 'bg-gray-100 text-gray-500'}
+                          ${s.rank === 1 ? 'bg-primary-400 text-white' : s.rank === 2 ? 'bg-gray-300 text-white' : 'bg-gray-100 text-gray-500'}
                         `}>{s.rank}</span>
                         <span className="truncate">{s.teamName}</span>
                         <span className="text-gray-400 ml-auto">{s.wins}W{s.losses}L</span>
@@ -265,20 +265,23 @@ export default function MixedResultsExport() {
                 if (!results) return null;
 
                 const icons = { '1st': Trophy, '2nd': Medal, '3rd': Award, '4th': Users };
-                const colors = { '1st': 'yellow', '2nd': 'gray', '3rd': 'orange', '4th': 'slate' };
+                // 1位トーナメントだけ赤、以降は濃さの違うグレーで区別する
+                const iconColors = {
+                  '1st': 'text-primary-500', '2nd': 'text-gray-700',
+                  '3rd': 'text-gray-500', '4th': 'text-gray-400',
+                };
                 const Icon = icons[cat];
-                const color = colors[cat];
 
                 return (
                   <div key={cat} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <Icon size={20} className={`text-${color}-500`} />
+                      <Icon size={20} className={iconColors[cat]} />
                       <h3 className="text-lg font-bold text-gray-800">{CATEGORY_LABELS[cat]}</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       {results.winner && (
-                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
-                          <div className="text-xs text-yellow-600 font-medium mb-1">優勝</div>
+                        <div className="bg-gradient-to-br from-primary-50 to-white rounded-xl p-4 border border-primary-200">
+                          <div className="text-xs text-primary-600 font-medium mb-1">優勝</div>
                           <div className="font-bold text-gray-800">{results.winner.teamName}</div>
                           <div className="text-xs text-gray-400 mt-1">{results.winner.male.affiliation} / {results.winner.female.affiliation}</div>
                         </div>
@@ -291,10 +294,10 @@ export default function MixedResultsExport() {
                         </div>
                       )}
                       {results.sfLosers.length > 0 && (
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
-                          <div className="text-xs text-orange-500 font-medium mb-1">3位</div>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+                          <div className="text-xs text-gray-500 font-medium mb-1">3位</div>
                           {results.sfLosers.map((team, i) => team && (
-                            <div key={i} className={i > 0 ? 'mt-2 pt-2 border-t border-orange-200' : ''}>
+                            <div key={i} className={i > 0 ? 'mt-2 pt-2 border-t border-gray-200' : ''}>
                               <div className="font-bold text-gray-800">{team.teamName}</div>
                               <div className="text-xs text-gray-400">{team.male.affiliation} / {team.female.affiliation}</div>
                             </div>
@@ -319,7 +322,7 @@ export default function MixedResultsExport() {
                 onClick={() => setSelectedLeague(l.leagueId)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                   selectedLeague === l.leagueId
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -345,9 +348,9 @@ export default function MixedResultsExport() {
 
             return (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+                <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-primary-100">
                   <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 bg-gradient-to-br from-emerald-600 to-teal-700 text-white text-sm font-bold rounded-lg flex items-center justify-center">
+                    <span className="w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-700 text-white text-sm font-bold rounded-lg flex items-center justify-center">
                       {league.leagueId.trim()}
                     </span>
                     <div>
@@ -366,7 +369,7 @@ export default function MixedResultsExport() {
                         <th className="px-2 py-1.5 text-left text-[10px] text-gray-500 min-w-[70px]">所属</th>
                         {league.teams.map((_, i) => (
                           <th key={i} className="px-1 py-1.5 text-center text-[10px] text-gray-500 w-16">
-                            <span className="inline-flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] font-bold">{i + 1}</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-gray-800 rounded-full text-[9px] font-bold">{i + 1}</span>
                           </th>
                         ))}
                         <th className="px-2 py-1.5 text-center text-[10px] text-gray-500 w-12">勝敗</th>
@@ -382,7 +385,7 @@ export default function MixedResultsExport() {
                         return (
                           <tr key={team.teamId} className="border-t border-gray-100">
                             <td className="px-2 py-1">
-                              <span className="inline-flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] font-bold">{rowIdx + 1}</span>
+                              <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-gray-800 rounded-full text-[9px] font-bold">{rowIdx + 1}</span>
                             </td>
                             <td className="px-2 py-1">
                               <div className="text-[11px] font-medium text-gray-800 leading-tight">{team.male.name}</div>
@@ -403,7 +406,7 @@ export default function MixedResultsExport() {
                               const isTeam1 = match.team1Id === team.teamId;
                               const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
                               return (
-                                <td key={colIdx} className={`px-1 py-1 text-center text-[10px] border-l border-gray-100 whitespace-nowrap ${won ? 'text-emerald-700 font-bold bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                                <td key={colIdx} className={`px-1 py-1 text-center text-[10px] border-l border-gray-100 whitespace-nowrap ${won ? 'text-gray-800 font-bold bg-primary-50' : 'text-red-600 bg-red-50'}`}>
                                   {formatScoreText(match, team.teamId)}
                                 </td>
                               );
@@ -414,9 +417,9 @@ export default function MixedResultsExport() {
                             <td className="px-2 py-1 text-center border-l border-gray-200">
                               {isComplete && standing && standing.rank > 0 && (
                                 <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold
-                                  ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+                                  ${standing.rank === 1 ? 'bg-primary-100 text-primary-700' :
                                     standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-                                    standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
+                                    standing.rank === 3 ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-500'}
                                 `}>
                                   {standing.rank}
                                 </span>
@@ -426,12 +429,12 @@ export default function MixedResultsExport() {
                               <td className="px-2 py-1 text-center border-l border-gray-200">
                                 {standing?.tiebreakReason && (
                                   standing.tiebreakReason.startsWith('ゲーム率') ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                       <Info size={9} className="shrink-0" />
                                       <GameRatioCell gamesWon={standing.gamesWon} gamesLost={standing.gamesLost} className="text-[9px]" />
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                       <Info size={9} className="shrink-0" />
                                       {standing.tiebreakReason}
                                     </span>

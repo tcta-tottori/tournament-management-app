@@ -202,7 +202,7 @@ export function buildCertificatePreviewHtml(entry: CertEntry, layout: CertLayout
   return base.replace(
     '</style>',
     `
-  html, body { background: #f1f5f9; }
+  html, body { background: #f4f4f4; }
   .page { box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
   /* 印字位置が分かるよう、プレビューだけ薄いガイドを出す（氏名と、その上の行） */
   .cert-block::before, .cert-above::before {

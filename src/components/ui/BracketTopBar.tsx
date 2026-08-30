@@ -97,7 +97,7 @@ export default function BracketTopBar({
 
         <div className="flex-1 min-w-0 text-center">
           <h2 className="text-base font-bold text-gray-800 truncate">
-            <Trophy className="w-4 h-4 inline-block mr-1 text-amber-500" />
+            <Trophy className="w-4 h-4 inline-block mr-1 text-primary-500" />
             {current?.label || 'トーナメント'}
           </h2>
           {subtitle && <p className="text-[10px] text-gray-500 truncate mt-0.5">{subtitle}</p>}
@@ -119,7 +119,7 @@ export default function BracketTopBar({
           </span>
         </div>
         {playing > 0 && (
-          <span className="flex items-center gap-0.5 text-green-600 font-bold">
+          <span className="flex items-center gap-0.5 text-gray-700 font-bold">
             <Timer className="w-3 h-3" />
             {playing}試合中
           </span>

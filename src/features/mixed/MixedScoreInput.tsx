@@ -262,18 +262,18 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
       data-lpignore="true"
       data-form-type="other"
       onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
-      className="w-9 h-14 text-center text-lg font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
+      className="w-9 h-14 text-center text-lg font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
       placeholder="?"
     />
   );
 
   // Winner highlight classes
   const score1HighlightClass = winnerSide === 1
-    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
-    : 'border-emerald-300';
+    ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300'
+    : 'border-primary-300';
   const score2HighlightClass = winnerSide === 2
-    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
-    : 'border-emerald-300';
+    ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300'
+    : 'border-primary-300';
 
   return createPortal(
     // キーボード表示中は visualViewport の高さ・位置に合わせ、見えている領域（画面上半分）いっぱいに表示する
@@ -289,11 +289,11 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`shrink-0 bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-5 ${keyboardOpen ? 'py-1.5' : 'py-2.5'}`}>
+        <div className={`shrink-0 bg-gradient-to-r from-primary-700 to-primary-800 text-white px-5 ${keyboardOpen ? 'py-1.5' : 'py-2.5'}`}>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-sm">スコア入力</h3>
-              <div className="text-xs text-emerald-200">
+              <div className="text-xs text-primary-200">
                 第{match.matchNumber}試合 ・ {match.leagueId.trim()}リーグ
               </div>
             </div>
@@ -307,20 +307,20 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
         <div className={`flex-1 min-h-0 overflow-y-auto ${keyboardOpen ? 'px-4 py-2' : 'p-4'}`}>
           {/* Game rule display */}
           {gameRule && (
-            <div className={`px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
-              <div className="text-[11px] text-amber-700 font-medium">{gameRule}</div>
+            <div className={`px-3 py-1.5 bg-primary-50 border border-primary-200 rounded-lg ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
+              <div className="text-[11px] text-gray-800 font-medium">{gameRule}</div>
             </div>
           )}
 
           {/* Match card */}
           <div className={`flex items-center gap-3 ${keyboardOpen ? 'mb-2' : 'mb-4'}`}>
-            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 1 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 1 ? 'bg-primary-50 border-primary-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team1?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team1?.male.name}</div>
               <div className="text-xs text-gray-700">{team1?.female.name}</div>
             </div>
             <div className="text-lg font-bold text-gray-300">VS</div>
-            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 2 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`flex-1 text-center rounded-xl border-2 transition-all ${keyboardOpen ? 'p-1.5' : 'p-2.5'} ${winnerSide === 2 ? 'bg-primary-50 border-primary-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="text-[10px] text-gray-400 mb-0.5">チーム{team2?.numberInLeague}</div>
               <div className="font-bold text-sm text-gray-800">{team2?.male.name}</div>
               <div className="text-xs text-gray-700">{team2?.female.name}</div>
@@ -331,7 +331,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           <div className={`flex items-center justify-center gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
             {isTiebreak && loserSide === 1 && (
               <div className="flex flex-col items-center">
-                <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                 {tbInput}
               </div>
             )}
@@ -346,7 +346,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
               autoCorrect="off"
               data-lpignore="true"
               data-form-type="other"
-              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score1HighlightClass}`}
+              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all ${score1HighlightClass}`}
               placeholder="0"
             />
             <span className="text-3xl font-bold text-gray-400">-</span>
@@ -362,12 +362,12 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
               autoCorrect="off"
               data-lpignore="true"
               data-form-type="other"
-              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all ${score2HighlightClass}`}
+              className={`w-16 h-14 text-center text-3xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all ${score2HighlightClass}`}
               placeholder="0"
             />
             {isTiebreak && loserSide === 2 && (
               <div className="flex flex-col items-center">
-                <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                 {tbInput}
               </div>
             )}
@@ -383,7 +383,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           <div className={`grid grid-cols-2 gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
             <button
               onClick={() => match.team2Id && handleDEF(match.team2Id)}
-              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
             >
               <Ban size={14} />
               <span className="truncate">{team1?.teamName || 'チーム1'}</span>
@@ -391,7 +391,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
             </button>
             <button
               onClick={() => match.team1Id && handleDEF(match.team1Id)}
-              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-orange-50 border-2 border-orange-300 text-orange-700 rounded-xl hover:bg-orange-100 transition-all text-sm font-bold active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
             >
               <Ban size={14} />
               <span className="truncate">{team2?.teamName || 'チーム2'}</span>
@@ -405,7 +405,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
         <div className={`shrink-0 border-t border-gray-100 bg-white px-4 ${keyboardOpen ? 'py-2 space-y-1.5' : 'py-3 space-y-2'}`}>
           <button
             onClick={handleSave}
-            className={`w-full flex items-center justify-center gap-2 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md text-sm font-bold active:scale-[0.98] ${keyboardOpen ? 'py-2.5 min-h-[44px]' : 'py-3 min-h-[48px]'}`}
+            className={`w-full flex items-center justify-center gap-2 px-4 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all shadow-md text-sm font-bold active:scale-[0.98] ${keyboardOpen ? 'py-2.5 min-h-[44px]' : 'py-3 min-h-[48px]'}`}
           >
             <Save size={14} />決定
           </button>

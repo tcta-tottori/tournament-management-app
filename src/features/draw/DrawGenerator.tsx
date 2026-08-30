@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { sortEventsByClass } from '../data/eventOrder';
 import { useAppStore } from '../../stores/appStore';
 import { DrawEngine } from './DrawEngine';
 import type { DrawEntry } from './DrawEngine';
@@ -13,10 +14,12 @@ export default function DrawGenerator() {
   const [generatedDraw, setGeneratedDraw] = useState<{ draw: DrawEntry[], drawSize: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const events = useLiveQuery(
+  const rawEvents = useLiveQuery(
     () => currentTournamentId ? db.events.where('tournamentId').equals(currentTournamentId).toArray() : [],
     [currentTournamentId]
   ) || [];
+  // クラスは「男子→女子」「アルファベット→年齢」の順に並べる
+  const events = useMemo(() => sortEventsByClass(rawEvents), [rawEvents]);
 
   const entries = useLiveQuery(
     () => selectedEventId ? db.entries.where('eventId').equals(selectedEventId).toArray() : [],
@@ -195,12 +198,12 @@ export default function DrawGenerator() {
                 <Users className="w-6 h-6 text-primary-500" />
                 <div>
                   <p className="text-xs text-gray-500 font-medium tracking-wider uppercase">有効エントリー数</p>
-                  <p className="text-xl font-bold text-primary-600">{activeEntries.length} <span className="text-sm font-normal text-primary-500">組</span></p>
+                  <p className="text-xl font-bold text-gray-700">{activeEntries.length} <span className="text-sm font-normal text-primary-500">組</span></p>
                 </div>
               </div>
 
               {savedDraw ? (
-                <div className="bg-green-50 text-green-600 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-green-200">
+                <div className="bg-primary-50 text-gray-700 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-primary-200">
                   <Save className="w-4 h-4" />
                   保存済みドローあり
                 </div>
@@ -225,7 +228,7 @@ export default function DrawGenerator() {
                 <button
                   onClick={handleSaveDraw}
                   disabled={!generatedDraw || isSaving}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   {isSaving ? '保存中...' : '確定して保存'}

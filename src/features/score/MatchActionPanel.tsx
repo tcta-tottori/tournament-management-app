@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
-import { propagateByes } from '../draw/rebuildMatches';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
 import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import {
   Play,
@@ -58,10 +58,10 @@ const STATUS_CONFIG: Record<
   { label: string; bg: string; text: string }
 > = {
   waiting:  { label: '待機中',   bg: 'bg-gray-100',   text: 'text-gray-600' },
-  ready:    { label: '準備完了', bg: 'bg-blue-100',   text: 'text-blue-700' },
-  playing:  { label: '試合中',   bg: 'bg-green-100',  text: 'text-green-700' },
-  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-primary-700' },
-  walkover: { label: 'W/O',     bg: 'bg-orange-100', text: 'text-orange-700' },
+  ready:    { label: '準備完了', bg: 'bg-gray-100',   text: 'text-gray-700' },
+  playing:  { label: '試合中',   bg: 'bg-primary-100',  text: 'text-gray-800' },
+  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-gray-800' },
+  walkover: { label: 'W/O',     bg: 'bg-primary-100', text: 'text-gray-800' },
 };
 
 // Default voice settings used for broadcast calls
@@ -94,7 +94,7 @@ export default function MatchActionPanel({
   const [callNameReadings, setCallNameReadings] = useState<Record<string, string>>({});
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop } = useCallTts();
 
   // 所属ふりがなマップ（コール文のふりがな注釈用）
   const affiliationFuriganaMap = useLiveQuery(async () => {
@@ -197,8 +197,8 @@ export default function MatchActionPanel({
         });
       }
 
-      // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
-      if (eventId) await propagateByes(eventId);
+      // 次の相手がBYEだけの枠なら更に次の回戦へ送り、3位決定戦の顔ぶれも整える
+      if (eventId) await refreshBracketProgress(eventId);
 
       onMatchUpdate();
     } finally {
@@ -252,8 +252,8 @@ export default function MatchActionPanel({
       });
 
       setScoreInput('');
-      // BYEで送っていた勝ち上がりも取り消す
-      if (dbMatch) await propagateByes(dbMatch.eventId);
+      // BYEで送っていた勝ち上がりを取り消し、3位決定戦の顔ぶれも整える
+      if (dbMatch) await refreshBracketProgress(dbMatch.eventId);
 
       onMatchUpdate();
     } finally {
@@ -500,14 +500,14 @@ export default function MatchActionPanel({
                 <p
                   className={`font-bold text-gray-900 text-base truncate ${
                     match.winnerEntryId === match.player1EntryId && isFinished
-                      ? 'text-primary-600'
+                      ? 'text-gray-700'
                       : ''
                   }`}
                 >
                   {match.player1Name || '(未定)'}
                   {match.winnerEntryId === match.player1EntryId &&
                     isFinished && (
-                      <Trophy className="w-4 h-4 inline ml-1.5 text-yellow-500" />
+                      <Trophy className="w-4 h-4 inline ml-1.5 text-primary-500" />
                     )}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
@@ -525,14 +525,14 @@ export default function MatchActionPanel({
                 <p
                   className={`font-bold text-gray-900 text-base truncate ${
                     match.winnerEntryId === match.player2EntryId && isFinished
-                      ? 'text-primary-600'
+                      ? 'text-gray-700'
                       : ''
                   }`}
                 >
                   {match.player2Name || '(未定)'}
                   {match.winnerEntryId === match.player2EntryId &&
                     isFinished && (
-                      <Trophy className="w-4 h-4 inline ml-1.5 text-yellow-500" />
+                      <Trophy className="w-4 h-4 inline ml-1.5 text-primary-500" />
                     )}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
@@ -605,7 +605,7 @@ export default function MatchActionPanel({
                 <button
                   onClick={handleStartMatch}
                   disabled={isProcessing}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 transition-colors"
                 >
                   <Play className="w-4 h-4" />
                   試合開始
@@ -668,7 +668,7 @@ export default function MatchActionPanel({
               <button
                 onClick={handleCall}
                 disabled={!canCall}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={
                   !match.courtId ? 'コートを割り当ててからコールしてください' : ''
                 }
@@ -690,7 +690,7 @@ export default function MatchActionPanel({
 
           {/* Hint when court not assigned */}
           {!match.courtId && !isFinished && (
-            <p className="text-xs text-amber-600 mt-2">
+            <p className="text-xs text-gray-700 mt-2">
               コールするにはコートを割り当ててください
             </p>
           )}

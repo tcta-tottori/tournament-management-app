@@ -5,7 +5,7 @@ import {
   ClipboardList, CalendarClock, BarChart2,
   HelpCircle, ExternalLink, HardDrive, Eye,
   AlertTriangle, Network, Menu, X, Volume2,
-  PanelLeftClose, PanelLeftOpen, Radio, Printer
+  PanelLeftClose, PanelLeftOpen, Radio, Printer, ArrowRight
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -16,10 +16,10 @@ import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../../features/sy
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
 import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
-import GeminiLoadingIndicator from '../ui/GeminiLoadingIndicator';
+import VoiceLoadingIndicator from '../ui/VoiceLoadingIndicator';
 import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
 import HeaderBackdrop from './HeaderBackdrop';
-import { geminiTts } from '../../features/broadcast/geminiTts';
+import { callTts } from '../../features/broadcast/callTts';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -64,16 +64,7 @@ export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     typeof window !== 'undefined' && localStorage.getItem('sidebarCollapsed') === '1'
   );
-  const [isDesktop, setIsDesktop] = useState(
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
-  );
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0');
@@ -81,7 +72,7 @@ export default function AppLayout() {
 
   // モバイルの自動再生制約対策: 最初のユーザー操作でオーディオをアンロックする
   useEffect(() => {
-    const unlock = () => { geminiTts.unlockAudio(); };
+    const unlock = () => { callTts.unlockAudio(); };
     document.addEventListener('click', unlock, { once: true, capture: true });
     document.addEventListener('touchstart', unlock, { once: true, capture: true });
     return () => {
@@ -295,122 +286,180 @@ export default function AppLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-bg-main overflow-hidden">
+    <div className="flex h-[100dvh] bg-bg-main overflow-hidden">
 
-      {/* ===== ヘッダー ===== */}
-      <header className="header-main flex items-center gap-2 sm:gap-3 px-3 sm:px-5 h-[56px] shrink-0 z-30">
-        <HeaderBackdrop />
-
-        {/* 左: ハンバーガーボタン + 現在ページ名 */}
-        <button
-          className="header-hamburger-btn"
-          onClick={() => isDesktop ? setSidebarCollapsed(v => !v) : setMenuOpen(!menuOpen)}
-          aria-label="メニューを開く"
-        >
-          <Menu style={{ width: 24, height: 24 }} />
-        </button>
-        {currentPageLabel && (
-          <div className="header-page-name min-w-0">
-            {CurrentPageIcon && (
-              <CurrentPageIcon style={{ width: 16, height: 16 }} className="shrink-0" />
-            )}
-            <span className="truncate">{currentPageLabel}</span>
-          </div>
-        )}
-
-        {/* 右: 協会名 + 大会名（右揃え・残り幅いっぱい） */}
-        <div className="header-title-right">
-          {(() => {
-            const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
-            const mainName = tName
-              ? tName.replace(/\(.*?\)|（.*?）/g, '').trim()
-              : '大会運営システム';
-            return (<>
-              <p className="header-org-name">鳥取市テニス協会</p>
-              <h1 className="header-title" title={mainName}>{mainName}</h1>
-            </>);
-          })()}
-        </div>
-      </header>
-
-      {/* ===== 流れる表示バー（ティッカー・全幅） ===== */}
-      {(() => {
-        const displayName = isMixedImported && mixedTournamentInfo
-          ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
-          : isTeamImported && teamTournamentInfo
-            ? teamTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
-            : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
-        const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
-        return (
-          <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
-            <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
-              <div className="info-ticker flex items-center h-full whitespace-nowrap">
-                {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
-                  <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
-                    {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
-                    <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
-                    {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
-                  </span>
-                )) : (
-                  <span className="info-ticker-item">
-                    <span>{displayName || '大会運営システム'}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ===== スライドメニュー（モバイル：右から展開）※PCは常設サイドバー ===== */}
-      {/* オーバーレイ */}
-      <div
-        className={`hamburger-overlay lg:hidden ${menuOpen ? 'hamburger-overlay-visible' : ''}`}
-        onClick={() => setMenuOpen(false)}
-      />
-      {/* ドロワー */}
-      <div className={`hamburger-drawer lg:hidden ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
-        <div className="hamburger-drawer-header">
-          <span>メニュー</span>
+      {/* ===== PC: 画面の上端から立てる常設メニュー（ヘッダーの高さぶんも含む） ===== */}
+      <aside
+        className={`side-menu hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
+          sidebarCollapsed ? 'w-[64px]' : 'w-56'
+        }`}
+        style={{ background: 'linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%)' }}
+      >
+        {/* 折りたたみトグル */}
+        <div className={`flex items-center h-[56px] shrink-0 border-b border-white/20 ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'}`}>
+          {!sidebarCollapsed && <span className="text-[11px] font-bold text-white/75 tracking-wide">メニュー</span>}
           <button
-            className="hamburger-icon-btn"
-            onClick={() => setMenuOpen(false)}
-            aria-label="メニューを閉じる"
+            onClick={() => setSidebarCollapsed(v => !v)}
+            className="p-1.5 text-white/75 hover:text-white hover:bg-white/20 rounded transition-colors"
+            title={sidebarCollapsed ? 'メニューを展開' : 'アイコンのみに縮小'}
+            aria-label={sidebarCollapsed ? 'メニューを展開' : 'メニューを縮小'}
           >
-            <X style={{ width: 20, height: 20 }} />
+            {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
         </div>
-        <div className="hamburger-drawer-list">
+
+        {/* ナビゲーション */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-0.5">
           {allTabs.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button
                 key={item.id}
-                className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
-                onClick={() => handleMenuItemClick(item.path)}
+                onClick={() => navigate(item.path)}
+                title={item.label}
+                className={`side-menu-item ${isActive ? 'side-menu-item-active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
+                style={sidebarCollapsed ? { padding: '12px 0' } : undefined}
               >
                 <item.icon
                   className="shrink-0"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined,
-                  }}
+                  style={{ width: 18, height: 18 }}
                 />
+                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* フッター：操作ボタン・バージョン */}
+        <div className="border-t border-white/20 p-2 flex flex-col gap-1.5 shrink-0">
+          {sidebarCollapsed ? (
+            <>
+              <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/75 hover:text-white hover:bg-white/20 rounded" title="音声設定">
+                <Volume2 className="w-4 h-4" />
+              </button>
+              <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-white/80 hover:text-white text-center py-1" title="バージョン情報">
+                2.4
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center flex-wrap gap-1.5">
+                <SyncStatusIndicator />
+                <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定" aria-label="音声設定">
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>音声</span>
+                </button>
+                <PublicViewHeaderLink />
+                <a href="https://www.tottori-tenis.net/" target="_blank" rel="noopener noreferrer" className="header-link" title="鳥取県テニス協会HPを開く">
+                  <span>テニス協会HP</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <button onClick={() => setVersionModalOpen(true)} className="drawer-version-btn" title="バージョン情報・更新履歴">
+                <span className="header-version">Ver 2.4</span>
+                <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
+              </button>
+            </>
+          )}
+        </div>
+      </aside>
+
+      {/* ===== 右側: ヘッダー + 流れる表示バー + 本体 ===== */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* ===== ヘッダー（左=メニュータイトル / 右=メニューボタン。大会名は下の表示バーへ） ===== */}
+        <header className="header-main flex items-center gap-3 px-4 lg:px-5 shrink-0 z-30">
+          <HeaderBackdrop />
+
+          {/* 左: 現在ページ名（メニュータイトル） */}
+          <div className="header-page-name min-w-0">
+            {CurrentPageIcon && (
+              <CurrentPageIcon style={{ width: 18, height: 18 }} className="shrink-0" />
+            )}
+            <span className="truncate">{currentPageLabel || '大会運営システム'}</span>
+          </div>
+
+          {/* 右: メニューボタン（スマホのみ・開くと × に変わる） */}
+          <button
+            className="header-menu-btn header-menu-btn-mobile-only"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label={menuOpen ? 'メニューを閉じる' : 'メニューを開く'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen
+              ? <X style={{ width: 26, height: 26 }} strokeWidth={2} />
+              : <Menu style={{ width: 26, height: 26 }} strokeWidth={2} />}
+          </button>
+        </header>
+
+        {/* ===== 流れる表示バー（ティッカー） ===== */}
+        {(() => {
+          const displayName = isMixedImported && mixedTournamentInfo
+            ? mixedTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+            : isTeamImported && teamTournamentInfo
+              ? teamTournamentInfo.name.replace(/\(.*?\)|（.*?）/g, '')
+              : tournament?.name.replace(/\(.*?\)|（.*?）/g, '') || '';
+          const activeTickerItems = isMixedImported ? mixedTickerItems : isTeamImported ? teamTickerItems : tickerItems;
+          return (
+            <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
+              <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
+                <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                  {/* 大会名はヘッダーではなくここに流す */}
+                  <span className="info-ticker-item info-ticker-lead">
+                    <span>{displayName || '大会運営システム'}</span>
+                    <span className="info-ticker-dot" />
+                  </span>
+                  {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
+                    <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
+                      {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
+                      <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
+                      {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
+                    </span>
+                  )) : null}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* メインコンテンツ（ページ遷移アニメーション） */}
+        <main className="flex-1 min-w-0 overflow-y-auto relative bg-bg-main">
+          <div key={location.pathname} className="page-enter min-h-full">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+
+      {/* ===== スマホ: 全画面メニュー（ヘッダーは出したまま、その下いっぱいに開く） ===== */}
+      <div className={`fullmenu fullmenu-mobile-only ${menuOpen ? 'fullmenu-open' : ''}`}>
+        <div className="fullmenu-list">
+          {allTabs.map((item, i) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <button
+                key={item.id}
+                className={`fullmenu-item ${isActive ? 'fullmenu-item-active' : ''}`}
+                style={{ '--i': i } as React.CSSProperties}
+                onClick={() => handleMenuItemClick(item.path)}
+              >
+                <item.icon className="shrink-0" />
                 <span>{item.label}</span>
+                <ArrowRight className="fullmenu-arrow" style={{ width: 18, height: 18 }} />
               </button>
             );
           })}
         </div>
-        {/* 下部: 操作ボタン4つ → バージョン情報 → 協会ロゴ */}
-        <div className="hamburger-drawer-footer">
-          {/* 画面上部ボタン4つ */}
+
+        {/* 下部: 操作ボタン → バージョン情報 → 協会ロゴ */}
+        <div
+          className="fullmenu-footer"
+          style={{ '--footer-delay': `${allTabs.length * 45}ms` } as React.CSSProperties}
+        >
           <div className="drawer-action-row">
             <SyncStatusIndicator />
             <button
               onClick={() => setVoiceSettingsOpen(true)}
               className="header-link"
-              title="音声設定（Gemini TTS）"
+              title="音声設定"
               aria-label="音声設定"
             >
               <Volume2 className="w-3.5 h-3.5" />
@@ -424,8 +473,8 @@ export default function AppLayout() {
               className="header-link"
               title="鳥取県テニス協会HPを開く"
             >
-              <span>テニス協会HP</span>
               <ExternalLink className="w-3 h-3" />
+              <span>テニス協会HP</span>
             </a>
           </div>
 
@@ -441,98 +490,12 @@ export default function AppLayout() {
 
           {/* 協会ロゴ */}
           <img
-            src={`${import.meta.env.BASE_URL}logo-tcta.png`}
+            src={`${import.meta.env.BASE_URL}logo-tcta-white.png`}
             alt="鳥取市テニス協会"
-            className="hamburger-drawer-logo"
+            className="fullmenu-logo"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         </div>
-      </div>
-
-      {/* ===== 本体：PCは常設サイドバー＋メイン、モバイルはメインのみ ===== */}
-      <div className="flex flex-1 min-h-0">
-        {/* PC用 常設サイドバー（デフォルト展開・折りたたみでアイコンのみ） */}
-        <aside
-          className={`hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
-            sidebarCollapsed ? 'w-[64px]' : 'w-56'
-          }`}
-          style={{ background: 'linear-gradient(180deg, #0f3326 0%, #163d31 30%, #1b4d3e 100%)' }}
-        >
-          {/* 折りたたみトグル */}
-          <div className={`flex items-center h-10 shrink-0 border-b border-white/10 ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'}`}>
-            {!sidebarCollapsed && <span className="text-[11px] font-bold text-white/50 tracking-wide">メニュー</span>}
-            <button
-              onClick={() => setSidebarCollapsed(v => !v)}
-              className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded transition-colors"
-              title={sidebarCollapsed ? 'メニューを展開' : 'アイコンのみに縮小'}
-              aria-label={sidebarCollapsed ? 'メニューを展開' : 'メニューを縮小'}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {/* ナビゲーション */}
-          <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-0.5">
-            {allTabs.map((item) => {
-              const isActive = location.pathname.startsWith(item.path);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => navigate(item.path)}
-                  title={item.label}
-                  className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
-                  style={sidebarCollapsed ? { padding: '12px 0' } : undefined}
-                >
-                  <item.icon
-                    className="shrink-0"
-                    style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined }}
-                  />
-                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* フッター：操作ボタン・バージョン */}
-          <div className="border-t border-white/10 p-2 flex flex-col gap-1.5 shrink-0">
-            {sidebarCollapsed ? (
-              <>
-                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded" title="音声設定（Gemini TTS）">
-                  <Volume2 className="w-4 h-4" />
-                </button>
-                <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-amber-300/80 hover:text-amber-300 text-center py-1" title="バージョン情報">
-                  2.4
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center flex-wrap gap-1.5">
-                  <SyncStatusIndicator />
-                  <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定（Gemini TTS）" aria-label="音声設定">
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span>音声</span>
-                  </button>
-                  <PublicViewHeaderLink />
-                  <a href="https://www.tottori-tenis.net/" target="_blank" rel="noopener noreferrer" className="header-link" title="鳥取県テニス協会HPを開く">
-                    <span>テニス協会HP</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <button onClick={() => setVersionModalOpen(true)} className="drawer-version-btn" title="バージョン情報・更新履歴">
-                  <span className="header-version">Ver 2.4</span>
-                  <span className="drawer-version-date">{__BUILD_TIMESTAMP__}</span>
-                </button>
-              </>
-            )}
-          </div>
-        </aside>
-
-        {/* メインコンテンツ（ページ遷移アニメーション） */}
-        <main className="flex-1 min-w-0 overflow-y-auto relative bg-bg-main">
-          <div key={location.pathname} className="page-enter min-h-full">
-            <Outlet />
-          </div>
-        </main>
       </div>
 
       {/* バージョン情報モーダル */}
@@ -542,8 +505,8 @@ export default function AppLayout() {
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />
 
-      {/* Gemini TTS 音声取得中のグローバルインジケータ */}
-      <GeminiLoadingIndicator />
+      {/* コール音声の準備中を知らせるグローバルインジケータ */}
+      <VoiceLoadingIndicator />
     </div>
   );
 }

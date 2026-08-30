@@ -62,9 +62,9 @@ export default function TeamImportView() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* タイトルカード */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 mb-6 border border-blue-100">
+      <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-8 mb-6 border border-gray-100">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-14 h-14 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
             <Users size={28} className="text-white" />
           </div>
           <div>
@@ -73,16 +73,16 @@ export default function TeamImportView() {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
-            <div className="text-3xl font-bold text-blue-700">5</div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="text-3xl font-bold text-gray-700">5</div>
             <div className="text-sm text-gray-500">リーグ (A~E)</div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
-            <div className="text-3xl font-bold text-indigo-700">22</div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="text-3xl font-bold text-gray-700">22</div>
             <div className="text-sm text-gray-500">チーム参加</div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
-            <div className="text-3xl font-bold text-violet-700">4</div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="text-3xl font-bold text-gray-700">4</div>
             <div className="text-sm text-gray-500">順位別トーナメント</div>
           </div>
         </div>
@@ -96,10 +96,10 @@ export default function TeamImportView() {
         className={`
           relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer
           ${isDragging
-            ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
+            ? 'border-gray-500 bg-gray-50 scale-[1.02] shadow-lg'
             : isImported
-              ? 'border-blue-300 bg-blue-50/50'
-              : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/30'
+              ? 'border-gray-300 bg-gray-50/50'
+              : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50/30'
           }
         `}
         onClick={() => document.getElementById('team-file-input')?.click()}
@@ -114,27 +114,27 @@ export default function TeamImportView() {
 
         {isImported ? (
           <div className="space-y-3">
-            <CheckCircle2 size={48} className="mx-auto text-blue-500" />
-            <div className="text-lg font-semibold text-blue-700">読み込み完了</div>
+            <CheckCircle2 size={48} className="mx-auto text-gray-500" />
+            <div className="text-lg font-semibold text-gray-700">読み込み完了</div>
             <div className="text-sm text-gray-500 flex items-center justify-center gap-2">
               <FileSpreadsheet size={16} />
               {importFileName}
             </div>
             <div className="flex justify-center gap-6 mt-4">
               <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                <span className="text-2xl font-bold text-blue-600">{leagues.length}</span>
+                <span className="text-2xl font-bold text-gray-600">{leagues.length}</span>
                 <span className="text-sm text-gray-500 ml-1">リーグ</span>
               </div>
               <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                <span className="text-2xl font-bold text-indigo-600">{leagues.reduce((s, l) => s + l.teams.length, 0)}</span>
+                <span className="text-2xl font-bold text-gray-600">{leagues.reduce((s, l) => s + l.teams.length, 0)}</span>
                 <span className="text-sm text-gray-500 ml-1">チーム</span>
               </div>
             </div>
             {/* リーグ別サマリー */}
             <div className="mt-4 grid grid-cols-5 gap-2">
               {leagues.map(l => (
-                <div key={l.leagueId} className="bg-white border border-blue-100 rounded-lg px-3 py-2 text-center">
-                  <div className="text-xs font-bold text-blue-600">{l.leagueId}リーグ</div>
+                <div key={l.leagueId} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-center">
+                  <div className="text-xs font-bold text-gray-600">{l.leagueId}リーグ</div>
                   <div className="text-sm text-gray-600">{l.teams.length}チーム</div>
                 </div>
               ))}
@@ -144,7 +144,7 @@ export default function TeamImportView() {
         ) : (
           <div className="space-y-3">
             <div className={`transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
-              <Upload size={48} className={`mx-auto ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+              <Upload size={48} className={`mx-auto ${isDragging ? 'text-gray-500' : 'text-gray-400'}`} />
             </div>
             <div className="text-lg font-medium text-gray-600">
               Excelファイルをドラッグ＆ドロップ
@@ -184,7 +184,7 @@ export default function TeamImportView() {
                 type="text"
                 value={tournamentInfo.name}
                 onChange={e => updateTournamentInfo('name', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
               />
             </div>
 
@@ -195,7 +195,7 @@ export default function TeamImportView() {
                 type="text"
                 value={tournamentInfo.date}
                 onChange={e => updateTournamentInfo('date', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
               />
             </div>
 
@@ -210,7 +210,7 @@ export default function TeamImportView() {
                     value={tournamentInfo.gameRules?.[4] || ''}
                     onChange={e => updateGameRule(4, e.target.value)}
                     placeholder="例: 6ゲームマッチ（6-6タイブレーク・ノーアド）"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
                 <div>
@@ -220,7 +220,7 @@ export default function TeamImportView() {
                     value={tournamentInfo.gameRules?.[5] || ''}
                     onChange={e => updateGameRule(5, e.target.value)}
                     placeholder="例: 6ゲーム先取（ノーアド）"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
                 <div>
@@ -230,7 +230,7 @@ export default function TeamImportView() {
                     value={tournamentInfo.bracketGameRule || ''}
                     onChange={e => updateBracketGameRule(e.target.value)}
                     placeholder="例: 6ゲームマッチ（6-6タイブレーク・ノーアド）"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
               </div>
@@ -261,12 +261,12 @@ export default function TeamImportView() {
           ].map(({ step, label }, i) => (
             <div key={step} className="flex items-center">
               <div className="flex-1 text-center">
-                <div className="w-10 h-10 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm border-2 border-blue-200">
+                <div className="w-10 h-10 mx-auto bg-gradient-to-br from-gray-100 to-white rounded-full flex items-center justify-center text-gray-700 font-bold text-sm border-2 border-gray-200">
                   {step}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">{label}</div>
               </div>
-              {i < 4 && <div className="w-full h-0.5 bg-gradient-to-r from-blue-200 to-indigo-200 mx-1" />}
+              {i < 4 && <div className="w-full h-0.5 bg-gradient-to-r from-gray-200 to-gray-300 mx-1" />}
             </div>
           ))}
         </div>

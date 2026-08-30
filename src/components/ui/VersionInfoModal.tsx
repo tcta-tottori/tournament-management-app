@@ -23,8 +23,53 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'Ver 2.4',
     date: '2026-07-26',
-    highlights: '賞状の印刷メニューを追加・コート変更に対応・ドロー表示の刷新',
+    highlights: '画面の配色を協会サイトに統一・賞状の印刷メニュー・音声コールを内蔵音声に・リーグのコート運用・3位決定戦',
     timeGroups: [
+      {
+        time: '—',
+        summary: '画面の見た目の調整',
+        changes: [
+          { type: 'design', text: 'メニューのアイコンを白で太く・大きくし、開いたときに上から順に出てくるようにしました' },
+          { type: 'design', text: 'メニュー下部の音声・観戦用などのボタンを、アイコン大きめ・文字小さめに整えました。協会ロゴも白抜きの画像に差し替えています' },
+          { type: 'design', text: '画面の文字を基本的に黒にし、赤はアイコンや現在地などの差し色に絞りました' },
+          { type: 'chore', text: 'データ画面の「データ管理」の見出しを削除しました（ページ名はヘッダーに出ます）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'ドロー画面',
+        changes: [
+          { type: 'feat', text: 'クラス名をタップすると、下にクラス一覧が開いて選べるようになりました' },
+          { type: 'feat', text: 'クラスの並び順を「男子→女子」、各性別の中は「アルファベット（A・B・C…）→年齢（45・55・65…）」に統一しました' },
+          { type: 'design', text: '表示範囲の切り替え（全回戦表示／準決勝以降）を大きく中央に置きました' },
+          { type: 'design', text: 'あたりの修正・3位決定戦・名前の修正・ゲームルールの変更を、右下の編集ボタンから開くメニューにまとめました' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'ヘッダーとメニュー',
+        changes: [
+          { type: 'design', text: 'ヘッダーの背景を協会サイトのキービジュアル（白地に赤・淡赤・白の四角が浮かぶ構図）のアニメーションにしました。四角が左から右へゆっくり流れ、ズームしながら現れて消えます' },
+          { type: 'design', text: 'メニュー（スライドメニュー・PCのサイドバー）とメニューボタンを赤背景・白文字にしました。現在地は白地に赤文字で反転します' },
+          { type: 'design', text: 'PCではメニューを画面の上端から立て、ヘッダーの高さぶんまで表示するようにしました' },
+          { type: 'design', text: 'ヘッダーは左に現在のページ名、右にメニューボタン（スマホ）を置く形にし、大会名は流れる表示バーの先頭に流すようにしました' },
+          { type: 'design', text: 'スマホではヘッダーを端末のステータスバーの下まで敷き、境目が出ないようにしました（四角のアニメーションもステータスバーの高さまで表示されます）' },
+          { type: 'design', text: '四角のアニメーションを速くし、大きくなって消えるもの・小さくなって消えるもの・道半ばから現れるものを混ぜました' },
+          { type: 'design', text: 'スマホのメニューボタンを協会サイトと同じ白地に黒線にし、開くと × に変わるようにしました。ボタンまわりはヘッダーの意匠を白くぼかして見やすくしています' },
+          { type: 'design', text: 'スマホのメニューを全画面表示にし、1行ずつ矢印付きで並べる協会サイトと同じ形にしました' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '画面の配色（協会サイトに統一）',
+        changes: [
+          { type: 'design', text: 'アプリ全体の配色を協会サイトと同じ「白ベース＋赤の差し色」に統一しました（結果画像と同じトンマナ）' },
+          { type: 'design', text: 'ヘッダー・メニュー・サイドバーを白地にし、下端の赤いラインと現在地の赤で見出しを立てました' },
+          { type: 'design', text: 'リーグごと・種目ごとの色分け（虹色）と金・銀・銅のメダル配色をやめ、枠線やバッジは無彩色のグレーに。赤は勝者・1位・進行中など要点だけに使います' },
+          { type: 'design', text: 'ライブスコアのスコアボードを墨地＋赤に変更。協会HPに貼り付けたときもサイトになじむようにしました' },
+          { type: 'chore', text: 'コート使用終了の警告点滅（黄→赤）と、時間割Excelに合わせた種目の色分けは、見分けが必要なため従来どおりです' },
+        ],
+      },
       {
         time: '—',
         summary: '印刷メニュー（賞状）',
@@ -71,6 +116,44 @@ const CHANGELOG: ChangelogEntry[] = [
           { type: 'feat', text: '対戦順を見やすいカード形式に刷新し、所属を改行表示' },
           { type: 'feat', text: '試合中はカードの枠のみ点滅、終了した試合は一番下へ移動してグレー表示（次の控えを分かりやすく）' },
           { type: 'fix', text: '同期不整合による対戦カードの重複や「1R/F」等の誤ったラウンド表示を修正し、ドロー表どおりに表示' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '3位決定戦・選手名の修正',
+        changes: [
+          { type: 'feat', text: '3位決定戦に対応。ドロー画面の「3位決定戦なし/あり」で追加でき、準決勝が終わると敗者同士の対戦が自動で入る' },
+          { type: 'feat', text: '3位決定戦は決勝の下に表示。コート投入・スコア入力・コール・審判用紙も通常の試合と同じように扱える' },
+          { type: 'feat', text: '結果画像はトーナメント表の枠内に、決勝と同じ形式（少し小さめ）で3位決定戦を表示。ダブルスはペアを1人ずつ2行で表記。3位決定戦が終わるまで結果画像は出さない' },
+          { type: 'design', text: '結果画像のシード一覧は枠外に中央揃えで表示' },
+          { type: 'feat', text: 'エントリー確定後でも、ドロー画面の「名前を修正」から氏名・ふりがな・所属を直せるように（対戦表の表示も同時に更新）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '試合ルールの修正',
+        changes: [
+          { type: 'feat', text: 'ドロー画面の種目名の下のルール表示をタップして、その場でゲームルール（回戦別・熱中症時）を修正できるように' },
+          { type: 'feat', text: 'スコア入力ダイアログのルール表示にも「修正」ボタンを追加（ドロー・対戦順・タイムテーブルのどこからでも修正可）' },
+          { type: 'chore', text: 'ゲームルール編集を共通ダイアログ化し、対戦順シートと同じ操作に統一' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'リーグ戦のコート運用',
+        changes: [
+          { type: 'feat', text: 'リーグ戦は使用コート（1〜2面）をリーグ単位で割り当てられるように。ドロー画面の「使用コート」から選択' },
+          { type: 'feat', text: '割り当てたコートが空いたら、対戦カードの「コートに入れる」をタップして次の対戦を投入（2面空いていればどちらに入れるか選択）' },
+          { type: 'feat', text: 'リーグに割り当てたコートはそのリーグの専有になり、他の種目の「入るコート」候補・コート選択から外れる' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '音声コール',
+        changes: [
+          { type: 'feat', text: '読み上げをブラウザ内蔵音声（Web Speech API）に対応。通信・APIキー不要で待ち時間ゼロ、会場の電波が悪くてもコールできる（標準設定）' },
+          { type: 'feat', text: '音声設定でエンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを選択できるように' },
+          { type: 'fix', text: 'Gemini の生成に失敗してもブラウザ内蔵音声で読み上げ直し、コールが無音のままにならないように' },
         ],
       },
       {
@@ -509,9 +592,9 @@ const CHANGELOG: ChangelogEntry[] = [
 ];
 
 const TYPE_CONFIG = {
-  feat:   { label: '新機能', icon: Sparkles,   color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  fix:    { label: '修正',   icon: Bug,         color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
-  design: { label: 'デザイン', icon: Paintbrush, color: 'text-violet-600', bg: 'bg-violet-50',  border: 'border-violet-200' },
+  feat:   { label: '新機能', icon: Sparkles,   color: 'text-gray-700', bg: 'bg-primary-50', border: 'border-primary-200' },
+  fix:    { label: '修正',   icon: Bug,         color: 'text-gray-700',   bg: 'bg-primary-50',   border: 'border-primary-200' },
+  design: { label: 'デザイン', icon: Paintbrush, color: 'text-gray-600', bg: 'bg-gray-50',  border: 'border-gray-200' },
   chore:  { label: 'その他', icon: Wrench,      color: 'text-gray-500',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 } as const;
 
@@ -554,18 +637,18 @@ export default function VersionInfoModal({ open, onClose }: Props) {
 
         {/* ヘッダー */}
         <div className="relative overflow-hidden shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-[#0a2618]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800" />
           <div className="absolute inset-0 opacity-20"
-            style={{ background: 'radial-gradient(circle at 30% 40%, rgba(212,225,87,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(61,126,166,0.3) 0%, transparent 50%)' }} />
+            style={{ background: 'radial-gradient(circle at 30% 40%, rgba(198,56,52,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(118,118,118,0.3) 0%, transparent 50%)' }} />
           <div className="absolute -top-6 -right-6 w-28 h-28 border border-white/[0.08] rounded-full" />
           <div className="absolute -bottom-4 -left-4 w-20 h-20 border border-white/[0.06] rounded-full" />
 
           <div className="relative px-5 pt-5 pb-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-full bg-accent/20 border border-accent/30">
-                  <Sparkles className="w-3 h-3 text-accent" />
-                  <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-full bg-white/15 border border-white/25">
+                  <Sparkles className="w-3 h-3 text-white" />
+                  <span className="text-[11px] font-bold text-white tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <h2 className="text-2xl font-bold text-white">Ver 2.4</h2>
@@ -604,7 +687,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-primary-700">{entry.version}</span>
+                      <span className="text-sm font-bold text-gray-800">{entry.version}</span>
                       <span className="text-[11px] text-gray-400">{entry.date}</span>
                       {entry === CHANGELOG[0] && (
                         <span className="px-1.5 py-0.5 text-[9px] font-bold text-white bg-primary-500 rounded-full uppercase tracking-wider">New</span>
@@ -638,7 +721,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                           >
                             <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span className="text-[11px] font-mono text-gray-500 shrink-0 tabular-nums">{group.time}</span>
-                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-primary-700 font-medium' : 'text-gray-600'}`}>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>
                               {group.summary}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -682,7 +765,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
             href="https://github.com/TCTA-Tottori/tournament-management-app"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5 transition-colors"
+            className="text-[11px] text-gray-700 hover:text-gray-800 font-medium flex items-center gap-0.5 transition-colors"
           >
             GitHub
             <ChevronRight className="w-3 h-3" />

@@ -1,41 +1,58 @@
 @import "tailwindcss";
 
+/* ===========================================================
+   ベースカラー — 協会サイトと同じ「白ベース＋赤の差し色」
+   ---------------------------------------------------------
+   地は白〜ごく淡いグレー、文字・罫線・枠は無彩色のグレー。
+   赤（#c63834）は見出し・現在地・主要ボタン・勝者など
+   「ここを見てほしい」ところだけに差す。
+   結果画像（resultCanvasKit.ts の COL）と同じ値を使う。
+   =========================================================== */
 :root {
-  --bg-main: #f7f5f2;
-  --text-main: #111827;
-  --text-muted: #4b5563;
-  --border-main: #e5ddd3;
+  --bg-main: #f7f7f7;
+  --text-main: #262626;
+  --text-muted: #767676;
+  --border-main: #e8e8e8;
   --card-bg: #ffffff;
-  --table-stripe: #faf8f5;
+  --table-stripe: #fafafa;
   --input-bg: #ffffff;
+
+  /* ブランド赤（差し色） */
+  --brand-red: #c63834;
+  --brand-red-dark: #8c2220;
+  --brand-red-soft: #fdf3f2;
+  /* 墨（見出し・ヘッダーの文字色） */
+  --ink: #262626;
 }
 
 
 @theme {
-  /* Primary — Tennis Court Green */
-  --color-primary-50: #ecf5ec;
-  --color-primary-100: #d1e7d1;
-  --color-primary-200: #a8d5a8;
-  --color-primary-500: #2d6a4f;
-  --color-primary-600: #1b4d3e;
-  --color-primary-700: #0f3326;
+  /* Primary — ブランドレッド（サイトの見出し・アイコンと同じ赤） */
+  --color-primary-50: #fdf3f2;
+  --color-primary-100: #fae3e2;
+  --color-primary-200: #f2c7c5;
+  --color-primary-300: #e49f9c;
+  --color-primary-400: #d46a66;
+  --color-primary-500: #c63834;
+  --color-primary-600: #ad2c29;
+  --color-primary-700: #8c2220;
+  --color-primary-800: #6b1a18;
+  --color-primary-900: #4d1211;
 
-  /* Secondary — Tottori Sand */
-  --color-secondary-50: #fdf8f0;
-  --color-secondary-100: #f9ecd8;
-  --color-secondary-200: #f0d9b5;
-  --color-secondary-500: #c4956a;
-  --color-secondary-600: #a67845;
-  --color-secondary-700: #8b5e2f;
+  /* Secondary — 無彩色グレー（旧・砂色。ベースは白と墨で組む） */
+  --color-secondary-50: #fafafa;
+  --color-secondary-100: #f4f4f4;
+  --color-secondary-200: #e8e8e8;
+  --color-secondary-500: #767676;
+  --color-secondary-600: #5a5a5a;
+  --color-secondary-700: #404040;
 
-  /* Accent — Tennis Ball (refined yellow-green) */
-  --color-accent: #d4e157;
+  /* Accent — 差し色は赤ひとつに統一 */
+  --color-accent: #c63834;
 
-  /* Ocean Blue — Sea of Japan */
-  --color-ocean: #3d7ea6;
-
-  /* Sky */
-  --color-sky: #e8f4f8;
+  /* 旧・海／空の色。無彩色に寄せて残す（参照箇所の互換用） */
+  --color-ocean: #5a5a5a;
+  --color-sky: #f4f4f4;
 
   /* Backgrounds & Borders — Linked to vars */
   --color-bg-main: var(--bg-main);
@@ -44,9 +61,36 @@
   --color-table-stripe: var(--table-stripe);
 
   /* Status Colors */
-  --color-success: #2d6a4f;
-  --color-danger: #c0392b;
-  --color-warning: #e67e22;
+  --color-success: #c63834;
+  --color-danger: #ad2c29;
+  --color-warning: #b4741f;
+
+  /* ---- Tailwind 既定パレットの上書き ----
+     グレーはサイトと同じ無彩色、レッドはブランド赤に差し替える。
+     これで gray-* / red-* を使っている画面もそのままトンマナに乗る。 */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f4f4f4;
+  --color-gray-200: #e8e8e8;
+  --color-gray-300: #d6d6d6;
+  --color-gray-400: #a6a6a6;
+  --color-gray-500: #767676;
+  --color-gray-600: #5a5a5a;
+  --color-gray-700: #404040;
+  --color-gray-800: #262626;
+  --color-gray-900: #141414;
+  --color-gray-950: #0a0a0a;
+
+  --color-red-50: #fdf3f2;
+  --color-red-100: #fae3e2;
+  --color-red-200: #f2c7c5;
+  --color-red-300: #e49f9c;
+  --color-red-400: #d46a66;
+  --color-red-500: #c63834;
+  --color-red-600: #ad2c29;
+  --color-red-700: #8c2220;
+  --color-red-800: #6b1a18;
+  --color-red-900: #4d1211;
+  --color-red-950: #330c0b;
 }
 
 @layer base {
@@ -73,13 +117,23 @@
 }
 
 /* ===========================================================
-   ヘッダー — 深緑背景 + 動的ゴールド波 + 金砂散りばめデザイン
+   ヘッダー — 白地 + 下端に赤のライン（サイトのヘッダーと同じ構成）
    =========================================================== */
+/* ヘッダーの高さ。端末のステータスバーぶん（safe-area）を上に足して、
+   スマホでステータスバーとヘッダーの境目が出ないようにする。 */
 .header-main {
   position: relative;
-  background: linear-gradient(135deg, #0f3326 0%, #1b4d3e 40%, #245840 70%, #1b4d3e 100%);
-  border-bottom: none;
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-main);
+  box-shadow: 0 1px 3px rgba(20, 20, 20, 0.04);
   overflow: hidden;
+}
+
+/* PCの常設メニューもヘッダーと同じだけ上に余白を取り、上端を揃える */
+.side-menu {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .header-main > * {
@@ -87,60 +141,34 @@
   z-index: 2;
 }
 
-/* ===== 動的ゴールド波型ライン ===== */
-.header-gold-waves-container {
+/* ヘッダー下端の赤いライン（サイトの見出し罫と同じ差し色） */
+.header-main::after {
+  content: '';
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.header-wave {
-  position: absolute;
-  top: 0;
   left: 0;
-  height: 100%;
-  pointer-events: none;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--brand-red);
+  z-index: 3;
 }
 
-/* 波1: 幅200%で右方向にスクロール */
-.header-wave-1 {
-  width: 200%;
-  animation: wave-scroll-right 20s linear infinite;
-}
+/* ===========================================================
+   ヘッダー背景の意匠 — 赤と白のキューブが流れるアニメーション
+   -----------------------------------------------------------
+   協会サイトのキービジュアル（白地に赤・淡赤・白の四角がランダムに
+   浮かぶ構図）を、キューブの群れごと右下へゆっくり流している。
+   四角ひとつずつが現れて消えるのではなく、絵全体が同じ速さで
+   流れるので、動きが途切れずにずっと続いて見える。
 
-/* 波2: 幅200%で左方向にスクロール */
-.header-wave-2 {
-  width: 200%;
-  animation: wave-scroll-left 25s linear infinite;
-}
-
-/* 波3: 上下にゆらぎ */
-.header-wave-3 {
-  width: 100%;
-  animation: wave-float 6s ease-in-out infinite;
-}
-
-@keyframes wave-scroll-right {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-@keyframes wave-scroll-left {
-  0% { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
-}
-
-@keyframes wave-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-/* ===== 金の微粒子エフェクト — 空気中に漂う金の粉 ===== */
-.header-gold-dust {
+   継ぎ目なくループさせるしくみ:
+   HeaderBackdrop.tsx が四角の並びを「タイル1枚」として作り、SVG の
+   pattern で縦横に敷き詰めている。流す距離をちょうどタイル1枚ぶん
+   （--tile-w / --tile-h）にすると、流し終わりの絵が流し始めと
+   まったく同じになるため、先頭に戻ってもどこにも継ぎ目が出ない。
+   ヘッダーの文字を読みにくくしないよう、全体は淡く敷いている。
+   =========================================================== */
+.header-motif {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -148,97 +176,48 @@
   pointer-events: none;
   z-index: 1;
   overflow: hidden;
+  /* 白地＋右側にごく淡い赤のグラデーション（従来の意匠を土台として残す） */
+  background: linear-gradient(100deg, #ffffff 0%, #ffffff 55%, var(--brand-red-soft) 100%);
 }
 
-/* 微粒子（type 0）— 金色の粉塵、ゆっくり浮遊しながら明滅 */
-.header-gold-dust .dust-t0 {
+/* 左右の端は白くフェードさせ、タイトルとメニューボタンを浮かせる */
+.header-motif::after {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  background: rgba(255,215,120,0.9);
-  animation: float-micro 6s ease-in-out infinite alternate;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.72) 16%, rgba(255, 255, 255, 0) 38%),
+    linear-gradient(270deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 7%, rgba(255, 255, 255, 0) 20%);
+  z-index: 2;
 }
 
-/* 小粒子（type 1）— 小さな金の粒、ゆらゆら漂いキラキラ */
-.header-gold-dust .dust-t1 {
+/* 四角を敷き詰めた面。
+   左上にタイル1枚ぶん大きく取り出しておき、右下へ流れても隅が空かないようにする。
+   四角の集合だけを淡くする（下地のグラデーションはそのまま）。 */
+.header-motif-flow {
   position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,225,140,1) 0%, rgba(218,185,92,0.5) 70%, transparent 100%);
-  animation: float-drift 8s ease-in-out infinite alternate;
+  left: calc(-1 * var(--tile-w));
+  top: calc(-1 * var(--tile-h));
+  width: calc(100% + var(--tile-w));
+  height: calc(100% + var(--tile-h));
+  opacity: 0.62;
+  will-change: transform;
+  animation: header-motif-drift var(--flow-dur) linear infinite;
 }
 
-/* 中粒子（type 2）— キラッと光るアクセント */
-.header-gold-dust .dust-t2 {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,240,190,1) 0%, rgba(255,215,120,0.6) 40%, transparent 100%);
-  box-shadow: 0 0 3px rgba(255,215,120,0.3);
-  animation: float-sparkle 7s ease-in-out infinite;
+/* タイル1枚ぶん（右へ --tile-w・下へ --tile-h）流したら元の絵に戻る＝継ぎ目のないループ */
+@keyframes header-motif-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(var(--tile-w), var(--tile-h), 0); }
 }
 
-/* 微粒子の浮遊 — ゆっくりふわふわ＋控えめに明滅 */
-@keyframes float-micro {
-  0%   { transform: translate(0, 0); opacity: 0.3; }
-  25%  { transform: translate(0.5px, -1.5px); opacity: 0.55; }
-  50%  { transform: translate(-0.3px, -0.5px); opacity: 0.35; }
-  75%  { transform: translate(0.8px, 0.5px); opacity: 0.6; }
-  100% { transform: translate(-0.5px, -1px); opacity: 0.3; }
+/* 動きを減らす設定のときは静止させる（絵柄はそのまま活かす） */
+@media (prefers-reduced-motion: reduce) {
+  .header-motif-flow {
+    animation: none;
+  }
 }
-
-/* 小粒子の漂い — ゆらゆら＋キラキラ感 */
-@keyframes float-drift {
-  0%   { transform: translate(0, 0); opacity: 0.25; }
-  20%  { transform: translate(1px, -2px); opacity: 0.55; }
-  40%  { transform: translate(-0.5px, -1px); opacity: 0.3; }
-  60%  { transform: translate(1.5px, 0.5px); opacity: 0.6; }
-  80%  { transform: translate(-1px, -1.5px); opacity: 0.35; }
-  100% { transform: translate(0.5px, -0.5px); opacity: 0.25; }
-}
-
-/* 中粒子のキラメキ — 漂いながらキラッと光る */
-@keyframes float-sparkle {
-  0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
-  15%  { transform: translate(1px, -1.5px) scale(0.85); opacity: 0.3; }
-  30%  { transform: translate(-0.5px, -0.5px) scale(0.9); opacity: 0.35; }
-  48%  { transform: translate(0.8px, -1px) scale(0.95); opacity: 0.35; }
-  50%  { transform: translate(1px, -1.2px) scale(1.4); opacity: 0.85; box-shadow: 0 0 6px rgba(255,215,120,0.6), 0 0 12px rgba(218,185,92,0.3); }
-  52%  { transform: translate(1px, -1px) scale(0.95); opacity: 0.35; }
-  70%  { transform: translate(-1px, 0.5px) scale(0.85); opacity: 0.25; }
-  85%  { transform: translate(0.5px, -1px) scale(0.8); opacity: 0.2; }
-}
-
-/* --- アニメーションのタイミングずらし（自然なランダム感） --- */
-
-/* 極微粒子: 素数ベースのずらし */
-.header-gold-dust .dust-t0:nth-child(2n)    { animation-duration: 5s; }
-.header-gold-dust .dust-t0:nth-child(3n)    { animation-duration: 7s; }
-.header-gold-dust .dust-t0:nth-child(5n)    { animation-duration: 8s; }
-.header-gold-dust .dust-t0:nth-child(7n)    { animation-duration: 5.5s; }
-.header-gold-dust .dust-t0:nth-child(11n)   { animation-duration: 9s; }
-.header-gold-dust .dust-t0:nth-child(2n+1)  { animation-delay: 0.4s; }
-.header-gold-dust .dust-t0:nth-child(3n+1)  { animation-delay: 1.1s; }
-.header-gold-dust .dust-t0:nth-child(5n+2)  { animation-delay: 2.3s; }
-.header-gold-dust .dust-t0:nth-child(7n+3)  { animation-delay: 3.7s; }
-.header-gold-dust .dust-t0:nth-child(11n+5) { animation-delay: 4.8s; }
-.header-gold-dust .dust-t0:nth-child(odd)   { animation-direction: alternate-reverse; }
-
-/* 微粒子 */
-.header-gold-dust .dust-t1:nth-child(2n)    { animation-duration: 7s; }
-.header-gold-dust .dust-t1:nth-child(3n)    { animation-duration: 9s; }
-.header-gold-dust .dust-t1:nth-child(5n)    { animation-duration: 10s; }
-.header-gold-dust .dust-t1:nth-child(7n)    { animation-duration: 6.5s; }
-.header-gold-dust .dust-t1:nth-child(2n+1)  { animation-delay: 0.7s; }
-.header-gold-dust .dust-t1:nth-child(3n+1)  { animation-delay: 2s; }
-.header-gold-dust .dust-t1:nth-child(5n+2)  { animation-delay: 3.3s; }
-.header-gold-dust .dust-t1:nth-child(7n+3)  { animation-delay: 5s; }
-.header-gold-dust .dust-t1:nth-child(odd)   { animation-direction: alternate-reverse; }
-
-/* 小粒子（キラメキ） */
-.header-gold-dust .dust-t2:nth-child(2n)    { animation-duration: 8s; }
-.header-gold-dust .dust-t2:nth-child(3n)    { animation-duration: 9s; }
-.header-gold-dust .dust-t2:nth-child(5n)    { animation-duration: 11s; }
-.header-gold-dust .dust-t2:nth-child(2n+1)  { animation-delay: 1.5s; }
-.header-gold-dust .dust-t2:nth-child(3n+1)  { animation-delay: 3s; }
-.header-gold-dust .dust-t2:nth-child(5n+2)  { animation-delay: 5.5s; }
 
 .header-logo {
   width: 40px;
@@ -246,61 +225,12 @@
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
-  border: 1.5px solid rgba(218, 185, 92, 0.3);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(218, 185, 92, 0.1);
+  border: 1px solid var(--border-main);
+  box-shadow: 0 1px 3px rgba(20, 20, 20, 0.08);
 }
 
-.header-org-name {
-  /* 親（ヘッダー右ブロック）より広がらないようにする。
-     広がると大会名ごと左にはみ出し、ページ名と重なってしまう。 */
-  max-width: 100%;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  line-height: 1.2;
-  color: rgba(218, 185, 92, 0.85);
-  text-shadow: 0 0 12px rgba(218, 185, 92, 0.2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* スマホ: 大会名は最大2行まで。文字数の多いページ名（決勝トーナメント等）と
-   並んでも重ならないよう、残り幅の中に収める。 */
-.header-title {
-  max-width: 100%;
-  font-size: 13px;
-  font-weight: 800;
-  color: #fff;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-
-@media (min-width: 640px) {
-  .header-org-name {
-    font-size: 10px;
-    letter-spacing: 0.15em;
-  }
-  .header-title {
-    font-size: 18px;
-    line-height: 1.3;
-    letter-spacing: 0.04em;
-    /* PCは1行＋末尾省略 */
-    display: block;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-}
-
+/* ===== メニュー内の小さなリンクボタン（音声・観戦用・協会HPなど） ===== */
+/* 赤い地の上に置くので、白い文字＋うっすら白い下地にする */
 .header-link {
   display: flex;
   align-items: center;
@@ -309,91 +239,77 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(218, 185, 92, 0.06);
-  border: 1px solid rgba(218, 185, 92, 0.15);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   transition: color 0.2s, background 0.2s, border-color 0.2s;
 }
 
 .header-link:hover {
-  color: #fff;
-  background: rgba(218, 185, 92, 0.12);
-  border-color: rgba(218, 185, 92, 0.3);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* バージョンバッジ。赤い地の上なので白地に赤文字にする */
 .header-version {
   font-size: 12px;
   font-weight: 800;
-  color: #ffd978;
+  color: var(--brand-red);
   padding: 4px 14px;
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(218, 185, 92, 0.15) 0%, rgba(255, 215, 120, 0.1) 100%);
-  border: 1.5px solid rgba(218, 185, 92, 0.4);
+  background: #ffffff;
+  border: 1px solid #ffffff;
   letter-spacing: 0.08em;
-  text-shadow: 0 0 8px rgba(255, 217, 120, 0.3);
-  box-shadow:
-    0 0 12px rgba(218, 185, 92, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* ===== ヘッダー左: ハンバーガーボタン + 現在ページ名 ===== */
-.header-hamburger-btn {
+/* ===== ヘッダー右端のメニューボタン（スマホ） ===== */
+/* 協会サイトと同じく、白地に黒い線だけのボタン。開くと×に変わる */
+.header-menu-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  color: #fff;
-  background: rgba(218, 185, 92, 0.08);
-  border: 1px solid rgba(218, 185, 92, 0.25);
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  color: #141414;
+  background: transparent;
+  border: none;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
-.header-hamburger-btn:hover {
-  background: rgba(218, 185, 92, 0.18);
-  border-color: rgba(218, 185, 92, 0.45);
+@media (hover: hover) {
+  .header-menu-btn:hover {
+    color: var(--brand-red);
+  }
 }
-
-.header-page-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  /* ページ名は省略せず表示する（極端に長い場合のみ上限で省略）。
-     大会名側は残り幅に合わせて折り返すので重ならない。 */
-  flex: 0 0 auto;
-  max-width: 46%;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-.header-page-name svg {
-  color: #ffd978;
+.header-menu-btn:active {
+  opacity: 0.6;
 }
 
-@media (min-width: 640px) {
-  .header-page-name {
-    gap: 6px;
-    font-size: 15px;
-    letter-spacing: 0.03em;
+/* 運営アプリはPCに常設メニューがあるので、PCではボタンを出さない */
+@media (min-width: 1024px) {
+  .header-menu-btn-mobile-only {
+    display: none;
   }
 }
 
-/* ===== ヘッダー右: 協会名 + 大会名（右揃え） ===== */
-.header-title-right {
+/* ===== ヘッダー左: 現在ページ名（メニュータイトル） ===== */
+.header-page-name {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  text-align: right;
-  /* 残り幅をすべて使い、はみ出さない（ページ名との重なり防止） */
+  align-items: center;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 6px #fff, 0 0 12px #fff;
+}
+.header-page-name svg {
+  color: var(--brand-red);
 }
 
 /* ===== ドロワー下部: 操作ボタン4つ ===== */
@@ -423,17 +339,18 @@
 }
 .drawer-version-date {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 /* ===========================================================
-   ナビゲーションバー
+   ナビゲーションバー — 白地 + 現在地だけ赤
    =========================================================== */
 .nav-bar {
-  background: #163d31;
-  box-shadow: 0 2px 12px rgba(15, 51, 38, 0.3);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-main);
+  box-shadow: 0 1px 3px rgba(20, 20, 20, 0.04);
   padding-top: 4px;
 }
 
@@ -448,7 +365,7 @@
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.55);
+  color: #767676;
   transition: all 0.2s ease;
   border: none;
   background: transparent;
@@ -465,8 +382,8 @@
 }
 
 .nav-tab:hover {
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  background: #f4f4f4;
 }
 
 .nav-tab::after {
@@ -474,10 +391,10 @@
 }
 
 .nav-bar .nav-tab-active {
-  color: #1b4d3e;
+  color: var(--brand-red);
   font-weight: 800;
-  background: #f0fdf4;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  background: var(--brand-red-soft);
+  box-shadow: inset 0 -2px 0 0 var(--brand-red);
 }
 
 .nav-bar .nav-tab-active::after {
@@ -485,115 +402,175 @@
 }
 
 /* ===========================================================
-   ハンバーガーメニュー
+   スマホ: 全画面メニュー
+   -----------------------------------------------------------
+   協会サイトと同じ構成。ヘッダーは出したままで、その下いっぱいに
+   メニューを開く（ヘッダーのボタンは × に変わる）。
    =========================================================== */
-
-/* info-bar左端に配置するインラインボタン */
-.hamburger-inline-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px 0 12px;
-  height: 100%;
-  background: rgba(27, 77, 62, 0.9);
-  border: none;
-  border-right: 1px solid rgba(218, 185, 92, 0.2);
-  color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-  z-index: 1;
-  transition: background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.hamburger-inline-btn:hover {
-  background: rgba(27, 77, 62, 1);
-}
-
-.hamburger-inline-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.03em;
-}
-
-.hamburger-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.85);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.hamburger-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-/* オーバーレイ */
-.hamburger-overlay {
+.fullmenu {
   position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(0, 0, 0, 0.45);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.hamburger-overlay-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* 左スライドドロワー */
-.hamburger-drawer {
-  position: fixed;
-  top: 0;
+  top: calc(56px + env(safe-area-inset-top, 0px));
   left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 50;
-  width: 280px;
-  max-width: 80vw;
-  background: linear-gradient(180deg, #0f3326 0%, #163d31 30%, #1b4d3e 100%);
-  box-shadow: none;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  z-index: 45;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
 }
 
-.hamburger-drawer-open {
-  transform: translateX(0);
-  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+.fullmenu-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
-.hamburger-drawer-header {
+/* 運営アプリはPCに常設メニューがあるので、PCでは全画面メニューを出さない */
+@media (min-width: 1024px) {
+  .fullmenu-mobile-only {
+    display: none;
+  }
+}
+
+/* 観戦用ページはPCでも使うため、広い画面では右側のパネルにする */
+@media (min-width: 1024px) {
+  .fullmenu:not(.fullmenu-mobile-only) {
+    left: auto;
+    width: 380px;
+    box-shadow: -8px 0 32px rgba(20, 20, 20, 0.18);
+    transform: translateX(12px);
+  }
+  .fullmenu:not(.fullmenu-mobile-only).fullmenu-open {
+    transform: translateX(0);
+  }
+}
+
+.fullmenu-list {
+  flex: 1;
+  /* min-height:0 が無いと中身の高さぶん伸びてしまい、下の説明欄と重なる */
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+}
+
+/* 一行ぶんの項目。左にアイコンと名前、右に矢印（サイトと同じ形） */
+.fullmenu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  font-size: 13px;
+  gap: 14px;
+  width: 100%;
+  padding: 17px 20px;
+  font-size: 17px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
 }
 
-.hamburger-drawer-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 8px 24px;
+/* アイコンは白で太め・大きめ（文字と同じ強さで並ぶように） */
+.fullmenu-item > svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.4;
+  flex-shrink: 0;
 }
 
-.hamburger-drawer-item {
+.fullmenu-item:hover,
+.fullmenu-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 現在地は白地に赤文字で反転させる */
+.fullmenu-item-active {
+  color: var(--brand-red);
+  background: #ffffff;
+}
+
+.fullmenu-item-active:hover,
+.fullmenu-item-active:active {
+  background: #ffffff;
+}
+
+/* 右端の矢印 */
+.fullmenu-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* 開いたときに上から順に出てくる（--i は上からの並び順） */
+@keyframes fullmenu-item-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fullmenu-open .fullmenu-item {
+  animation: fullmenu-item-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+.fullmenu-open .fullmenu-footer {
+  animation: fullmenu-item-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--footer-delay, 0ms));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullmenu-open .fullmenu-item,
+  .fullmenu-open .fullmenu-footer {
+    animation: none;
+  }
+}
+
+.fullmenu-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+/* 下部の説明ボタン（音声・観戦用・協会HPなど）。
+   アイコンはメニューと同じ太さ・大きさ、文字は小さめにする。 */
+.fullmenu-footer .header-link {
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.fullmenu-footer .header-link svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.4;
+}
+.fullmenu-footer .drawer-action-row {
+  gap: 6px;
+}
+
+/* 協会ロゴ（白抜き版の画像をそのまま使う） */
+.fullmenu-logo {
+  max-width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ===========================================================
+   PC: 常設サイドバーの項目
+   =========================================================== */
+.side-menu-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -601,7 +578,7 @@
   padding: 12px 14px;
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -610,51 +587,35 @@
   text-align: left;
 }
 
-.hamburger-drawer-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+.side-menu-item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.hamburger-drawer-item-active {
-  color: #d4e157 !important;
-  background: rgba(212, 225, 87, 0.1);
+/* 現在地は白地に赤文字で反転させる */
+.side-menu-item-active {
+  color: var(--brand-red) !important;
+  background: #ffffff;
   font-weight: 700;
+  box-shadow: 0 1px 4px rgba(20, 20, 20, 0.18);
 }
 
-.hamburger-drawer-item-active:hover {
-  background: rgba(212, 225, 87, 0.15);
-}
-
-/* ドロワー下部ロゴ */
-.hamburger-drawer-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-}
-
-.hamburger-drawer-logo {
-  max-width: 160px;
-  height: auto;
-  object-fit: contain;
-  border-radius: 6px;
+.side-menu-item-active:hover {
+  background: #ffffff;
 }
 
 /* ===========================================================
-   ドロップダウンメニュー（フロストガラス）
+   ドロップダウンメニュー（白地・薄い影）
    =========================================================== */
 .dropdown-menu {
-  background: rgba(15, 51, 38, 0.92);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid var(--border-main);
   border-radius: 10px;
   box-shadow:
-    0 12px 48px rgba(15, 51, 38, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+    0 12px 32px rgba(20, 20, 20, 0.12),
+    0 2px 6px rgba(20, 20, 20, 0.06);
   max-height: 60vh;
   overflow-y: auto;
 }
@@ -666,20 +627,21 @@
   padding: 10px 16px;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: #5a5a5a;
   transition: all 0.15s ease;
   border-radius: 6px;
   margin: 2px 4px;
 }
 
 .dropdown-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink);
+  background: #f4f4f4;
 }
 
 .dropdown-item-active {
-  color: #d4e157 !important;
-  background: rgba(212, 225, 87, 0.08);
+  color: var(--brand-red) !important;
+  background: var(--brand-red-soft);
+  font-weight: 700;
 }
 
 /* ===========================================================
@@ -717,10 +679,10 @@
   50% { opacity: 0.82; }
 }
 
-/* ===== 大会情報バー ===== */
+/* ===== 大会情報バー — 白地 + 下端に細い赤ライン ===== */
 .info-bar {
-  background: #1b4d3e;
-  border-bottom: 1px solid rgba(218, 185, 92, 0.15);
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-main);
   position: relative;
 }
 .info-bar::after {
@@ -730,14 +692,20 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(218,185,92,0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(198, 56, 52, 0.45), transparent);
 }
 .info-bar-label {
-  background: rgba(27,77,62,0.9);
-  border-right: 1px solid rgba(218,185,92,0.2);
+  background: #ffffff;
+  border-right: 1px solid var(--border-main);
   position: relative;
   z-index: 1;
-  color: #ffd700;
+  color: var(--brand-red);
+}
+
+/* 先頭に流す大会名。ヘッダーにはメニュータイトルを出すので、大会名はここに置く */
+.info-ticker-lead {
+  font-weight: 700;
+  color: var(--brand-red);
 }
 
 /* ティッカーエリア — 左右フェードアウト */
@@ -763,8 +731,8 @@
 
 /* リーグ対戦中ハイライト（点滅） */
 @keyframes league-match-highlight {
-  0%, 100% { background-color: rgba(253, 224, 71, 0.22); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.35); }
-  50%      { background-color: rgba(253, 224, 71, 0.55); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.7); }
+  0%, 100% { background-color: rgba(198, 56, 52, 0.07); box-shadow: inset 0 0 0 1px rgba(198, 56, 52, 0.25); }
+  50%      { background-color: rgba(198, 56, 52, 0.20); box-shadow: inset 0 0 0 1px rgba(198, 56, 52, 0.6); }
 }
 .league-match-blink {
   animation: league-match-highlight 1.5s ease-in-out infinite;
@@ -791,14 +759,14 @@
 
 @keyframes block-warning-red-blink {
   0%, 100% {
-    background-color: rgba(239, 68, 68, 0.22);
-    border-color: rgba(220, 38, 38, 0.65);
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0);
+    background-color: rgba(198, 56, 52, 0.18);
+    border-color: rgba(198, 56, 52, 0.65);
+    box-shadow: 0 0 0 0 rgba(198, 56, 52, 0.0);
   }
   50% {
-    background-color: rgba(239, 68, 68, 0.60);
-    border-color: rgba(185, 28, 28, 1);
-    box-shadow: 0 0 22px 3px rgba(220, 38, 38, 0.7);
+    background-color: rgba(198, 56, 52, 0.55);
+    border-color: rgba(140, 34, 32, 1);
+    box-shadow: 0 0 22px 3px rgba(198, 56, 52, 0.7);
   }
 }
 .block-warning-red {
@@ -808,12 +776,12 @@
 /* ドロー：試合中カードは枠のみ点滅（カード内容はそのまま） */
 @keyframes bracket-card-blink {
   0%, 100% {
-    border-color: #22c55e;
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    border-color: #d46a66;
+    box-shadow: 0 0 0 0 rgba(198, 56, 52, 0);
   }
   50% {
-    border-color: #15803d;
-    box-shadow: 0 0 9px 1px rgba(34, 197, 94, 0.6);
+    border-color: #8c2220;
+    box-shadow: 0 0 9px 1px rgba(198, 56, 52, 0.55);
   }
 }
 .bracket-card-blink {
@@ -823,46 +791,47 @@
 /* コール中ポップアップ：枠のみ赤で点滅（内容は点滅しない） */
 @keyframes call-popup-blink {
   0%, 100% {
-    border-color: #f87171;
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    border-color: #e49f9c;
+    box-shadow: 0 0 0 0 rgba(198, 56, 52, 0);
   }
   50% {
-    border-color: #dc2626;
-    box-shadow: 0 0 14px 2px rgba(239, 68, 68, 0.6);
+    border-color: #c63834;
+    box-shadow: 0 0 14px 2px rgba(198, 56, 52, 0.55);
   }
 }
 .call-popup-blink {
   animation: call-popup-blink 1.1s ease-in-out infinite;
 }
 
-/* 対戦順：空きコート割当（入れる）カードは青枠のみ点滅 */
+/* 対戦順：空きコート割当（入れる）カードは墨の枠のみ点滅 */
 @keyframes enter-card-blink {
   0%, 100% {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    border-color: #a6a6a6;
+    box-shadow: 0 0 0 0 rgba(38, 38, 38, 0);
   }
   50% {
-    border-color: #1d4ed8;
-    box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.55);
+    border-color: #262626;
+    box-shadow: 0 0 12px 2px rgba(38, 38, 38, 0.4);
   }
 }
 .enter-card-blink {
   animation: enter-card-blink 1.1s ease-in-out infinite;
 }
 
-/* 空きコートに入れる（コート確定後・空き発生）カードはオレンジ枠で点滅 */
-@keyframes enter-court-orange-blink {
+/* 空きコートに入れる（コート確定後・空き発生）カードは墨の濃い枠で点滅。
+   試合中（赤点滅）・控え（淡いグレー点滅）と濃さで区別する。 */
+@keyframes enter-court-blink {
   0%, 100% {
-    border-color: #fb923c;
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+    border-color: #5a5a5a;
+    box-shadow: 0 0 0 0 rgba(20, 20, 20, 0);
   }
   50% {
-    border-color: #ea580c;
-    box-shadow: 0 0 13px 2px rgba(249, 115, 22, 0.6);
+    border-color: #141414;
+    box-shadow: 0 0 13px 2px rgba(20, 20, 20, 0.45);
   }
 }
-.enter-court-orange-blink {
-  animation: enter-court-orange-blink 1s ease-in-out infinite;
+.enter-court-blink {
+  animation: enter-court-blink 1s ease-in-out infinite;
 }
 
 /* ティッカーアイテム */
@@ -871,41 +840,38 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  color: #fff;
+  color: #404040;
   font-weight: 600;
   letter-spacing: 0.03em;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 .info-ticker-alert {
-  color: #ff6b6b;
+  color: var(--brand-red);
   font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 .info-ticker-dot {
   display: inline-block;
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.5);
+  background: #d6d6d6;
   margin-left: 16px;
-  box-shadow: 0 0 4px rgba(255,215,0,0.4);
 }
 
-/* 鳥取カードスタイル */
+/* カードスタイル（白地・薄いグレーの枠） */
 .card-tottori {
   background: var(--card-bg);
   border: 1px solid var(--border-main);
   border-radius: 12px;
   box-shadow:
-    0 1px 3px rgba(139, 94, 47, 0.06),
-    0 4px 16px rgba(139, 94, 47, 0.04);
+    0 1px 3px rgba(20, 20, 20, 0.05),
+    0 4px 16px rgba(20, 20, 20, 0.03);
   transition: box-shadow 0.25s ease, transform 0.25s ease, background-color 0.3s ease;
 }
 
 .card-tottori:hover {
   box-shadow:
-    0 2px 6px rgba(139, 94, 47, 0.08),
-    0 8px 24px rgba(139, 94, 47, 0.07);
+    0 2px 6px rgba(20, 20, 20, 0.07),
+    0 8px 24px rgba(20, 20, 20, 0.05);
 }
 
 /* ドロップダウンアニメーション */
@@ -1039,7 +1005,8 @@
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  background: linear-gradient(to bottom, #dce1e8, #d3d8e0);
+  background: #f4f4f4;
+  border-bottom: 1px solid var(--border-main);
   padding: 6px 6px 0;
   gap: 2px;
 }
@@ -1061,21 +1028,22 @@
   transition: background 0.15s ease, color 0.15s ease;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: #767676;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .chrome-tab:hover:not(.chrome-tab-active) {
-  background: rgba(255, 255, 255, 0.4);
-  color: #334155;
+  background: rgba(255, 255, 255, 0.7);
+  color: #262626;
 }
 
 .chrome-tab-active {
-  background: #f7f5f2;
-  color: #1e293b;
+  background: #ffffff;
+  color: var(--ink);
   z-index: 2;
   font-weight: 700;
+  box-shadow: inset 0 2px 0 0 var(--brand-red);
 }
 
 .chrome-tab-active::before,
@@ -1092,13 +1060,13 @@
 .chrome-tab-active::before {
   left: -10px;
   border-bottom-right-radius: 10px;
-  box-shadow: 4px 0 0 0 #f7f5f2;
+  box-shadow: 4px 0 0 0 #ffffff;
 }
 
 .chrome-tab-active::after {
   right: -10px;
   border-bottom-left-radius: 10px;
-  box-shadow: -4px 0 0 0 #f7f5f2;
+  box-shadow: -4px 0 0 0 #ffffff;
 }
 
 
@@ -1118,7 +1086,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #10b981;
+  background: var(--brand-red);
   border: 2px solid white;
   display: flex;
   align-items: center;
@@ -1196,55 +1164,55 @@
   stroke-width: 2.5;
 }
 
-/* IN（コート割当・エメラルド） */
+/* IN（コート割当）— 主要操作なのでブランド赤のベタ */
 .bracket-btn-in {
-  background-image: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border-color: #047857;
+  background-image: linear-gradient(135deg, #d2504c 0%, #c63834 100%);
+  border-color: #8c2220;
   box-shadow:
-    0 1px 2px rgba(5, 150, 105, 0.35),
-    0 2px 6px rgba(5, 150, 105, 0.2);
+    0 1px 2px rgba(198, 56, 52, 0.3),
+    0 2px 6px rgba(198, 56, 52, 0.16);
 }
 .bracket-btn-in:hover {
   box-shadow:
-    0 2px 4px rgba(5, 150, 105, 0.4),
-    0 4px 10px rgba(5, 150, 105, 0.25);
+    0 2px 4px rgba(198, 56, 52, 0.36),
+    0 4px 10px rgba(198, 56, 52, 0.2);
 }
 
-/* 変更（コート変更・インディゴ/ブルー） */
+/* 変更（コート変更）— 白地 + グレーの枠（副次操作） */
 .bracket-btn-change {
-  background-image: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border-color: #1d4ed8;
-  box-shadow:
-    0 1px 2px rgba(37, 99, 235, 0.35),
-    0 2px 6px rgba(37, 99, 235, 0.2);
+  background-image: none;
+  background-color: #ffffff;
+  color: #404040;
+  border-color: #d6d6d6;
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.06);
 }
 .bracket-btn-change:hover {
-  box-shadow:
-    0 2px 4px rgba(37, 99, 235, 0.4),
-    0 4px 10px rgba(37, 99, 235, 0.25);
+  background-color: #f4f4f4;
+  border-color: #a6a6a6;
+  box-shadow: 0 2px 4px rgba(20, 20, 20, 0.08);
 }
 
-/* コール（ローズ/レッド） */
+/* コール（呼び出し）— 墨のベタ */
 .bracket-btn-call {
-  background-image: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
-  border-color: #be123c;
+  background-image: linear-gradient(135deg, #404040 0%, #262626 100%);
+  border-color: #141414;
   box-shadow:
-    0 1px 2px rgba(225, 29, 72, 0.35),
-    0 2px 6px rgba(225, 29, 72, 0.2);
+    0 1px 2px rgba(20, 20, 20, 0.28),
+    0 2px 6px rgba(20, 20, 20, 0.16);
 }
 .bracket-btn-call:hover {
   box-shadow:
-    0 2px 4px rgba(225, 29, 72, 0.4),
-    0 4px 10px rgba(225, 29, 72, 0.25);
+    0 2px 4px rgba(20, 20, 20, 0.32),
+    0 4px 10px rgba(20, 20, 20, 0.2);
 }
 
 /* ALL タブ用グレーグラデーションラベル（視認性優先） */
 .chrome-tab-label-rainbow {
   background: linear-gradient(
     135deg,
-    #94a3b8 0%,
-    #64748b 50%,
-    #334155 100%
+    #a6a6a6 0%,
+    #5a5a5a 50%,
+    #262626 100%
   );
   -webkit-background-clip: text;
   background-clip: text;

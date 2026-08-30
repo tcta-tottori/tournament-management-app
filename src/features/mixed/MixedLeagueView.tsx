@@ -22,16 +22,9 @@ function saveCourtOverrides(overrides: Record<string, string>) {
   localStorage.setItem(COURT_OVERRIDE_KEY, JSON.stringify(overrides));
 }
 
-/** リーグバッジカラー（Blue先頭で全ページ統一） */
+/** リーグバッジカラー（サイトのトンマナに合わせ、全リーグ共通の無彩色） */
 const LEAGUE_COLORS = [
-  { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', header: 'from-blue-500 to-indigo-600' },
-  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', header: 'from-emerald-500 to-teal-600' },
-  { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', header: 'from-purple-500 to-violet-600' },
-  { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700', header: 'from-rose-500 to-pink-600' },
-  { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', header: 'from-amber-500 to-orange-600' },
-  { from: 'from-cyan-600', to: 'to-sky-700', light: 'from-cyan-50 to-sky-50', border: 'border-cyan-200', badge: 'bg-cyan-100 text-cyan-700', header: 'from-cyan-500 to-sky-600' },
-  { from: 'from-lime-600', to: 'to-green-700', light: 'from-lime-50 to-green-50', border: 'border-lime-200', badge: 'bg-lime-100 text-lime-700', header: 'from-lime-500 to-green-600' },
-  { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200', badge: 'bg-fuchsia-100 text-fuchsia-700', header: 'from-fuchsia-500 to-purple-600' },
+  { from: 'from-gray-600', to: 'to-gray-700', light: 'from-gray-50 to-white', border: 'border-gray-200', badge: 'bg-gray-100 text-gray-700', header: 'from-gray-500 to-gray-600' },
 ];
 
 export default function MixedLeagueView() {
@@ -121,7 +114,7 @@ export default function MixedLeagueView() {
       return {
         text: '',
         color: 'text-gray-400',
-        bg: `bg-white hover:bg-emerald-50 cursor-pointer ${isCurrent ? 'league-match-blink' : ''}`,
+        bg: `bg-white hover:bg-primary-50 cursor-pointer ${isCurrent ? 'league-match-blink' : ''}`,
         isCurrent
       };
     }
@@ -143,8 +136,8 @@ export default function MixedLeagueView() {
 
     return {
       text,
-      color: won ? 'text-emerald-700 font-bold' : 'text-red-600',
-      bg: `${won ? 'bg-emerald-50' : 'bg-red-50'} cursor-pointer`,
+      color: won ? 'text-gray-800 font-bold' : 'text-red-600',
+      bg: `${won ? 'bg-primary-50' : 'bg-red-50'} cursor-pointer`,
       isCurrent: false,
     };
   };
@@ -158,7 +151,7 @@ export default function MixedLeagueView() {
             <th className="px-3 py-2 text-left text-xs text-gray-500">ペア名 / 所属</th>
             {selectedLeague.teams.map((_, i) => (
               <th key={i} className="px-2 py-2 text-center text-xs text-gray-500 w-20">
-                <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-100 text-gray-800 rounded-full text-xs font-bold">
                   {i + 1}
                 </span>
               </th>
@@ -176,10 +169,10 @@ export default function MixedLeagueView() {
               <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
                 <td className="px-3 py-2">
                   <div className="flex flex-col items-center">
-                    <span className="inline-flex items-center justify-center w-7 h-7 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
+                    <span className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-gray-800 rounded-full text-sm font-bold">
                       {rowIdx + 1}
                     </span>
-                    <span className="text-[10px] font-bold text-emerald-600 mt-0.5">No.{team.pairNumber}</span>
+                    <span className="text-[10px] font-bold text-gray-700 mt-0.5">No.{team.pairNumber}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -212,7 +205,7 @@ export default function MixedLeagueView() {
                       }}
                     >
                       {cell.text === '__DIAG__' ? (
-                        <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" /></svg>
+                        <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none"><line x1="0" y1="0" x2="100%" y2="100%" stroke="#d6d6d6" strokeWidth="1" /></svg>
                       ) : (cell.text || (team.teamId !== colTeam.teamId && (
                         <span className="text-gray-300 text-xs">未入力</span>
                       )))}
@@ -231,9 +224,9 @@ export default function MixedLeagueView() {
                   <td className="px-3 py-2 text-center border-l border-gray-200">
                     {standing && standing.rank > 0 && (
                       <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold
-                        ${standing.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
+                        ${standing.rank === 1 ? 'bg-primary-100 text-primary-700' :
                           standing.rank === 2 ? 'bg-gray-200 text-gray-600' :
-                          standing.rank === 3 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}
+                          standing.rank === 3 ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-500'}
                       `}>
                         {standing.rank}
                       </span>
@@ -260,8 +253,8 @@ export default function MixedLeagueView() {
       {/* Blink animation style */}
       <style>{`
         @keyframes league-match-highlight {
-          0%, 100% { background-color: rgba(253, 224, 71, 0.25); }
-          50% { background-color: rgba(253, 224, 71, 0.65); }
+          0%, 100% { background-color: rgba(212,106,102, 0.25); }
+          50% { background-color: rgba(212,106,102, 0.65); }
         }
         .league-match-blink {
           animation: league-match-highlight 1.5s ease-in-out infinite;
@@ -403,11 +396,11 @@ export default function MixedLeagueView() {
 
         {/* エントリー未完了警告 */}
         {!allEntryDone && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-orange-700 flex items-center gap-2">
+          <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 text-sm text-gray-800 flex items-center gap-2">
             <span className="text-lg">⚠</span>
             <div>
               <div className="font-bold">エントリーが完了していません</div>
-              <div className="text-xs text-orange-500 mt-0.5">エントリーページで全選手の参加確認を完了してからスコア入力してください</div>
+              <div className="text-xs text-primary-500 mt-0.5">エントリーページで全選手の参加確認を完了してからスコア入力してください</div>
             </div>
           </div>
         )}
@@ -432,16 +425,16 @@ export default function MixedLeagueView() {
                     className={`
                       flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
                       ${isFinished
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        ? 'bg-primary-50 border-primary-200 text-gray-800'
                         : isPlaying
-                          ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
+                          ? 'bg-primary-50 border-primary-200 text-gray-800 animate-pulse'
                           : isCurrent
-                            ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300 league-match-blink'
+                            ? 'bg-primary-200 text-gray-900 font-bold border-primary-300 league-match-blink'
                             : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                       }
                     `}
                   >
-                    {isCurrent && !isFinished && <span className="text-yellow-700">▶</span>}
+                    {isCurrent && !isFinished && <span className="text-gray-800">▶</span>}
                     <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
                     <span className="font-bold">
                       {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
@@ -458,12 +451,12 @@ export default function MixedLeagueView() {
                   </button>
                   {/* Court override badge */}
                   {overrideCourt && (
-                    <span className="mt-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                    <span className="mt-0.5 text-[10px] text-gray-600 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 flex items-center gap-0.5">
                       <MapPin size={9} />{overrideCourt}
                       {!isFinished && (
                         <button
                           onClick={(e) => { e.stopPropagation(); match && persistCourtOverride(match.matchId, null); }}
-                          className="ml-0.5 text-blue-400 hover:text-red-500"
+                          className="ml-0.5 text-gray-400 hover:text-red-500"
                         >
                           <X size={9} />
                         </button>
@@ -474,7 +467,7 @@ export default function MixedLeagueView() {
                   {match && !isFinished && !overrideCourt && freeCourts.length > 0 && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setCourtPopupMatchId(match.matchId); }}
-                      className="mt-0.5 text-[10px] text-indigo-500 hover:text-indigo-700 flex items-center gap-0.5 hover:bg-indigo-50 rounded px-1 py-0.5 transition-colors"
+                      className="mt-0.5 text-[10px] text-gray-500 hover:text-gray-700 flex items-center gap-0.5 hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
                       title="空きコートで実施"
                     >
                       <ArrowRightLeft size={9} />空きコート
@@ -487,7 +480,7 @@ export default function MixedLeagueView() {
 
           {/* Current match indicator */}
           {currentMatch && currentMatchNumber && (
-            <div className="mt-3 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-gray-900">
               現在: 第{currentMatchNumber}試合（{currentMatchTeam1?.teamName || '?'} vs {currentMatchTeam2?.teamName || '?'}）{finishedCount}/{totalCount} 完了
             </div>
           )}
@@ -514,14 +507,14 @@ export default function MixedLeagueView() {
                   <tr key={s.teamId} className="border-b border-gray-100 last:border-0">
                     <td className="py-2 px-2 text-center">
                       <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
-                        ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-gray-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-gray-200 text-gray-600'}
+                        ${i === 0 ? 'bg-primary-400 text-white' : i === 1 ? 'bg-gray-400 text-white' : i === 2 ? 'bg-primary-400 text-white' : 'bg-gray-200 text-gray-600'}
                       `}>
                         {s.rank}
                       </span>
                     </td>
                     <td className="py-2 px-2 font-medium text-gray-800">{s.teamName}</td>
                     <td className="py-2 px-2 text-center font-mono text-gray-700">{s.wins}-{s.losses}</td>
-                    <td className="py-2 px-2 text-center font-mono text-emerald-600">{s.gamesWon}</td>
+                    <td className="py-2 px-2 text-center font-mono text-gray-700">{s.gamesWon}</td>
                     <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
                     {leagueComplete && (
                       <td className="py-2 px-2 text-center font-mono text-gray-600">
@@ -560,7 +553,7 @@ export default function MixedLeagueView() {
       {courtPopupMatchId && createPortal(
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setCourtPopupMatchId(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-72 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-4 py-2.5 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2.5 flex items-center justify-between">
               <h4 className="text-sm font-bold flex items-center gap-1.5"><ArrowRightLeft size={14} />空きコートで実施</h4>
               <button onClick={() => setCourtPopupMatchId(null)} className="p-1 hover:bg-white/20 rounded-lg"><X size={16} /></button>
             </div>
@@ -581,9 +574,9 @@ export default function MixedLeagueView() {
                         persistCourtOverride(courtPopupMatchId, fc.courtName);
                         setCourtPopupMatchId(null);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 transition-all text-sm"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all text-sm"
                     >
-                      <MapPin size={14} className="text-indigo-500 flex-shrink-0" />
+                      <MapPin size={14} className="text-gray-500 flex-shrink-0" />
                       <span className="font-medium text-gray-800">{fc.courtName}</span>
                       <span className="text-xs text-gray-400 ml-auto">{fc.leagueId.trim()}リーグ</span>
                     </button>
@@ -608,7 +601,7 @@ export default function MixedLeagueView() {
       {showRules && tournamentInfo?.rules && createPortal(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowRules(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] max-w-[95vw] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-5 py-3 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-5 py-3 flex items-center justify-between">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <BookOpen size={16} />
                 大会ルール
@@ -621,7 +614,7 @@ export default function MixedLeagueView() {
               <ul className="space-y-2">
                 {tournamentInfo.rules.map((rule, i) => (
                   <li key={i} className="text-sm text-gray-700 flex gap-2">
-                    <span className="text-amber-500 flex-shrink-0">&#x25CF;</span>
+                    <span className="text-primary-500 flex-shrink-0">&#x25CF;</span>
                     {rule}
                   </li>
                 ))}
@@ -635,7 +628,7 @@ export default function MixedLeagueView() {
       {/* Fullscreen portal (mobile) */}
       {isFullscreen && createPortal(
         <div className="fixed inset-0 bg-white z-[100] flex flex-col">
-          <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="bg-gradient-to-r from-primary-700 to-primary-800 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
             <h3 className="font-bold text-sm">
               {selectedLeague.leagueId.trim()}リーグ {selectedLeague.courtName && `(${selectedLeague.courtName})`}
             </h3>
@@ -649,7 +642,7 @@ export default function MixedLeagueView() {
             </div>
             {/* Current match info in fullscreen */}
             {currentMatch && currentMatchNumber && (
-              <div className="mt-3 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-gray-900">
                 現在: 第{currentMatchNumber}試合（{currentMatchTeam1?.teamName || '?'} vs {currentMatchTeam2?.teamName || '?'}）{finishedCount}/{totalCount} 完了
               </div>
             )}

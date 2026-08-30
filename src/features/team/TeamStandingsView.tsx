@@ -5,14 +5,14 @@ import { calculateTeamStandings } from './teamLogic';
 
 /** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
-  { header: 'from-blue-500 to-indigo-600', badge: 'bg-blue-100 text-blue-700' },
-  { header: 'from-emerald-500 to-teal-600', badge: 'bg-emerald-100 text-emerald-700' },
-  { header: 'from-purple-500 to-violet-600', badge: 'bg-purple-100 text-purple-700' },
-  { header: 'from-rose-500 to-pink-600', badge: 'bg-rose-100 text-rose-700' },
-  { header: 'from-amber-500 to-orange-600', badge: 'bg-amber-100 text-amber-700' },
-  { header: 'from-cyan-500 to-sky-600', badge: 'bg-cyan-100 text-cyan-700' },
-  { header: 'from-lime-500 to-green-600', badge: 'bg-lime-100 text-lime-700' },
-  { header: 'from-fuchsia-500 to-purple-600', badge: 'bg-fuchsia-100 text-fuchsia-700' },
+  { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
+  { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
+  { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
+  { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
 ];
 
 export default function TeamStandingsView() {
@@ -48,7 +48,7 @@ export default function TeamStandingsView() {
           disabled={!allComplete}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${
             allComplete
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:scale-105'
+              ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg hover:shadow-xl hover:scale-105'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
@@ -60,7 +60,7 @@ export default function TeamStandingsView() {
 
       {/* 未完了リーグ警告 */}
       {!allComplete && incompleteLeagues.length > 0 && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm text-amber-700">
+        <div className="flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 text-sm text-gray-800">
           <AlertTriangle size={16} />
           <span>
             未完了リーグ: {incompleteLeagues.map(l => l.leagueId).join(', ')}
@@ -102,9 +102,9 @@ export default function TeamStandingsView() {
                     <tr key={s.teamId} className="border-t hover:bg-gray-50">
                       <td className="px-3 py-1.5">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
-                          s.rank === 1 ? 'bg-yellow-100 text-yellow-800' :
+                          s.rank === 1 ? 'bg-primary-100 text-primary-800' :
                           s.rank === 2 ? 'bg-gray-200 text-gray-700' :
-                          s.rank === 3 ? 'bg-orange-100 text-orange-700' :
+                          s.rank === 3 ? 'bg-gray-100 text-gray-700' :
                           'bg-gray-100 text-gray-500'
                         }`}>
                           {s.rank}位

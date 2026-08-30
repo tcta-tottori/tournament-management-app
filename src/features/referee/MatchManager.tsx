@@ -3,12 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { FURIGANA_SEED } from '../../db/seedData';
 import { useAppStore } from '../../stores/appStore';
-import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Plus, Trash2, Clock } from 'lucide-react';
+import { ClipboardList, ListOrdered, Printer, Trophy, Edit3, Check, X, ChevronDown, ChevronUp, Volume2, Play, Square, Megaphone, BookOpen, Clock } from 'lucide-react';
 import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -16,7 +16,11 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder, matchKey } from './standbyRanking';
+import { buildLeagueCourtMap } from '../draw/leagueCourts';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
+import { isThirdPlaceMatch, THIRD_PLACE_LABEL } from '../draw/thirdPlace';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
+import GameRulesDialog from '../../components/ui/GameRulesDialog';
 import CallStatusPopup from '../../components/ui/CallStatusPopup';
 import { fillTestScores } from '../score/testScoreFiller';
 
@@ -57,6 +61,11 @@ function getMatchGameRuleText(evt: Event | undefined, round: number, totalRounds
 
 function getMatchFormatForRound(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
   return resolveRoundRule(evt, round, totalRounds)?.matchFormat || 'game';
+}
+
+/** 特定の試合の回戦名（3位決定戦は決勝と同じ回戦だが別名で呼ぶ） */
+function labelForMatch(m: { matchId: string; round: number }, totalRounds: number): string {
+  return isThirdPlaceMatch(m) ? THIRD_PLACE_LABEL : getRoundName(m.round, totalRounds);
 }
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -245,6 +254,13 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
+  // リーグ戦のコート割り当て（eventId → コートID）。
+  // 割り当てのあるリーグはそのコートだけで回し、他の種目はそのコートを使わない。
+  const leagueCourtMap = useMemo(
+    () => buildLeagueCourtMap([...allDraws.values()]),
+    [allDraws],
+  );
+
   // コートは現在の大会に紐づくものだけを対象にする。
   // db.courts.toArray()（全大会分）だと他大会・過去セッションの残存コートまで
   // 「空きコート」として数えてしまい、控え計算で全試合が「◯番コートへ」になり
@@ -384,13 +400,13 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   // 控え／入るコートのランキング。表示中の対戦順(globalSortedMatches)そのままで採番し、
   // 控え番号と表示位置を必ず一致させる。
   const standbyInfo = useMemo(
-    () => assignStandbyInOrder(globalSortedMatches, courts),
-    [globalSortedMatches, courts],
+    () => assignStandbyInOrder(globalSortedMatches, courts, { leagueCourtIds: leagueCourtMap }),
+    [globalSortedMatches, courts, leagueCourtMap],
   );
 
   // --- 音声コール ---
-  // Gemini TTS では話速・音程は「音声設定」のスタイル指示で制御するため、
-  // ここでは互換のための固定値のみ保持する
+  // 話速・音程は「音声設定」（ブラウザ内蔵音声のスライダー／Gemini のスタイル指示）で
+  // 制御するため、ここでは互換のための固定値のみ保持する
   const voiceSettings: VoiceSettings = {
     rate: 1.0,
     pitch: 1.0,
@@ -407,7 +423,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { speak, stop, isLoading: isCallLoading } = useGeminiTts();
+  const { speak, stop, isLoading: isCallLoading } = useCallTts();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(
@@ -539,7 +555,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     };
 
     const isDoubles = useEvent?.type === 'Doubles';
-    const roundName = getRoundName(m.round, useTotalRounds);
+    const roundName = labelForMatch(m, useTotalRounds);
 
     if (isDoubles) {
       const [fallbackNameA, fallbackPairNameA] = m.player1Name.includes(' / ')
@@ -854,22 +870,34 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return set;
   }, [allMatchesFlat, courtIdToName]);
 
-  // コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+  // コート選択ダイアログ用のコート一覧（番号順・同名コートは1つにまとめる）。
   // 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
-  const courtPickList = useMemo(() => {
-    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+  // リーグにコートを割り当てている種目は、その割り当てコートだけを候補にする。
+  // 他のリーグが専有しているコートは、その種目以外からは選べない。
+  const buildCourtPickList = useCallback((eventId: string) => {
+    const ownIds = leagueCourtMap.get(eventId) || [];
+    const reservedNames = new Set<string>();
+    for (const [evId, ids] of leagueCourtMap) {
+      if (evId === eventId) continue;
+      for (const id of ids) {
+        const n = courtIdToName.get(id);
+        if (n) reservedNames.add(n);
+      }
+    }
+    const target = ownIds.length > 0 ? courts.filter(c => ownIds.includes(c.courtId)) : courts;
+    const sorted = [...target].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
     const seen = new Set<string>();
     const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
     for (const c of sorted) {
       if (seen.has(c.name)) continue;
       seen.add(c.name);
-      const status = c.isAvailable === false
+      const status = c.isAvailable === false || reservedNames.has(c.name)
         ? 'unavailable'
         : playingCourtNames.has(c.name) ? 'playing' : 'empty';
       list.push({ courtId: c.courtId, name: c.name, status });
     }
     return list;
-  }, [courts, playingCourtNames]);
+  }, [courts, playingCourtNames, leagueCourtMap, courtIdToName]);
 
   // 待機試合を指定コートに入れる（試合開始）
   // matchId は種目内でしか一意でないため、種目をまたぐ検索では matchKey（eventId::matchId）で照合する。
@@ -984,7 +1012,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
         player1Name: m.player1Name,
         player2Name: m.player2Name,
         eventName: evt?.name || '',
-        roundLabel: getRoundName(m.round, evTotalRounds),
+        roundLabel: labelForMatch(m, evTotalRounds),
         callText: text,
       });
     }
@@ -995,28 +1023,12 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     bulkCallStart(bulkItems, voiceSettings.rate, 1);
   }, [currentTournamentId, courts, allMatchesFlat, bulkCallActive, bulkCallStart, buildMatchCall, affiliationFuriganaMap, voiceSettings, events, allDraws]);
 
-  // --- ゲームルール編集 ---
+  // --- ゲームルール編集（ドロー画面と共通のダイアログ） ---
   const [editingRuleEventId, setEditingRuleEventId] = useState<string | null>(null);
-  const [editingRules, setEditingRules] = useState<RoundGameRule[]>([]);
 
   const openRuleEditor = useCallback((evt: Event) => {
     setEditingRuleEventId(evt.eventId);
-    setEditingRules(evt.roundGameRules?.length ? [...evt.roundGameRules] : [
-      { roundLabel: '全回戦', ruleText: `${evt.gameRules?.games ?? 6}ゲームマッチ（${evt.gameRules?.games ?? 6}-${evt.gameRules?.games ?? 6}タイブレーク）`, games: evt.gameRules?.games ?? 6 },
-    ]);
   }, []);
-
-  const saveRules = useCallback(async () => {
-    if (!editingRuleEventId) return;
-    const evt = events.find(e => e.eventId === editingRuleEventId);
-    if (!evt?.id) return;
-    const defaultGames = editingRules.length > 0 ? editingRules[0].games : 6;
-    await db.events.update(evt.id, {
-      roundGameRules: editingRules,
-      gameRules: { ...evt.gameRules, games: defaultGames, tiebreakPoint: defaultGames },
-    });
-    setEditingRuleEventId(null);
-  }, [editingRuleEventId, editingRules, events]);
 
   // --- 結果入力 ---
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -1159,11 +1171,14 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
             });
           }
         }
+
+        // 勝ち上がり・3位決定戦の顔ぶれを整える
+        await refreshBracketProgress(matchEventId);
       }
     }
 
     // 試合終了時は空いたコートを自動では埋めず、空きコートとして残す。
-    // 空きが出た次の控え（控え1）はオレンジ点滅で「入れる」状態になり、
+    // 空きが出た次の控え（控え1）は墨の枠が点滅して「入れる」状態になり、
     // 審判/運営がタップして手動でコートに入れる運用にする。
 
     cancelEdit();
@@ -1322,7 +1337,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   .ba  { border: 1px solid #000; }
 </style></head><body>
 ${printableMatches.map(m => {
-      const rName = roundName(m.round);
+      const rName = isThirdPlaceMatch(m) ? THIRD_PLACE_LABEL : roundName(m.round);
       const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
       const courtDisplay = courtObj?.name || '';
 
@@ -1730,9 +1745,9 @@ ${printableMatches.map(m => {
   const statusLabels: Record<string, { text: string; color: string }> = {
     waiting: { text: '待機', color: 'bg-gray-100 text-gray-500' },
     ready: { text: '準備完了', color: 'bg-primary-50 text-primary-500' },
-    playing: { text: '試合中', color: 'bg-green-100 text-primary-500' },
-    finished: { text: '終了', color: 'bg-primary-50 text-primary-600' },
-    walkover: { text: '不戦勝', color: 'bg-amber-100 text-warning' },
+    playing: { text: '試合中', color: 'bg-primary-100 text-primary-500' },
+    finished: { text: '終了', color: 'bg-primary-50 text-gray-700' },
+    walkover: { text: '不戦勝', color: 'bg-primary-100 text-warning' },
   };
 
   return (
@@ -1772,7 +1787,7 @@ ${printableMatches.map(m => {
             {!hasPlayingMatches && globalSortedMatches.some(m => (m.status === 'waiting' || m.status === 'ready') && !!m.player1Name && !!m.player2Name && m.player1Name !== 'BYE' && m.player2Name !== 'BYE') && (
               <button
                 onClick={handleAssignInitialCourts}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-md transition-all"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-gray-600 to-gray-700 rounded-lg hover:from-gray-700 hover:to-gray-800 shadow-md transition-all"
               >
                 <Play className="w-4 h-4" />
                 初回コート確定（{courts.filter(c => c.isAvailable).length}コートに割り当て）
@@ -1782,7 +1797,7 @@ ${printableMatches.map(m => {
             {hasWaitingMatchesWithCourts && (
               <button
                 onClick={handleBulkFirstCall}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-700 hover:to-emerald-700 shadow-md transition-all"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg hover:from-primary-700 hover:to-primary-800 shadow-md transition-all"
               >
                 <Megaphone className="w-4 h-4" />
                 全コート初戦一斉コール
@@ -1837,7 +1852,7 @@ ${printableMatches.map(m => {
                   const renderPlayer = (num: number, name: string, affiliation: string, isWinner: boolean, dim: boolean) => (
                     <div className="min-w-0 flex-1 text-center">
                       <div className="flex items-baseline justify-center gap-1 min-w-0">
-                        {num > 0 && <span className="text-sm font-mono font-bold text-blue-400 shrink-0">{num}</span>}
+                        {num > 0 && <span className="text-sm font-mono font-bold text-gray-400 shrink-0">{num}</span>}
                         <span className={`text-sm leading-tight truncate ${isWinner ? 'font-bold text-primary-700' : dim ? 'font-medium text-gray-500' : 'font-semibold text-gray-900'}`} title={name}>
                           {name || '-'}
                         </span>
@@ -1868,7 +1883,7 @@ ${printableMatches.map(m => {
 
                     let statusDisplay: { text: string; color: string };
                     if (isPlaying) {
-                      statusDisplay = { text: '試合中', color: 'bg-green-100 text-green-700' };
+                      statusDisplay = { text: '試合中', color: 'bg-primary-100 text-gray-800' };
                     } else if (isFinished) {
                       statusDisplay = st;
                     } else if (!hasPlayers) {
@@ -1879,37 +1894,37 @@ ${printableMatches.map(m => {
 
                     // 中央上のバッジ:
                     // - 試合中/終了 → コート番号
-                    // - 空きコートが出て入れる状態 → 緑のボタン（タップでコートを選ぶ）。
+                    // - 空きコートが出て入れる状態 → 赤のボタン（タップでコートを選ぶ）。
                     //   どのコートに入るかは運営がダイアログで選ぶので、番号は出さない。
-                    // - それ以外の待機 → 大会全体で対戦順の上から「控え1〜5」（青）
+                    // - それ以外の待機 → 大会全体で対戦順の上から「控え1〜5」（グレー）
                     let centerBadge: { text: string; color: string } | null = null;
                     if ((isPlaying || isFinished) && courtObj?.name) {
-                      centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600' };
+                      centerBadge = { text: `${courtObj.name}番コート`, color: isPlaying ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600' };
                     } else if (hasPlayers && enterCourtName) {
-                      // 空きコートに入れる。運営はタップでコートを選ぶ緑ボタン、
+                      // 空きコートに入れる。運営はタップでコートを選ぶ赤ボタン、
                       // 観戦用（読み取り専用）はコートが未確定なので番号を出さない。
                       centerBadge = readOnly
-                        ? { text: '次に入ります', color: 'bg-orange-500 text-white' }
-                        : { text: '▶ コートを選ぶ', color: 'bg-green-600 text-white' };
+                        ? { text: '次に入ります', color: 'bg-primary-500 text-white' }
+                        : { text: '▶ コートを選ぶ', color: 'bg-primary-600 text-white' };
                     } else if (hasPlayers && sb?.standbyLabel) {
-                      centerBadge = { text: sb.standbyLabel, color: 'bg-blue-500 text-white' };
+                      centerBadge = { text: sb.standbyLabel, color: 'bg-gray-500 text-white' };
                     }
 
                     // カード枠の配色:
-                    // - 試合中: 緑枠点滅
-                    // - 空きコートが出て入れる: オレンジ枠点滅（タップでコートを選んで投入）
-                    // - 控え1〜5: 背景は白のまま、青の枠のみ点滅（まだ入れない＝順番待ち）
+                    // - 試合中: 赤枠点滅
+                    // - 空きコートが出て入れる: 墨の枠点滅（タップでコートを選んで投入）
+                    // - 控え1〜5: 背景は白のまま、淡いグレーの枠のみ点滅（まだ入れない＝順番待ち）
                     // - それ以外の待機: 通常カード
                     const cardClass = isFinished
                       ? 'bg-gray-50 border-gray-200 opacity-60'
                       : isPlaying
-                        ? 'bg-green-50 border-2 border-green-500 bracket-card-blink'
+                        ? 'bg-primary-50 border-2 border-primary-500 bracket-card-blink'
                         : !hasPlayers
                           ? 'bg-white border-gray-200 opacity-50'
                           : enterCourtName
-                            ? 'bg-orange-50 border-2 border-orange-400 enter-court-orange-blink'
+                            ? 'bg-gray-50 border-2 border-gray-700 enter-court-blink'
                             : sb?.standbyLabel
-                              ? 'bg-white border-2 border-blue-400 enter-card-blink'
+                              ? 'bg-white border-2 border-gray-400 enter-card-blink'
                               : `${evColor.bg} border-gray-200`;
 
                     const w1 = isFinished && !!m.winnerEntryId && m.winnerEntryId === m.player1EntryId;
@@ -1951,11 +1966,11 @@ ${printableMatches.map(m => {
                             <span className={`text-[11px] font-bold truncate ${evColor.text}`} title={evLabel}>{evLabel}</span>
                             <div className="flex-1" />
                             {centerBadge && (
-                              // 入れる状態の緑バッジはボタン（タップでコート選択ダイアログを開く）
+                              // 入れる状態の赤バッジはボタン（タップでコート選択ダイアログを開く）
                               enterCourtName && isWaitingEnterable ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setCourtPickMatchId(matchKey(m)); }}
-                                  className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm transition-colors hover:bg-green-700 ${centerBadge.color}`}
+                                  className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shadow-sm transition-colors hover:bg-primary-700 ${centerBadge.color}`}
                                 >
                                   {centerBadge.text}
                                 </button>
@@ -1971,7 +1986,7 @@ ${printableMatches.map(m => {
                           <div className="flex items-start gap-2">
                             {renderPlayer(num1, m.player1Name, m.player1Affiliation, w1, isFinished)}
                             <div className="flex flex-col items-center justify-center shrink-0 pt-0.5 min-w-[32px]">
-                              <span className="text-base font-bold text-blue-300 leading-none">vs</span>
+                              <span className="text-base font-bold text-gray-300 leading-none">vs</span>
                               {isFinished && m.score && <span className="text-[9px] font-mono font-bold text-gray-500 leading-tight mt-0.5">{m.score}</span>}
                             </div>
                             {renderPlayer(num2, m.player2Name, m.player2Affiliation, w2, isFinished)}
@@ -1981,7 +1996,7 @@ ${printableMatches.map(m => {
                             {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
                             <div className="flex-1" />
                             {elapsedLabel && (
-                              <span className="absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold font-mono">
+                              <span className="absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary-100 text-gray-800 text-[11px] font-bold font-mono">
                                 <Clock className="w-3 h-3" />
                                 {elapsedLabel}
                               </span>
@@ -1990,7 +2005,7 @@ ${printableMatches.map(m => {
                             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={() => handlePrintMatch(m)}
-                                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 transition-all"
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200 transition-all"
                                 title="印刷"
                               >
                                 <Printer className="w-4 h-4" />
@@ -1998,7 +2013,7 @@ ${printableMatches.map(m => {
                               {evt && (
                                 <button
                                   onClick={() => openRuleEditor(evt)}
-                                  className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg border border-amber-200 transition-all"
+                                  className="p-1.5 text-primary-500 hover:text-gray-700 hover:bg-primary-50 rounded-lg border border-primary-200 transition-all"
                                   title="試合ルール"
                                 >
                                   <BookOpen className="w-4 h-4" />
@@ -2009,8 +2024,8 @@ ${printableMatches.map(m => {
                                   onClick={() => openCallModal(m)}
                                   className={`p-1.5 rounded-lg border transition-all ${
                                     callTargetMatchId === matchKey(m)
-                                      ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
-                                      : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50'
+                                      ? 'text-gray-700 bg-primary-50 border-primary-300'
+                                      : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50'
                                   }`}
                                   title="音声コール"
                                 >
@@ -2070,7 +2085,7 @@ ${printableMatches.map(m => {
                 >
                   <div className="flex items-center gap-3">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-primary-100 text-primary-600'
+                      isActive ? 'bg-white/20 text-white' : 'bg-primary-100 text-gray-700'
                     }`}>
                       <ListOrdered className="w-4 h-4" />
                     </div>
@@ -2089,7 +2104,7 @@ ${printableMatches.map(m => {
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
                         isActive
                           ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
-                          : 'bg-amber-500 text-white hover:bg-amber-600'
+                          : 'bg-primary-500 text-white hover:bg-primary-600'
                       }`}
                       title="ゲームルール"
                     >
@@ -2134,12 +2149,12 @@ ${printableMatches.map(m => {
                         {/* ラウンドヘッダー */}
                         <tr>
                           <td colSpan={7} className="px-0 py-0">
-                            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-slate-100 to-slate-50 border-b border-t border-slate-200">
+                            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-50 border-b border-t border-gray-200">
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-700 text-white text-[10px] font-bold">{round}</span>
-                                <span className="text-xs font-bold text-slate-700 tracking-wide">{roundLabel}</span>
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-700 text-white text-[10px] font-bold">{round}</span>
+                                <span className="text-xs font-bold text-gray-700 tracking-wide">{roundLabel}</span>
                                 {evt.roundGameRules && evt.roundGameRules.length > 0 && (
-                                  <span className="text-[10px] text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded">
+                                  <span className="text-[10px] text-gray-700 font-medium bg-primary-50 px-1.5 py-0.5 rounded">
                                     {(() => {
                                       const rules = evt.roundGameRules;
                                       if (rules.length === 1) return rules[0].ruleText;
@@ -2165,13 +2180,13 @@ ${printableMatches.map(m => {
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <div className="h-1.5 w-16 bg-slate-200 rounded-full overflow-hidden">
+                                <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                    className="h-full bg-primary-500 rounded-full transition-all duration-500"
                                     style={{ width: roundMatches.length > 0 ? `${(rFinished / roundMatches.length) * 100}%` : '0%' }}
                                   />
                                 </div>
-                                <span className="text-[10px] font-mono text-slate-400">{rFinished}/{roundMatches.length}</span>
+                                <span className="text-[10px] font-mono text-gray-400">{rFinished}/{roundMatches.length}</span>
                               </div>
                             </div>
                           </td>
@@ -2186,21 +2201,21 @@ ${printableMatches.map(m => {
 
                               if (isEditing) {
                                 return (
-                                  <tr key={matchKey(m)} className="border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                                    <td className="py-2.5 px-2 text-center font-mono text-blue-400 text-xs font-bold">{m.matchOrder}</td>
+                                  <tr key={matchKey(m)} className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                                    <td className="py-2.5 px-2 text-center font-mono text-gray-400 text-xs font-bold">{m.matchOrder}</td>
                                     <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
-                                        {autoWinner === 1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-amber-800' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
+                                        {autoWinner === 1 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-gray-900' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
                                           {m.player1Name}
                                         </span>
                                       </div>
                                     </td>
-                                    <td className="py-2.5 px-1 text-center text-blue-300 text-xs font-bold">vs</td>
+                                    <td className="py-2.5 px-1 text-center text-gray-300 text-xs font-bold">vs</td>
                                     <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
-                                        {autoWinner === 2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-amber-800' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
+                                        {autoWinner === 2 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-gray-900' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
                                           {m.player2Name}
                                         </span>
                                       </div>
@@ -2215,14 +2230,14 @@ ${printableMatches.map(m => {
                                             value={editScore1}
                                             onChange={e => { setEditScore1(e.target.value); setEditTiebreak(''); }}
                                             placeholder="0"
-                                            className="w-11 border border-blue-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-11 border border-gray-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                             onKeyDown={e => {
                                               if (e.key === 'Enter') saveResult(m);
                                               if (e.key === 'Escape') cancelEdit();
                                             }}
                                             autoFocus
                                           />
-                                          <span className="text-blue-300 font-bold text-xs">-</span>
+                                          <span className="text-gray-300 font-bold text-xs">-</span>
                                           <input
                                             type="number"
                                             min="0"
@@ -2230,7 +2245,7 @@ ${printableMatches.map(m => {
                                             value={editScore2}
                                             onChange={e => { setEditScore2(e.target.value); setEditTiebreak(''); }}
                                             placeholder="0"
-                                            className="w-11 border border-blue-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                                            className="w-11 border border-gray-300 rounded-md px-1 py-1 text-sm text-center font-mono bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                             onKeyDown={e => {
                                               if (e.key === 'Enter') saveResult(m);
                                               if (e.key === 'Escape') cancelEdit();
@@ -2239,7 +2254,7 @@ ${printableMatches.map(m => {
                                         </div>
                                         {isTiebreakScore && (
                                           <div className="flex items-center gap-1 text-xs text-gray-500">
-                                            <span className="text-amber-600 font-bold">TB</span>
+                                            <span className="text-gray-700 font-bold">TB</span>
                                             {tiebreakLoserSide === 1 && (
                                               <>
                                                 <input
@@ -2249,7 +2264,7 @@ ${printableMatches.map(m => {
                                                   value={editTiebreak}
                                                   onChange={e => setEditTiebreak(e.target.value)}
                                                   placeholder="0"
-                                                  className="w-9 border border-amber-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  className="w-9 border border-primary-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-primary-50 focus:border-primary-500 focus:ring-1 focus:ring-primary-400 outline-none"
                                                   onKeyDown={e => {
                                                     if (e.key === 'Enter') saveResult(m);
                                                     if (e.key === 'Escape') cancelEdit();
@@ -2270,7 +2285,7 @@ ${printableMatches.map(m => {
                                                   value={editTiebreak}
                                                   onChange={e => setEditTiebreak(e.target.value)}
                                                   placeholder="0"
-                                                  className="w-9 border border-amber-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                  className="w-9 border border-primary-300 rounded-md px-1 py-0.5 text-xs text-center font-mono bg-primary-50 focus:border-primary-500 focus:ring-1 focus:ring-primary-400 outline-none"
                                                   onKeyDown={e => {
                                                     if (e.key === 'Enter') saveResult(m);
                                                     if (e.key === 'Escape') cancelEdit();
@@ -2284,11 +2299,11 @@ ${printableMatches.map(m => {
                                     </td>
                                     <td className="py-2.5 px-2 text-center">
                                       {autoWinner ? (
-                                        <span className="text-[10px] text-amber-600 font-bold bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-[10px] text-gray-700 font-bold bg-primary-100 px-1.5 py-0.5 rounded-full">
                                           {autoWinner === 1 ? 'P1' : 'P2'}勝
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] text-blue-500 font-medium">...</span>
+                                        <span className="text-[10px] text-gray-500 font-medium">...</span>
                                       )}
                                     </td>
                                     <td className="py-2.5 px-2 text-center">
@@ -2296,7 +2311,7 @@ ${printableMatches.map(m => {
                                         <button
                                           onClick={() => saveResult(m)}
                                           disabled={!autoWinner}
-                                          className="p-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                          className="p-1.5 text-white bg-primary-500 hover:bg-primary-600 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
                                           title="保存"
                                         >
                                           <Check className="w-3.5 h-3.5" />
@@ -2315,53 +2330,53 @@ ${printableMatches.map(m => {
 
                               return (
                                 <React.Fragment key={matchKey(m)}>
-                                  <tr className={`border-b border-slate-100 transition-colors group ${
+                                  <tr className={`border-b border-gray-100 transition-colors group ${
                                     isThisSpeaking
-                                      ? 'bg-gradient-to-r from-amber-50 to-orange-50'
+                                      ? 'bg-gradient-to-r from-primary-50 to-white'
                                       : m.status === 'finished'
-                                        ? 'bg-slate-50/50'
+                                        ? 'bg-gray-50/50'
                                         : m.status === 'playing'
-                                          ? 'bg-gradient-to-r from-emerald-50/50 to-transparent'
-                                          : idx % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'
+                                          ? 'bg-gradient-to-r from-primary-50/50 to-transparent'
+                                          : idx % 2 === 1 ? 'bg-gray-50/30' : 'bg-white'
                                   } hover:bg-primary-50/40`}>
                                     <td className="py-2.5 px-2 text-center">
                                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${
                                         m.status === 'finished'
-                                          ? 'bg-slate-200 text-slate-500'
+                                          ? 'bg-gray-200 text-gray-500'
                                           : m.status === 'playing'
-                                            ? 'bg-emerald-100 text-emerald-700'
-                                            : 'bg-slate-100 text-slate-500'
+                                            ? 'bg-primary-100 text-gray-800'
+                                            : 'bg-gray-100 text-gray-500'
                                       }`}>
                                         {m.matchOrder}
                                       </span>
                                     </td>
                                     <td className="py-2.5 px-2 overflow-hidden">
                                       <div className="flex items-center gap-1 min-w-0">
-                                        {isWinner1 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`truncate ${isWinner1 ? 'font-bold text-amber-800' : isWinner2 ? 'text-gray-400' : 'font-medium text-slate-800'}`}>
+                                        {isWinner1 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
+                                        <span className={`truncate ${isWinner1 ? 'font-bold text-primary-800' : isWinner2 ? 'text-gray-400' : 'font-medium text-gray-800'}`}>
                                           {m.player1Name || '(未定)'}
                                         </span>
                                         {m.player1Affiliation && (
-                                          <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">({m.player1Affiliation})</span>
+                                          <span className="text-[10px] text-gray-400 shrink-0 hidden sm:inline">({m.player1Affiliation})</span>
                                         )}
                                       </div>
                                     </td>
                                     <td className="py-2.5 px-0 text-center">
-                                      <span className="text-[10px] text-slate-300 font-bold">vs</span>
+                                      <span className="text-[10px] text-gray-300 font-bold">vs</span>
                                     </td>
                                     <td className="py-2.5 px-2 overflow-hidden">
                                       <div className="flex items-center gap-1 min-w-0">
-                                        {isWinner2 && <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-                                        <span className={`truncate ${isWinner2 ? 'font-bold text-amber-800' : isWinner1 ? 'text-gray-400' : 'font-medium text-slate-800'}`}>
+                                        {isWinner2 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
+                                        <span className={`truncate ${isWinner2 ? 'font-bold text-primary-800' : isWinner1 ? 'text-gray-400' : 'font-medium text-gray-800'}`}>
                                           {m.player2Name || '(未定)'}
                                         </span>
                                         {m.player2Affiliation && (
-                                          <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">({m.player2Affiliation})</span>
+                                          <span className="text-[10px] text-gray-400 shrink-0 hidden sm:inline">({m.player2Affiliation})</span>
                                         )}
                                       </div>
                                     </td>
                                     <td className="py-2.5 px-2 text-center">
-                                      <span className={`font-mono text-xs ${m.status === 'finished' ? 'text-slate-700 font-semibold' : 'text-slate-400'}`}>
+                                      <span className={`font-mono text-xs ${m.status === 'finished' ? 'text-gray-700 font-semibold' : 'text-gray-400'}`}>
                                         {m.score || (isWalkover ? 'W.O' : '-')}
                                       </span>
                                     </td>
@@ -2373,7 +2388,7 @@ ${printableMatches.map(m => {
                                         {/* 対戦票印刷 */}
                                         <button
                                           onClick={() => handlePrintMatch(m)}
-                                          className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-all shadow-sm hover:shadow"
+                                          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-all shadow-sm hover:shadow"
                                           title="対戦票印刷"
                                         >
                                           <Printer className="w-4 h-4" />
@@ -2387,8 +2402,8 @@ ${printableMatches.map(m => {
                                             }}
                                             className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                               m.status === 'finished'
-                                                ? 'text-orange-400 border-orange-200 hover:text-orange-600 hover:bg-orange-50 hover:border-orange-300'
-                                                : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50 hover:border-primary-300'
+                                                ? 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
+                                                : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
                                             }`}
                                             title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
                                           >
@@ -2413,8 +2428,8 @@ ${printableMatches.map(m => {
                                               }}
                                               className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                                 isCallTarget
-                                                  ? 'text-emerald-600 bg-emerald-50 border-emerald-300'
-                                                  : 'text-emerald-400 border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300'
+                                                  ? 'text-gray-700 bg-primary-50 border-primary-300'
+                                                  : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
                                               }`}
                                               title="音声コール"
                                             >
@@ -2455,7 +2470,7 @@ ${printableMatches.map(m => {
         const evt = events.find(e => e.eventId === sm.eventId);
         const evDraw = allDraws.get(sm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
-        const roundName = getRoundName(sm.round, evTotalRounds);
+        const roundName = labelForMatch(sm, evTotalRounds);
         const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
         return (
           <CallStatusPopup
@@ -2469,194 +2484,12 @@ ${printableMatches.map(m => {
         );
       })()}
 
-      {/* ゲームルール編集ダイアログ */}
+      {/* ゲームルール編集ダイアログ（ドロー画面と共通） */}
       {editingRuleEventId && (() => {
         const ruleEvt = events.find(e => e.eventId === editingRuleEventId);
+        if (!ruleEvt) return null;
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setEditingRuleEventId(null)}>
-            <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px]" />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" />
-                  <div>
-                    <h3 className="text-sm font-bold">ゲームルール編集</h3>
-                    <p className="text-[10px] text-white/70">{ruleEvt?.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setEditingRuleEventId(null)} className="p-1 rounded-lg hover:bg-white/20">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-3 max-h-[60vh] overflow-auto">
-                {editingRules.map((rule, i) => (
-                  <div key={i} className="flex items-start gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    <div className="flex-1 space-y-2">
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-medium">適用範囲</label>
-                        <input
-                          type="text"
-                          value={rule.roundLabel}
-                          onChange={e => {
-                            const next = [...editingRules];
-                            next[i] = { ...next[i], roundLabel: e.target.value };
-                            setEditingRules(next);
-                          }}
-                          placeholder="例: 全回戦, 1～2回戦, 準決勝以降"
-                          className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-medium">ルール</label>
-                        <input
-                          type="text"
-                          value={rule.ruleText}
-                          onChange={e => {
-                            const next = [...editingRules];
-                            const text = e.target.value;
-                            const gMatch = text.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30)).match(/(\d+)\s*ゲーム/);
-                            next[i] = { ...next[i], ruleText: text, games: gMatch ? parseInt(gMatch[1]) : next[i].games };
-                            setEditingRules(next);
-                          }}
-                          placeholder="例: 8ゲームマッチ（8-8タイブレーク）"
-                          className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
-                        />
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={12}
-                            value={rule.games}
-                            onChange={e => {
-                              const next = [...editingRules];
-                              next[i] = { ...next[i], games: parseInt(e.target.value) || 6 };
-                              setEditingRules(next);
-                            }}
-                            className="w-16 text-sm text-center border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-[10px] text-gray-500 font-medium">方式</label>
-                          <select
-                            value={rule.matchFormat || 'game'}
-                            onChange={e => {
-                              const next = [...editingRules];
-                              next[i] = { ...next[i], matchFormat: e.target.value as 'game' | 'twoSetsSuper10' };
-                              setEditingRules(next);
-                            }}
-                            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:border-amber-400 outline-none"
-                          >
-                            <option value="game">ゲームマッチ</option>
-                            <option value="twoSetsSuper10">2セット+STB</option>
-                          </select>
-                        </div>
-                      </div>
-                      {/* 熱中症警戒アラート時の試合形式（任意） */}
-                      <div className="mt-1 pt-2 border-t border-dashed border-red-200 space-y-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-red-600">🌡 熱中症警戒時の試合形式（任意）</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={rule.heatRuleText ?? ''}
-                          onChange={e => {
-                            const next = [...editingRules];
-                            const text = e.target.value;
-                            const gMatch = text.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30)).match(/(\d+)\s*ゲーム/);
-                            next[i] = { ...next[i], heatRuleText: text, heatGames: gMatch ? parseInt(gMatch[1]) : next[i].heatGames };
-                            setEditingRules(next);
-                          }}
-                          placeholder="例: 6ゲームマッチ（ノーアドバンテージ）"
-                          className="w-full text-sm border border-red-200 rounded-lg px-2.5 py-1.5 focus:border-red-400 focus:ring-2 focus:ring-red-200 outline-none"
-                        />
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-500 font-medium">ゲーム数</label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={12}
-                              value={rule.heatGames ?? ''}
-                              onChange={e => {
-                                const next = [...editingRules];
-                                const v = e.target.value;
-                                next[i] = { ...next[i], heatGames: v === '' ? undefined : (parseInt(v) || undefined) };
-                                setEditingRules(next);
-                              }}
-                              placeholder="-"
-                              className="w-16 text-sm text-center border border-red-200 rounded-lg px-2 py-1 focus:border-red-400 outline-none"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[10px] text-gray-500 font-medium">方式</label>
-                            <select
-                              value={rule.heatMatchFormat || 'game'}
-                              onChange={e => {
-                                const next = [...editingRules];
-                                next[i] = { ...next[i], heatMatchFormat: e.target.value as 'game' | 'twoSetsSuper10' };
-                                setEditingRules(next);
-                              }}
-                              className="text-xs border border-red-200 rounded-lg px-2 py-1 focus:border-red-400 outline-none"
-                            >
-                              <option value="game">ゲームマッチ</option>
-                              <option value="twoSetsSuper10">2セット+STB</option>
-                            </select>
-                          </div>
-                          {(rule.heatRuleText || rule.heatGames) && (
-                            <button
-                              onClick={() => {
-                                const next = [...editingRules];
-                                next[i] = { ...next[i], heatRuleText: undefined, heatGames: undefined, heatMatchFormat: undefined };
-                                setEditingRules(next);
-                              }}
-                              className="text-[10px] text-red-500 hover:text-red-700 underline"
-                            >
-                              クリア
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {editingRules.length > 1 && (
-                      <button
-                        onClick={() => setEditingRules(editingRules.filter((_, idx) => idx !== i))}
-                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                <button
-                  onClick={() => setEditingRules([...editingRules, { roundLabel: '', ruleText: '', games: 6 }])}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-amber-600 border border-dashed border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  ルールを追加
-                </button>
-              </div>
-
-              <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
-                <button
-                  onClick={() => setEditingRuleEventId(null)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={saveRules}
-                  className="px-4 py-2 text-xs font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 shadow-sm"
-                >
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
+          <GameRulesDialog event={ruleEvt} onClose={() => setEditingRuleEventId(null)} />
         );
       })()}
 
@@ -2693,9 +2526,10 @@ ${printableMatches.map(m => {
             courts={courts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
             onClose={() => setScoreDialogMatchId(null)}
             onMatchUpdate={() => {}}
-            getRoundName={(round) => getRoundName(round, evTotalRounds)}
+            getRoundName={(round) => (isThirdPlaceMatch(sm) ? THIRD_PLACE_LABEL : getRoundName(round, evTotalRounds))}
             isLeague={false}
             gameRuleText={getMatchGameRuleText(evt, sm.round, evTotalRounds)}
+            onEditRules={evt ? () => openRuleEditor(evt) : undefined}
             requiredGames={resolveRequiredGames(getMatchGameRuleText(evt, sm.round, evTotalRounds), sm.round, evTotalRounds)}
             matchFormat={getMatchFormatForRound(evt, sm.round, evTotalRounds)}
           />
@@ -2712,10 +2546,10 @@ ${printableMatches.map(m => {
         return (
           <CourtPickDialog
             eventName={shortEventName(evt?.name || pm.eventId)}
-            roundName={getRoundName(pm.round, evTotalRounds)}
+            roundName={labelForMatch(pm, evTotalRounds)}
             player1Name={pm.player1Name}
             player2Name={pm.player2Name}
-            courts={courtPickList}
+            courts={buildCourtPickList(pm.eventId)}
             onSelect={(courtId) => handleEnterCourt(matchKey(pm), courtId)}
             onClose={() => setCourtPickMatchId(null)}
             onScoreInput={() => {

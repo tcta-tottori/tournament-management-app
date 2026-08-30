@@ -84,7 +84,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
           <div className="relative">
             <GoogleDriveIcon className="w-7 h-7" />
             {!isFinished && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full drive-modal-pulse" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-gray-500 rounded-full drive-modal-pulse" />
             )}
           </div>
           <div>
@@ -169,7 +169,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
                     <span className="w-4 h-4 rounded-full border-2 border-gray-200 border-t-[#1a73e8] drive-modal-spin" />
                   )}
                   {step.status === 'done' && (
-                    <CheckCircle2 className="w-4.5 h-4.5 text-green-500" />
+                    <CheckCircle2 className="w-4.5 h-4.5 text-primary-500" />
                   )}
                   {step.status === 'error' && (
                     <AlertCircle className="w-4.5 h-4.5 text-red-500" />
@@ -179,7 +179,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
                 <div className="min-w-0 flex-1">
                   <span className={`text-sm ${
                     step.status === 'loading' ? 'text-gray-800 font-medium' :
-                    step.status === 'done' ? 'text-green-700' :
+                    step.status === 'done' ? 'text-gray-800' :
                     step.status === 'error' ? 'text-red-600' :
                     'text-gray-400'
                   }`}>
@@ -197,7 +197,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
           {result && (
             <div className={`mt-4 p-3 rounded-lg text-sm ${
               result.success
-                ? 'bg-green-50 text-green-800 border border-green-200'
+                ? 'bg-primary-50 text-gray-900 border border-primary-200'
                 : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
               <div className="flex items-start gap-2">

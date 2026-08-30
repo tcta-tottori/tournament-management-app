@@ -70,7 +70,7 @@ function PlayerCardLine({ info, fallbackName }: { info?: CallPlayerInfo; fallbac
   return (
     <div>
       <div className="text-sm font-bold text-gray-800">
-        {info?.number ? <span className="text-emerald-600 mr-1">{info.number}.</span> : null}
+        {info?.number ? <span className="text-gray-700 mr-1">{info.number}.</span> : null}
         {name}
       </div>
       {info?.affiliation && <div className="text-[11px] text-gray-500 mt-0.5">{info.affiliation}</div>}
@@ -140,7 +140,7 @@ export default function CallSettingsModal({
       <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm my-auto overflow-hidden animate-[confirmSlideUp_0.2s_ease-out]">
         {/* ヘッダー */}
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3.5 flex items-center gap-3">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-3.5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
             <Volume2 className="w-5 h-5 text-white" />
           </div>
@@ -173,10 +173,10 @@ export default function CallSettingsModal({
               <div className="min-w-0">
                 <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
                   <MapPin className="w-3 h-3 shrink-0" />コート
-                  {courtAssigned && <span className="text-emerald-600 font-medium">（修正可）</span>}
+                  {courtAssigned && <span className="text-gray-700 font-medium">（修正可）</span>}
                 </label>
                 <select value={courtNumber} onChange={e => onCourtChange?.(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all">
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all">
                   <option value="">選択</option>
                   {courtOptions.length > 0
                     ? courtOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)
@@ -191,7 +191,7 @@ export default function CallSettingsModal({
                   <span className="text-gray-400 font-medium">（任意）</span>
                 </label>
                 <input type="time" value={startTime} onChange={e => onStartTimeChange?.(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all" />
               </div>
             </div>
           )}
@@ -213,7 +213,7 @@ export default function CallSettingsModal({
                           value={it.reading}
                           onChange={e => onNameReadingChange?.(it.key, e.target.value)}
                           placeholder="ふりがな"
-                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all"
                         />
                       </div>
                     ))}
@@ -234,7 +234,7 @@ export default function CallSettingsModal({
                           value={it.reading}
                           onChange={e => onAffReadingChange?.(it.key, e.target.value)}
                           placeholder="ふりがな"
-                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                          className="w-full min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all"
                         />
                       </div>
                     ))}
@@ -252,7 +252,7 @@ export default function CallSettingsModal({
               <textarea value={callText ?? ''} onChange={e => onCallTextChange?.(e.target.value)}
                 rows={5}
                 placeholder={showCourtAndTime && !courtNumber ? 'コートを選択すると読み上げ内容が表示されます。' : ''}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm leading-relaxed bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all resize-y" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm leading-relaxed bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all resize-y" />
               <p className="text-[10px] text-gray-400 mt-1">この内容（ひらがな）でコールします。読みが違う場合は修正してください。</p>
             </div>
           )}
@@ -267,7 +267,7 @@ export default function CallSettingsModal({
           <button
             onClick={() => { if (canCall) onCall(); }}
             disabled={!canCall}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all">
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all">
             <Volume2 className="w-4 h-4" />コール
           </button>
         </div>

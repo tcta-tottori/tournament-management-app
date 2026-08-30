@@ -8,10 +8,10 @@ import { MapPin, Play, Clock, CheckCircle, AlertCircle, X, Trophy, Timer, Settin
 
 /** テニスコート型のSVGオーバーレイ（縦向き・モバイル用） */
 function CourtLines({ status }: { status: string }) {
-  const color = status === 'playing' ? 'rgba(22,163,74,0.25)'
-    : status === 'ready' ? 'rgba(59,130,246,0.2)'
-    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
-    : 'rgba(148,163,184,0.15)';
+  const color = status === 'playing' ? 'rgba(198,56,52,0.25)'
+    : status === 'ready' ? 'rgba(118,118,118,0.2)'
+    : status === 'unavailable' ? 'rgba(166,166,166,0.2)'
+    : 'rgba(166,166,166,0.15)';
   return (
     <svg viewBox="0 0 60 110" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
       <rect x="4" y="4" width="52" height="102" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
@@ -29,10 +29,10 @@ function CourtLines({ status }: { status: string }) {
 
 /** テニスコート型のSVGオーバーレイ（横向き・PC用） */
 function CourtLinesH({ status }: { status: string }) {
-  const color = status === 'playing' ? 'rgba(22,163,74,0.25)'
-    : status === 'ready' ? 'rgba(59,130,246,0.2)'
-    : status === 'unavailable' ? 'rgba(156,163,175,0.2)'
-    : 'rgba(148,163,184,0.15)';
+  const color = status === 'playing' ? 'rgba(198,56,52,0.25)'
+    : status === 'ready' ? 'rgba(118,118,118,0.2)'
+    : status === 'unavailable' ? 'rgba(166,166,166,0.2)'
+    : 'rgba(166,166,166,0.15)';
   return (
     <svg viewBox="0 0 110 60" className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
       <rect x="4" y="4" width="102" height="52" fill="none" stroke={color} strokeWidth="1.5" rx="1" />
@@ -113,11 +113,11 @@ function BlockHeader({
     warning === 'red'
       ? 'bg-red-600 text-white border-red-700'
       : warning === 'yellow'
-        ? 'bg-yellow-400 text-yellow-900 border-yellow-600'
-        : 'bg-white/70 text-emerald-700 border-emerald-300';
+        ? 'bg-primary-400 text-gray-900 border-primary-600'
+        : 'bg-white/70 text-gray-800 border-primary-300';
   return (
     <div className={`flex items-center justify-between gap-1 px-1 ${compact ? 'mb-1.5' : 'mb-2'}`}>
-      <div className="text-[10px] text-emerald-700 font-bold leading-none">{label}</div>
+      <div className="text-[10px] text-gray-800 font-bold leading-none">{label}</div>
       {endTime ? (
         <div className={`text-[10px] font-bold border rounded px-1.5 py-0.5 leading-none ${badgeClass}`}>
           〜{endTime}
@@ -335,13 +335,13 @@ export default function CourtMap() {
 
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
     playing: {
-      bg: 'bg-green-100',
-      border: 'border-green-400',
-      text: 'text-green-800',
-      glow: 'shadow-[0_0_12px_rgba(22,163,74,0.3)]',
+      bg: 'bg-primary-100',
+      border: 'border-primary-400',
+      text: 'text-gray-900',
+      glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]',
     },
     ready: {
-      bg: 'bg-blue-50',
+      bg: 'bg-gray-50',
       border: 'border-primary-500',
       text: 'text-primary-500',
       glow: '',
@@ -373,7 +373,7 @@ export default function CourtMap() {
     if (!cs) return null;
     const isOver = timeOverCourts.has(courtName);
     const style = isOver
-      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(198,56,52,0.4)]' }
       : statusStyles[cs.status];
     const isSelected = selectedCourt === courtName;
 
@@ -396,23 +396,23 @@ export default function CourtMap() {
               {isOver ? (
                 <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />
               ) : (
-                <Play className="w-3 h-3 text-green-500 fill-green-500" />
+                <Play className="w-3 h-3 text-primary-500 fill-primary-500" />
               )}
             </div>
           )}
           <div className={`text-xl font-bold ${style.text} leading-none`}>{courtName}</div>
           <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
           {cs.currentMatch && (
-            <div className="mt-1 pt-1 border-t border-green-200/60 w-full space-y-0">
-              <p className="text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
-              <p className="text-[7px] text-green-600 text-center">vs</p>
-              <p className="text-[9px] font-medium text-green-800 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
+            <div className="mt-1 pt-1 border-t border-primary-200/60 w-full space-y-0">
+              <p className="text-[9px] font-medium text-gray-900 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[7px] text-gray-700 text-center">vs</p>
+              <p className="text-[9px] font-medium text-gray-900 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
-            <div className="mt-1 pt-1 border-t border-blue-100/60 w-full space-y-0">
+            <div className="mt-1 pt-1 border-t border-gray-100/60 w-full space-y-0">
               <p className="text-[9px] text-primary-500 truncate text-center leading-tight">{cs.nextMatch.player1Name}</p>
-              <p className="text-[7px] text-blue-400 text-center">vs</p>
+              <p className="text-[7px] text-gray-400 text-center">vs</p>
               <p className="text-[9px] text-primary-500 truncate text-center leading-tight">{cs.nextMatch.player2Name}</p>
             </div>
           )}
@@ -427,7 +427,7 @@ export default function CourtMap() {
     if (!cs) return null;
     const isOver = timeOverCourts.has(courtName);
     const style = isOver
-      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(239,68,68,0.4)]' }
+      ? { bg: 'bg-red-100', border: 'border-red-500', text: 'text-red-800', glow: 'shadow-[0_0_16px_rgba(198,56,52,0.4)]' }
       : statusStyles[cs.status];
     const isSelected = selectedCourt === courtName;
 
@@ -451,7 +451,7 @@ export default function CourtMap() {
               isOver ? (
                 <AlertCircle className="w-3 h-3 text-red-500 animate-pulse mb-0.5" />
               ) : (
-                <Play className="w-3 h-3 text-green-500 fill-green-500 mb-0.5" />
+                <Play className="w-3 h-3 text-primary-500 fill-primary-500 mb-0.5" />
               )
             )}
             <div className={`text-xl font-bold ${style.text} leading-none`}>{courtName}</div>
@@ -459,16 +459,16 @@ export default function CourtMap() {
           </div>
           {/* 右: 対戦情報 */}
           {cs.currentMatch && (
-            <div className="flex-1 min-w-0 border-l border-green-200/60 pl-2 space-y-0">
-              <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player1Name}</p>
-              <p className="text-[7px] text-green-600">vs</p>
-              <p className="text-[10px] font-medium text-green-800 truncate leading-tight">{cs.currentMatch.player2Name}</p>
+            <div className="flex-1 min-w-0 border-l border-primary-200/60 pl-2 space-y-0">
+              <p className="text-[10px] font-medium text-gray-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[7px] text-gray-700">vs</p>
+              <p className="text-[10px] font-medium text-gray-900 truncate leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
-            <div className="flex-1 min-w-0 border-l border-blue-100/60 pl-2 space-y-0">
+            <div className="flex-1 min-w-0 border-l border-gray-100/60 pl-2 space-y-0">
               <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player1Name}</p>
-              <p className="text-[7px] text-blue-400">vs</p>
+              <p className="text-[7px] text-gray-400">vs</p>
               <p className="text-[10px] text-primary-500 truncate leading-tight">{cs.nextMatch.player2Name}</p>
             </div>
           )}
@@ -509,7 +509,7 @@ export default function CourtMap() {
             <button
               onClick={() => setBlockTimeEditorOpen(true)}
               title="ブロックごとの使用終了時刻を設定"
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-primary-50 text-gray-900 border border-primary-300 hover:bg-primary-100 transition-colors flex items-center gap-1.5"
             >
               <Settings className="w-4 h-4" />
               使用時刻設定
@@ -520,7 +520,7 @@ export default function CourtMap() {
         {/* サマリー */}
         <div className="flex gap-4 mt-3 text-sm flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-green-400" />
+            <span className="w-3 h-3 rounded-full bg-primary-400" />
             試合中 {stats.playing}
           </span>
           <span className="flex items-center gap-1.5">
@@ -535,8 +535,8 @@ export default function CourtMap() {
             <span className="w-3 h-3 rounded-full bg-gray-300" />
             使用不可 {stats.unavailable}
           </span>
-          <span className="flex items-center gap-1.5 text-yellow-700">
-            <span className="w-3 h-3 rounded-sm border border-yellow-600 bg-yellow-300 animate-pulse" />
+          <span className="flex items-center gap-1.5 text-gray-800">
+            <span className="w-3 h-3 rounded-sm border border-primary-600 bg-primary-300 animate-pulse" />
             ブロック終了2時間前
           </span>
           <span className="flex items-center gap-1.5 text-red-700">
@@ -563,7 +563,7 @@ export default function CourtMap() {
                     const blockIdx = venue.blocks.length - 1 - ri;
                     return (
                       <div key={blockIdx}>
-                        <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                        <div className={`bg-primary-50/60 rounded-xl border border-primary-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
                           <BlockHeader
                             label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
                             endTime={currentVenueBlockEndTimes[String(blockIdx)]}
@@ -585,9 +585,9 @@ export default function CourtMap() {
                   })}
                 </div>
                 <div className="flex items-center">
-                  <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
+                  <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
-                    <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
+                    <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                   </div>
                 </div>
               </div>
@@ -597,7 +597,7 @@ export default function CourtMap() {
                 {venue.blocks.map((block, blockIdx) => (
                   <div key={blockIdx} className="flex items-start">
                     {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
-                    <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-2.5 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                    <div className={`bg-primary-50/60 rounded-xl border border-primary-200 p-2.5 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
                       <BlockHeader
                         label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
                         endTime={currentVenueBlockEndTimes[String(blockIdx)]}
@@ -612,9 +612,9 @@ export default function CourtMap() {
                     {/* 本部表示（指定ブロックの後 = 5と9の間） */}
                     {blockIdx === venue.hqPosition && (
                       <div className="flex flex-col items-center justify-end mx-2 self-end pb-3">
-                        <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm">
+                        <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm">
                           <span className="text-base">🏠</span>
-                          <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
+                          <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                         </div>
                       </div>
                     )}
@@ -643,7 +643,7 @@ export default function CourtMap() {
                     const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
                     return (
                       <div key={blockIdx} className="w-full">
-                        <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                        <div className={`bg-primary-50/60 rounded-xl border border-primary-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
                           <BlockHeader
                             label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
                             endTime={currentVenueBlockEndTimes[String(blockIdx)]}
@@ -665,9 +665,9 @@ export default function CourtMap() {
                   })}
                 </div>
                 <div className="flex items-center">
-                  <div className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
+                  <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
-                    <span className="text-sm font-bold text-amber-800 [writing-mode:vertical-rl]">本部</span>
+                    <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                   </div>
                 </div>
               </div>
@@ -677,7 +677,7 @@ export default function CourtMap() {
                 const gridCols = cols <= 4 ? 'grid-cols-4' : 'grid-cols-6';
                 return (
                   <div key={blockIdx} className="w-full">
-                    <div className={`bg-emerald-50/60 rounded-xl border border-emerald-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
+                    <div className={`bg-primary-50/60 rounded-xl border border-primary-200 p-3 shadow-sm ${getBlockWarningClass(blockIdx)}`}>
                       <BlockHeader
                         label={`${block.courts[0]}〜${block.courts[block.courts.length - 1]}番`}
                         endTime={currentVenueBlockEndTimes[String(blockIdx)]}
@@ -689,9 +689,9 @@ export default function CourtMap() {
                     </div>
                     {blockIdx === venue.hqPosition && (
                       <div className="flex items-center gap-3 my-3">
-                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2 shadow-sm">
+                        <div className="flex items-center gap-2 bg-primary-50 border border-primary-300 rounded-lg px-4 py-2 shadow-sm">
                           <span className="text-base">🏠</span>
-                          <span className="text-sm font-bold text-amber-800">本部</span>
+                          <span className="text-sm font-bold text-gray-900">本部</span>
                         </div>
                         <div className="flex-1 border-t border-dashed border-border-main" />
                         <span className="text-[10px] text-gray-500">通路</span>
@@ -735,7 +735,7 @@ export default function CourtMap() {
                     <span>{finished}/{total} 完了</span>
                     <span>{pct}%</span>
                   </div>
-                  <div className="w-full bg-[#e0e7ef] rounded-full h-2.5">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
                     <div
                       className="h-2.5 rounded-full transition-all duration-500"
                       style={{ width: `${pct}%`, background: 'linear-gradient(135deg, #2e7d32, #1b5e20)' }}
@@ -743,7 +743,7 @@ export default function CourtMap() {
                   </div>
                   <div className="flex gap-3 mt-2 text-xs text-gray-500">
                     <span className="flex items-center gap-1">
-                      <Play className="w-3 h-3 text-green-500" /> {playing}試合中
+                      <Play className="w-3 h-3 text-primary-500" /> {playing}試合中
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" /> {total - finished - playing}待機
@@ -767,19 +767,19 @@ export default function CourtMap() {
             className="relative bg-white rounded-2xl shadow-2xl border border-border-main w-full max-w-md max-h-[85vh] overflow-auto"
             onClick={e => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-gradient-to-br from-amber-50 to-amber-100 border-b border-amber-200 px-5 py-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-gradient-to-br from-primary-50 to-primary-100 border-b border-primary-200 px-5 py-4 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   ブロック使用終了時刻
                 </h3>
-                <p className="text-[11px] text-amber-800/80 mt-0.5">
+                <p className="text-[11px] text-gray-900/80 mt-0.5">
                   {venue.name} — 設定した時刻の2時間前で黄色、1時間前で赤く点滅します
                 </p>
               </div>
               <button
                 onClick={() => setBlockTimeEditorOpen(false)}
-                className="p-1.5 rounded-lg bg-white/60 hover:bg-white text-amber-800 transition-colors"
+                className="p-1.5 rounded-lg bg-white/60 hover:bg-white text-gray-900 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -796,8 +796,8 @@ export default function CourtMap() {
                       warning === 'red'
                         ? 'bg-red-50 border-red-300'
                         : warning === 'yellow'
-                          ? 'bg-yellow-50 border-yellow-300'
-                          : 'bg-emerald-50/50 border-emerald-200'
+                          ? 'bg-primary-50 border-primary-300'
+                          : 'bg-primary-50/50 border-primary-200'
                     }`}
                   >
                     <div>
@@ -854,10 +854,10 @@ export default function CourtMap() {
             {/* ヘッダー: コート番号 + ステータス */}
             <div className={`shrink-0 px-5 pt-5 pb-4 ${
               selectedCourtDetail.status === 'playing'
-                ? 'bg-gradient-to-br from-green-600 via-green-700 to-emerald-800'
+                ? 'bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800'
                 : selectedCourtDetail.status === 'ready'
-                  ? 'bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800'
-                  : 'bg-gradient-to-br from-gray-600 via-gray-700 to-slate-800'
+                  ? 'bg-gradient-to-br from-gray-600 via-gray-700 to-gray-800'
+                  : 'bg-gradient-to-br from-gray-600 via-gray-700 to-gray-800'
             } text-white`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
@@ -867,7 +867,7 @@ export default function CourtMap() {
                       <span className="text-3xl font-black">{selectedCourt}</span>
                     </div>
                     {selectedCourtDetail.status === 'playing' && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping opacity-75" />
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-400 rounded-full animate-ping opacity-75" />
                     )}
                   </div>
                   <div>
@@ -877,9 +877,9 @@ export default function CourtMap() {
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
                         selectedCourtDetail.status === 'playing'
-                          ? 'bg-green-400/30 text-green-100 border border-green-400/40'
+                          ? 'bg-primary-400/30 text-primary-100 border border-primary-400/40'
                           : selectedCourtDetail.status === 'ready'
-                            ? 'bg-blue-400/30 text-blue-100 border border-blue-400/40'
+                            ? 'bg-gray-400/30 text-gray-100 border border-gray-400/40'
                             : 'bg-white/20 text-white/80 border border-white/20'
                       }`}>
                         {selectedCourtDetail.status === 'playing' && <Play className="w-3 h-3" />}
@@ -1012,19 +1012,19 @@ export default function CourtMap() {
                           key={m.matchId}
                           className={`rounded-xl p-3 border transition-all court-detail-item ${
                             isPlaying
-                              ? 'bg-green-50 border-green-300 shadow-sm shadow-green-100'
+                              ? 'bg-primary-50 border-primary-300 shadow-sm shadow-primary-100'
                               : isFinished
                                 ? 'bg-gray-50 border-gray-200'
-                                : 'bg-blue-50 border-blue-200'
+                                : 'bg-gray-50 border-gray-200'
                           }`}
                           style={{ animationDelay: `${idx * 50}ms` }}
                         >
                           {/* 上段: 種目 + 回戦 + ステータス */}
                           <div className="flex items-center gap-2 mb-2">
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              isPlaying ? 'bg-green-200 text-green-800'
+                              isPlaying ? 'bg-primary-200 text-gray-900'
                               : isFinished ? 'bg-gray-200 text-gray-600'
-                              : 'bg-blue-200 text-blue-700'
+                              : 'bg-gray-200 text-gray-700'
                             }`}>
                               {isPlaying ? '試合中' : isFinished ? '終了' : m.status === 'walkover' ? 'W/O' : '待機'}
                             </span>
@@ -1040,7 +1040,7 @@ export default function CourtMap() {
                             <div className="flex items-center gap-2">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1">
-                                  <Trophy className="w-3 h-3 text-yellow-500 shrink-0" />
+                                  <Trophy className="w-3 h-3 text-primary-500 shrink-0" />
                                   <span className="text-sm font-bold text-gray-900 truncate">{winnerName}</span>
                                 </div>
                                 <span className="text-xs text-gray-400 truncate block">vs {loserName}</span>

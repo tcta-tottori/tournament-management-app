@@ -7,9 +7,9 @@
 //     12 米本 叶芽（青翔開智高）    4 6 6 7 | 6 | [9]
 //
 //   - 左上にクラス（種目）名＋ラウンド、右上にコートのバッジ
-//   - サーブ側は名前の前の黄色い「▶」で示す
+//   - サーブ側は名前の前の赤い「▶」で示す
 //   - 選手名は結果表と同じ「番号 選手名（所属）」の順で並べる
-//   - 決着済みのセットは淡い緑、進行中のセットは1段明るい帯、
+//   - 決着済みのセットは墨、進行中のセットは赤の帯、
 //     現在のポイントは白ボックス
 // 運営のスコア入力画面と観戦ページの両方で同じ見た目を使う。
 // =============================================
@@ -47,14 +47,18 @@ const SIZE: Record<BoardSize, {
   },
 };
 
-/** スコアボードの配色（中継テロップに合わせた緑） */
+/**
+ * スコアボードの配色。
+ * 協会サイトのトンマナ（白ベース＋赤の差し色）に合わせ、
+ * 地は墨（無彩色）、進行中のセットとサーブ表示だけを赤にしている。
+ */
 const COLOR = {
   /** パネルの地色 */
-  panel: 'bg-[#125e42]',
-  /** 進行中セットの帯（地色より1段明るい） */
-  current: 'bg-[#1a7d57]',
+  panel: 'bg-[#262626]',
+  /** 進行中セットの帯（差し色の赤） */
+  current: 'bg-[#c63834]',
   /** 決着済みセットで負けている側の数字 */
-  dim: 'text-[#63b18e]',
+  dim: 'text-[#8f8f8f]',
 };
 
 /** 「1回戦」→「1R」のように中継風に短くする（準決勝・決勝はそのまま） */
@@ -137,7 +141,7 @@ export default function LiveScoreBoard({
       {/* 見出し（左上にクラス名＋ラウンド / 右上にコート） */}
       <div className="flex items-end gap-2">
         <span
-          className={`inline-block min-w-0 truncate rounded-t-md font-bold text-white py-0.5 bg-[#0a2419] ${sz.label}`}
+          className={`inline-block min-w-0 truncate rounded-t-md font-bold text-white py-0.5 bg-[#262626] ${sz.label}`}
           title={classLabel}
         >
           {classLabel}
@@ -145,7 +149,7 @@ export default function LiveScoreBoard({
         <span className="flex-1" />
         {courtLabel && (
           <span
-            className={`inline-block shrink-0 truncate rounded-t-md font-black text-[#0f3326] py-0.5 bg-[#d4e157] ${sz.label}`}
+            className={`inline-block shrink-0 truncate rounded-t-md font-black text-white py-0.5 bg-[#c63834] ${sz.label}`}
           >
             {courtLabel}
           </span>
@@ -160,10 +164,10 @@ export default function LiveScoreBoard({
             data-testid={`lsb-row-${row.player}`}
             className={`flex items-stretch ${sz.row} ${idx === 0 ? 'border-b border-black/20' : ''}`}
           >
-            {/* サーブ表示（黄色の▶） */}
+            {/* サーブ表示（赤の▶） */}
             <div className={`${sz.serveCol} shrink-0 flex items-center justify-center pl-1`}>
               {row.serving && (
-                <Play className={`${sz.serveIcon} fill-[#d4e157] text-[#d4e157] drop-shadow-[0_0_4px_rgba(212,225,87,0.6)]`} />
+                <Play className={`${sz.serveIcon} fill-[#e05a56] text-[#e05a56] drop-shadow-[0_0_4px_rgba(198,56,52,0.55)]`} />
               )}
             </div>
 
@@ -175,7 +179,7 @@ export default function LiveScoreBoard({
                 </span>
               )}
               {row.seed != null && (
-                <span className={`${sz.seed} shrink-0 rounded-full bg-[#d4e157] text-[#0f3326] font-black leading-tight`}>
+                <span className={`${sz.seed} shrink-0 rounded-full bg-[#c63834] text-white font-black leading-tight`}>
                   {row.seed}
                 </span>
               )}
@@ -223,12 +227,12 @@ export default function LiveScoreBoard({
             {!finished ? (
               <div
                 data-testid={`lsb-point-${row.player}`}
-                className={`${sz.pointBox} ${sz.point} shrink-0 flex items-center justify-center font-black bg-white text-[#0f3326]`}
+                className={`${sz.pointBox} ${sz.point} shrink-0 flex items-center justify-center font-black bg-white text-[#262626]`}
               >
                 {pointLabel(live, row.player)}
               </div>
             ) : (
-              <div className={`${sz.pointBox} ${sz.point} shrink-0 flex items-center justify-center font-black bg-white text-[#0f3326]`}>
+              <div className={`${sz.pointBox} ${sz.point} shrink-0 flex items-center justify-center font-black bg-white text-[#262626]`}>
                 {row.isWinner ? '✓' : ''}
               </div>
             )}

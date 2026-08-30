@@ -212,7 +212,7 @@ export default function DrawRenderer({
       // --- Court number badge (playing / ready) ---
       if (match && (isPlaying || isReady)) {
         const courtNum = match.courtName?.replace(/[^\d]/g, '') || '';
-        const bgColor = isPlaying ? '#22c55e' : '#f97316';
+        const bgColor = isPlaying ? '#c63834' : '#5a5a5a';
         const badgeX = lineX + roundW / 2 - 12;
         const badgeY = yMid - 10;
 
@@ -246,7 +246,7 @@ export default function DrawRenderer({
       if (match && onMatchClick) {
         htmlElements.push(
           <div key={`click-${r}-${m}`}
-            className="absolute cursor-pointer hover:bg-blue-50/40 rounded transition-colors"
+            className="absolute cursor-pointer hover:bg-gray-50/40 rounded transition-colors"
             style={{
               left: lineX,
               top: yTop - ROW_H / 2 + 2,
@@ -271,13 +271,13 @@ export default function DrawRenderer({
   if (finalWinnerName) {
     htmlElements.push(
       <div key="winner"
-        className="absolute flex items-center gap-1.5 px-2 py-0.5 bg-yellow-50 border-2 border-yellow-400 rounded-md shadow"
+        className="absolute flex items-center gap-1.5 px-2 py-0.5 bg-primary-50 border-2 border-primary-400 rounded-md shadow"
         style={{
           left: winnerX + 2,
           top: winnerY + ROW_H / 2 - 14,
           zIndex: 10,
         }}>
-        <span className="text-yellow-600 text-base">🏆</span>
+        <span className="text-gray-700 text-base">🏆</span>
         <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{finalWinnerName}</span>
       </div>
     );
@@ -300,7 +300,7 @@ export default function DrawRenderer({
         onDrop={(e) => onDrop(e, slot.position)}
         onClick={() => onTap?.(slot.position)}
         className={`absolute flex items-center select-none cursor-grab active:cursor-grabbing
-          ${isSelected ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}
+          ${isSelected ? 'ring-2 ring-gray-500 bg-gray-50' : ''}
         `}
         style={{
           left: x,
@@ -317,7 +317,7 @@ export default function DrawRenderer({
         </div>
         {/* Seed badge */}
         {isSeed && (
-          <div className="w-4 text-[10px] font-bold text-amber-700 text-center shrink-0">
+          <div className="w-4 text-[10px] font-bold text-gray-800 text-center shrink-0">
             {slot.seed}
           </div>
         )}

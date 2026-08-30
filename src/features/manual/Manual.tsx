@@ -58,7 +58,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
 
 const FEATURE_SECTIONS: FeatureSection[] = [
   {
-    id: 'sync', icon: Wifi, iconBg: 'bg-blue-100', iconFg: 'text-blue-600', title: 'マルチデバイス同期',
+    id: 'sync', icon: Wifi, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'マルチデバイス同期',
     description: '複数の端末からエントリーや対戦成績をリアルタイムに同期編集できる機能です。受付用iPad・スコア入力用タブレットなど、役割ごとに端末を分けて同時に作業できます。',
     keyFeatures: [
       'ルームコード（6桁）によるかんたん接続',
@@ -114,7 +114,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'data', icon: Database, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'データ管理',
+    id: 'data', icon: Database, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'データ管理',
     description: 'ドロー会議システムとのデータ連携、選手マスタの管理、ふりがな・所属情報の整備を行うページです。通常大会・ミックスダブルス・団体戦の全形式に対応しています。',
     keyFeatures: [
       'ドロー会議システムのバックアップデータ（JSON）を一括読込',
@@ -137,7 +137,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'entry', icon: Users, iconBg: 'bg-sky-100', iconFg: 'text-sky-600', title: 'エントリー登録',
+    id: 'entry', icon: Users, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'エントリー登録',
     description: 'ドロー順に沿った選手のチェックイン管理と、当日の棄権・不戦勝処理を行うページです。通常大会・ミックスダブルス・団体戦で画面が自動切替されます。',
     keyFeatures: [
       '全種目のエントリーをドロー順で一覧表示',
@@ -162,7 +162,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'draw-lot', icon: Dices, iconBg: 'bg-violet-100', iconFg: 'text-violet-600', title: '抽選・ドロー作成',
+    id: 'draw-lot', icon: Dices, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: '抽選・ドロー作成',
     description: 'JTA（日本テニス協会）ルールに準拠した自動ドロー生成を行います。',
     keyFeatures: [
       'ドローサイズの自動決定（4/8/16/32/64/128）',
@@ -184,7 +184,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'draw-table', icon: Trophy, iconBg: 'bg-amber-100', iconFg: 'text-amber-600', title: 'ドロー表プレビュー・調整',
+    id: 'draw-table', icon: Trophy, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー表プレビュー・調整',
     description: 'トーナメントブラケットまたはリーグ（総当たり）形式で表示し、手動調整やExcel/JPEG出力を行います。',
     keyFeatures: [
       'トーナメント表示とリーグ（総当たり表）表示の切替',
@@ -193,48 +193,58 @@ const FEATURE_SECTIONS: FeatureSection[] = [
       '試合結果のJPEG画像出力',
       '試合結果のExcel出力',
       'ドロータイプの自動検出（少人数 → リーグ自動選択）',
+      'リーグ戦は使用コート（1〜2面）をリーグ単位で割り当て、空いたら次の対戦をタップで投入',
+      'ゲームルール（回戦別・熱中症時）の修正（種目名の下のルール表示をタップ）',
+      '3位決定戦（準決勝の敗者同士）の追加。準決勝が終わると自動で組み合わせが入る',
+      'エントリー確定後の選手名・ふりがな・所属の修正（「名前を修正」→枠をタップ）',
     ],
     operationSteps: [
       { step: 1, title: '種目の選択', description: '上部のドロップダウンで対象種目を選択します。' },
       { step: 2, title: '表示モードの切替', description: '「トーナメント」/「リーグ」ボタンで切り替えます。少人数種目は自動リーグ表示。' },
       { step: 3, title: '位置の入れ替え', description: 'PC: ドラッグ＆ドロップ。スマホ: 1枠目タップ → 入れ替え先タップ。' },
-      { step: 4, title: '変更の保存', description: '入れ替えたら「変更を保存」で保存。未保存の変更は警告表示されます。' },
-      { step: 5, title: '出力', description: '「Excel出力」でドロー表、「結果JPEG」で画像、「結果Excel」で結果入りExcelをダウンロード。' },
+      { step: 4, title: '3位決定戦・名前の修正', description: '「3位決定戦なし/あり」で切り替え、「名前を修正」をONにして枠をタップすると氏名・ふりがな・所属を直せます。' },
+      { step: 5, title: '変更の保存', description: '入れ替えたら「変更を保存」で保存。未保存の変更は警告表示されます。' },
+      { step: 6, title: '出力', description: '「Excel出力」でドロー表、「結果JPEG」で画像、「結果Excel」で結果入りExcelをダウンロード。' },
     ],
     tips: [
       '入れ替え可能なのは1回戦の枠のみです',
       '結果JPEG/結果Excelは大会終了後の結果発表に活用してください',
       '参加者2〜5名かつドローサイズ8以下は自動でリーグ表示になります',
+      'リーグの「使用コート」に割り当てた面は、そのリーグの専有になり他の種目には割り当てられません',
+      '取り込んだルールが違っていたら、ドロー画面・対戦順・スコア入力のどこからでも修正できます',
+      '3位決定戦は決勝の下に表示され、終わるまで結果画像は出ません。結果画像にも決勝と同じ形式で3位決定戦を載せます',
+      '名前の修正は選手マスタごと直すため、同じ選手が出ている他の種目にも反映されます',
     ],
   },
   {
-    id: 'referee', icon: ClipboardList, iconBg: 'bg-emerald-100', iconFg: 'text-emerald-600', title: '対戦順・音声コール',
-    description: 'ドローから試合一覧を自動生成し、音声コール機能で選手呼び出しを行います。Web Speech API / VOICEVOX の2つの音声エンジンに対応しています。',
+    id: 'referee', icon: ClipboardList, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '対戦順・音声コール',
+    description: 'ドローから試合一覧を自動生成し、音声コール機能で選手呼び出しを行います。標準はブラウザ内蔵音声（Web Speech API）で、ネット接続なしでコールできます。',
     keyFeatures: [
       '1回戦の全対戦カードと2回戦以降の空枠を自動生成',
       'BYE対戦（不戦勝）の自動walkover処理',
       '全種目の試合をフラットテーブルで一覧表示（種目・ゲーム数・時間・コート列）',
-      'Web Speech API / VOICEVOX 音声エンジンによる音声コール',
+      'ブラウザ内蔵音声（標準）または Gemini TTS による音声コール',
       'ふりがなデータ・所属ふりがなを活用した正確な読み上げ',
-      '音声設定（速度・ピッチ・音量・繰り返し回数）のカスタマイズ',
+      '音声設定（エンジン・音声・話速・高さ）のカスタマイズ',
       '試合順Excelインポート（リーグ戦のまとめ入れにも対応）',
       '種目ごとの個別印刷',
     ],
     operationSteps: [
       { step: 1, title: '試合の確認', description: 'ドロー画面で試合を生成すると、全種目の対戦順が自動表示されます。' },
       { step: 2, title: '音声コール', description: 'コールボタンでコート番号を入力→選手名・所属・コート番号を音声読み上げ。' },
-      { step: 3, title: '音声設定の調整', description: '音声エンジン（Web Speech / VOICEVOX）の選択、速度・ピッチ・音量・繰り返し回数を調整できます。' },
+      { step: 3, title: '音声設定の調整', description: 'ヘッダーの「音声」から、エンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを調整できます。' },
       { step: 4, title: '印刷', description: '各種目の印刷ボタンで対戦順シートを印刷します。' },
     ],
     tips: [
       '音声コールはChrome（PC）+ 外部スピーカーで最も安定します',
+      'ブラウザ内蔵音声は通信不要で即座に鳴るため、会場の電波が悪くてもコールできます',
       'ふりがな登録済みの選手は正確な読みでコールされます',
       '所属のふりがなも設定可能（データ管理ページの所属ふりがな辞書）',
-      'VOICEVOXエンジンを使う場合はローカルでVOICEVOXサーバーを起動してください',
+      'Gemini TTS（より自然な声）を使う場合は、音声設定でエンジンを切り替えてください。失敗時はブラウザ内蔵音声で自動的に読み上げます',
     ],
   },
   {
-    id: 'schedule-sheet', icon: CalendarClock, iconBg: 'bg-cyan-100', iconFg: 'text-cyan-600', title: 'タイムテーブル',
+    id: 'schedule-sheet', icon: CalendarClock, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'タイムテーブル',
     description: 'コート×時刻のグリッドで全試合の時間配置を管理します。Excelインポートまたは自動生成に対応。試合ステータスがリアルタイム反映されます。',
     keyFeatures: [
       'コートごとのON/OFF切替',
@@ -260,7 +270,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'score', icon: MonitorPlay, iconBg: 'bg-rose-100', iconFg: 'text-rose-600', title: 'スコアボード（試合進行管理）',
+    id: 'score', icon: MonitorPlay, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'スコアボード（試合進行管理）',
     description: '試合のステータス管理・スコア入力・勝者記録を行う当日運営の中核画面です。通常大会・ミックスダブルス・団体戦で画面が自動切替されます。',
     keyFeatures: [
       'ブラケットビュー: トーナメント表上で試合を直接選択',
@@ -293,7 +303,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'court-bracket', icon: Network, iconBg: 'bg-orange-100', iconFg: 'text-orange-600', title: 'ドロー状況',
+    id: 'court-bracket', icon: Network, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー状況',
     description: '全種目のトーナメントブラケットを一覧表示し、試合の進行状況を俯瞰的に確認できます。',
     keyFeatures: [
       '全種目のブラケットを1画面に集約表示',
@@ -311,7 +321,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'dashboard', icon: BarChart2, iconBg: 'bg-indigo-100', iconFg: 'text-indigo-600', title: 'ライブダッシュボード',
+    id: 'dashboard', icon: BarChart2, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'ライブダッシュボード',
     description: '大会全体の進行状況をリアルタイムで監視するダッシュボードです。情報バーのティッカーと連動して進捗・コート状況・時間超過警告を表示します。',
     keyFeatures: [
       'ドーナツチャートによる全体進捗率の表示',
@@ -337,7 +347,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'print', icon: Printer, iconBg: 'bg-amber-100', iconFg: 'text-amber-600', title: '印刷（賞状）',
+    id: 'print', icon: Printer, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '印刷（賞状）',
     description: '賞状を印刷するための専用メニューです。試合や順位がまだ確定していなくても開けるので、表彰式の準備を先に進められます。',
     keyFeatures: [
       '賞状に刷るのは既定で氏名のみ（賞位・クラス名・所属は必要なときだけ追加で印刷）',
@@ -376,7 +386,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'backup', icon: Save, iconBg: 'bg-teal-100', iconFg: 'text-teal-600', title: 'バックアップ・復元',
+    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'バックアップ・復元',
     description: 'Google ドライブ・GitHub・ローカルファイルでのバックアップ管理を行います。ミックスダブルス・団体戦のデータも含めて一括保全できます。',
     keyFeatures: [
       'Google ドライブ連携: OAuth認証でクラウド保存（専用フォルダ管理）',
@@ -468,7 +478,7 @@ function WorkflowOverview() {
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="w-4 h-4 text-primary-500" />
                       <span className="font-bold text-gray-900 text-sm">{ws.title}</span>
-                      <span className="text-[10px] bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full font-medium ml-auto whitespace-nowrap">{ws.label}</span>
+                      <span className="text-[10px] bg-primary-100 text-gray-700 px-2 py-0.5 rounded-full font-medium ml-auto whitespace-nowrap">{ws.label}</span>
                     </div>
                     <p className="text-xs text-gray-500 leading-relaxed">{ws.description}</p>
                     <div className="flex items-center gap-1 mt-1.5">
@@ -518,7 +528,7 @@ function FeatureSectionCard({ section, isOpen, onToggle }: { section: FeatureSec
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
               {section.keyFeatures.map((f, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                   <span>{f}</span>
                 </div>
               ))}
@@ -550,10 +560,10 @@ function FeatureSectionCard({ section, isOpen, onToggle }: { section: FeatureSec
               <Lightbulb className="w-3.5 h-3.5" />
               ポイント・注意点
             </h4>
-            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 space-y-1.5">
+            <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 space-y-1.5">
               {section.tips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-amber-800">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-900">
+                  <Lightbulb className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
                   <span>{tip}</span>
                 </div>
               ))}
@@ -615,8 +625,8 @@ function FAQSection({ items, isOpen, onToggle }: { items: FAQItem[]; isOpen: boo
     <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
         {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
-        <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-          <MessageCircleQuestion className="w-5 h-5 text-blue-600" />
+        <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+          <MessageCircleQuestion className="w-5 h-5 text-gray-600" />
         </div>
         <div>
           <span className="font-bold text-gray-900">よくある質問 (FAQ)</span>
@@ -629,15 +639,15 @@ function FAQSection({ items, isOpen, onToggle }: { items: FAQItem[]; isOpen: boo
             <div key={i} className="border border-gray-100 rounded-lg overflow-hidden">
               <button
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="w-full text-left px-4 py-3 flex items-center gap-2 hover:bg-blue-50/50 transition-colors"
+                className="w-full text-left px-4 py-3 flex items-center gap-2 hover:bg-gray-50/50 transition-colors"
               >
-                <span className="text-blue-500 font-bold text-sm shrink-0">Q.</span>
+                <span className="text-gray-500 font-bold text-sm shrink-0">Q.</span>
                 <span className="text-sm font-medium text-gray-800 flex-1">{item.question}</span>
                 {openIdx === i ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
               </button>
               {openIdx === i && (
                 <div className="px-4 pb-3 flex gap-2">
-                  <span className="text-emerald-500 font-bold text-sm shrink-0">A.</span>
+                  <span className="text-primary-500 font-bold text-sm shrink-0">A.</span>
                   <p className="text-sm text-gray-600 leading-relaxed">{item.answer}</p>
                 </div>
               )}
@@ -674,7 +684,7 @@ function TroubleshootingSection({ items, isOpen, onToggle }: { items: TroubleIte
                 <div className="text-xs text-gray-500">
                   <span className="font-semibold text-gray-600">原因: </span>{item.cause}
                 </div>
-                <div className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1.5">
+                <div className="text-xs text-gray-800 bg-primary-50 rounded px-2 py-1.5">
                   <span className="font-semibold">対処法: </span>{item.solution}
                 </div>
               </div>
@@ -728,7 +738,7 @@ export default function Manual() {
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
-            <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-primary-600 px-3 py-1.5 rounded-md font-medium transition-colors">
+            <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-gray-700 px-3 py-1.5 rounded-md font-medium transition-colors">
               全て開く
             </button>
             <button onClick={closeAll} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-md font-medium transition-colors">

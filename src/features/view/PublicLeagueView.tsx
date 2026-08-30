@@ -169,7 +169,7 @@ function MixedLeagueSection({
                       return (
                         <td key={colIdx} className="relative bg-gray-100 border-l border-gray-100">
                           <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none">
-                            <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" />
+                            <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d6d6d6" strokeWidth="1" />
                           </svg>
                         </td>
                       );
@@ -204,7 +204,7 @@ function MixedLeagueSection({
                       <td
                         key={colIdx}
                         className={`px-1 py-2 text-center text-sm border-l border-gray-100 ${
-                          won ? 'bg-emerald-50 text-emerald-700 font-bold' : 'bg-red-50 text-red-600'
+                          won ? 'bg-primary-50 text-gray-800 font-bold' : 'bg-red-50 text-red-600'
                         }`}
                       >
                         {text}
@@ -338,7 +338,7 @@ function TeamLeagueSection({
                       return (
                         <td key={colIdx} className="relative bg-gray-100 border-l border-gray-100">
                           <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none">
-                            <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1" />
+                            <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d6d6d6" strokeWidth="1" />
                           </svg>
                         </td>
                       );
@@ -362,7 +362,7 @@ function TeamLeagueSection({
                       <td
                         key={colIdx}
                         className={`px-1 py-1.5 text-center border-l border-gray-100 ${
-                          won ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                          won ? 'bg-primary-50 text-gray-800' : 'bg-red-50 text-red-600'
                         }`}
                       >
                         <div className="text-sm font-bold">
@@ -377,7 +377,7 @@ function TeamLeagueSection({
                                 className={`px-0.5 rounded ${
                                   sm.winnerId
                                     ? smWon
-                                      ? 'bg-emerald-200 text-emerald-800'
+                                      ? 'bg-primary-200 text-gray-900'
                                       : 'bg-red-200 text-red-700'
                                     : 'bg-gray-100 text-gray-400'
                                 }`}
@@ -460,11 +460,11 @@ function LeagueHeaderCard({
 function RankBadge({ rank }: { rank: number }) {
   const color =
     rank === 1
-      ? 'bg-yellow-400 text-white'
+      ? 'bg-primary-400 text-white'
       : rank === 2
       ? 'bg-gray-400 text-white'
       : rank === 3
-      ? 'bg-orange-400 text-white'
+      ? 'bg-primary-400 text-white'
       : 'bg-gray-200 text-gray-600';
   return (
     <span

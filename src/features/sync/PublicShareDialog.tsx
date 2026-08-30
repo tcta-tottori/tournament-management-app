@@ -82,7 +82,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
       }}
     >
       <div className="relative w-[min(94vw,460px)] max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white">
+        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-primary-600 to-primary-700 text-white">
           <div className="flex items-center gap-2.5">
             <Share2 className="w-5 h-5" />
             <div>
@@ -102,9 +102,9 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {noServerWarning && (
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200">
-              <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-[11px] text-amber-700 leading-relaxed">
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-primary-50 border border-primary-200">
+              <Info className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-gray-800 leading-relaxed">
                 <p className="font-bold mb-0.5">中継サーバー未設定</p>
                 <p>
                   別端末からの観戦にはWebSocket中継サーバーが必要です。
@@ -115,11 +115,11 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
           )}
 
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
               ルームコード
             </p>
-            <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
-              <span className="flex-1 text-xl font-mono font-bold text-slate-800 tracking-[0.3em]">
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+              <span className="flex-1 text-xl font-mono font-bold text-gray-800 tracking-[0.3em]">
                 {roomCode || '未接続'}
               </span>
             </div>
@@ -127,17 +127,17 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
 
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 観戦用URL
               </p>
               {isFixedUrl && (
-                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5">
+                <span className="text-[9px] font-bold text-gray-800 bg-primary-100 border border-primary-200 rounded-full px-2 py-0.5">
                   固定URL・HP貼りっぱなしOK
                 </span>
               )}
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <p className="text-xs font-mono text-slate-800 break-all leading-relaxed">
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+              <p className="text-xs font-mono text-gray-800 break-all leading-relaxed">
                 {url}
               </p>
             </div>
@@ -145,7 +145,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
               <button
                 onClick={copy}
                 disabled={!roomCode}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
               >
                 {copied ? (
                   <>
@@ -163,7 +163,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
                 <button
                   onClick={share}
                   disabled={!roomCode}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-slate-200 hover:border-emerald-300 hover:text-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-gray-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Share2 className="w-4 h-4" />
                   <span>共有</span>
@@ -173,7 +173,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
                 href={roomCode ? url : undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-slate-200 hover:border-emerald-300 hover:text-emerald-600 transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-gray-700 transition-all ${
                   !roomCode ? 'pointer-events-none opacity-40' : ''
                 }`}
               >
@@ -183,9 +183,9 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
             </div>
           </div>
 
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 border border-emerald-100">
-            <Info className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-            <div className="text-[11px] text-emerald-700 leading-relaxed">
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-primary-50 border border-primary-100">
+            <Info className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
+            <div className="text-[11px] text-gray-800 leading-relaxed">
               <p className="font-bold mb-0.5">使い方</p>
               <ul className="list-disc ml-4 space-y-0.5">
                 <li>このURLをHPやSNSに掲載、もしくはQRコードに変換して案内できます</li>

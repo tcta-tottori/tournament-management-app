@@ -6,7 +6,7 @@
 // =============================================
 
 import { db } from '../../db/database';
-import { propagateByes } from '../draw/rebuildMatches';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
 import type { LiveScore, LiveScoreConfig, MatchFormatType } from '../../db/database';
 import {
   applyConfig,
@@ -219,8 +219,8 @@ export async function finalizeLiveScore(live: LiveScore, winner: 1 | 2): Promise
     }
   }
 
-  // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
-  if (!isLeague) await propagateByes(live.eventId);
+  // 次の相手がBYEだけの枠なら更に次の回戦へ送り、3位決定戦の顔ぶれも整える
+  if (!isLeague) await refreshBracketProgress(live.eventId);
 
   if (live.id != null) {
     await db.liveScores.update(live.id, { status: 'finished', winner, updatedAt: now });
@@ -265,8 +265,8 @@ export async function revertLiveScoreResult(live: LiveScore): Promise<void> {
     updatedAt: now,
   });
 
-  // BYEで送っていた勝ち上がりも取り消す
-  await propagateByes(live.eventId);
+  // BYEで送っていた勝ち上がりを取り消し、3位決定戦の顔ぶれも整える
+  await refreshBracketProgress(live.eventId);
 }
 
 /** ライブスコアを削除（配信を止めて記録を消す） */

@@ -293,7 +293,7 @@ export default function ScheduleGenerator() {
       {drawTimeHint?.startTime && (
         <div className="flex items-start gap-2 p-3 bg-primary-50 border border-primary-200 rounded-md">
           <Clock className="w-4 h-4 text-primary-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-primary-700 font-medium">
+          <p className="text-xs text-gray-800 font-medium">
             ドロー表に試合開始時刻の記載があります（最早 {drawTimeHint.startTime}
             {drawTimeHint.matchDuration ? ` / ${drawTimeHint.matchDuration}分間隔` : ''}）。
             記載のある試合はその時刻に配置します。
@@ -302,7 +302,7 @@ export default function ScheduleGenerator() {
       )}
 
       {hasExistingSchedule && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+        <div className="flex items-start gap-2 p-3 bg-primary-50 border border-primary-200 rounded-md">
           <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
           <p className="text-xs text-warning font-medium">
             既にスケジュールが設定されています。自動生成を実行すると既存のコート割当・時間が上書きされます。
@@ -350,7 +350,7 @@ export default function ScheduleGenerator() {
         <button
           onClick={handleGenerate}
           disabled={isGenerating || !currentTournamentId}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-ocean rounded-md hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-ocean rounded-md hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Zap className="w-4 h-4" />
           {isGenerating ? '生成中...' : '自動生成'}
@@ -365,7 +365,7 @@ export default function ScheduleGenerator() {
         <div className={`p-3 rounded-md text-sm ${
           result.includes('失敗') || result.includes('ありません') || result.includes('ください')
             ? 'bg-red-50 text-red-700 border border-red-200'
-            : 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-primary-50 text-gray-800 border border-primary-200'
         }`}>
           {result}
         </div>

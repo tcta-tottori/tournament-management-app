@@ -3,7 +3,7 @@ import { Megaphone, Square, Volume2, Loader2 } from 'lucide-react';
 import { useBulkCallStore, type BulkCallItem } from '../../stores/bulkCallStore';
 import { db } from '../../db/database';
 import { findOccupyingMatch } from '../../db/courtOccupancy';
-import { geminiTts } from '../../features/broadcast/geminiTts';
+import { callTts, type PreparedCall } from '../../features/broadcast/callTts';
 
 /** 音声生成の並列数（多すぎるとAPIのレート制限に掛かるため控えめに） */
 const PREFETCH_CONCURRENCY = 4;
@@ -16,17 +16,18 @@ function callTextOf(item: BulkCallItem, index: number): string {
 }
 
 /**
- * 全コート分の音声を先に生成する。
+ * 全コート分の音声を先に用意する。
  * コートごとに生成→再生を繰り返すとコート間に生成待ちの間が空くため、
  * 先に全部を並列で作ってから続けて再生する。
+ * （ブラウザ内蔵音声は生成待ちが無いので、この工程は即座に終わる）
  */
 async function prefetchAll(
   items: BulkCallItem[],
   repeatCount: number,
   signal: { aborted: boolean },
   onProgress: (done: number) => void,
-): Promise<(Blob | null)[]> {
-  const blobs: (Blob | null)[] = new Array(items.length).fill(null);
+): Promise<(PreparedCall | null)[]> {
+  const prepared: (PreparedCall | null)[] = new Array(items.length).fill(null);
   let nextIndex = 0;
   let done = 0;
 
@@ -36,11 +37,11 @@ async function prefetchAll(
       if (i >= items.length || signal.aborted) return;
       const text = callTextOf(items[i], i);
       try {
-        blobs[i] = await geminiTts.synthesize(text, { repeatCount });
+        prepared[i] = await callTts.synthesize(text, { repeatCount });
       } catch {
         // 一時的な失敗は1回だけ再試行する
         try {
-          if (!signal.aborted) blobs[i] = await geminiTts.synthesize(text, { repeatCount });
+          if (!signal.aborted) prepared[i] = await callTts.synthesize(text, { repeatCount });
         } catch (err) {
           console.error('[一斉コール] 音声生成に失敗', items[i].courtName, err);
         }
@@ -53,7 +54,7 @@ async function prefetchAll(
   await Promise.all(
     Array.from({ length: Math.min(PREFETCH_CONCURRENCY, items.length) }, worker),
   );
-  return blobs;
+  return prepared;
 }
 
 export default function BulkCallOverlay() {
@@ -74,16 +75,16 @@ export default function BulkCallOverlay() {
 
     // --- 1) 全コート分の音声をまとめて生成 ---
     useBulkCallStore.getState().setPhase('preparing');
-    const blobs = await prefetchAll(
+    const preparedCalls = await prefetchAll(
       allItems,
       repeatCount,
       abortRef.current,
       (n) => useBulkCallStore.getState().setPreparedCount(n),
     );
 
-    // 1件も生成できなかった場合はコールを中止する（無音のまま試合が開始されるのを防ぐ）
-    if (!abortRef.current.aborted && blobs.every(b => b === null)) {
-      alert('音声の生成に失敗しました。音声設定（APIキー・中継サーバー）をご確認ください。');
+    // 1件も用意できなかった場合はコールを中止する（無音のまま試合が開始されるのを防ぐ）
+    if (!abortRef.current.aborted && preparedCalls.every(c => c === null)) {
+      alert('音声を用意できませんでした。音声設定をご確認ください。');
       useBulkCallStore.getState().abort();
       runningRef.current = false;
       return;
@@ -111,10 +112,10 @@ export default function BulkCallOverlay() {
         }
       }
 
-      // 音声再生（生成済み）
-      const blob = blobs[i];
-      if (blob) {
-        await geminiTts.playBlob(blob);
+      // 音声再生（用意済み）
+      const prepared = preparedCalls[i];
+      if (prepared) {
+        await callTts.playPrepared(prepared);
         if (abortRef.current.aborted) break;
         if (i < allItems.length - 1) {
           await new Promise(resolve => setTimeout(resolve, GAP_MS));
@@ -139,7 +140,7 @@ export default function BulkCallOverlay() {
   }, [isActive, aborted, runSequence]);
 
   const handleAbort = useCallback(() => {
-    geminiTts.stop();
+    callTts.stop();
     abort();
   }, [abort]);
 
@@ -166,8 +167,8 @@ export default function BulkCallOverlay() {
 
   return (
     <div className="fixed top-[56px] right-3 z-50 w-80">
-      <div className="bg-white rounded-xl shadow-2xl border border-emerald-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 flex items-center gap-2">
+      <div className="bg-white rounded-xl shadow-2xl border border-primary-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-2.5 flex items-center gap-2">
           <div className="relative">
             {isPreparing
               ? <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -206,33 +207,33 @@ export default function BulkCallOverlay() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-gray-500 font-medium">進捗</span>
-              <span className="text-xs font-bold text-emerald-600">{progress}%</span>
+              <span className="text-xs font-bold text-gray-700">{progress}%</span>
             </div>
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-700"
+                className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-700"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
 
           {isPreparing && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <Loader2 className="w-4 h-4 text-emerald-500 shrink-0 animate-spin" />
-              <p className="text-[11px] text-emerald-700 font-medium">
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
+              <Loader2 className="w-4 h-4 text-primary-500 shrink-0 animate-spin" />
+              <p className="text-[11px] text-gray-800 font-medium">
                 全{items.length}コート分の音声を読み込んでから、続けてコールします
               </p>
             </div>
           )}
 
           {current && isActive && !isPreparing && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <Volume2 className="w-4 h-4 text-emerald-500 shrink-0 animate-pulse" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
+              <Volume2 className="w-4 h-4 text-primary-500 shrink-0 animate-pulse" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-emerald-800 truncate">
+                <p className="text-xs font-bold text-gray-900 truncate">
                   {current.courtName}番コート
                 </p>
-                <p className="text-[10px] text-emerald-600 truncate">
+                <p className="text-[10px] text-gray-700 truncate">
                   {current.player1Name} vs {current.player2Name}
                 </p>
               </div>
@@ -246,11 +247,11 @@ export default function BulkCallOverlay() {
                   key={`${item.courtName}-${item.matchId}`}
                   className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold transition-all ${
                     isPreparing
-                      ? (i < preparedCount ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400')
+                      ? (i < preparedCount ? 'bg-primary-100 text-gray-700' : 'bg-gray-100 text-gray-400')
                       : i < currentIndex
-                        ? 'bg-emerald-100 text-emerald-600'
+                        ? 'bg-primary-100 text-gray-700'
                         : i === currentIndex
-                          ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 animate-pulse'
+                          ? 'bg-primary-600 text-white ring-2 ring-primary-300 animate-pulse'
                           : 'bg-gray-100 text-gray-400'
                   }`}
                 >

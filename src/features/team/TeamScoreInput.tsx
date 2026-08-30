@@ -24,98 +24,36 @@ interface MatchTheme {
   btn: string;
 }
 
-const MATCH_TYPE_THEME: Record<MatchType, MatchTheme> = {
-  MIX: {
-    grad: 'from-violet-500 to-fuchsia-500',
-    bg: 'bg-gradient-to-br from-violet-50 to-fuchsia-50',
-    border: 'border-violet-200',
-    text: 'text-violet-700',
-    badge: 'bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white',
-    ring: 'focus:ring-violet-400 focus:border-violet-500',
-    accentBorder: 'border-violet-300',
-    softBg: 'bg-violet-100/60',
-    btn: 'bg-white hover:bg-violet-50 border-violet-200 text-violet-700',
-  },
-  WD: {
-    grad: 'from-pink-500 to-rose-500',
-    bg: 'bg-gradient-to-br from-pink-50 to-rose-50',
-    border: 'border-pink-200',
-    text: 'text-pink-700',
-    badge: 'bg-gradient-to-br from-pink-500 to-rose-500 text-white',
-    ring: 'focus:ring-pink-400 focus:border-pink-500',
-    accentBorder: 'border-pink-300',
-    softBg: 'bg-pink-100/60',
-    btn: 'bg-white hover:bg-pink-50 border-pink-200 text-pink-700',
-  },
-  MD: {
-    grad: 'from-sky-500 to-blue-500',
-    bg: 'bg-gradient-to-br from-sky-50 to-blue-50',
-    border: 'border-sky-200',
-    text: 'text-sky-700',
-    badge: 'bg-gradient-to-br from-sky-500 to-blue-500 text-white',
-    ring: 'focus:ring-sky-400 focus:border-sky-500',
-    accentBorder: 'border-sky-300',
-    softBg: 'bg-sky-100/60',
-    btn: 'bg-white hover:bg-sky-50 border-sky-200 text-sky-700',
-  },
-  D3: {
-    grad: 'from-blue-500 to-indigo-500',
-    bg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
-    border: 'border-blue-200',
-    text: 'text-blue-700',
-    badge: 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white',
-    ring: 'focus:ring-blue-400 focus:border-blue-500',
-    accentBorder: 'border-blue-300',
-    softBg: 'bg-blue-100/60',
-    btn: 'bg-white hover:bg-blue-50 border-blue-200 text-blue-700',
-  },
-  D2: {
-    grad: 'from-cyan-500 to-blue-500',
-    bg: 'bg-gradient-to-br from-cyan-50 to-blue-50',
-    border: 'border-cyan-200',
-    text: 'text-cyan-700',
-    badge: 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white',
-    ring: 'focus:ring-cyan-400 focus:border-cyan-500',
-    accentBorder: 'border-cyan-300',
-    softBg: 'bg-cyan-100/60',
-    btn: 'bg-white hover:bg-cyan-50 border-cyan-200 text-cyan-700',
-  },
-  D1: {
-    grad: 'from-teal-500 to-cyan-500',
-    bg: 'bg-gradient-to-br from-teal-50 to-cyan-50',
-    border: 'border-teal-200',
-    text: 'text-teal-700',
-    badge: 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white',
-    ring: 'focus:ring-teal-400 focus:border-teal-500',
-    accentBorder: 'border-teal-300',
-    softBg: 'bg-teal-100/60',
-    btn: 'bg-white hover:bg-teal-50 border-teal-200 text-teal-700',
-  },
-  S2: {
-    grad: 'from-amber-500 to-orange-500',
-    bg: 'bg-gradient-to-br from-amber-50 to-orange-50',
-    border: 'border-amber-200',
-    text: 'text-amber-700',
-    badge: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white',
-    ring: 'focus:ring-amber-400 focus:border-amber-500',
-    accentBorder: 'border-amber-300',
-    softBg: 'bg-amber-100/60',
-    btn: 'bg-white hover:bg-amber-50 border-amber-200 text-amber-700',
-  },
-  S1: {
-    grad: 'from-red-500 to-rose-500',
-    bg: 'bg-gradient-to-br from-red-50 to-rose-50',
-    border: 'border-red-200',
-    text: 'text-red-700',
-    badge: 'bg-gradient-to-br from-red-500 to-rose-500 text-white',
-    ring: 'focus:ring-red-400 focus:border-red-500',
-    accentBorder: 'border-red-300',
-    softBg: 'bg-red-100/60',
-    btn: 'bg-white hover:bg-red-50 border-red-200 text-red-700',
-  },
+/**
+ * 種目（S1/S2/D1…）ごとの配色。
+ * 協会サイトのトンマナ（白ベース＋赤の差し色）に合わせ、種目ごとの
+ * 色分けはやめて全種目で共通の無彩色にしている。赤は勝者スコアなど
+ * 要点だけに使う。
+ */
+const NEUTRAL_MATCH_THEME: MatchTheme = {
+  grad: 'from-gray-600 to-gray-700',
+  bg: 'bg-gradient-to-br from-gray-50 to-white',
+  border: 'border-gray-200',
+  text: 'text-gray-700',
+  badge: 'bg-gradient-to-br from-gray-600 to-gray-700 text-white',
+  ring: 'focus:ring-gray-400 focus:border-gray-500',
+  accentBorder: 'border-gray-300',
+  softBg: 'bg-gray-100/60',
+  btn: 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700',
 };
 
-/** 対戦チーム別テーマ（左=オレンジ、右=グリーン） */
+const MATCH_TYPE_THEME: Record<MatchType, MatchTheme> = {
+  MIX: NEUTRAL_MATCH_THEME,
+  WD: NEUTRAL_MATCH_THEME,
+  MD: NEUTRAL_MATCH_THEME,
+  D3: NEUTRAL_MATCH_THEME,
+  D2: NEUTRAL_MATCH_THEME,
+  D1: NEUTRAL_MATCH_THEME,
+  S2: NEUTRAL_MATCH_THEME,
+  S1: NEUTRAL_MATCH_THEME,
+};
+
+/** 対戦チーム別テーマ（左=ブランド赤、右=墨） */
 interface TeamTheme {
   bg: string;
   bgStrong: string;
@@ -131,28 +69,30 @@ interface TeamTheme {
 
 const TEAM_THEME: Record<1 | 2, TeamTheme> = {
   1: {
-    bg: 'bg-orange-50',
-    bgStrong: 'bg-orange-100',
-    border: 'border-orange-300',
-    borderStrong: 'border-orange-500',
-    text: 'text-orange-700',
-    textStrong: 'text-orange-800',
-    grad: 'from-orange-500 to-amber-500',
-    btnBg: 'bg-white hover:bg-orange-50',
-    btnBorder: 'border-orange-300',
-    btnText: 'text-orange-700',
+    bg: 'bg-primary-50',
+    bgStrong: 'bg-primary-100',
+    border: 'border-primary-300',
+    borderStrong: 'border-primary-500',
+    text: 'text-gray-800',
+    textStrong: 'text-gray-900',
+    grad: 'from-primary-500 to-primary-600',
+    btnBg: 'bg-white hover:bg-primary-50',
+    btnBorder: 'border-primary-300',
+    btnText: 'text-gray-800',
   },
+  // 2チーム目は墨（無彩色）。左右どちらのチームかを色で見分けられるよう、
+  // 1チーム目の赤と濃さ・色味で対比させている。
   2: {
-    bg: 'bg-emerald-50',
-    bgStrong: 'bg-emerald-100',
-    border: 'border-emerald-300',
-    borderStrong: 'border-emerald-500',
-    text: 'text-emerald-700',
-    textStrong: 'text-emerald-800',
-    grad: 'from-emerald-500 to-teal-500',
-    btnBg: 'bg-white hover:bg-emerald-50',
-    btnBorder: 'border-emerald-300',
-    btnText: 'text-emerald-700',
+    bg: 'bg-gray-50',
+    bgStrong: 'bg-gray-100',
+    border: 'border-gray-300',
+    borderStrong: 'border-gray-600',
+    text: 'text-gray-700',
+    textStrong: 'text-gray-800',
+    grad: 'from-gray-600 to-gray-700',
+    btnBg: 'bg-white hover:bg-gray-50',
+    btnBorder: 'border-gray-300',
+    btnText: 'text-gray-700',
   },
 };
 
@@ -244,7 +184,7 @@ function PlayerPickerPopup({
         <div className="flex-1 overflow-y-auto min-h-0">
           {roster.length > 0 ? (
             <div className="p-3">
-              <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-1 pb-2 flex items-center gap-1">
+              <div className="text-[10px] font-black text-gray-500 uppercase tracking-wider px-1 pb-2 flex items-center gap-1">
                 <Users className="w-3 h-3" />
                 チーム選手（タップで選択）
               </div>
@@ -260,7 +200,7 @@ function PlayerPickerPopup({
                       onClick={() => !isUsed && commit(name)}
                       className={`px-3 py-3 rounded-xl border-2 text-base font-bold transition-all text-left ${
                         isUsed
-                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                          ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                           : isSelected
                           ? `${teamTheme.bgStrong} ${teamTheme.borderStrong} ${teamTheme.textStrong} shadow-sm`
                           : `${teamTheme.btnBg} ${teamTheme.btnBorder} ${teamTheme.btnText} active:scale-95`
@@ -272,7 +212,7 @@ function PlayerPickerPopup({
                           <DisplayNameSpan name={name} mainLen={partsFor(name)?.mainLen} />
                         </span>
                         {isUsed && (
-                          <span className="ml-auto text-[9px] font-bold text-slate-400 shrink-0">出場済み</span>
+                          <span className="ml-auto text-[9px] font-bold text-gray-400 shrink-0">出場済み</span>
                         )}
                       </div>
                     </button>
@@ -280,18 +220,18 @@ function PlayerPickerPopup({
                 })}
               </div>
               {usedSet.size > 0 && (
-                <p className="mt-3 text-[10px] text-slate-400 px-1 leading-snug">
+                <p className="mt-3 text-[10px] text-gray-400 px-1 leading-snug">
                   ※ 同じ対戦内で既に出場した選手は選択できません。
                 </p>
               )}
 
               {/* 表示名編集セクション */}
               {members && members.length > 0 && teamId && onUpdateDisplayName && (
-                <div className="mt-3 pt-2 border-t border-slate-100">
+                <div className="mt-3 pt-2 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={() => setShowDisplayNameEdit(!showDisplayNameEdit)}
-                    className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1"
+                    className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 px-1"
                   >
                     <Pencil className="w-2.5 h-2.5" />
                     表示名を編集
@@ -303,7 +243,7 @@ function PlayerPickerPopup({
                         const autoName = getDisplayNameParts(m.player, members);
                         return (
                           <div key={m.player.name} className="flex items-center gap-1.5 text-[10px]">
-                            <span className="text-slate-500 truncate w-16 shrink-0">{m.player.name.trim().split(/[\s\u3000]+/)[0]}</span>
+                            <span className="text-gray-500 truncate w-16 shrink-0">{m.player.name.trim().split(/[\s\u3000]+/)[0]}</span>
                             <input
                               type="text"
                               value={m.player.displayName ?? ''}
@@ -315,7 +255,7 @@ function PlayerPickerPopup({
                               className={`flex-1 min-w-0 text-center text-xs font-bold border rounded px-1 py-0.5 focus:outline-none focus:ring-1 ${
                                 m.player.displayName
                                   ? `${teamTheme.btnBorder} ${teamTheme.btnText} bg-white`
-                                  : 'border-slate-200 text-slate-400'
+                                  : 'border-gray-200 text-gray-400'
                               }`}
                             />
                           </div>
@@ -327,14 +267,14 @@ function PlayerPickerPopup({
               )}
             </div>
           ) : (
-            <div className="p-6 text-center text-sm text-slate-400">
+            <div className="p-6 text-center text-sm text-gray-400">
               チーム選手の登録がありません。<br />下から手動入力してください。
             </div>
           )}
         </div>
 
         {/* フッター: 手動入力 / クリア */}
-        <div className="shrink-0 border-t border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div className="shrink-0 border-t border-gray-200 bg-gray-50 p-3 space-y-2">
           {manualMode ? (
             <form
               autoComplete="off"
@@ -358,14 +298,14 @@ function PlayerPickerPopup({
                   data-1p-ignore="true"
                   enterKeyHint="done"
                   className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                    manualIsDuplicate ? 'border-amber-300 focus:ring-amber-300' : `border-slate-300 ${theme.ring}`
+                    manualIsDuplicate ? 'border-primary-300 focus:ring-primary-300' : `border-gray-300 ${theme.ring}`
                   }`}
                 />
                 <button
                   type="submit"
                   disabled={!manualTrim}
                   title={manualIsDuplicate ? 'この名前はこの対戦で出場済みですが、そのまま追加できます' : undefined}
-                  className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${manualIsDuplicate ? 'from-amber-500 to-orange-600' : teamTheme.grad} disabled:opacity-30 active:scale-95`}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-br ${manualIsDuplicate ? 'from-primary-500 to-primary-600' : teamTheme.grad} disabled:opacity-30 active:scale-95`}
                 >
                   <Check className="w-4 h-4" />
                 </button>
@@ -375,14 +315,14 @@ function PlayerPickerPopup({
                     setManualMode(false);
                     setManualName((current || '').trim());
                   }}
-                  className="px-2 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white border border-slate-200 active:scale-95"
+                  className="px-2 py-2 rounded-lg text-xs font-bold text-gray-500 bg-white border border-gray-200 active:scale-95"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 px-1">同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力してください。</p>
+              <p className="text-[10px] text-gray-400 px-1">同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力してください。</p>
               {manualIsDuplicate && (
-                <div className="text-[10px] font-bold text-amber-600 px-1">
+                <div className="text-[10px] font-bold text-gray-700 px-1">
                   「{manualTrim}」は既にこの対戦で出場済みです。同姓別人などの場合はこのまま追加できます。
                 </div>
               )}
@@ -391,7 +331,7 @@ function PlayerPickerPopup({
             <button
               type="button"
               onClick={openManual}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-lg hover:bg-slate-100 active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-gray-600 bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-100 active:scale-[0.98]"
             >
               <Pencil className="w-3.5 h-3.5" />
               手動入力する
@@ -401,7 +341,7 @@ function PlayerPickerPopup({
             <button
               type="button"
               onClick={() => commit('')}
-              className="w-full py-2 text-xs font-bold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 active:scale-[0.98]"
+              className="w-full py-2 text-xs font-bold text-gray-700 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 active:scale-[0.98]"
             >
               選手名をクリア
             </button>
@@ -469,7 +409,7 @@ function PlayerPickerButton({
       className={`w-full flex items-center justify-between gap-1 text-[13px] border-2 rounded-md px-2 py-1.5 transition-all active:scale-[0.97] ${
         value
           ? `bg-white ${teamTheme.border} ${teamTheme.text} font-bold`
-          : `bg-white ${teamTheme.border} text-slate-400`
+          : `bg-white ${teamTheme.border} text-gray-400`
       }`}
     >
       {value ? <DisplayNameSpan name={value} mainLen={mainLen} className="truncate" /> : <span className="truncate">{placeholder}</span>}
@@ -912,11 +852,11 @@ export default function TeamScoreInput({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-700 to-purple-700 text-white px-5 py-3">
+        <div className="bg-gradient-to-r from-gray-700 to-gray-800 text-white px-5 py-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-sm">団体戦スコア入力</h3>
-              <div className="text-xs text-indigo-200 mt-0.5">3種目のスコアを入力</div>
+              <div className="text-xs text-gray-200 mt-0.5">3種目のスコアを入力</div>
             </div>
             <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
               <X size={18} />
@@ -937,33 +877,33 @@ export default function TeamScoreInput({
           <div className="flex items-stretch gap-2 mb-2">
             <div className={`flex-1 flex flex-col items-center justify-center text-center py-2.5 px-3 rounded-xl border-2 transition-all min-h-[56px] ${
               overallWinner === 1
-                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
+                ? 'bg-gradient-to-b from-primary-50 to-primary-100/60 border-primary-400 shadow-sm'
                 : overallWinner === 2
-                ? 'bg-slate-50 border-slate-200'
+                ? 'bg-gray-50 border-gray-200'
                 : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
               <div className={`font-bold text-sm truncate w-full ${
-                overallWinner === 1 ? 'text-amber-800' : overallWinner === 2 ? 'text-slate-400' : TEAM_THEME[1].textStrong
+                overallWinner === 1 ? 'text-gray-900' : overallWinner === 2 ? 'text-gray-400' : TEAM_THEME[1].textStrong
               }`}>{team1Name}</div>
               <div className="h-4 flex items-center">
                 {overallWinner === 1 && (
-                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
+                  <span className="text-[10px] font-black text-primary-600 tracking-wider">WIN</span>
                 )}
               </div>
             </div>
             <div className={`flex-1 flex flex-col items-center justify-center text-center py-2.5 px-3 rounded-xl border-2 transition-all min-h-[56px] ${
               overallWinner === 2
-                ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-400 shadow-sm'
+                ? 'bg-gradient-to-b from-primary-50 to-primary-100/60 border-primary-400 shadow-sm'
                 : overallWinner === 1
-                ? 'bg-slate-50 border-slate-200'
+                ? 'bg-gray-50 border-gray-200'
                 : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
             }`}>
               <div className={`font-bold text-sm truncate w-full ${
-                overallWinner === 2 ? 'text-amber-800' : overallWinner === 1 ? 'text-slate-400' : TEAM_THEME[2].textStrong
+                overallWinner === 2 ? 'text-gray-900' : overallWinner === 1 ? 'text-gray-400' : TEAM_THEME[2].textStrong
               }`}>{team2Name}</div>
               <div className="h-4 flex items-center">
                 {overallWinner === 2 && (
-                  <span className="text-[10px] font-black text-amber-600 tracking-wider">WIN</span>
+                  <span className="text-[10px] font-black text-primary-600 tracking-wider">WIN</span>
                 )}
               </div>
             </div>
@@ -974,18 +914,18 @@ export default function TeamScoreInput({
             <div className="flex items-baseline gap-1">
               <span className={`text-5xl font-black tabular-nums leading-none ${
                 overallWinner > 0
-                  ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
-                  : 'text-slate-300'
+                  ? 'bg-gradient-to-br from-primary-500 to-primary-600 bg-clip-text text-transparent'
+                  : 'text-gray-300'
               }`}>
                 {winTally.t1}
               </span>
               <span className={`text-3xl font-black leading-none ${
-                overallWinner > 0 ? 'text-slate-400' : 'text-slate-300'
+                overallWinner > 0 ? 'text-gray-400' : 'text-gray-300'
               }`}>-</span>
               <span className={`text-5xl font-black tabular-nums leading-none ${
                 overallWinner > 0
-                  ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent'
-                  : 'text-slate-300'
+                  ? 'bg-gradient-to-br from-primary-500 to-primary-600 bg-clip-text text-transparent'
+                  : 'text-gray-300'
               }`}>
                 {winTally.t2}
               </span>
@@ -1002,11 +942,11 @@ export default function TeamScoreInput({
               const theme = MATCH_TYPE_THEME[mt];
 
               const score1Class = hasScores && info.winner === 1
-                ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
-                : `border-slate-300 ${theme.ring}`;
+                ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300'
+                : `border-gray-300 ${theme.ring}`;
               const score2Class = hasScores && info.winner === 2
-                ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300'
-                : `border-slate-300 ${theme.ring}`;
+                ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-300'
+                : `border-gray-300 ${theme.ring}`;
 
               return (
                 <div key={mt} className={`rounded-2xl border-2 ${theme.border} ${theme.bg} p-3 shadow-sm transition-all overflow-hidden`}>
@@ -1018,14 +958,14 @@ export default function TeamScoreInput({
                       </span>
                       <span className={`text-xs font-bold ${theme.text}`}>{MATCH_TYPE_LABELS[mt]}</span>
                       {terminated[mt] && (
-                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-300 px-1.5 py-0.5 rounded-full tracking-wider">
+                        <span className="text-[9px] font-black text-gray-700 bg-primary-50 border border-primary-300 px-1.5 py-0.5 rounded-full tracking-wider">
                           打ち切り
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {hasScores && info.winner > 0 && !terminated[mt] && (
-                        <span className="text-[10px] font-bold text-emerald-600 bg-white border border-emerald-300 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-gray-700 bg-white border border-primary-300 px-2 py-0.5 rounded-full">
                           <Trophy className="w-2.5 h-2.5 inline mr-0.5" />
                           {info.winner === 1 ? team1Name : team2Name}
                         </span>
@@ -1041,8 +981,8 @@ export default function TeamScoreInput({
                         }}
                         className={`flex items-center gap-1 px-2 h-6 rounded-md text-[10px] font-bold border transition-colors ${
                           terminated[mt]
-                            ? 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600'
-                            : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
+                            ? 'bg-primary-500 text-white border-primary-500 hover:bg-primary-600'
+                            : 'bg-white text-gray-700 border-primary-200 hover:bg-primary-50'
                         }`}
                         title="この種目を打ち切り（勝利数にカウントしない）"
                       >
@@ -1057,7 +997,7 @@ export default function TeamScoreInput({
                     {/* Tiebreak for team1 side (when team1 lost the tiebreak) */}
                     {info.isTiebreak && info.loserSide === 1 && (
                       <div className="flex flex-col items-center">
-                        <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                        <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                         <input
                           ref={setRef(`${mt}-tiebreak`)}
                           type="text"
@@ -1075,7 +1015,7 @@ export default function TeamScoreInput({
                           data-lpignore="true"
                           data-form-type="other"
                           data-1p-ignore="true"
-                          className="w-9 h-12 text-center text-base font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
+                          className="w-9 h-12 text-center text-base font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
                           placeholder="?"
                         />
                       </div>
@@ -1139,7 +1079,7 @@ export default function TeamScoreInput({
                     {/* Tiebreak for team2 side (when team2 lost the tiebreak) */}
                     {info.isTiebreak && info.loserSide === 2 && (
                       <div className="flex flex-col items-center">
-                        <div className="text-[9px] text-blue-500 mb-0.5">TB</div>
+                        <div className="text-[9px] text-gray-500 mb-0.5">TB</div>
                         <input
                           ref={setRef(`${mt}-tiebreak`)}
                           type="text"
@@ -1167,14 +1107,14 @@ export default function TeamScoreInput({
                           data-lpignore="true"
                           data-form-type="other"
                           data-1p-ignore="true"
-                          className="w-9 h-12 text-center text-base font-bold border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50"
+                          className="w-9 h-12 text-center text-base font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
                           placeholder="?"
                         />
                       </div>
                     )}
                   </div>
 
-                  {/* 選手名選択（対戦チーム別カラー: 左=オレンジ, 右=グリーン）。
+                  {/* 選手名選択（対戦チーム別カラー: 左=赤, 右=墨）。
                       シングルス（S1/S2）は各チーム1名のみ選択。 */}
                   {(() => {
                     const isSingles = playersPerSubMatch(mt) === 1;
@@ -1235,7 +1175,7 @@ export default function TeamScoreInput({
           <button
             type="button"
             onClick={onClose}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98] bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl transition-all shadow-md text-sm font-medium mb-3 active:scale-[0.98] bg-gradient-to-r from-gray-600 to-gray-700 text-white hover:from-gray-700 hover:to-gray-800"
           >
             <Check size={14} />
             閉じる {filledCount > 0 && `(${filledCount}/${matchTypeOrder.length} 自動保存済み)`}
@@ -1259,7 +1199,7 @@ export default function TeamScoreInput({
             >
               キャンセル
             </button>
-            <span className="text-xs font-bold text-slate-400 tabular-nums shrink-0">{nowTime}</span>
+            <span className="text-xs font-bold text-gray-400 tabular-nums shrink-0">{nowTime}</span>
           </div>
         </form>
       </div>

@@ -1186,7 +1186,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           <GoogleDriveIcon className="w-5 h-5" />
           <h2 className="font-semibold text-gray-800">Google ドライブ連携</h2>
           {isConnected && (
-            <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">接続中</span>
+            <span className="text-[10px] font-bold bg-primary-100 text-gray-800 px-2 py-0.5 rounded-full">接続中</span>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -1197,10 +1197,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
             </div>
           )}
           <div className="hidden sm:flex items-center gap-2 text-[10px]">
-            <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+            <span className="bg-gray-50 text-gray-700 px-1.5 py-0.5 rounded font-medium">
               <Users className="w-3 h-3 inline mr-0.5" />ふりがな {furiganaDictCount}
             </span>
-            <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+            <span className="bg-gray-50 text-gray-700 px-1.5 py-0.5 rounded font-medium">
               <Building2 className="w-3 h-3 inline mr-0.5" />所属 {affiliationCount}
             </span>
           </div>
@@ -1229,7 +1229,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
             {/* 接続情報 + フォルダ表示 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex items-center gap-2 text-xs text-gray-600">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
+                <span className="w-2 h-2 bg-primary-500 rounded-full" />
                 <span>{userEmail || 'Google ドライブ接続中'}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -1238,7 +1238,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     href={gdriveFolderLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#1a73e8] bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-100"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#1a73e8] bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-100"
                   >
                     <FolderOpen className="w-3.5 h-3.5" />
                     フォルダ
@@ -1288,7 +1288,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
         {result && (
           <div className={`p-3 rounded-lg text-sm ${
             result.success
-              ? 'bg-green-50 text-green-800 border border-green-200'
+              ? 'bg-primary-50 text-gray-900 border border-primary-200'
               : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             <div className="flex items-start gap-2">
@@ -1348,10 +1348,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         key={f.id}
                         onClick={() => handleSelectTournamentFile(f)}
                         disabled={!!loadingFileId}
-                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
-                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-500" />}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-gray-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
@@ -1359,8 +1359,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-gray-100 flex items-center justify-center transition-colors">
+                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
                         </div>
                       </button>
                     );
@@ -1416,10 +1416,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         key={f.id}
                         onClick={() => handleSelectScheduleFile(f)}
                         disabled={!!loadingScheduleFileId}
-                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
-                          {isLoading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-500" />}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
+                          {isLoading ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-gray-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
@@ -1427,8 +1427,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-50 group-hover:bg-gray-100 flex items-center justify-center transition-colors">
+                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
                         </div>
                       </button>
                     );
@@ -1454,7 +1454,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               <div className="relative">
                 <GoogleDriveIcon className="w-7 h-7" />
                 {wizardPhase !== 'done' && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full drive-modal-pulse" />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-gray-500 rounded-full drive-modal-pulse" />
                 )}
               </div>
               <div className="flex-1">
@@ -1474,8 +1474,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       <div key={i} className="flex items-center gap-1">
                         {i > 0 && <ChevronRight className="w-2.5 h-2.5 text-gray-300" />}
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          isDone ? 'bg-green-100 text-green-700' :
-                          isCurrent ? 'bg-blue-100 text-blue-700' :
+                          isDone ? 'bg-primary-100 text-gray-800' :
+                          isCurrent ? 'bg-gray-100 text-gray-700' :
                           'bg-gray-100 text-gray-400'
                         }`}>{label}</span>
                       </div>
@@ -1532,10 +1532,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         <div className="shrink-0 w-5 h-5 flex items-center justify-center">
                           {step.status === 'waiting' && <span className="w-2 h-2 rounded-full bg-gray-200" />}
                           {step.status === 'loading' && <span className="w-4 h-4 rounded-full border-2 border-gray-200 border-t-[#1a73e8] drive-modal-spin" />}
-                          {step.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                          {step.status === 'done' && <CheckCircle2 className="w-4 h-4 text-primary-500" />}
                           {step.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
                         </div>
-                        <span className={`text-sm ${step.status === 'loading' ? 'text-gray-800 font-medium' : step.status === 'done' ? 'text-green-700' : step.status === 'error' ? 'text-red-600' : 'text-gray-400'}`}>
+                        <span className={`text-sm ${step.status === 'loading' ? 'text-gray-800 font-medium' : step.status === 'done' ? 'text-gray-800' : step.status === 'error' ? 'text-red-600' : 'text-gray-400'}`}>
                           {step.label}
                         </span>
                         {step.detail && <span className="text-[11px] text-gray-400 ml-auto">{step.detail}</span>}
@@ -1556,7 +1556,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     <p className="text-[11px] text-gray-500 mt-0.5">{wizardDrawFiles.length}件のファイル</p>
                   </div>
                   {wizardListDocFiles.length > 0 && (
-                    <div className="mx-2 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
+                    <div className="mx-2 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-primary-50 border border-primary-200 text-[11px] text-gray-800">
                       <ListChecks className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                       <span>
                         大会日程表を検出しました（{wizardListDocFiles.map(f => f.name.replace(/\.(xlsx?|xls)$/i, '')).join('、')}）。
@@ -1579,10 +1579,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           key={f.id}
                           onClick={() => handleWizardSelectTournament(f)}
                           disabled={!!wizardLoadingFileId}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 group"
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-all text-left disabled:opacity-50 group"
                         >
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm shrink-0">
-                            {isLoading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-blue-500" />}
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-sm shrink-0">
+                            {isLoading ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-gray-500" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
@@ -1590,7 +1590,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                               {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
-                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-500 shrink-0" />
+                          <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 shrink-0" />
                         </button>
                       );
                     })}
@@ -1614,7 +1614,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               {wizardPhase === 'confirm-tournament' && (
                 <div className="px-0 py-0">
                   {/* ヘッダー */}
-                  <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-700 px-5 py-4">
+                  <div className="relative overflow-hidden bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-4">
                     <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/[0.06]" />
                     <div className="flex items-center gap-3 relative">
                       <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
@@ -1715,11 +1715,11 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                 }}
                                 className={`text-left px-3 py-2.5 rounded-xl border transition-colors ${
                                   isActive
-                                    ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300'
+                                    ? 'border-primary-400 bg-primary-50 ring-1 ring-primary-300'
                                     : 'border-gray-200 bg-white hover:bg-gray-50'
                                 }`}
                               >
-                                <div className={`text-sm font-bold ${isActive ? 'text-emerald-700' : 'text-gray-700'}`}>{sec.label}</div>
+                                <div className={`text-sm font-bold ${isActive ? 'text-gray-800' : 'text-gray-700'}`}>{sec.label}</div>
                                 <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                                   <MapPin className="w-3 h-3" />{sec.info.venue}
                                   <span className="ml-1">{sec.leagues.length}リーグ・{sec.leagues.reduce((s, l) => s + l.teams.length, 0)}チーム</span>
@@ -1736,12 +1736,12 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       <div className="flex gap-2">
                         <input type="text" value={wizardEditName} onChange={e => setWizardEditName(e.target.value)}
                           placeholder="大会名を入力"
-                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-[3px] focus:ring-emerald-500/10 outline-none transition-all" />
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium bg-gray-50/50 focus:bg-white focus:border-primary-400 focus:ring-[3px] focus:ring-primary-500/10 outline-none transition-all" />
                         <button type="button" onClick={handleToggleOfficialPicker}
                           className={`shrink-0 px-2.5 py-2 text-[11px] font-semibold border rounded-lg transition-all ${
                             officialPickerOpen
-                              ? 'text-white bg-emerald-600 border-emerald-600'
-                              : 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                              ? 'text-white bg-primary-600 border-primary-600'
+                              : 'text-gray-700 bg-primary-50 border-primary-200 hover:bg-primary-100'
                           }`}
                           title="大会日程表から正式名称を選ぶ">
                           {officialListLoading
@@ -1751,7 +1751,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         <button type="button" onClick={() => {
                           const raw = wizardTournamentFileName.replace(/\.(xlsx?|xls)$/i, '');
                           setWizardEditName(cleanTournamentName(raw));
-                        }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all" title="不要な文字を自動除去">
+                        }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-gray-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all" title="不要な文字を自動除去">
                           <Sparkles className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1762,14 +1762,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
 
                       {/* 正式名称の選択パネル */}
                       {officialPickerOpen && (
-                        <div className="mt-2 border border-emerald-200 rounded-xl bg-emerald-50/40 overflow-hidden">
+                        <div className="mt-2 border border-primary-200 rounded-xl bg-primary-50/40 overflow-hidden">
                           {officialListLoading ? (
                             <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-gray-500">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               大会日程表を読み込んでいます...
                             </div>
                           ) : officialListError ? (
-                            <div className="flex items-start gap-2 px-3 py-3 text-[11px] text-amber-700 bg-amber-50">
+                            <div className="flex items-start gap-2 px-3 py-3 text-[11px] text-gray-800 bg-primary-50">
                               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                               <span>{officialListError}</span>
                             </div>
@@ -1780,7 +1780,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                   <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                                   <input type="text" value={officialFilter} onChange={e => setOfficialFilter(e.target.value)}
                                     placeholder="大会名で絞り込み"
-                                    className="w-full border border-emerald-200 rounded-lg pl-8 pr-3 py-1.5 text-[12px] bg-white focus:border-emerald-400 outline-none" />
+                                    className="w-full border border-primary-200 rounded-lg pl-8 pr-3 py-1.5 text-[12px] bg-white focus:border-primary-400 outline-none" />
                                 </div>
                               </div>
                               <div className="max-h-56 overflow-y-auto p-2 space-y-1">
@@ -1791,14 +1791,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                     key={`${t.season}-${t.no}-${t.name}-${i}`}
                                     type="button"
                                     onClick={() => applyOfficialTournament(t)}
-                                    className="w-full text-left px-3 py-2 rounded-lg bg-white border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                                    className="w-full text-left px-3 py-2 rounded-lg bg-white border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors"
                                   >
                                     <div className="text-[12px] font-bold text-gray-800">{t.name}</div>
                                     <div className="text-[10px] text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                       {t.category && <span>{t.category}</span>}
                                       {t.date && <span><Calendar className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.date}</span>}
                                       {t.venue && <span><MapPin className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.venue}</span>}
-                                      {t.season && <span className="text-emerald-600">{t.season}</span>}
+                                      {t.season && <span className="text-gray-700">{t.season}</span>}
                                     </div>
                                   </button>
                                 ))}
@@ -1819,7 +1819,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             onChange={e => setWizardEditDate(e.target.value)}
                             onBlur={e => setWizardEditDate(formatJpDate(e.target.value))}
                             placeholder="例: 11/3（日）"
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all" />
                         </div>
                         <div>
                           <label className="text-[11px] font-medium text-gray-500 block mb-1">
@@ -1832,7 +1832,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                               : wizardEditVenue || ''
                             }
                             onChange={e => setWizardEditVenue(e.target.value)}
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all"
                           >
                             <option value="">会場を選択</option>
                             <option value="ヤマタスポーツパーク">ヤマタスポーツパーク</option>
@@ -1855,14 +1855,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             setWizardDateMode(mode);
                             if (mode === 'normal') setWizardEditDate(wizardSourceDate);
                             else if (mode === 'reserve') setWizardEditDate(wizardSourceReserveDate);
-                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all mb-1">
                             <option value="normal">通常日程{wizardSourceDate ? ` (${wizardSourceDate})` : ''}</option>
                             <option value="reserve">予備日{wizardSourceReserveDate ? ` (${wizardSourceReserveDate})` : ''}</option>
                             <option value="custom">その他</option>
                           </select>
                           {wizardDateMode === 'custom' && (
                             <input type="text" value={wizardEditDate} onChange={e => setWizardEditDate(e.target.value)} placeholder="例: 3/15"
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all" />
                           )}
                         </div>
                         <div>
@@ -1874,14 +1874,14 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                             setWizardVenueMode(mode);
                             if (mode === 'normal') setWizardEditVenue(wizardSourceVenue);
                             else if (mode === 'reserve') setWizardEditVenue(wizardSourceReserveVenue);
-                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all mb-1">
+                          }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all mb-1">
                             <option value="normal">通常会場{wizardSourceVenue ? ` (${wizardSourceVenue})` : ''}</option>
                             <option value="reserve">予備日会場{wizardSourceReserveVenue ? ` (${wizardSourceReserveVenue})` : ''}</option>
                             <option value="custom">その他</option>
                           </select>
                           {wizardVenueMode === 'custom' && (
                             <input type="text" value={wizardEditVenue} onChange={e => setWizardEditVenue(e.target.value)} placeholder="例: ヤマタスポーツパーク"
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all" />
                           )}
                         </div>
                       </div>
@@ -1894,7 +1894,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         <div>
                           <label className="text-[11px] font-medium text-gray-500 block mb-1">開始時刻</label>
                           <input type="time" value={wizardEditStartTime} onChange={e => setWizardEditStartTime(e.target.value)}
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-emerald-400 outline-none transition-all" />
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all" />
                         </div>
                         <p className="text-[10px] text-gray-400">
                           ドロー表から検出（{wizardParsedExcel?.suggestedCourtCount || '—'}面）。この使用コート・開始時刻をもとに時間割を生成します。
@@ -1912,7 +1912,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     </button>
                     <button onClick={handleWizardConfirmTournament}
                       disabled={wizardIsImporting}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 shadow-sm transition-all">
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-50 shadow-sm transition-all">
                       <Upload className="w-4 h-4" />
                       {wizardIsImporting ? 'インポート中...' : (wizardMixedPending || wizardTeamPending) ? '確定してエントリーへ' : 'インポート'}
                     </button>
@@ -1927,12 +1927,12 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                   <button
                     onClick={handleWizardAutoGenerateSchedule}
                     disabled={wizardScheduleGenerating || wizardAutoGenPending}
-                    className="w-full flex items-center gap-3 px-3 py-3 mb-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:from-emerald-100 transition-all text-left disabled:opacity-60"
+                    className="w-full flex items-center gap-3 px-3 py-3 mb-3 rounded-xl border border-primary-200 bg-gradient-to-br from-primary-50 to-white hover:from-primary-100 transition-all text-left disabled:opacity-60"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-100 to-white flex items-center justify-center shadow-sm shrink-0">
                       {(wizardScheduleGenerating || wizardAutoGenPending)
-                        ? <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
-                        : <Dices className="w-5 h-5 text-emerald-600" />}
+                        ? <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
+                        : <Dices className="w-5 h-5 text-primary-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-bold text-gray-800">ドローから自動生成</div>
@@ -1942,19 +1942,19 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           : '記載の開始時刻・使用コートで時間割を自動作成します'}
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-primary-400 shrink-0" />
                   </button>
 
                   {/* Googleドライブから時間割ファイルを読み込む */}
                   <button
                     onClick={handleWizardBrowseSchedule}
                     disabled={wizardScheduleListLoading}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:from-blue-100 transition-all text-left disabled:opacity-60"
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white hover:from-gray-100 transition-all text-left disabled:opacity-60"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-sky-100 flex items-center justify-center shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-white flex items-center justify-center shadow-sm shrink-0">
                       {wizardScheduleListLoading
-                        ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                        : <CalendarClock className="w-5 h-5 text-blue-600" />}
+                        ? <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                        : <CalendarClock className="w-5 h-5 text-gray-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-bold text-gray-800">Googleドライブから読み込む</div>
@@ -1964,8 +1964,8 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       </div>
                     </div>
                     {wizardScheduleListOpen
-                      ? <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
-                      : <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />}
+                      ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
 
                   {/* 時間割ファイル一覧（展開時） */}
@@ -1977,7 +1977,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           時間割ファイルを検索中...
                         </div>
                       ) : wizardScheduleListError ? (
-                        <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
+                        <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-primary-50 border border-primary-200 text-[12px] text-gray-800">
                           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                           <span>{wizardScheduleListError}</span>
                         </div>
@@ -1996,10 +1996,10 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                 key={f.id}
                                 onClick={() => handleWizardSelectSchedule(f)}
                                 disabled={!!wizardLoadingFileId}
-                                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-blue-50 active:bg-blue-100 transition-all text-left disabled:opacity-50 group"
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-all text-left disabled:opacity-50 group"
                               >
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm shrink-0">
-                                  {isLoading ? <Loader2 className="w-5 h-5 text-green-500 animate-spin" /> : <CalendarClock className="w-5 h-5 text-green-600" />}
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center shadow-sm shrink-0">
+                                  {isLoading ? <Loader2 className="w-5 h-5 text-primary-500 animate-spin" /> : <CalendarClock className="w-5 h-5 text-primary-600" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[13px] font-semibold text-gray-800 truncate">{displayName}</div>
@@ -2007,7 +2007,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                     {modDate.toLocaleDateString('ja-JP')} {modDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                                   </div>
                                 </div>
-                                <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-green-500 shrink-0" />
+                                <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-500 shrink-0" />
                               </button>
                             );
                           })}
@@ -2031,7 +2031,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               {wizardPhase === 'done' && wizardResult && (
                 <div className="px-5 py-4">
                   <div className={`p-3 rounded-lg text-sm ${
-                    wizardResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+                    wizardResult.success ? 'bg-primary-50 text-gray-900 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
                   }`}>
                     <div className="flex items-start gap-2">
                       {wizardResult.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
@@ -2333,11 +2333,11 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
       />
 
       {/* ふりがな操作 */}
-      <div className="border border-blue-100 rounded-lg overflow-hidden">
-        <div className="bg-blue-50 px-3 py-2 flex items-center gap-2">
-          <Users className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-bold text-blue-800">ふりがな一覧</h3>
-          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-auto">{furiganaDictCount}件</span>
+      <div className="border border-gray-100 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 px-3 py-2 flex items-center gap-2">
+          <Users className="w-4 h-4 text-gray-600" />
+          <h3 className="text-sm font-bold text-gray-800">ふりがな一覧</h3>
+          <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full ml-auto">{furiganaDictCount}件</span>
         </div>
         <div className="p-3 flex flex-wrap gap-2">
           <button
@@ -2363,7 +2363,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
           <button
             onClick={() => excelFuriganaRef.current?.click()}
             disabled={isProcessing}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-800 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excelから読込
@@ -2372,17 +2372,17 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
       </div>
 
       {/* 所属操作 */}
-      <div className="border border-purple-100 rounded-lg overflow-hidden">
-        <div className="bg-purple-50 px-3 py-2 flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-purple-600" />
-          <h3 className="text-sm font-bold text-purple-800">所属一覧</h3>
-          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full ml-auto">{affiliationCount}件</span>
+      <div className="border border-gray-100 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 px-3 py-2 flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-gray-600" />
+          <h3 className="text-sm font-bold text-gray-800">所属一覧</h3>
+          <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full ml-auto">{affiliationCount}件</span>
         </div>
         <div className="p-3 flex flex-wrap gap-2">
           <button
             onClick={handleDownloadAffiliation}
             disabled={isProcessing || !gdriveConnected}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors shadow-sm"
           >
             <GoogleDriveIcon className="w-3.5 h-3.5" />
             <Download className="w-3.5 h-3.5" />
@@ -2391,7 +2391,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
           <button
             onClick={handleUploadAffiliation}
             disabled={isProcessing || !gdriveConnected || affiliationCount === 0}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors border border-purple-200"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 disabled:opacity-50 transition-colors border border-gray-200"
           >
             <GoogleDriveIcon className="w-3.5 h-3.5" />
             <Upload className="w-3.5 h-3.5" />
@@ -2402,7 +2402,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
           <button
             onClick={() => excelAffRef.current?.click()}
             disabled={isProcessing}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors border border-emerald-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-800 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excelから読込
@@ -2413,7 +2413,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
       {/* 結果メッセージ */}
       {result && (
         <div className={`p-3 rounded-lg text-sm ${
-          result.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+          result.success ? 'bg-primary-50 text-gray-900 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-start gap-2">
             {result.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}

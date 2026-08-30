@@ -1,10 +1,20 @@
 // =============================================================================
-// 音声（Gemini TTS）設定
+// 音声（コール読み上げ）設定
+//
+// エンジンは2種類。
+// - browser: ブラウザ内蔵音声（Web Speech API）。ネット・APIキー不要で待ち時間ゼロ。
+//            会場で確実に鳴らしたい通常運用はこちら（既定）。
+// - gemini:  Gemini TTS。声は自然だがネットワーク・APIキー・モデルに依存する。
 // =============================================================================
 
 export type VoiceMode = 'direct' | 'proxy';
 
+/** 読み上げエンジン */
+export type VoiceEngine = 'browser' | 'gemini';
+
 export interface VoiceConfig {
+  /** 使用する読み上げエンジン */
+  engine: VoiceEngine;
   /** `direct` = ブラウザから直接 Gemini API を叩く（APIキーが必要）
    *  `proxy`  = sync-server 経由（APIキーはサーバー側） */
   mode: VoiceMode;
@@ -16,8 +26,16 @@ export interface VoiceConfig {
   model: string;
   /** Gemini の組み込み音声名 */
   voiceName: string;
-  /** 自然言語で指定する話し方の指示 */
+  /** 自然言語で指定する話し方の指示（Gemini のみ） */
   styleInstruction: string;
+  /** ブラウザ内蔵音声で使う音声の voiceURI（空なら日本語音声を自動選択） */
+  browserVoiceURI: string;
+  /** ブラウザ内蔵音声の話速（0.5〜2.0） */
+  browserRate: number;
+  /** ブラウザ内蔵音声の高さ（0.5〜2.0） */
+  browserPitch: number;
+  /** Gemini が失敗したときにブラウザ内蔵音声でコールし直すか */
+  fallbackToBrowser: boolean;
 }
 
 /** sync-settings-storage（zustand persist）から WS URL を抜き取り HTTP URL へ変換 */
@@ -40,18 +58,23 @@ function defaultServerUrl(): string {
   return '';
 }
 
+const KEY_ENGINE = 'voice_engine';
 const KEY_MODE = 'voice_mode';
 const KEY_API = 'voice_api_key';
 const KEY_SERVER = 'voice_server_url';
 const KEY_MODEL = 'voice_model';
 const KEY_VOICE = 'voice_name';
 const KEY_STYLE = 'voice_style';
+const KEY_BROWSER_VOICE = 'voice_browser_voice';
+const KEY_BROWSER_RATE = 'voice_browser_rate';
+const KEY_BROWSER_PITCH = 'voice_browser_pitch';
+const KEY_FALLBACK = 'voice_fallback_browser';
 const EVENT_CHANGED = 'voice-settings-changed';
 
 /**
  * 既定モデル。Flash 系は Pro 系より生成が速く、コールの待ち時間が短い。
  * ここで指定した ID がその API キーで使えない場合は
- * `MODEL_FALLBACKS` の順に自動で切り替える（geminiTts 側で処理）。
+ * `MODEL_FALLBACKS` の順に自動で切り替える（callTts 側で処理）。
  */
 const DEFAULT_MODEL = 'gemini-3.1-flash-preview-tts';
 
@@ -73,6 +96,18 @@ const LEGACY_DEFAULT_MODELS = ['gemini-2.5-flash-preview-tts'];
 
 const DEFAULT_STYLE =
   '落ち着いた女性アナウンサーの声で、はっきりと丁寧に読み上げてください';
+
+/**
+ * 既定のエンジン。
+ * 会場ではネットワークが不安定になりがちで、コールが出ないと運営が止まるため、
+ * 端末内蔵の音声（オフラインで即時に鳴る）を標準にしている。
+ * より自然な声で読ませたい場合は音声設定から Gemini TTS に切り替えられる。
+ */
+const DEFAULT_ENGINE: VoiceEngine = 'browser';
+
+/** ブラウザ内蔵音声の既定値（コールはやや落ち着いた速さが聞き取りやすい） */
+const DEFAULT_BROWSER_RATE = 1.0;
+const DEFAULT_BROWSER_PITCH = 1.0;
 
 /** 実際に音声生成に成功したモデル（自動フォールバックの結果） */
 const KEY_RESOLVED_MODEL = 'voice_model_resolved';
@@ -118,7 +153,18 @@ export function setResolvedModel(model: string): void {
   }
 }
 
+/** 数値設定の読み出し（未設定・不正値は既定値にフォールバック） */
+function readNumber(key: string, fallback: number, min: number, max: number): number {
+  const raw = localStorage.getItem(key);
+  if (raw === null) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 export function getVoiceSettings(): VoiceConfig {
+  const engine: VoiceEngine =
+    localStorage.getItem(KEY_ENGINE) === 'gemini' ? 'gemini' : DEFAULT_ENGINE;
   const mode: VoiceMode = IS_KEY_LOCKED
     ? 'direct'
     : ((localStorage.getItem(KEY_MODE) as VoiceMode) || 'direct');
@@ -128,16 +174,23 @@ export function getVoiceSettings(): VoiceConfig {
     ? BAKED_MODEL
     : (!stored || LEGACY_DEFAULT_MODELS.includes(stored) ? DEFAULT_MODEL : stored);
   return {
+    engine,
     mode,
     apiKey: IS_KEY_LOCKED ? BAKED_API_KEY : (localStorage.getItem(KEY_API) || ''),
     serverUrl: localStorage.getItem(KEY_SERVER) || defaultServerUrl(),
     model,
     voiceName: localStorage.getItem(KEY_VOICE) || 'Kore',
     styleInstruction: localStorage.getItem(KEY_STYLE) ?? DEFAULT_STYLE,
+    browserVoiceURI: localStorage.getItem(KEY_BROWSER_VOICE) || '',
+    browserRate: readNumber(KEY_BROWSER_RATE, DEFAULT_BROWSER_RATE, 0.5, 2),
+    browserPitch: readNumber(KEY_BROWSER_PITCH, DEFAULT_BROWSER_PITCH, 0.5, 2),
+    // 既定は ON。Gemini が落ちてもコールが無音にならないようにする。
+    fallbackToBrowser: localStorage.getItem(KEY_FALLBACK) !== 'false',
   };
 }
 
 export function setVoiceSettings(patch: Partial<VoiceConfig>): void {
+  if (patch.engine !== undefined) localStorage.setItem(KEY_ENGINE, patch.engine);
   // ロック済みの値はユーザー編集を無視する
   if (patch.mode !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_MODE, patch.mode);
   if (patch.apiKey !== undefined && !IS_KEY_LOCKED) localStorage.setItem(KEY_API, patch.apiKey);
@@ -149,6 +202,10 @@ export function setVoiceSettings(patch: Partial<VoiceConfig>): void {
   }
   if (patch.voiceName !== undefined) localStorage.setItem(KEY_VOICE, patch.voiceName);
   if (patch.styleInstruction !== undefined) localStorage.setItem(KEY_STYLE, patch.styleInstruction);
+  if (patch.browserVoiceURI !== undefined) localStorage.setItem(KEY_BROWSER_VOICE, patch.browserVoiceURI);
+  if (patch.browserRate !== undefined) localStorage.setItem(KEY_BROWSER_RATE, String(patch.browserRate));
+  if (patch.browserPitch !== undefined) localStorage.setItem(KEY_BROWSER_PITCH, String(patch.browserPitch));
+  if (patch.fallbackToBrowser !== undefined) localStorage.setItem(KEY_FALLBACK, String(patch.fallbackToBrowser));
   try {
     window.dispatchEvent(new Event(EVENT_CHANGED));
   } catch {

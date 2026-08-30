@@ -1,13 +1,24 @@
 // =============================================================================
-// Gemini TTS シングルトンサービス
+// コール音声シングルトンサービス
 //
-// - HTMLAudioElement を一つだけ生成し、iOS/Android モバイル向けに
-//   「初回ユーザー操作で無音再生してアンロック」するパターンを実装
-// - direct モード: ブラウザから直接 Gemini API を呼ぶ（APIキーを使用）
-// - proxy モード:  sync-server 経由（APIキーはサーバー側で保持）
+// 2つのエンジンを切り替えて読み上げる。
+// - browser: ブラウザ内蔵音声（Web Speech API）。オフラインで待ち時間ゼロ。
+//            会場で確実にコールしたい通常運用はこちら（既定）。
+// - gemini:  Gemini TTS。声は自然だがネットワーク・APIキー・モデルに依存する。
+//            direct モード = ブラウザから直接 API を呼ぶ／proxy モード = sync-server 経由。
+//
+// Gemini での生成に失敗したときは（設定が ON なら）ブラウザ内蔵音声で読み直す。
+// コールが無音のまま試合が始まってしまうのを防ぐための保険。
+//
+// HTMLAudioElement は一つだけ生成し、iOS/Android 向けに
+// 「初回ユーザー操作で無音再生してアンロック」するパターンを実装している。
 // =============================================================================
 
 import { getVoiceSettings, getResolvedModel, setResolvedModel, MODEL_FALLBACKS } from './voiceConfig';
+import type { VoiceConfig, VoiceEngine } from './voiceConfig';
+import {
+  cancelBrowserSpeech, currentVoiceLabel, isBrowserTtsSupported, speakWithBrowser, unlockBrowserTts,
+} from './browserTts';
 
 /** 無音 WAV（再生を「プライム」するだけに使用） */
 const SILENT_WAV =
@@ -39,18 +50,31 @@ export function buildRepeatedText(text: string, repeatCount = 1): string {
   return parts.join('\n');
 }
 
-export interface GeminiTtsState {
+/**
+ * 生成済み（またはこれから読み上げる）コール音声。
+ * Gemini は音声データ（Blob）を先に作れるが、ブラウザ内蔵音声は
+ * データを取り出せないため、読み上げるテキストのまま持ち回る。
+ */
+export type PreparedCall =
+  | { kind: 'blob'; blob: Blob }
+  | { kind: 'speech'; text: string };
+
+export interface CallTtsState {
   /** 音声取得〜再生終了までの間 true */
   isSpeaking: boolean;
   /** API から音声データを取得中 true（再生開始すると false） */
   isLoading: boolean;
-  /** 直近の生成で実際に使われたモデル ID（未生成なら空文字） */
+  /** 直近の読み上げで実際に使ったエンジン（未使用なら null） */
+  lastEngine: VoiceEngine | null;
+  /** 直近の生成で実際に使われたモデル ID / 音声名（未生成なら空文字） */
   lastModel: string;
   /** 直近の生成にかかったミリ秒（未生成なら 0） */
   lastLatencyMs: number;
+  /** Gemini に失敗してブラウザ内蔵音声に切り替えたときの理由（無ければ空文字） */
+  lastFallbackReason: string;
 }
 
-type Listener = (state: GeminiTtsState) => void;
+type Listener = (state: CallTtsState) => void;
 
 /** 指定モデルがこの API キーで使えない（存在しない）ことを表す */
 class ModelUnavailableError extends Error {
@@ -63,14 +87,16 @@ class ModelUnavailableError extends Error {
   }
 }
 
-class GeminiTtsService {
+class CallTtsService {
   private audio: HTMLAudioElement | null = null;
   private unlocked = false;
   private currentUrl: string | null = null;
   private _isSpeaking = false;
   private _isLoading = false;
+  private _lastEngine: VoiceEngine | null = null;
   private _lastModel = '';
   private _lastLatencyMs = 0;
+  private _lastFallbackReason = '';
   private listeners = new Set<Listener>();
   private abortCtrl: AbortController | null = null;
   /**
@@ -101,12 +127,14 @@ class GeminiTtsService {
     return this._isLoading;
   }
 
-  get state(): GeminiTtsState {
+  get state(): CallTtsState {
     return {
       isSpeaking: this._isSpeaking,
       isLoading: this._isLoading,
+      lastEngine: this._lastEngine,
       lastModel: this._lastModel,
       lastLatencyMs: this._lastLatencyMs,
+      lastFallbackReason: this._lastFallbackReason,
     };
   }
 
@@ -153,6 +181,8 @@ class GeminiTtsService {
    * 初回ユーザー操作（click/touch）から同期的に呼ばれる必要がある。
    */
   unlockAudio(): void {
+    // ブラウザ内蔵音声（iOS/Safari）も同じユーザー操作でアンロックしておく
+    unlockBrowserTts();
     if (this.unlocked) return;
     try {
       const a = this.getAudio();
@@ -174,6 +204,33 @@ class GeminiTtsService {
     }
   }
 
+  /**
+   * 実際に使うエンジンを決める。
+   * Gemini を選んでいても API キー/中継サーバーが未設定なら内蔵音声で鳴らす
+   * （設定漏れでコールが無音になるのを防ぐ）。
+   */
+  private pickEngine(cfg: VoiceConfig): VoiceEngine {
+    const geminiReady = cfg.mode === 'direct' ? !!cfg.apiKey : !!cfg.serverUrl;
+    if (cfg.engine === 'gemini' && geminiReady) return 'gemini';
+    if (isBrowserTtsSupported()) return 'browser';
+    return 'gemini';
+  }
+
+  /** ブラウザ内蔵音声で読み上げる */
+  private async speakWithBrowserEngine(text: string, cfg: VoiceConfig): Promise<void> {
+    await speakWithBrowser(text, {
+      voiceURI: cfg.browserVoiceURI,
+      rate: cfg.browserRate,
+      pitch: cfg.browserPitch,
+      volume: 1,
+      signal: this.abortCtrl?.signal,
+    });
+    this._lastEngine = 'browser';
+    this._lastModel = currentVoiceLabel(cfg.browserVoiceURI) || 'ブラウザ内蔵音声';
+    this._lastLatencyMs = 0; // 生成待ちが無い
+    this.emit();
+  }
+
   async speak(
     text: string,
     options: {
@@ -187,14 +244,41 @@ class GeminiTtsService {
 
     this.abortCtrl = new AbortController();
     this.setSpeaking(true);
+    this._lastFallbackReason = '';
+
+    const cfg = getVoiceSettings();
+    // 繰り返しも含めて1回の生成にまとめる（声色が途中で変わらないようにするため）
+    const full = buildRepeatedText(text, options.repeatCount ?? 1);
 
     try {
-      // 繰り返しも含めて1回の生成にまとめる（声色が途中で変わらないようにするため）
-      await this.synthesizeAndPlay(buildRepeatedText(text, options.repeatCount ?? 1));
+      if (this.pickEngine(cfg) === 'browser') {
+        try {
+          await this.speakWithBrowserEngine(full, cfg);
+        } catch (err) {
+          if (this.abortCtrl.signal.aborted) throw err;
+          // 読み上げ音声が入っていない端末では Gemini 側で鳴らす
+          const geminiReady = cfg.mode === 'direct' ? !!cfg.apiKey : !!cfg.serverUrl;
+          if (!geminiReady) throw err;
+          this._lastFallbackReason = err instanceof Error ? err.message : String(err);
+          console.warn('[コール音声] ブラウザ内蔵音声が使えないため Gemini TTS で読み上げます', err);
+          await this.synthesizeAndPlay(full);
+        }
+      } else {
+        try {
+          await this.synthesizeAndPlay(full);
+        } catch (err) {
+          if (this.abortCtrl.signal.aborted) throw err;
+          if (!cfg.fallbackToBrowser || !isBrowserTtsSupported()) throw err;
+          // Gemini が使えなくてもコールは出す（無音のまま試合が始まるのを防ぐ）
+          this._lastFallbackReason = err instanceof Error ? err.message : String(err);
+          console.warn('[コール音声] Gemini に失敗したためブラウザ内蔵音声で読み上げます', err);
+          await this.speakWithBrowserEngine(full, cfg);
+        }
+      }
       if (!this.abortCtrl.signal.aborted) options.onComplete?.();
     } catch (err) {
       if (!(err instanceof Error) || err.name !== 'AbortError') {
-        console.error('[Gemini TTS]', err);
+        console.error('[コール音声]', err);
         options.onError?.(err as Error);
       }
     } finally {
@@ -211,6 +295,7 @@ class GeminiTtsService {
   }
 
   private stopInternal(): void {
+    cancelBrowserSpeech();
     if (this.abortCtrl) {
       this.abortCtrl.abort();
       this.abortCtrl = null;
@@ -225,33 +310,49 @@ class GeminiTtsService {
   }
 
   /**
-   * 音声データだけを生成して返す（再生しない）。
-   * 一斉コールのように、先に全部の音声を用意してから続けて再生したい場合に使う。
+   * コール音声を先に用意する（再生はしない）。
+   * 一斉コールのように、先に全部を用意してから続けて再生したい場合に使う。
+   * ブラウザ内蔵音声は生成という概念が無いので、テキストのまま返す。
    */
   async synthesize(
     text: string,
     options: { repeatCount?: number; signal?: AbortSignal } = {},
-  ): Promise<Blob> {
+  ): Promise<PreparedCall> {
     const cfg = getVoiceSettings();
     const t = buildRepeatedText(text, options.repeatCount ?? 1);
+    if (this.pickEngine(cfg) === 'browser') return { kind: 'speech', text: t };
+
     this.beginLoading();
     try {
-      return cfg.mode === 'direct'
+      const blob = cfg.mode === 'direct'
         ? await this.synthesizeDirect(t, cfg, options.signal)
         : await this.synthesizeViaProxy(t, cfg, options.signal);
+      return { kind: 'blob', blob };
+    } catch (err) {
+      if (options.signal?.aborted) throw err;
+      if (!cfg.fallbackToBrowser || !isBrowserTtsSupported()) throw err;
+      // 生成に失敗した分だけ内蔵音声に切り替える（一斉コールを止めない）
+      this._lastFallbackReason = err instanceof Error ? err.message : String(err);
+      console.warn('[コール音声] Gemini の生成に失敗したためブラウザ内蔵音声を使います', err);
+      return { kind: 'speech', text: t };
     } finally {
       this.endLoading();
     }
   }
 
-  /** `synthesize()` で先に生成しておいた音声を再生する */
-  async playBlob(blob: Blob): Promise<void> {
+  /** `synthesize()` で用意しておいたコールを再生する */
+  async playPrepared(prepared: PreparedCall): Promise<void> {
     this.stopInternal();
     this.unlockAudio();
     this.abortCtrl = new AbortController();
     this.setSpeaking(true);
     try {
-      await this.playAudioBlob(blob);
+      if (prepared.kind === 'blob') {
+        await this.playAudioBlob(prepared.blob);
+        this._lastEngine = 'gemini';
+      } else {
+        await this.speakWithBrowserEngine(prepared.text, getVoiceSettings());
+      }
     } finally {
       this.abortCtrl = null;
       this.setSpeaking(false);
@@ -274,6 +375,8 @@ class GeminiTtsService {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
     const cfg = getVoiceSettings();
+    // ブラウザ内蔵音声は生成待ちが無いので事前生成そのものが不要
+    if (this.pickEngine(cfg) === 'browser') return;
     if (cfg.mode === 'direct' ? !cfg.apiKey : !cfg.serverUrl) return;
     const full = buildRepeatedText(trimmed, repeatCount);
     const key = this.cacheKey(full, cfg);
@@ -382,6 +485,7 @@ class GeminiTtsService {
     }
     const blob = await res.blob();
     // 中継サーバー側のモデル名はレスポンスヘッダー（無ければ /api/gemini-status）で分かる
+    this._lastEngine = 'gemini';
     this._lastModel = res.headers.get('X-Gemini-Model') || this._lastModel;
     this._lastLatencyMs = Math.round(performance.now() - startedAt);
     return blob;
@@ -411,6 +515,7 @@ class GeminiTtsService {
       try {
         const startedAt = performance.now();
         const blob = await this.requestAudio(text, model, cfg, signal);
+        this._lastEngine = 'gemini';
         this._lastModel = model;
         this._lastLatencyMs = Math.round(performance.now() - startedAt);
         setResolvedModel(model);
@@ -606,4 +711,4 @@ class GeminiTtsService {
   }
 }
 
-export const geminiTts = new GeminiTtsService();
+export const callTts = new CallTtsService();

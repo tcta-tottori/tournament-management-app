@@ -4,12 +4,12 @@ import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
 import { extractGamesFromText } from './gameRules';
-import { propagateByes } from '../draw/rebuildMatches';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
 import {
   X,
   Trophy,
@@ -21,6 +21,7 @@ import {
   Timer,
   ChevronRight,
   BookOpen,
+  Pencil,
   UserX,
   AlertCircle,
   Radio,
@@ -67,6 +68,11 @@ interface ScoreInputDialogProps {
   /** 現在の試合に適用されるゲームルール文字列 */
   gameRuleText?: string;
   /**
+   * ゲームルールの修正を開く。渡すとルール表示の右端に鉛筆ボタンが出る。
+   * 取り込んだルールが違っていたとき、スコアを入れる場で直せるようにするため。
+   */
+  onEditRules?: () => void;
+  /**
    * 対象回戦に適用される規定ゲーム数。呼び出し側が回戦別ルールを解決して渡す。
    * 省略時は gameRuleText から抽出（全角数字は正規化）してフォールバックする。
    */
@@ -81,10 +87,10 @@ interface ScoreInputDialogProps {
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
   waiting:  { label: '待機中',   bg: 'bg-gray-100',    text: 'text-gray-600',    dot: 'bg-gray-400' },
-  ready:    { label: '準備完了', bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500' },
-  playing:  { label: '試合中',   bg: 'bg-green-100',   text: 'text-green-700',   dot: 'bg-green-500' },
-  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
-  walkover: { label: 'W/O',     bg: 'bg-orange-100',  text: 'text-orange-700',  dot: 'bg-orange-400' },
+  ready:    { label: '準備完了', bg: 'bg-gray-100',    text: 'text-gray-700',    dot: 'bg-gray-500' },
+  playing:  { label: '試合中',   bg: 'bg-primary-100',   text: 'text-gray-800',   dot: 'bg-primary-500' },
+  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-gray-800', dot: 'bg-primary-500' },
+  walkover: { label: 'W/O',     bg: 'bg-primary-100',  text: 'text-gray-800',  dot: 'bg-primary-400' },
 };
 
 const DEFAULT_VOICE: VoiceSettings = { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 };
@@ -121,6 +127,7 @@ export default function ScoreInputDialog({
   bestOf = 1,
   isLeague = false,
   gameRuleText,
+  onEditRules,
   requiredGames: requiredGamesProp,
   matchFormat = 'game',
 }: ScoreInputDialogProps) {
@@ -156,7 +163,7 @@ export default function ScoreInputDialog({
   // ソフトキーボードが出ている間も、見えている領域にダイアログ全体を収める
   const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(!!match);
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop } = useCallTts();
   const navigate = useNavigate();
 
   // この試合のライブスコアが既に開始されているか（ボタン文言の出し分け用）
@@ -519,8 +526,8 @@ export default function ScoreInputDialog({
               updatedAt: Date.now(),
             });
           }
-          // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
-          await propagateByes(dbMatch.eventId);
+          // 次の相手がBYEだけの枠なら更に次の回戦へ送り、3位決定戦の顔ぶれも整える
+          await refreshBracketProgress(dbMatch.eventId);
         }
       }
       onMatchUpdate();
@@ -591,9 +598,9 @@ export default function ScoreInputDialog({
       });
       setSets(Array.from({ length: maxSets }, () => ({ p1: '', p2: '' })));
       setTiebreaks(Array.from({ length: maxSets }, () => null));
-      // BYEで送っていた勝ち上がりも取り消す
+      // BYEで送っていた勝ち上がりを取り消し、3位決定戦の顔ぶれも整える
       const resetMatch = await db.matches.get(match.dbId);
-      if (resetMatch) await propagateByes(resetMatch.eventId);
+      if (resetMatch) await refreshBracketProgress(resetMatch.eventId);
 
       onMatchUpdate();
     } finally { setIsProcessing(false); }
@@ -813,9 +820,18 @@ export default function ScoreInputDialog({
         {/* ゲームルール表示 */}
         {gameRuleText && (
           <div className={`px-4 sm:px-6 pb-0 ${keyboardOpen ? 'pt-2' : 'pt-3'}`}>
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
-              <BookOpen className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="text-xs font-bold text-amber-800">{gameRuleText}</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
+              <BookOpen className="w-4 h-4 text-primary-600 shrink-0" />
+              <span className="text-xs font-bold text-gray-900 flex-1 min-w-0">{gameRuleText}</span>
+              {onEditRules && (
+                <button
+                  onClick={onEditRules}
+                  title="ゲームルールを修正"
+                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-gray-800 bg-white border border-primary-300 rounded-full px-2 py-0.5 hover:bg-primary-100 transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />修正
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -832,10 +848,10 @@ export default function ScoreInputDialog({
                 {/* Player 1 */}
                 <div className="text-center">
                   <p className={`font-bold text-base sm:text-lg leading-tight ${
-                    isP1Winner ? 'text-primary-600' : isP1Loser ? 'text-gray-400' : 'text-gray-900'
+                    isP1Winner ? 'text-gray-700' : isP1Loser ? 'text-gray-400' : 'text-gray-900'
                   }`}>
                     {match.player1Name || '(未定)'}
-                    {isP1Winner && <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />}
+                    {isP1Winner && <Trophy className="w-4 h-4 inline ml-1 text-primary-500" />}
                   </p>
                   <p className={`text-xs mt-0.5 ${isP1Loser ? 'text-gray-300' : 'text-gray-500'}`}>{match.player1Affiliation}</p>
                 </div>
@@ -845,10 +861,10 @@ export default function ScoreInputDialog({
                 {/* Player 2 */}
                 <div className="text-center">
                   <p className={`font-bold text-base sm:text-lg leading-tight ${
-                    isP2Winner ? 'text-primary-600' : isP2Loser ? 'text-gray-400' : 'text-gray-900'
+                    isP2Winner ? 'text-gray-700' : isP2Loser ? 'text-gray-400' : 'text-gray-900'
                   }`}>
                     {match.player2Name || '(未定)'}
-                    {isP2Winner && <Trophy className="w-4 h-4 inline ml-1 text-yellow-500" />}
+                    {isP2Winner && <Trophy className="w-4 h-4 inline ml-1 text-primary-500" />}
                   </p>
                   <p className={`text-xs mt-0.5 ${isP2Loser ? 'text-gray-300' : 'text-gray-500'}`}>{match.player2Affiliation}</p>
                 </div>
@@ -933,7 +949,7 @@ export default function ScoreInputDialog({
                             value={tiebreaks[i] || ''}
                             onChange={e => handleTiebreakChange(i, e.target.value)}
                             disabled={isFinished}
-                            className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                            className="w-10 h-8 text-center text-sm font-bold border border-primary-200 rounded bg-primary-50 focus:border-primary-400 focus:ring-2 focus:ring-primary-300/30 outline-none disabled:bg-primary-50/50 disabled:text-gray-400"
                           />
                           <span className="text-gray-300 text-[10px]">)</span>
                         </>
@@ -963,7 +979,7 @@ export default function ScoreInputDialog({
                             value={tiebreaks[i] || ''}
                             onChange={e => handleTiebreakChange(i, e.target.value)}
                             disabled={isFinished}
-                            className="w-10 h-8 text-center text-sm font-bold border border-orange-200 rounded bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30 outline-none disabled:bg-orange-50/50 disabled:text-gray-400"
+                            className="w-10 h-8 text-center text-sm font-bold border border-primary-200 rounded bg-primary-50 focus:border-primary-400 focus:ring-2 focus:ring-primary-300/30 outline-none disabled:bg-primary-50/50 disabled:text-gray-400"
                           />
                           <span className="text-gray-300 text-[10px]">)</span>
                         </>
@@ -976,9 +992,9 @@ export default function ScoreInputDialog({
               {/* スーパータイブレーク入力（twoSetsSuper10: 1-1の場合） */}
               {isTwoSetFormat && needsSuperTB && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-purple-500 w-8 text-right shrink-0 font-bold">STB</span>
+                  <span className="text-[10px] text-gray-500 w-8 text-right shrink-0 font-bold">STB</span>
                   <div className="flex items-center gap-1 flex-1 justify-center">
-                    <span className="text-[10px] text-purple-400 font-bold">[</span>
+                    <span className="text-[10px] text-gray-400 font-bold">[</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -995,9 +1011,9 @@ export default function ScoreInputDialog({
                         }
                       }}
                       disabled={isFinished}
-                      className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                      className="w-12 h-10 text-center text-lg font-bold border-2 border-gray-300 rounded-lg bg-gray-50 focus:border-gray-500 focus:ring-2 focus:ring-gray-300/30 outline-none disabled:bg-gray-50/50 disabled:text-gray-500"
                     />
-                    <span className="text-purple-400 font-bold">-</span>
+                    <span className="text-gray-400 font-bold">-</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1008,14 +1024,14 @@ export default function ScoreInputDialog({
                         setSuperTB(prev => ({ ...prev, p2: toHalfWidthDigits(e.target.value).slice(0, 2) }));
                       }}
                       disabled={isFinished}
-                      className="w-12 h-10 text-center text-lg font-bold border-2 border-purple-300 rounded-lg bg-purple-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-300/30 outline-none disabled:bg-purple-50/50 disabled:text-gray-500"
+                      className="w-12 h-10 text-center text-lg font-bold border-2 border-gray-300 rounded-lg bg-gray-50 focus:border-gray-500 focus:ring-2 focus:ring-gray-300/30 outline-none disabled:bg-gray-50/50 disabled:text-gray-500"
                     />
-                    <span className="text-[10px] text-purple-400 font-bold">]</span>
+                    <span className="text-[10px] text-gray-400 font-bold">]</span>
                   </div>
                 </div>
               )}
               {isTwoSetFormat && needsSuperTB && (
-                <p className="text-center text-[10px] text-purple-500 font-medium">10ポイント スーパータイブレーク</p>
+                <p className="text-center text-[10px] text-gray-500 font-medium">10ポイント スーパータイブレーク</p>
               )}
             </div>
 
@@ -1033,7 +1049,7 @@ export default function ScoreInputDialog({
             {/* 自動勝者判定表示 */}
             {autoWinner && canFinish && !scoreValidationError && (
               <div className="text-center">
-                <span className="text-xs text-primary-600 font-bold">
+                <span className="text-xs text-gray-700 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
                   {retPlayer && (match.status === 'playing' ? ' (DEF/Ret)' : ' (DEF/W.O)')}
                 </span>
@@ -1048,7 +1064,7 @@ export default function ScoreInputDialog({
             <button
               onClick={handleOpenLiveScore}
               disabled={isProcessing || !match.player1Name || !match.player2Name}
-              className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-gradient-to-r from-[#2d6a4f] to-[#0f3326] text-white hover:brightness-110 active:scale-[0.98] disabled:opacity-40 transition-all min-h-[48px] shadow-lg shadow-[#0f3326]/30"
+              className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-gradient-to-r from-[#d2504c] to-[#c63834] text-white hover:brightness-110 active:scale-[0.98] disabled:opacity-40 transition-all min-h-[48px] shadow-lg shadow-[#c63834]/30"
             >
               <Radio className="w-5 h-5" />
               {hasLiveScore ? 'ライブスコアを再開' : 'ライブスコア開始'}
@@ -1112,7 +1128,7 @@ export default function ScoreInputDialog({
                 </button>
               ) : (
                 <button onClick={handleCall}
-                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] transition-all min-h-[44px]">
+                  className="inline-flex items-center gap-1.5 text-sm px-3 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] transition-all min-h-[44px]">
                   <Volume2 className="w-4 h-4" /> コール
                 </button>
               )
@@ -1136,13 +1152,13 @@ export default function ScoreInputDialog({
               <div className="flex gap-2">
                 {canReady && (
                   <button onClick={handleReadyMatch} disabled={isProcessing}
-                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-gray-600 text-white hover:bg-gray-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
                     <Check className="w-5 h-5" /> 準備完了
                   </button>
                 )}
                 {canStart && (
                   <button onClick={handleStartMatch} disabled={isProcessing}
-                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
+                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 transition-all min-h-[48px]">
                     <Play className="w-5 h-5" /> 試合開始
                   </button>
                 )}
