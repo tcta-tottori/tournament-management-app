@@ -467,14 +467,20 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const champNameH = champLines.length > 0
     ? champLines.length * CHAMP_NAME_PX + (champLines.length - 1) * 3
     : 0;
+  // ダブルス（氏名が2行）は所属を氏名の右側へ、シングルスは氏名の下に置く
+  const champAffRight = isDoubles && champLines.length >= 2 && champAffLines.length > 0;
+  const CHAMP_AFF_GAP = 6;
   meas.font = fontOf('black', CHAMP_NAME_PX);
-  let champTextW = champLines.length > 0
+  const champNameW = champLines.length > 0
     ? Math.max(...champLines.map(t => meas.measureText(t).width))
     : 0;
-  if (champAffLines.length > 0) {
-    meas.font = fontOf('normal', CHAMP_AFF_PX);
-    champTextW = Math.max(champTextW, ...champAffLines.map(t => meas.measureText(`（${t}）`).width));
-  }
+  meas.font = fontOf('normal', CHAMP_AFF_PX);
+  const champAffW = champAffLines.length > 0
+    ? Math.max(...champAffLines.map(t => meas.measureText(`（${t}）`).width))
+    : 0;
+  const champTextW = champAffRight
+    ? champNameW + CHAMP_AFF_GAP + champAffW
+    : Math.max(champNameW, champAffW);
   // 優勝表示の左右幅。名前が収まる分だけにして、左右の山の間の余白を詰める。
   const CENTER_W = clamp(champTextW + 36, 196, 430);
 
@@ -484,7 +490,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const champBlockH = champName
     ? CHAMP_TICK + 2
       + (finalScoreText ? CHAMP_SCORE_PX + 4 : 0)
-      + (champAffLines.length > 0 ? champAffLines.length * CHAMP_AFF_STEP + 3 : 0)
+      + (!champAffRight && champAffLines.length > 0 ? champAffLines.length * CHAMP_AFF_STEP + 3 : 0)
       + champNameH + 5 + CHAMP_CHIP_H
     : 0;
 
@@ -849,9 +855,11 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     let cursor = apexY - CHAMP_TICK - 2;
     const scoreY = cursor - CHAMP_SCORE_PX / 2;
     if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 4;
-    // 所属（ダブルスは1人ずつ2行）。下から上へ積む。
-    const affYs = champAffLines.map((_, i) =>
-      cursor - 5 - CHAMP_AFF_PX / 2 - (champAffLines.length - 1 - i) * CHAMP_AFF_STEP);
+    // 所属。シングルスは氏名の下に積む（ダブルスは氏名の右へ回すので高さは取らない）。
+    const affYs = champAffRight
+      ? []
+      : champAffLines.map((_, i) =>
+        cursor - 5 - CHAMP_AFF_PX / 2 - (champAffLines.length - 1 - i) * CHAMP_AFF_STEP);
     if (affYs.length > 0) cursor = affYs[0] - CHAMP_AFF_PX / 2 - 5;
     // 氏名は下から上へ積む（ダブルスは2行）
     const lastNameY = cursor - CHAMP_NAME_PX / 2;
@@ -872,13 +880,38 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2, chipGrad);
     drawText(ctx, chipLabel, centerX, chipY + chipH / 2 + 0.5, chipPx, 'center', COL.white, 'black');
 
-    champLines.forEach((line, i) => {
-      drawText(ctx, line, centerX, nameYs[i], CHAMP_NAME_PX, 'center', COL.gray900, 'black', CENTER_W - 16);
-    });
-    champAffLines.forEach((t, i) => {
-      if (!t) return;
-      drawText(ctx, `（${t}）`, centerX, affYs[i], CHAMP_AFF_PX, 'center', COL.gray500, 'normal', CENTER_W - 16);
-    });
+    if (champAffRight) {
+      // 氏名（2行）＋その右の所属をひとかたまりとして中央に置く
+      const groupW = Math.min(champNameW + CHAMP_AFF_GAP + champAffW, CENTER_W - 16);
+      const nameW = Math.min(champNameW, Math.max(40, groupW - CHAMP_AFF_GAP - champAffW));
+      const groupLeft = centerX - groupW / 2;
+      const nameCenterX = groupLeft + nameW / 2;
+      champLines.forEach((line, i) => {
+        drawText(ctx, line, nameCenterX, nameYs[i], CHAMP_NAME_PX, 'center', COL.gray900, 'black', nameW);
+      });
+      const affX = groupLeft + nameW + CHAMP_AFF_GAP;
+      const affMaxW = groupLeft + groupW - affX;
+      // 所属も2行なら氏名の各行に合わせ、1つだけなら氏名の中央に合わせる
+      const affTop = champAffLines.length === champLines.length
+        ? nameYs[0]
+        : (nameYs[0] + nameYs[nameYs.length - 1]) / 2
+          - ((champAffLines.length - 1) * CHAMP_AFF_STEP) / 2;
+      champAffLines.forEach((t, i) => {
+        if (!t) return;
+        const y = champAffLines.length === champLines.length
+          ? nameYs[i]
+          : affTop + i * CHAMP_AFF_STEP;
+        drawText(ctx, `（${t}）`, affX, y + 0.5, CHAMP_AFF_PX, 'left', COL.gray500, 'normal', affMaxW);
+      });
+    } else {
+      champLines.forEach((line, i) => {
+        drawText(ctx, line, centerX, nameYs[i], CHAMP_NAME_PX, 'center', COL.gray900, 'black', CENTER_W - 16);
+      });
+      champAffLines.forEach((t, i) => {
+        if (!t) return;
+        drawText(ctx, `（${t}）`, centerX, affYs[i], CHAMP_AFF_PX, 'center', COL.gray500, 'normal', CENTER_W - 16);
+      });
+    }
     if (finalScoreText) {
       drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
       // タイブレークの得点・Ret / W.O は負けた側の外側へ小さく添える
