@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMixedStore } from './mixedStore';
+import CourtChangeDialog from '../../components/ui/CourtChangeDialog';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { LeagueMatchScore, MixedLeague } from './types';
 
@@ -58,7 +59,10 @@ function getLeagueCourtStatus(_league: MixedLeague, lMatches: LeagueMatchScore[]
 }
 
 export default function MixedLiveCourtView() {
-  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments } = useMixedStore();
+  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments, assignBracketMatchToCourt } = useMixedStore();
+  // 進行中の試合を別のコートへ移すためのダイアログ
+  const [courtMove, setCourtMove] = useState<{ matchId: string; label: string } | null>(null);
+  const [courtMoveSelected, setCourtMoveSelected] = useState<string[]>([]);
 
   const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
 
@@ -378,6 +382,20 @@ export default function MixedLiveCourtView() {
                     <div className="text-lg font-black font-mono text-green-700">{h}:{String(m).padStart(2, '0')}</div>
                   </div>
                 </div>
+                {/* コートを間違えた・移動したときはここから振り替える */}
+                <button
+                  onClick={() => {
+                    setCourtMove({
+                      matchId: bm.matchId,
+                      label: `${t1 ? `${sei(t1.male.name)}/${sei(t1.female.name)}` : bm.team1Name} vs ${t2 ? `${sei(t2.male.name)}/${sei(t2.female.name)}` : bm.team2Name}`,
+                    });
+                    setCourtMoveSelected([String(selectedCourt)]);
+                    setSelectedCourt(null);
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 active:scale-[0.98] transition-all"
+                >
+                  <MapPin className="w-3.5 h-3.5" />コートを変更
+                </button>
               </div>
             );
           }
@@ -455,6 +473,26 @@ export default function MixedLiveCourtView() {
           </div>
         );
       })()}
+
+      {/* 進行中の試合のコート変更 */}
+      {courtMove && (
+        <CourtChangeDialog
+          title="コートを変更"
+          subtitle={courtMove.label}
+          selected={courtMoveSelected}
+          busy={Object.fromEntries(
+            Object.entries(bracketCourtAssignments)
+              .filter(([mid]) => mid !== courtMove.matchId)
+              .map(([, ca]) => [ca.courtName.replace('コート', ''), '使用中'])
+          )}
+          onToggle={c => setCourtMoveSelected([c])}
+          onConfirm={courts => {
+            if (courts[0]) assignBracketMatchToCourt(courtMove.matchId, `${courts[0]}コート`);
+            setCourtMove(null);
+          }}
+          onClose={() => setCourtMove(null)}
+        />
+      )}
     </div>
   );
 }

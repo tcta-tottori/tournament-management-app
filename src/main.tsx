@@ -55,6 +55,7 @@ import CourtSchedule from './features/schedule/CourtSchedule'
 import LiveDashboard from './features/live/LiveDashboard'
 
 import Manual from './features/manual/Manual'
+import PrintCenter from './features/print/PrintCenter'
 import BackupPage from './features/backup/BackupPage';
 // ResultsPage は結果タブ削除に伴い廃止
 import CourtBracketPage from './features/court-bracket/CourtBracketPage';
@@ -113,6 +114,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="broadcast" element={<LiveBroadcastPage />} />
           {/* results ルートは結果タブ削除に伴い廃止 */}
 
+          <Route path="print" element={<PrintCenter />} />
           <Route path="manual" element={<Manual />} />
           <Route path="backup" element={<BackupPage />} />
         </Route>
