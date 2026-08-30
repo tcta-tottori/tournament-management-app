@@ -453,15 +453,22 @@ export interface ResultHeaderOptions {
   venueScale?: number;
   /** ヘッダー下の罫線を引くか（既定 true）。表の外枠と二重線になる場合は false */
   headerRule?: boolean;
+  /**
+   * ヘッダー全体の拡大率（既定 1）。
+   * 画像の横幅はドローサイズで変わるため、HPなどで幅をそろえて並べると
+   * 幅の広い画像ほど縮小されて見出しが小さく見える。表幅に比例して
+   * ヘッダーを拡大しておくと、どのクラスも同じ大きさに見える。
+   */
+  headerScale?: number;
 }
 
-/**
- * 見出し・大会名の文字を組むときに前提とする表の幅。
- * 実際の表幅（tableW）はドローサイズで変わるが、それに合わせて文字を
- * 縮めると「16ドローと32ドローで見出しの大きさが違う」ことになるため、
- * 文字の詰め幅はこの固定値だけで決める。
- */
-const HEADER_LAYOUT_W = 820;
+/** ヘッダーの拡大率を決めるときの基準幅（この幅のとき等倍） */
+export const HEADER_BASE_W = 820;
+
+/** 表幅からヘッダーの拡大率を求める（極端に大きくならないよう頭打ちにする） */
+export function headerScaleOf(tableW: number): number {
+  return Math.min(1.9, Math.max(1, tableW / HEADER_BASE_W));
+}
 
 /**
  * 結果画像のヘッダーを描画する（白ベース＋赤の差し色）。
@@ -472,16 +479,18 @@ const HEADER_LAYOUT_W = 820;
 export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderOptions): void {
   const {
     title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos,
-    subtitle, titlePx = 46, venueScale = 1, headerRule = true,
+    subtitle, headerScale = 1, headerRule = true,
   } = o;
+  const titlePx = o.titlePx ?? 46 * headerScale;
+  const venueScale = o.venueScale ?? headerScale;
   const titleEn = o.titleEn ?? headingEnglish(title, o.titleEnFallback);
 
   // ---- 右側（大会名・会場）の基準位置 ----
   // 種目名の高さをここに合わせるため、先に決めておく。
-  const NAME_PX = 22;
-  const nameY = paddingY + 34;        // 大会名（middle ベースライン）
-  const subtitleY = nameY + 22;       // 小見出し（あれば）
-  const venueTopY = paddingY + (subtitle ? 66 : 54); // 会場ロゴ／会場名の上端
+  const NAME_PX = 22 * headerScale;
+  const nameY = paddingY + 34 * headerScale;        // 大会名（middle ベースライン）
+  const subtitleY = nameY + 22 * headerScale;       // 小見出し（あれば）
+  const venueTopY = paddingY + (subtitle ? 66 : 54) * headerScale; // 会場ロゴ／会場名の上端
   // 大会名の下端と会場の上端のちょうど中間＝左右の「分け目」
   const dividerY = (nameY + NAME_PX / 2 + venueTopY) / 2;
 
@@ -493,7 +502,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   const markSize = Math.max(16, Math.round(titlePx * 0.46));
   const markGap = Math.max(10, Math.round(titlePx * 0.24));
   // 右側の大会名と重ならない範囲まで、はみ出す場合だけ縮める
-  const maxTitleW = Math.max(180, HEADER_LAYOUT_W * 0.46) - markSize - markGap;
+  const maxTitleW = Math.max(180, tableW * 0.46) - markSize - markGap;
   let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
   if (titleW > maxTitleW) {
     const k = maxTitleW / titleW;
@@ -521,11 +530,11 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   // ---- 右: 大会名 + 小見出し + 会場 ----
   const rightX = paddingX + tableW;
   if (tournamentName) {
-    const nameMaxW = Math.max(200, HEADER_LAYOUT_W - headingW - 48);
+    const nameMaxW = Math.max(200, tableW - headingW - 48 * headerScale);
     drawText(ctx, tournamentName, rightX, nameY, NAME_PX, 'right', COL.gray800, 'bold', nameMaxW);
   }
   if (subtitle) {
-    drawText(ctx, subtitle, rightX, subtitleY, 14, 'right', COL.red500, 'black');
+    drawText(ctx, subtitle, rightX, subtitleY, 14 * headerScale, 'right', COL.red500, 'black');
   }
   drawVenueBadge(ctx, {
     venue,
