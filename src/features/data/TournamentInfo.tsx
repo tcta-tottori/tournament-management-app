@@ -112,7 +112,7 @@ export default function TournamentInfo() {
         <div className="space-y-3">
           {tournamentData.map((t, idx) => (
             <div key={idx} className="bg-primary-50 rounded-lg p-3 border border-primary-100">
-              <h3 className="font-bold text-primary-600 text-sm mb-2 flex items-center gap-1.5">
+              <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-1.5">
                 <Info className="w-4 h-4" />
                 {t.name}
               </h3>

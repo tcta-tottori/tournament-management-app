@@ -365,12 +365,12 @@ function NormalEntryRegistration() {
             {row.playerName}{row.partnerName && ` / ${row.partnerName}`}
           </div>
           <div className="text-[11px] text-gray-500 truncate">
-            {row.affiliation}{row.affiliation && ' ・ '}<span className="text-primary-600">{row.eventName}</span>
+            {row.affiliation}{row.affiliation && ' ・ '}<span className="text-gray-700">{row.eventName}</span>
           </div>
         </div>
         <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
           isAbsent ? 'bg-red-50 text-red-600'
-            : isChecked ? 'bg-primary-50 text-primary-700'
+            : isChecked ? 'bg-primary-50 text-gray-800'
             : 'bg-gray-100 text-gray-500'
         }`}>
           {isAbsent ? '欠場' : isChecked ? '受付済' : '未受付'}
@@ -948,7 +948,7 @@ function NormalEntryRegistration() {
               リーグ <strong className="text-gray-800">{playerSlots.length}人</strong>
             </span>
             {leagueStartTime && (
-              <span className="flex items-center gap-1 text-primary-700 font-medium">
+              <span className="flex items-center gap-1 text-gray-800 font-medium">
                 <Clock className="w-3.5 h-3.5" />
                 開始 <strong>{leagueStartTime}</strong>〜
               </span>
@@ -972,11 +972,11 @@ function NormalEntryRegistration() {
                 className={`flex items-center border rounded-lg shadow-sm transition-all h-[36px] ${borderClass} ${bgClass} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
                 style={{ width: 220 }}>
                 <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{idx + 1}</div>
-                {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+                {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
                 <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
                   {slot.entry ? (
                     <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
-                      <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                      <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-gray-700'}`}>
                         {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                       </div>
                       {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
@@ -992,8 +992,8 @@ function NormalEntryRegistration() {
                       </>
                     ) : (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                        <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-gray-700 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-gray-700 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-gray-700 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                       </>
                     )}
                   </div>
@@ -1076,7 +1076,7 @@ function NormalEntryRegistration() {
       key: string, x: number, y: number, time: string, size: 'sm' | 'md',
     ): React.ReactNode => (
       <div key={key}
-        className={`absolute ${size === 'sm' ? 'text-[9px]' : 'text-[10px]'} font-bold font-mono text-primary-700 bg-white/95 border border-primary-200 rounded-full px-1 py-[1px] leading-none whitespace-nowrap shadow-sm pointer-events-none`}
+        className={`absolute ${size === 'sm' ? 'text-[9px]' : 'text-[10px]'} font-bold font-mono text-gray-800 bg-white/95 border border-primary-200 rounded-full px-1 py-[1px] leading-none whitespace-nowrap shadow-sm pointer-events-none`}
         style={{ left: x, top: y, transform: 'translate(-50%, -115%)' }}>
         {time}
       </div>
@@ -1195,11 +1195,11 @@ function NormalEntryRegistration() {
             className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
             style={{ left: x, top: y, width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
             <div className="w-6 text-[10px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{vi}</div>
-            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
             <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
               {slot.entry ? (
                 <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
-                  <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                  <div className={`text-xs font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-gray-700'}`}>
                     {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                   </div>
                   {slot.affiliation && !isWithdrawn && <div className="text-[9px] text-gray-600 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
@@ -1215,8 +1215,8 @@ function NormalEntryRegistration() {
                   </>
                 ) : (
                   <>
-                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-gray-700 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-gray-700 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-gray-700 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
@@ -1428,11 +1428,11 @@ function NormalEntryRegistration() {
             className={`absolute flex items-center border rounded shadow-sm transition-all ${borderCls} ${bgCls} ${isDimmed ? 'opacity-20' : ''} ${isHighlighted ? 'ring-2 ring-gray-400 ring-offset-1' : ''}`}
             style={{ left: x, top: y, width: PC_SLOT_W, height: PC_SLOT_H }}>
             <div className="w-7 text-[11px] font-mono text-gray-400 text-center flex-shrink-0 border-r border-gray-100 self-stretch flex items-center justify-center">{viNum}</div>
-            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
+            {slot.seed > 0 && <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[10px] font-bold rounded-full ml-1">{slot.seed}</div>}
             <div className="flex-1 min-w-0 mx-1.5 overflow-hidden">
               {slot.entry ? (
                 <button onClick={() => handleCheckIn(slot)} className="text-left w-full group block" title={isWithdrawn ? '復元する' : isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}>
-                  <div className={`text-sm font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-primary-600'}`}>
+                  <div className={`text-sm font-bold leading-tight truncate ${isWithdrawn ? 'line-through text-red-400' : 'text-gray-900 group-hover:text-gray-700'}`}>
                     {slot.playerName}{slot.partnerName && <span className="text-gray-500 font-bold"> / {slot.partnerName}</span>}
                   </div>
                   {slot.affiliation && !isWithdrawn && <div className="text-[10px] text-gray-500 truncate leading-tight mt-0.5">{slot.affiliation}</div>}
@@ -1448,8 +1448,8 @@ function NormalEntryRegistration() {
                   </>
                 ) : (
                   <>
-                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-primary-600 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleCheckIn(slot); }} className={`p-1 rounded transition-colors ${isConfirmed ? 'text-gray-700 bg-primary-100 hover:bg-primary-200' : 'text-gray-400 hover:text-gray-700 hover:bg-primary-50'}`} title={isConfirmed ? '受付済み → 未確認に戻す' : 'クリックで受付'}><UserPlus className="w-3.5 h-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleMarkBye(slot); }} className="p-1 text-gray-400 hover:text-gray-700 hover:bg-primary-50 rounded transition-colors" title="DEFにする"><Ban className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
@@ -1502,7 +1502,7 @@ function NormalEntryRegistration() {
           DEF <strong className="text-gray-800">{slots.filter(s => s.entry?.status === 'withdrawn').length}</strong>
         </span>
         {earliestMatchTime && (
-          <span className="flex items-center gap-1 text-primary-700 font-medium">
+          <span className="flex items-center gap-1 text-gray-800 font-medium">
             <Clock className="w-3.5 h-3.5" />
             開始 <strong>{earliestMatchTime}</strong>〜
           </span>
@@ -1538,9 +1538,9 @@ function NormalEntryRegistration() {
         {/* スマホ: 左山・右山を分割表示 */}
         <div className="lg:hidden">
           {renderBracketSection(leftSlots, halfSize, 0, 'left',
-            { text: 'Left side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
+            { text: 'Left side', colorClass: 'text-gray-700', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' })}
           {renderBracketSection(rightSlots, halfSize, leftVisCount, 'right',
-            { text: 'Right side', colorClass: 'text-primary-600', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' },
+            { text: 'Right side', colorClass: 'text-gray-700', borderClass: 'border-primary-500', bgClass: 'bg-primary-500/10' },
             halfSize)}
         </div>
       </div>
@@ -1790,7 +1790,7 @@ function NormalEntryRegistration() {
       <div className="border-b border-primary-200 bg-primary-50/60 px-3 py-2.5">
         {/* 操作バー */}
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          <span className="text-[11px] font-bold text-primary-700 flex items-center gap-1">
+          <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
             <Shuffle className="w-3.5 h-3.5" />あたり修正中
           </span>
           <span className="text-[11px] text-gray-600 flex-1 min-w-[160px]">
@@ -1899,7 +1899,7 @@ function NormalEntryRegistration() {
         <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between sticky top-0 z-10 ${isConfirmedEvent ? 'bg-gray-200 border-gray-300' : 'bg-primary-50 border-border-main'}`}>
           <button onClick={() => toggleCollapse(eventId)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {isCollapsed ? <ChevronRight className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-            <h3 className={`font-bold text-sm ${isConfirmedEvent ? 'text-gray-400' : 'text-primary-600'}`}>{eventName}</h3>
+            <h3 className={`font-bold text-sm ${isConfirmedEvent ? 'text-gray-400' : 'text-gray-700'}`}>{eventName}</h3>
             {isConfirmedEvent && (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-300 text-gray-600 rounded text-[10px] font-bold">
                 <Lock className="w-2.5 h-2.5" />確定済
@@ -1909,7 +1909,7 @@ function NormalEntryRegistration() {
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {!isConfirmedEvent && (
               <button onClick={(e) => { e.stopPropagation(); handleCheckInEvent(eventId); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all min-h-[32px]">
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all min-h-[32px]">
                 <UserCheck className="w-3.5 h-3.5" />全員受付
               </button>
             )}
@@ -1946,7 +1946,7 @@ function NormalEntryRegistration() {
             <span className="bg-primary-600 text-white px-2 py-0.5 rounded-full font-semibold">{stats.checkedIn}</span>
             <span className="text-gray-500">/</span>
             <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{stats.total}</span>
-            {stats.absent > 0 && <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-semibold">{stats.absent} DEF</span>}
+            {stats.absent > 0 && <span className="bg-primary-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">{stats.absent} DEF</span>}
           </div>
         </div>
 
@@ -2119,13 +2119,13 @@ function NormalEntryRegistration() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 text-sm flex-wrap">
                   <div className="flex items-center gap-1"><span className="text-gray-500 text-xs">合計:</span><span className="font-bold text-gray-800">{overallStats.total}</span></div>
-                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary-500 inline-block" /><span className="font-bold text-primary-700">{overallStats.checkedIn}</span></div>
+                  <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary-500 inline-block" /><span className="font-bold text-gray-800">{overallStats.checkedIn}</span></div>
                   <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /><span className="font-bold text-red-600">{overallStats.absent}</span></div>
                   <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /><span className="font-bold text-gray-600">{overallStats.remaining}</span></div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={showAllEvents ? handleCheckInAll : () => selectedEventId && handleCheckInEvent(selectedEventId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all">
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all">
                     <UserCheck className="w-3.5 h-3.5" />全員受付済み
                   </button>
                   <button onClick={showAllEvents ? handleResetAll : () => selectedEventId && handleResetEvent(selectedEventId)}

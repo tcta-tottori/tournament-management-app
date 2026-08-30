@@ -226,7 +226,7 @@ export default function LiveScorePage() {
         <span
           className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border ${
             connected
-              ? 'bg-primary-50 border-primary-300 text-primary-700'
+              ? 'bg-primary-50 border-primary-300 text-gray-800'
               : 'bg-gray-100 border-gray-300 text-gray-500'
           }`}
           title={roomCode ? `ルーム: ${roomCode}` : '同期は開始されていません'}

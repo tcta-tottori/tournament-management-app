@@ -419,7 +419,7 @@ export default function ResultsPage() {
           <section key={event.eventId} className="bg-white rounded-xl card-tottori overflow-hidden">
             <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center gap-2">
               <Trophy className="w-5 h-5 text-primary-500" />
-              <h2 className="font-semibold text-primary-600">{event.name}</h2>
+              <h2 className="font-semibold text-gray-700">{event.name}</h2>
             </div>
             <div className="p-6 text-center text-gray-400 text-sm">ドローが作成されていません</div>
           </section>
@@ -464,7 +464,7 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
       <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">{event.name}</h2>
+          <h2 className="font-semibold text-gray-700">{event.name}</h2>
           <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border border-border-main">
             ドロー {draw.drawSize}
           </span>
@@ -525,7 +525,7 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
             <div className="flex items-start gap-3 bg-gradient-to-r from-primary-50/50 to-primary-50/30 border border-primary-200/60 rounded-lg px-4 py-2.5">
               <span className="text-lg mt-0.5">🥉</span>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-primary-600/80 uppercase tracking-wider mb-1">ベスト4</div>
+                <div className="text-xs font-semibold text-gray-700/80 uppercase tracking-wider mb-1">ベスト4</div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {result.semiFinalists.map((sf, i) => (
                     <div key={i} className="text-sm text-gray-700">
@@ -554,7 +554,7 @@ function TournamentCard({ event, draw, matches, previewOpts, onExcel, onJpeg }: 
               <Users className="w-3.5 h-3.5" />
               試合数: {result.finishedMatches} / {result.totalMatches}
             </span>
-            <span className="font-medium text-primary-600">{completionPct}%</span>
+            <span className="font-medium text-gray-700">{completionPct}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div
@@ -612,7 +612,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
       <div className="bg-primary-50 px-4 py-3 border-b border-border-main flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy className="w-5 h-5 text-primary-500" />
-          <h2 className="font-semibold text-primary-600">{event.name}</h2>
+          <h2 className="font-semibold text-gray-700">{event.name}</h2>
           <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border border-border-main">
             リーグ戦
           </span>
@@ -658,7 +658,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
                     </td>
                     <td className="px-3 py-2.5 font-bold text-gray-900">{s.name}</td>
                     <td className="px-3 py-2.5 text-gray-500 text-xs">{s.affiliation}</td>
-                    <td className="px-3 py-2.5 text-center font-semibold text-primary-600">{s.wins}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold text-gray-700">{s.wins}</td>
                     <td className="px-3 py-2.5 text-center font-semibold text-red-500">{s.losses}</td>
                   </tr>
                 ))}
@@ -678,7 +678,7 @@ function RoundRobinCard({ event, draw, matches, entries, players, previewOpts, o
               <Users className="w-3.5 h-3.5" />
               試合数: {analysis.finishedMatches} / {analysis.totalMatches}
             </span>
-            <span className="font-medium text-primary-600">{completionPct}%</span>
+            <span className="font-medium text-gray-700">{completionPct}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div

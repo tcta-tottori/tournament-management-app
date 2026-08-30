@@ -293,7 +293,7 @@ export default function ScheduleGenerator() {
       {drawTimeHint?.startTime && (
         <div className="flex items-start gap-2 p-3 bg-primary-50 border border-primary-200 rounded-md">
           <Clock className="w-4 h-4 text-primary-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-primary-700 font-medium">
+          <p className="text-xs text-gray-800 font-medium">
             ドロー表に試合開始時刻の記載があります（最早 {drawTimeHint.startTime}
             {drawTimeHint.matchDuration ? ` / ${drawTimeHint.matchDuration}分間隔` : ''}）。
             記載のある試合はその時刻に配置します。
@@ -365,7 +365,7 @@ export default function ScheduleGenerator() {
         <div className={`p-3 rounded-md text-sm ${
           result.includes('失敗') || result.includes('ありません') || result.includes('ください')
             ? 'bg-red-50 text-red-700 border border-red-200'
-            : 'bg-primary-50 text-primary-700 border border-primary-200'
+            : 'bg-primary-50 text-gray-800 border border-primary-200'
         }`}>
           {result}
         </div>

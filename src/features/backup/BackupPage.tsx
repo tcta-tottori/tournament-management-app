@@ -343,7 +343,7 @@ export default function BackupPage() {
         {tournamentName && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 flex items-center gap-3">
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-primary-100 to-white text-primary-600 shrink-0">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-primary-100 to-white text-gray-700 shrink-0">
                 <Trophy className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
@@ -398,7 +398,7 @@ export default function BackupPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isExporting || isImporting}
-                className="group relative overflow-hidden flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-white border-2 border-gray-200 hover:border-primary-300 text-gray-700 hover:text-primary-600 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                className="group relative overflow-hidden flex items-center justify-center gap-2.5 px-5 py-4 rounded-xl font-semibold bg-white border-2 border-gray-200 hover:border-primary-300 text-gray-700 hover:text-gray-700 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
               >
                 {isImporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                 <span>バックアップ復元</span>
@@ -408,7 +408,7 @@ export default function BackupPage() {
 
             {status && (
               <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm border ${
-                status.type === 'success' ? 'bg-primary-50 text-primary-800 border-primary-200' : 'bg-red-50 text-red-700 border-red-200'
+                status.type === 'success' ? 'bg-primary-50 text-gray-900 border-primary-200' : 'bg-red-50 text-red-700 border-red-200'
               }`}>
                 {status.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
                 <span className="flex-1">{status.message}</span>
@@ -430,7 +430,7 @@ export default function BackupPage() {
             {isGdriveConnected && (
               <div className="flex items-center gap-1 px-2.5 py-1 bg-primary-50 border border-primary-200 rounded-full">
                 <div className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-primary-700">接続中</span>
+                <span className="text-[10px] font-bold text-gray-800">接続中</span>
               </div>
             )}
           </div>
@@ -438,9 +438,9 @@ export default function BackupPage() {
             {!isGdriveConnected ? (
               <div className="flex items-center gap-3 px-4 py-4 rounded-xl bg-primary-50 border border-primary-200">
                 <AlertCircle className="w-5 h-5 shrink-0 text-primary-600" />
-                <div className="text-sm text-primary-800">
+                <div className="text-sm text-gray-900">
                   <div className="font-medium">Google ドライブに未接続</div>
-                  <div className="text-xs text-primary-600 mt-0.5">データページから接続設定を行ってください</div>
+                  <div className="text-xs text-gray-700 mt-0.5">データページから接続設定を行ってください</div>
                 </div>
               </div>
             ) : (
@@ -503,7 +503,7 @@ export default function BackupPage() {
 
                 {driveStatus && (
                   <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm border ${
-                    driveStatus.type === 'success' ? 'bg-primary-50 text-primary-800 border-primary-200' : 'bg-red-50 text-red-700 border-red-200'
+                    driveStatus.type === 'success' ? 'bg-primary-50 text-gray-900 border-primary-200' : 'bg-red-50 text-red-700 border-red-200'
                   }`}>
                     {driveStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
                     <span className="flex-1">{driveStatus.message}</span>

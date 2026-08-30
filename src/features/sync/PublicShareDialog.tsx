@@ -104,7 +104,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
           {noServerWarning && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-primary-50 border border-primary-200">
               <Info className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
-              <div className="text-[11px] text-primary-700 leading-relaxed">
+              <div className="text-[11px] text-gray-800 leading-relaxed">
                 <p className="font-bold mb-0.5">中継サーバー未設定</p>
                 <p>
                   別端末からの観戦にはWebSocket中継サーバーが必要です。
@@ -131,7 +131,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
                 観戦用URL
               </p>
               {isFixedUrl && (
-                <span className="text-[9px] font-bold text-primary-700 bg-primary-100 border border-primary-200 rounded-full px-2 py-0.5">
+                <span className="text-[9px] font-bold text-gray-800 bg-primary-100 border border-primary-200 rounded-full px-2 py-0.5">
                   固定URL・HP貼りっぱなしOK
                 </span>
               )}
@@ -163,7 +163,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
                 <button
                   onClick={share}
                   disabled={!roomCode}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-primary-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-gray-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Share2 className="w-4 h-4" />
                   <span>共有</span>
@@ -173,7 +173,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
                 href={roomCode ? url : undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-primary-600 transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-200 hover:border-primary-300 hover:text-gray-700 transition-all ${
                   !roomCode ? 'pointer-events-none opacity-40' : ''
                 }`}
               >
@@ -185,7 +185,7 @@ export default function PublicShareDialog({ open, onClose, roomCode, serverUrl }
 
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-primary-50 border border-primary-100">
             <Info className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
-            <div className="text-[11px] text-primary-700 leading-relaxed">
+            <div className="text-[11px] text-gray-800 leading-relaxed">
               <p className="font-bold mb-0.5">使い方</p>
               <ul className="list-disc ml-4 space-y-0.5">
                 <li>このURLをHPやSNSに掲載、もしくはQRコードに変換して案内できます</li>

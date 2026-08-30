@@ -256,7 +256,7 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
 
         {/* 補足: 順位表示条件・並び替えルール */}
         <div className="mt-2 text-[11px] text-gray-500">
-          {!allFinished && <span className="text-primary-600 font-medium">※順位は全対戦終了後に表示されます。</span>}
+          {!allFinished && <span className="text-gray-700 font-medium">※順位は全対戦終了後に表示されます。</span>}
           <span className="block mt-0.5">勝率＝取得ゲーム率。同勝数は「直接対戦（2者同率時）→ 勝率 → 得失ゲーム差」で順位を決定します。</span>
         </div>
 

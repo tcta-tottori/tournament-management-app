@@ -225,11 +225,11 @@ export default function AffiliationFuriganaManager() {
           所属ふりがな管理
         </h3>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
+          <span className="text-xs font-semibold bg-primary-100 text-gray-900 px-2 py-1 rounded-full">
             登録: {affiliationFurigana.filter(a => a.furigana).length} / {uniqueAffiliations.length}件
           </span>
           {unregisteredCount > 0 && (
-            <span className="text-xs font-semibold bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
+            <span className="text-xs font-semibold bg-primary-100 text-gray-900 px-2 py-1 rounded-full">
               未登録: {unregisteredCount}件
             </span>
           )}
@@ -241,7 +241,7 @@ export default function AffiliationFuriganaManager() {
           className={`mb-4 p-3 rounded-md text-sm flex items-start gap-2 ${
             status.isError
               ? 'bg-red-50 text-red-700 border border-red-200'
-              : 'bg-primary-50 text-primary-700 border border-primary-200'
+              : 'bg-primary-50 text-gray-800 border border-primary-200'
           }`}
         >
           {status.isError ? (
@@ -274,8 +274,8 @@ export default function AffiliationFuriganaManager() {
             <FileSpreadsheet className="w-6 h-6 text-primary-600" />
             <Upload className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-primary-900">Excelインポート</span>
-          <span className="text-xs text-primary-600 text-center">所属名・ふりがなをExcelから読込</span>
+          <span className="text-sm font-semibold text-gray-900">Excelインポート</span>
+          <span className="text-xs text-gray-700 text-center">所属名・ふりがなをExcelから読込</span>
           <input
             type="file"
             accept=".xlsx, .xls"
@@ -294,8 +294,8 @@ export default function AffiliationFuriganaManager() {
             <FileSpreadsheet className="w-6 h-6 text-primary-600" />
             <Download className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-primary-900">エクスポート</span>
-          <span className="text-xs text-primary-600 text-center">所属ふりがなをExcelに出力</span>
+          <span className="text-sm font-semibold text-gray-900">エクスポート</span>
+          <span className="text-xs text-gray-700 text-center">所属ふりがなをExcelに出力</span>
         </button>
       </div>
 
@@ -399,7 +399,7 @@ export default function AffiliationFuriganaManager() {
                       <div className="w-2/12 flex justify-center gap-1">
                         <button
                           onClick={() => handleEditStart(item)}
-                          className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
+                          className="p-1 text-gray-400 hover:text-gray-700 transition-colors"
                           title="編集"
                         >
                           <Pencil className="w-4 h-4" />

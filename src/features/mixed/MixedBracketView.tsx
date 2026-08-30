@@ -46,13 +46,13 @@ function getWinningGamesFromRules(rules: string[]): number {
 
 /** リーグバッジの色（エントリーページと統一） */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-primary-100 text-primary-700', 'B': 'bg-gray-100 text-gray-700',
-  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-primary-700',
-  'E': 'bg-primary-100 text-primary-700', 'F': 'bg-gray-100 text-gray-700',
-  'G': 'bg-primary-100 text-primary-700', 'H': 'bg-gray-100 text-gray-700',
-  'I': 'bg-primary-100 text-primary-700', 'J': 'bg-gray-100 text-gray-700',
-  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-primary-700',
-  'M': 'bg-primary-100 text-primary-700',
+  'A': 'bg-primary-100 text-gray-800', 'B': 'bg-gray-100 text-gray-700',
+  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-gray-800',
+  'E': 'bg-primary-100 text-gray-800', 'F': 'bg-gray-100 text-gray-700',
+  'G': 'bg-primary-100 text-gray-800', 'H': 'bg-gray-100 text-gray-700',
+  'I': 'bg-primary-100 text-gray-800', 'J': 'bg-gray-100 text-gray-700',
+  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-gray-800',
+  'M': 'bg-primary-100 text-gray-800',
 };
 
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
@@ -665,7 +665,7 @@ export default function MixedBracketView() {
                       disabled={isUsed}
                       className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
                         ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
-                          courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-primary-700' :
+                          courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-gray-800' :
                           'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >{c.replace('コート', '')}
                       {isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}
@@ -787,7 +787,7 @@ export default function MixedBracketView() {
             <div className={`grid grid-cols-2 gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
               <button
                 onClick={() => editingMatch.team2Id && handleDEF(editingMatch.team2Id)}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
               >
                 <Ban size={14} />
                 <span className="truncate">{editingMatch.team1Name}</span>
@@ -795,7 +795,7 @@ export default function MixedBracketView() {
               </button>
               <button
                 onClick={() => editingMatch.team1Id && handleDEF(editingMatch.team1Id)}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
               >
                 <Ban size={14} />
                 <span className="truncate">{editingMatch.team2Name}</span>
@@ -819,7 +819,7 @@ export default function MixedBracketView() {
               </button>
               {/* コートを間違えた・移動したときにここから直せる */}
               <button onClick={() => openCourtAssign(editingMatch)}
-                className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-50 border border-primary-200 rounded-xl text-primary-700 text-xs hover:bg-primary-100 active:scale-[0.98] transition-all">
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-50 border border-primary-200 rounded-xl text-gray-800 text-xs hover:bg-primary-100 active:scale-[0.98] transition-all">
                 <MapPin size={12} />
                 {bracketCourtAssignments[editingMatch.matchId] ? 'コート変更' : 'コート決定'}
               </button>
@@ -1141,7 +1141,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-primary-200 overflow-hidden">
       <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-2 border-b border-primary-100 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-primary-800 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
           <Shuffle size={14} className="text-primary-600" />
           1位トーナメント 抽選
         </h3>
@@ -1165,7 +1165,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
                       disabled={isAssigned || spinning}
                       className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                         isAssigned ? 'bg-primary-50 border-primary-200 text-primary-500 line-through opacity-60' :
-                        isSelected ? 'bg-primary-100 border-primary-400 text-primary-800 ring-1 ring-primary-300' :
+                        isSelected ? 'bg-primary-100 border-primary-400 text-gray-900 ring-1 ring-primary-300' :
                         'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
                     >
                       {t.leagueId} {t.teamName}
@@ -1178,7 +1178,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
             {/* ルーレットボタン */}
             {activeTeam && !spinning && (
               <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded-lg">
-                <span className="text-[10px] text-primary-700 flex-1 truncate">
+                <span className="text-[10px] text-gray-800 flex-1 truncate">
                   <span className="font-bold">{activeTeam.leagueId}</span> {activeTeam.teamName}
                 </span>
                 <button onClick={spinRoulette}
@@ -1188,7 +1188,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
               </div>
             )}
             {spinning && (
-              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-primary-700 animate-pulse">抽選中...</div>
+              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-gray-800 animate-pulse">抽選中...</div>
             )}
 
             {/* ドロー表形式スロット（対戦ペアで2列表示） */}
@@ -1258,7 +1258,7 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
           </>
         ) : (
           <div className="text-center py-4">
-            <div className="text-primary-600 font-bold text-sm mb-2">抽選完了</div>
+            <div className="text-gray-700 font-bold text-sm mb-2">抽選完了</div>
             <p className="text-xs text-gray-500">トーナメント表に反映されました</p>
           </div>
         )}
@@ -1451,7 +1451,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                 <div className="text-center">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold
                     ${round === totalRounds ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white' :
-                      round === totalRounds - 1 ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}>
+                      round === totalRounds - 1 ? 'bg-primary-100 text-gray-800' : 'bg-gray-100 text-gray-600'}`}>
                     {getRoundLabel(round, totalRounds)}
                   </span>
                 </div>
@@ -1601,9 +1601,9 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                       {/* 枠内ステータスバー */}
                       {match.team1Id && match.team2Id && (
                         <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
-                          ${isPlaying ? 'bg-primary-50 text-primary-700' :
+                          ${isPlaying ? 'bg-primary-50 text-gray-800' :
                             match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
-                            'bg-primary-50/50 text-primary-600'}
+                            'bg-primary-50/50 text-gray-700'}
                         `} style={{ height: STATUS_HEIGHT }}>
                           {isPlaying ? (
                             <>
@@ -1614,10 +1614,10 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                                 title={onCourtClick ? 'コートを変更する' : undefined}
                               >
                                 <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
-                                <span className="font-bold text-primary-700">{ca.courtName.replace('コート', '')}コート</span>
+                                <span className="font-bold text-gray-800">{ca.courtName.replace('コート', '')}コート</span>
                                 {onCourtClick && <MapPin size={9} className="text-primary-500" />}
                               </button>
-                              <span className="ml-auto font-mono text-primary-600">{elapsedStr}</span>
+                              <span className="ml-auto font-mono text-gray-700">{elapsedStr}</span>
                             </>
                           ) : match.status === 'finished' ? (
                             <span className="mx-auto text-gray-400">完了</span>
@@ -1794,7 +1794,7 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
   return (
     <>
       <button onClick={openDialog}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-primary-700 bg-primary-50 border border-primary-200 shadow-sm hover:bg-primary-100 active:scale-95 transition-all whitespace-nowrap">
+        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-800 bg-primary-50 border border-primary-200 shadow-sm hover:bg-primary-100 active:scale-95 transition-all whitespace-nowrap">
         <Printer size={12} className="text-primary-600" /> 賞状印刷
       </button>
 
@@ -1841,7 +1841,7 @@ function CertificatePrintButton({ brackets, allTeams, selectedCategory }: {
                       placeholder="氏名（例: 田中・山本）" className="w-full text-xs border border-gray-200 rounded px-2 py-1 font-bold" />
                   </div>
                 ))}
-                <button onClick={addEntry} className="w-full py-1.5 border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors">
+                <button onClick={addEntry} className="w-full py-1.5 border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 hover:border-primary-400 hover:text-gray-700 transition-colors">
                   + 手動で追加
                 </button>
               </div>

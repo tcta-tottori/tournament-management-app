@@ -31,7 +31,7 @@ const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
       conclusion: '→ 取得ポイントが多いチームAが上位',
     },
     grad: 'from-primary-500 to-primary-600',
-    iconBg: 'bg-primary-100 text-primary-700',
+    iconBg: 'bg-primary-100 text-gray-800',
   },
   gameRatio: {
     title: 'ゲーム率',
@@ -46,7 +46,7 @@ const TIEBREAK_RULE_DETAILS: Record<TiebreakRuleId, {
       conclusion: '→ ゲーム率が高いチームAが上位',
     },
     grad: 'from-primary-500 to-primary-600',
-    iconBg: 'bg-primary-100 text-primary-700',
+    iconBg: 'bg-primary-100 text-gray-800',
   },
   headToHead: {
     title: '直接対決',
@@ -207,12 +207,12 @@ function getTestPlayersForTeam(
 /** 種目カラー */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   MIX: { bg: 'bg-gray-100', text: 'text-gray-700' },
-  WD:  { bg: 'bg-primary-100',   text: 'text-primary-700' },
+  WD:  { bg: 'bg-primary-100',   text: 'text-gray-800' },
   MD:  { bg: 'bg-gray-100',    text: 'text-gray-700' },
   D3:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
   D2:  { bg: 'bg-gray-100',   text: 'text-gray-700' },
-  D1:  { bg: 'bg-primary-100',   text: 'text-primary-700' },
-  S2:  { bg: 'bg-primary-100',  text: 'text-primary-700' },
+  D1:  { bg: 'bg-primary-100',   text: 'text-gray-800' },
+  S2:  { bg: 'bg-primary-100',  text: 'text-gray-800' },
   S1:  { bg: 'bg-red-100',    text: 'text-red-700' },
 };
 
@@ -481,7 +481,7 @@ function TiebreakDetailPopup({ standing, onClose }: { standing: TeamLeagueStandi
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs px-2 py-1.5 bg-primary-50 border border-primary-200 rounded">
                 <span className="inline-flex w-5 h-5 rounded-full bg-primary-500 text-white items-center justify-center text-[10px] font-black">0</span>
-                <span className="font-bold text-primary-800">対戦勝数</span>
+                <span className="font-bold text-gray-900">対戦勝数</span>
               </div>
               {tiebreakOrder.map((r, i) => (
                 <button
@@ -919,7 +919,7 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-gray-800 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST
         </button>
@@ -937,7 +937,7 @@ export default function TeamLeagueView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-gray-800 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST（ALL）
         </button>
@@ -1270,7 +1270,7 @@ export default function TeamLeagueView() {
                   className={`shrink-0 flex items-center gap-0.5 text-[9px] lg:text-[10px] font-bold rounded px-1 py-0.5 whitespace-nowrap tabular-nums border transition-colors ${
                     mo.courts && mo.courts.length > 0
                       ? 'text-gray-500 bg-gray-100 border-gray-200 hover:bg-gray-200'
-                      : 'text-gray-300 bg-white border-dashed border-gray-200 hover:text-primary-600 hover:border-primary-300'
+                      : 'text-gray-300 bg-white border-dashed border-gray-200 hover:text-gray-700 hover:border-primary-300'
                   }`}
                 >
                   <MapPin className="w-2.5 h-2.5" />

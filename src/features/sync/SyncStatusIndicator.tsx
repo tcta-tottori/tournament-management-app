@@ -22,7 +22,7 @@ export default function SyncStatusIndicator() {
     <>
       <button
         onClick={() => setPanelOpen(true)}
-        className="relative flex items-center gap-1 px-2 py-1 rounded-lg transition-all hover:bg-white/20"
+        className="header-link relative"
         title={
           isDisconnectedWarn
             ? `同期が切断中${hasPending ? `（未送信 ${pendingChanges}件）` : ''}`
@@ -42,17 +42,10 @@ export default function SyncStatusIndicator() {
         ) : (
           <WifiOff className="w-3.5 h-3.5 text-white/55" />
         )}
-        {isConnected && !hasPending && (
-          <span className="text-[10px] font-bold text-white">
-            {peers.length + 1}
-          </span>
-        )}
-        {/* 未送信件数バッジ */}
-        {hasPending && (
-          <span className="text-[10px] font-bold text-white">
-            {pendingChanges}
-          </span>
-        )}
+        <span>
+          {isDisconnectedWarn ? '切断' : isConnecting ? '接続中' : isConnected ? `同期${peers.length + 1}` : '同期'}
+          {hasPending ? `(${pendingChanges})` : ''}
+        </span>
       </button>
       <SyncPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </>

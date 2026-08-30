@@ -80,7 +80,7 @@ export default function CourtChangeDialog({
                   disabled={!!busyReason}
                   className={`py-2 rounded-lg border-2 text-xs font-bold transition-all ${
                     busyReason ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                      : isSelected ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : isSelected ? 'border-primary-500 bg-primary-50 text-gray-800'
                       : 'border-gray-200 text-gray-600 hover:border-primary-300'
                   }`}
                 >
@@ -93,7 +93,7 @@ export default function CourtChangeDialog({
 
           {selected.length > 0 && (
             <p className="mt-3 text-center text-[11px] text-gray-500">
-              選択中: <span className="font-bold text-primary-600">
+              選択中: <span className="font-bold text-gray-700">
                 {[...selected].sort((a, b) => parseInt(a) - parseInt(b)).join('・')}
               </span> 番コート
             </p>

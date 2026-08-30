@@ -284,7 +284,7 @@ export default function PrintCenter() {
             <button
               onClick={() => setShowSettings(v => !v)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                showSettings ? 'bg-white text-primary-700' : 'bg-white/20 text-white hover:bg-white/30'
+                showSettings ? 'bg-white text-gray-800' : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
               <Settings2 className="w-3.5 h-3.5" />書式設定
@@ -292,7 +292,7 @@ export default function PrintCenter() {
             <button
               onClick={handlePrint}
               disabled={printPages.length === 0}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-white text-primary-700 text-xs font-black shadow disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-50 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-white text-gray-800 text-xs font-black shadow disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-50 active:scale-95 transition-all"
             >
               <Printer className="w-4 h-4" />{printPages.length}枚を印刷
             </button>
@@ -354,7 +354,7 @@ export default function PrintCenter() {
                   <button
                     onClick={addAllWinners}
                     disabled={winnersOnly(candidates).length === 0}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-gray-800 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     title="決勝が終わったクラスの優勝・準優勝・第3位をまとめて追加します"
                   >
                     <ListChecks className="w-3.5 h-3.5" />入賞者を一括追加
@@ -373,7 +373,7 @@ export default function PrintCenter() {
                       <span className="flex-1 min-w-0 truncate text-xs font-bold text-gray-800">{c.name}</span>
                       {c.affiliation && <span className="shrink-0 text-[10px] text-gray-400 truncate max-w-[120px]">{c.affiliation}</span>}
                       {c.rankHint && (
-                        <span className="shrink-0 text-[9px] font-black text-primary-700 bg-primary-100 rounded-full px-1.5 py-0.5">{c.rankHint}</span>
+                        <span className="shrink-0 text-[9px] font-black text-gray-800 bg-primary-100 rounded-full px-1.5 py-0.5">{c.rankHint}</span>
                       )}
                       <Plus className="w-3.5 h-3.5 text-gray-300 shrink-0" />
                     </button>
@@ -424,13 +424,13 @@ export default function PrintCenter() {
             <div className="p-2.5 flex gap-2">
               <button
                 onClick={() => addEntry({ category: entries[entries.length - 1]?.category || '' })}
-                className="flex-1 py-2 border-2 border-dashed border-gray-300 rounded-xl text-[11px] font-bold text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors"
+                className="flex-1 py-2 border-2 border-dashed border-gray-300 rounded-xl text-[11px] font-bold text-gray-500 hover:border-primary-400 hover:text-gray-700 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />手動で追加
               </button>
               <button
                 onClick={addBlankSet}
-                className="flex-1 py-2 border-2 border-dashed border-gray-300 rounded-xl text-[11px] font-bold text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors"
+                className="flex-1 py-2 border-2 border-dashed border-gray-300 rounded-xl text-[11px] font-bold text-gray-500 hover:border-primary-400 hover:text-gray-700 transition-colors"
                 title="優勝・準優勝・第3位の3枚を空欄で追加します"
               >
                 <Plus className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />優勝〜第3位のひな形
@@ -513,7 +513,7 @@ function EntryRow({
           {swapped && (
             <button
               onClick={e => { e.stopPropagation(); onChange({ names: swapped }); }}
-              className="p-1 text-gray-300 hover:text-primary-600"
+              className="p-1 text-gray-300 hover:text-gray-700"
               title="ペアの氏名の順番を入れ替える"
             ><ArrowLeftRight className="w-3.5 h-3.5" /></button>
           )}
@@ -540,7 +540,7 @@ function EntryRow({
         />
         {swapDoubles && swapped && entry.selected && (
           <span
-            className="shrink-0 text-[9px] font-black text-primary-700 bg-primary-100 rounded-full px-1.5 py-0.5"
+            className="shrink-0 text-[9px] font-black text-gray-800 bg-primary-100 rounded-full px-1.5 py-0.5"
             title={`入れ替えた「${swapped}」も印刷されます`}
           >×2</span>
         )}

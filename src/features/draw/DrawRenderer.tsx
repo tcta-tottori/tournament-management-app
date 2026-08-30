@@ -277,7 +277,7 @@ export default function DrawRenderer({
           top: winnerY + ROW_H / 2 - 14,
           zIndex: 10,
         }}>
-        <span className="text-primary-600 text-base">🏆</span>
+        <span className="text-gray-700 text-base">🏆</span>
         <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{finalWinnerName}</span>
       </div>
     );
@@ -317,7 +317,7 @@ export default function DrawRenderer({
         </div>
         {/* Seed badge */}
         {isSeed && (
-          <div className="w-4 text-[10px] font-bold text-primary-700 text-center shrink-0">
+          <div className="w-4 text-[10px] font-bold text-gray-800 text-center shrink-0">
             {slot.seed}
           </div>
         )}

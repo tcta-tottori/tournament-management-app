@@ -273,7 +273,7 @@ function CompactTeamCard({
           className={`py-1.5 text-[10px] font-bold border-x border-gray-100 transition-colors flex items-center justify-center gap-0.5 ${
             team.status === 'entry'
               ? 'bg-primary-500 text-white'
-              : 'bg-white text-gray-400 hover:bg-primary-50 hover:text-primary-600'
+              : 'bg-white text-gray-400 hover:bg-primary-50 hover:text-gray-700'
           }`}
         >
           <Check className="w-3 h-3" />
@@ -483,7 +483,7 @@ export default function TeamEntryView() {
           <span className="font-bold tabular-nums text-gray-700">{totalEntered}</span>
           <span className="text-gray-400"> / {totalTeams} チーム Entry</span>
           {teamsMissingMembers > 0 && (
-            <span className="ml-2 text-primary-600 font-bold">選手名簿なし {teamsMissingMembers}チーム</span>
+            <span className="ml-2 text-gray-700 font-bold">選手名簿なし {teamsMissingMembers}チーム</span>
           )}
         </div>
         <input
@@ -496,7 +496,7 @@ export default function TeamEntryView() {
         <button
           onClick={() => relinkInputRef.current?.click()}
           title="Excelを選び直して、選手が空のチームだけ名簿を復元します（スコアは保持）"
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 bg-white border border-primary-200 text-primary-700 hover:bg-primary-50"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 bg-white border border-primary-200 text-gray-800 hover:bg-primary-50"
         >
           <Upload className="w-3.5 h-3.5" />
           名簿を再取込

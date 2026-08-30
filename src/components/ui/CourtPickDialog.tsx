@@ -95,7 +95,7 @@ export default function CourtPickDialog({
             <div className="space-y-2">
               {blocks.map((block, bi) => (
                 <div key={bi} className="border border-primary-200 bg-primary-50/40 rounded-lg p-2">
-                  <div className="text-[10px] font-bold text-primary-700 mb-1.5 px-0.5">
+                  <div className="text-[10px] font-bold text-gray-800 mb-1.5 px-0.5">
                     {block.length > 1
                       ? `${block[0].name}〜${block[block.length - 1].name}番コート`
                       : `${block[0].name}番コート`}
@@ -136,7 +136,7 @@ export default function CourtPickDialog({
           <div className="pt-1 border-t border-gray-100">
             <button
               onClick={onScoreInput}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] text-sm font-bold text-primary-700 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 active:scale-[0.98] transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] text-sm font-bold text-gray-800 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 active:scale-[0.98] transition-colors"
             >
               <Trophy className="w-4 h-4" />
               コートを選ばずにスコア入力

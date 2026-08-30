@@ -241,14 +241,14 @@ export default function FuriganaManager() {
           <Database className="w-4 h-4 text-primary-600" />
           ふりがなDB管理
         </h3>
-        <span className="text-xs font-semibold bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
+        <span className="text-xs font-semibold bg-primary-100 text-gray-900 px-2 py-1 rounded-full">
           登録数: {furiganaDict?.length || 0}件
         </span>
       </div>
 
       {status && (
         <div className={`mb-4 p-3 rounded-md text-sm flex items-start gap-2 ${
-          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary-50 text-primary-700 border border-primary-200'
+          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary-50 text-gray-800 border border-primary-200'
         }`}>
           {status.isError ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />}
           <div className="flex-1">
@@ -282,8 +282,8 @@ export default function FuriganaManager() {
             <FileSpreadsheet className="w-6 h-6 text-primary-600" />
             <Upload className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-primary-900">Excelインポート</span>
-          <span className="text-xs text-primary-600 text-center">修正したExcelを読み込み優先更新</span>
+          <span className="text-sm font-semibold text-gray-900">Excelインポート</span>
+          <span className="text-xs text-gray-700 text-center">修正したExcelを読み込み優先更新</span>
           <input 
             type="file" 
             accept=".xlsx, .xls"
@@ -302,8 +302,8 @@ export default function FuriganaManager() {
             <FileSpreadsheet className="w-6 h-6 text-primary-600" />
             <Download className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-primary-900">未登録エクスポート</span>
-          <span className="text-xs text-primary-600 text-center">ふりがなが無い選手Excelに出力</span>
+          <span className="text-sm font-semibold text-gray-900">未登録エクスポート</span>
+          <span className="text-xs text-gray-700 text-center">ふりがなが無い選手Excelに出力</span>
         </button>
       </div>
 
@@ -323,7 +323,7 @@ export default function FuriganaManager() {
                     {dict.type === 'auto' ? (
                       <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">AI</span>
                     ) : (
-                      <span className="text-[10px] bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded">Excel</span>
+                      <span className="text-[10px] bg-primary-100 text-gray-700 px-1.5 py-0.5 rounded">Excel</span>
                     )}
                   </div>
                   <div className="w-1/2 text-gray-600">{dict.furigana}</div>

@@ -245,14 +245,14 @@ export default function EntryImport({ onClose }: EntryImportProps) {
   const renderStatusBadge = (row: ImportRow) => {
     if (row.status === 'matched' && row.matchedEventId) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-gray-900">
           一致
         </span>
       );
     }
     if (row.status === 'partial') {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-gray-900">
           {row.matchedPlayerId && row.isDoubles && !row.matchedPartnerId ? 'パートナー未一致' : '種目不一致'}
         </span>
       );
@@ -268,7 +268,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
     if (!row.isDoubles || !row.rawPartnerName) return null;
     if (row.matchedPartnerId) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-gray-900">
           一致
         </span>
       );

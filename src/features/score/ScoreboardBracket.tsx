@@ -180,7 +180,7 @@ export default function ScoreboardBracket({
     if (match.status === 'ready')
       return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-gray-100 text-gray-700 leading-none">準備完了</span>;
     if (match.status === 'playing')
-      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-primary-100 text-primary-700 leading-none animate-pulse">試合中</span>;
+      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-primary-100 text-gray-800 leading-none animate-pulse">試合中</span>;
     if (match.status === 'walkover')
       return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600 leading-none">W/O</span>;
     return null;
@@ -230,7 +230,7 @@ export default function ScoreboardBracket({
       >
         <div className="w-5 text-[10px] font-mono text-gray-400 border-r border-gray-100 pr-1 text-center">{visibleIndex}</div>
         {slot.seed > 0 && (
-          <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[9px] font-bold rounded-full">{slot.seed}</div>
+          <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[9px] font-bold rounded-full">{slot.seed}</div>
         )}
         <div className="flex-1 truncate font-medium text-gray-800 text-xs" title={slot.name}>
           {slot.name}
@@ -269,7 +269,7 @@ export default function ScoreboardBracket({
               {matchResult && (matchResult.status === 'finished' || matchResult.status === 'walkover') ? (
                 <div className="flex items-center gap-1">
                   <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />
-                  <span className="text-sm font-bold text-primary-600 truncate">{displayName}</span>
+                  <span className="text-sm font-bold text-gray-700 truncate">{displayName}</span>
                   {matchResult.score && <span className="text-[9px] text-gray-900 font-bold ml-auto shrink-0">{matchResult.score}</span>}
                 </div>
               ) : matchResult && matchResult.status === 'playing' ? (

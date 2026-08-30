@@ -39,7 +39,7 @@ export default function TeamCallStatusBubble() {
           </button>
         </div>
         <div className="px-4 py-3 space-y-1.5">
-          <div className="text-[10px] font-bold text-primary-700">
+          <div className="text-[10px] font-bold text-gray-800">
             {resolveBracketLabel(content.category, customLabels)} {content.roundLabel}
           </div>
           <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
