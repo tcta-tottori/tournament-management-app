@@ -265,7 +265,7 @@ export default function CourtBracketView({
         const playerY = topEmpty ? yBottom : yTop;
         paths.push(
           <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`}
-            fill="none" stroke="#94a3b8" strokeWidth="1" />
+            fill="none" stroke="#a6a6a6" strokeWidth="1" />
         );
         continue;
       }
@@ -276,8 +276,8 @@ export default function CourtBracketView({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      // 勝者の線は緑（従来は赤）。線自体は点滅させない（点滅はカードのみ）。
-      const getStroke = (isWinner: boolean) => isWinner ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8';
+      // 勝者の線はブランド赤。線自体は点滅させない（点滅はカードのみ）。
+      const getStroke = (isWinner: boolean) => isWinner ? '#ad2c29' : isPlaying ? '#c63834' : '#a6a6a6';
       const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1';
 
       // 角に丸みを持たせたパスを生成（横→縦のエルボーを二次ベジェで滑らかに）。
@@ -296,11 +296,11 @@ export default function CourtBracketView({
 
       const winnerExists = winnerIsTop || winnerIsBottom;
       paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
-        fill="none" stroke={winnerExists ? '#16a34a' : isPlaying ? '#22c55e' : '#94a3b8'}
+        fill="none" stroke={winnerExists ? '#ad2c29' : isPlaying ? '#c63834' : '#a6a6a6'}
         strokeWidth={winnerExists ? '2.5' : '1'} strokeLinecap="round" />);
 
       // 結果（スコア）を線が合流する付近に上下に並べて表示（手書きスケッチ準拠）。
-      // 上側=player1のスコアは合流点の上、下側=player2のスコアは下に配置。勝者側は緑ピル。
+      // 上側=player1のスコアは合流点の上、下側=player2のスコアは下に配置。勝者側は赤ピル。
       if (isFinished && matchResult.score) {
         const raw = matchResult.score.trim();
         // タイブレークの得点は落とした側に "6(4)" のように付き、Ret / W.O は注記として分かれる
@@ -319,8 +319,8 @@ export default function CourtBracketView({
             return (
               <g key={key}>
                 <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={7}
-                  fill={win ? '#16a34a' : '#ffffff'} stroke={win ? '#16a34a' : '#cbd5e1'} strokeWidth="1" />
-                <text x={cx} y={cy + 4.5} fill={win ? '#ffffff' : '#64748b'}
+                  fill={win ? '#ad2c29' : '#ffffff'} stroke={win ? '#ad2c29' : '#d6d6d6'} strokeWidth="1" />
+                <text x={cx} y={cy + 4.5} fill={win ? '#ffffff' : '#767676'}
                   fontSize={val.length > 3 ? 10 : 13} fontWeight="bold" fontFamily="monospace" textAnchor="middle">
                   {val}
                 </text>
@@ -341,8 +341,8 @@ export default function CourtBracketView({
           paths.push(
             <g key={`sX-${r}-${m}`}>
               <rect x={loserFeederMidX - w / 2} y={loserY - 8} width={w} height={16} rx={7}
-                fill="#ffffff" stroke="#f87171" strokeWidth="1" />
-              <text x={loserFeederMidX} y={loserY + 4} fill="#dc2626"
+                fill="#ffffff" stroke="#e49f9c" strokeWidth="1" />
+              <text x={loserFeederMidX} y={loserY + 4} fill="#ad2c29"
                 fontSize="10" fontWeight="bold" textAnchor="middle">
                 {note}
               </text>
@@ -366,7 +366,7 @@ export default function CourtBracketView({
       if (bottomText) {
         paths.push(
           <text key={`bt-${r}-${m}`} x={cardCenterX} y={cardBottomY}
-            fill={isPlaying ? '#16a34a' : '#1e40af'}
+            fill={isPlaying ? '#ad2c29' : '#262626'}
             fontSize="8.5" fontWeight="bold" textAnchor="middle">
             {bottomText}
           </text>
@@ -398,7 +398,7 @@ export default function CourtBracketView({
         ? ' ring-2 ring-primary-500 bg-primary-50 cursor-pointer'
         : ' cursor-pointer hover:ring-2 hover:ring-primary-200'
       : nameEditable
-        ? ' cursor-pointer hover:ring-2 hover:ring-amber-300'
+        ? ' cursor-pointer hover:ring-2 hover:ring-primary-300'
         : '';
 
     slotElements.push(
@@ -413,7 +413,7 @@ export default function CourtBracketView({
           {editMode ? slot.position : visibleIndex}
         </div>
         {slot.seed > 0 && (
-          <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[8px] font-bold rounded-full">
+          <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[8px] font-bold rounded-full">
             {slot.seed}
           </div>
         )}
@@ -449,7 +449,7 @@ export default function CourtBracketView({
   const courtColumn = (court: string, tone: 'playing' | 'ready' | 'idle') => {
     const num = (court || '').replace(/[^0-9]/g, '') || court;
     if (!num) return null;
-    const bg = tone === 'playing' ? 'bg-green-600' : tone === 'ready' ? 'bg-blue-600' : 'bg-gray-400';
+    const bg = tone === 'playing' ? 'bg-primary-600' : tone === 'ready' ? 'bg-gray-600' : 'bg-gray-400';
     return (
       <div className={`flex flex-col items-center justify-center shrink-0 text-white ${bg}`} style={{ width: 42 }}>
         <span className="text-[8px] font-bold leading-none opacity-85">コート</span>
@@ -458,11 +458,11 @@ export default function CourtBracketView({
     );
   };
 
-  // 控え（順番待ち）を左端に青で表示（対戦順シートと共通の控え番号）
+  // 控え（順番待ち）を左端にグレーで表示（対戦順シートと共通の控え番号）
   const standbyColumn = (label: string) => {
     const num = label.match(/(\d+)/)?.[1] ?? '';
     return (
-      <div className="flex flex-col items-center justify-center shrink-0 text-white bg-blue-400" style={{ width: 42 }}>
+      <div className="flex flex-col items-center justify-center shrink-0 text-white bg-gray-400" style={{ width: 42 }}>
         <span className="text-[8px] font-bold leading-none opacity-85">控え</span>
         <span className="text-xl font-black leading-none mt-0.5">{num}</span>
       </div>
@@ -470,10 +470,10 @@ export default function CourtBracketView({
   };
 
   // 空きコートが出て入れる状態の左端。どのコートに入れるかはタップ後に選ぶので、
-  // コート番号は表示しない（運営＝緑でタップしてコート選択、観戦用＝オレンジの案内）。
+  // コート番号は表示しない（運営＝赤でタップしてコート選択、観戦用＝グレーの案内）。
   const enterColumn = (interactive: boolean) => (
     <div
-      className={`flex flex-col items-center justify-center shrink-0 text-white ${interactive ? 'bg-green-600' : 'bg-orange-500'}`}
+      className={`flex flex-col items-center justify-center shrink-0 text-white ${interactive ? 'bg-primary-600' : 'bg-gray-600'}`}
       style={{ width: 42 }}
     >
       {interactive ? (
@@ -531,22 +531,22 @@ export default function CourtBracketView({
             : null;
       const clickProps = clickHandler ? { onClick: clickHandler, role: 'button' as const } : {};
       const clickCls = clickHandler
-        ? (isEnterable && onEnterCourt ? ' cursor-pointer hover:ring-2 hover:ring-orange-400' : ' cursor-pointer hover:ring-2 hover:ring-emerald-400')
+        ? (isEnterable && onEnterCourt ? ' cursor-pointer hover:ring-2 hover:ring-primary-400' : ' cursor-pointer hover:ring-2 hover:ring-gray-400')
         : '';
 
       // 枠の配色（点滅は枠のみ・カード内はそのまま = bracket-card-blink）
-      // 控え1〜5は青枠点滅（順番待ち）、空きコートが出て入れる状態はオレンジ枠点滅。
+      // 控え1〜5は淡いグレー枠点滅（順番待ち）、空きコートが出て入れる状態は濃い墨の枠点滅。
       const isStandby = !!(matchResult?.standbyLabel && bothPlayers && !isPlaying && !isFinished);
       const cardClass = isFinished
-        ? (isFinal ? 'border-2 border-amber-500 bg-amber-50' : 'border border-gray-400 bg-white')
+        ? (isFinal ? 'border-2 border-primary-500 bg-primary-50' : 'border border-gray-400 bg-white')
         : isPlaying
-          ? 'border-2 border-green-500 bg-green-50 bracket-card-blink'
+          ? 'border-2 border-primary-500 bg-primary-50 bracket-card-blink'
           : isEnterable
-            ? 'border-2 border-orange-400 bg-orange-50 enter-court-orange-blink'
+            ? 'border-2 border-gray-700 bg-gray-50 enter-court-blink'
             : isStandby
-              ? 'border-2 border-blue-400 bg-white enter-card-blink'
+              ? 'border-2 border-gray-400 bg-white enter-card-blink'
               : isReady
-                ? 'border border-blue-400 bg-blue-50'
+                ? 'border border-gray-400 bg-gray-50'
                 : isVs
                   ? 'border border-gray-300 bg-white'
                   : `border border-dashed ${isFinal ? 'border-gray-400' : 'border-gray-300'} bg-white`;
@@ -558,7 +558,7 @@ export default function CourtBracketView({
         const winnerAff = affiliationOf(matchResult.winnerEntryId);
         content = (
           <div className="flex items-center gap-1 w-full min-w-0 px-2">
-            {isFinal && <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />}
+            {isFinal && <Trophy className="w-4 h-4 text-primary-500 shrink-0" />}
             <span className={`truncate flex-1 ${isFinal ? 'text-[13px] font-bold text-primary-700' : 'text-[12px] font-semibold text-gray-800'}`} title={winnerFull}>
               {winnerFull}
             </span>

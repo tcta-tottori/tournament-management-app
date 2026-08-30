@@ -148,7 +148,7 @@ export default function ScoreboardBracket({
           const playerY = topBye ? yBottom : yTop;
           paths.push(
             <path key={`r${r}-m${m}-bye`} d={`M ${x} ${playerY} L ${xNext} ${playerY}`}
-              fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+              fill="none" stroke="#d6d6d6" strokeWidth="1.5" />
           );
           continue;
         }
@@ -160,7 +160,7 @@ export default function ScoreboardBracket({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      const getStroke = (isWinner: boolean) => isWinner ? '#dc2626' : isPlaying ? '#16a34a' : '#cbd5e1';
+      const getStroke = (isWinner: boolean) => isWinner ? '#ad2c29' : isPlaying ? '#ad2c29' : '#d6d6d6';
       const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1.5';
 
       paths.push(<path key={`r${r}-m${m}-top`} d={`M ${x} ${yTop} L ${xMid} ${yTop} L ${xMid} ${yMid}`}
@@ -170,7 +170,7 @@ export default function ScoreboardBracket({
 
       const winnerExists = winnerIsTop || winnerIsBottom;
       paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
-        fill="none" stroke={winnerExists ? '#dc2626' : isPlaying ? '#16a34a' : '#cbd5e1'}
+        fill="none" stroke={winnerExists ? '#ad2c29' : isPlaying ? '#ad2c29' : '#d6d6d6'}
         strokeWidth={winnerExists ? '2.5' : '1.5'} />);
     }
   }
@@ -178,9 +178,9 @@ export default function ScoreboardBracket({
   // --- ステータスバッジ ---
   const renderStatusBadge = (match: MatchResult) => {
     if (match.status === 'ready')
-      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-blue-100 text-blue-700 leading-none">準備完了</span>;
+      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-gray-100 text-gray-700 leading-none">準備完了</span>;
     if (match.status === 'playing')
-      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 leading-none animate-pulse">試合中</span>;
+      return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-primary-100 text-primary-700 leading-none animate-pulse">試合中</span>;
     if (match.status === 'walkover')
       return <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600 leading-none">W/O</span>;
     return null;
@@ -192,9 +192,9 @@ export default function ScoreboardBracket({
     if (!match || match.status === 'waiting')
       return `${base} border border-dashed border-gray-300 bg-white hover:border-gray-400 hover:shadow ${ring}`;
     if (match.status === 'ready')
-      return `${base} border border-blue-400 bg-blue-50 hover:border-blue-500 hover:shadow ${ring}`;
+      return `${base} border border-gray-400 bg-gray-50 hover:border-gray-500 hover:shadow ${ring}`;
     if (match.status === 'playing')
-      return `${base} border-2 border-green-500 bg-green-50 hover:shadow ${ring}`;
+      return `${base} border-2 border-primary-500 bg-primary-50 hover:shadow ${ring}`;
     if (match.status === 'finished')
       return `${base} border border-primary-500 bg-white shadow-sm hover:shadow ${ring}`;
     if (match.status === 'walkover')
@@ -230,7 +230,7 @@ export default function ScoreboardBracket({
       >
         <div className="w-5 text-[10px] font-mono text-gray-400 border-r border-gray-100 pr-1 text-center">{visibleIndex}</div>
         {slot.seed > 0 && (
-          <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full">{slot.seed}</div>
+          <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[9px] font-bold rounded-full">{slot.seed}</div>
         )}
         <div className="flex-1 truncate font-medium text-gray-800 text-xs" title={slot.name}>
           {slot.name}
@@ -268,7 +268,7 @@ export default function ScoreboardBracket({
             <div className="flex flex-col justify-center w-full min-w-0 px-2">
               {matchResult && (matchResult.status === 'finished' || matchResult.status === 'walkover') ? (
                 <div className="flex items-center gap-1">
-                  <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
+                  <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />
                   <span className="text-sm font-bold text-primary-600 truncate">{displayName}</span>
                   {matchResult.score && <span className="text-[9px] text-gray-900 font-bold ml-auto shrink-0">{matchResult.score}</span>}
                 </div>
@@ -284,7 +284,7 @@ export default function ScoreboardBracket({
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                    {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
+                    {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-primary-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
                   </div>
                 </>
               ) : matchResult && matchResult.status === 'ready' ? (
@@ -299,7 +299,7 @@ export default function ScoreboardBracket({
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                    {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                    {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-gray-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   </div>
                 </>
               ) : (
@@ -342,7 +342,7 @@ export default function ScoreboardBracket({
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
-                  {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-green-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
+                  {matchResult.updatedAt && <span className="flex items-center gap-0.5 bg-primary-700 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none ml-auto"><Timer className="w-2.5 h-2.5" />{formatElapsed(matchResult.updatedAt)}</span>}
                 </div>
               </>
             ) : matchResult && matchResult.status === 'ready' ? (
@@ -356,7 +356,7 @@ export default function ScoreboardBracket({
                   {renderStatusBadge(matchResult)}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
-                  {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                  {matchResult.scheduledTime && matchResult.round === 1 && <span className="bg-gray-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   {matchResult.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
                 </div>
               </>
@@ -368,7 +368,7 @@ export default function ScoreboardBracket({
                     : getSurname(matchResult?.player1Name || matchResult?.player2Name || '')}
                 </span>
                 <div className="flex items-center gap-1">
-                  {matchResult?.scheduledTime && matchResult.round === 1 && <span className="bg-blue-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
+                  {matchResult?.scheduledTime && matchResult.round === 1 && <span className="bg-gray-800 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.scheduledTime}</span>}
                   {matchResult?.courtName && <span className="bg-primary-500 text-white text-[8px] font-bold px-1 py-0.5 rounded leading-none">{matchResult.courtName}</span>}
                 </div>
               </div>
@@ -399,7 +399,7 @@ export default function ScoreboardBracket({
     );
     halfLabels.push(
       <div key="bottom-half" className="absolute flex items-center" style={{ left: labelX, top: bottomHalfCenterY - 10 }}>
-        <span className="text-[9px] font-bold text-orange-400 tracking-wider [writing-mode:vertical-rl]">Right side</span>
+        <span className="text-[9px] font-bold text-primary-400 tracking-wider [writing-mode:vertical-rl]">Right side</span>
       </div>
     );
   }

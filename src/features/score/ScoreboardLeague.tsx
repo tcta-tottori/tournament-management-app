@@ -197,7 +197,7 @@ export default function ScoreboardLeague({
     if (match.status === 'playing') {
       return {
         text: '試合中',
-        className: `bg-green-100 animate-pulse cursor-pointer ${isCurrent ? 'ring-2 ring-yellow-400 ring-inset' : ''}`,
+        className: `bg-primary-100 animate-pulse cursor-pointer ${isCurrent ? 'ring-2 ring-primary-400 ring-inset' : ''}`,
         selected,
         entryId1,
         entryId2,
@@ -211,7 +211,7 @@ export default function ScoreboardLeague({
         text: scoreText,
         className: isWin
           ? 'text-red-600 font-bold cursor-pointer hover:bg-red-50'
-          : 'text-blue-600 cursor-pointer hover:bg-blue-50',
+          : 'text-gray-600 cursor-pointer hover:bg-gray-50',
         selected,
         entryId1,
         entryId2,
@@ -315,7 +315,7 @@ export default function ScoreboardLeague({
                   return (
                     <td key={`cell-${rowIdx}-${colIdx}`} className={`border-2 border-gray-900 bg-gray-200 relative ${matchColW} h-12`}>
                       <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                        <line x1="0" y1="0" x2="100%" y2="100%" stroke="#374151" strokeWidth="1.5" />
+                        <line x1="0" y1="0" x2="100%" y2="100%" stroke="#404040" strokeWidth="1.5" />
                       </svg>
                     </td>
                   );
@@ -372,13 +372,13 @@ export default function ScoreboardLeague({
                 isDone
                   ? 'bg-primary-100 text-primary-700'
                   : isPlaying
-                    ? 'bg-green-100 text-green-700 animate-pulse'
+                    ? 'bg-primary-100 text-primary-700 animate-pulse'
                     : isCurrent
-                      ? 'bg-yellow-200 text-yellow-800 font-bold league-match-blink'
+                      ? 'bg-primary-200 text-primary-800 font-bold league-match-blink'
                       : 'bg-gray-100 text-gray-500'
               }`}
             >
-              {isCurrent && <span className="text-yellow-600 mr-0.5">▶</span>}
+              {isCurrent && <span className="text-primary-600 mr-0.5">▶</span>}
               <span className={isDone ? 'line-through' : ''}>
                 {toCircledNum(a + 1)}-{toCircledNum(b + 1)}
               </span>
@@ -416,8 +416,8 @@ export default function ScoreboardLeague({
     <div className="overflow-auto p-2 sm:p-4 md:p-6" style={{ width: '100%', height: '100%' }}>
       <style>{`
         @keyframes league-match-highlight {
-          0%, 100% { background-color: rgba(253, 224, 71, 0.25); }
-          50% { background-color: rgba(253, 224, 71, 0.65); }
+          0%, 100% { background-color: rgba(212,106,102, 0.25); }
+          50% { background-color: rgba(212,106,102, 0.65); }
         }
         .league-match-blink {
           animation: league-match-highlight 1.5s ease-in-out infinite;

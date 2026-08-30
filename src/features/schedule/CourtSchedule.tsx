@@ -93,9 +93,9 @@ export default function CourtSchedule() {
   const statusColor: Record<string, string> = {
     waiting: 'bg-gray-100 text-gray-500',
     ready: 'bg-primary-50 text-primary-500',
-    playing: 'bg-green-100 text-green-600',
+    playing: 'bg-primary-100 text-primary-600',
     finished: 'bg-primary-50 text-primary-600',
-    walkover: 'bg-amber-100 text-warning',
+    walkover: 'bg-primary-100 text-warning',
   };
 
   return (
@@ -160,7 +160,7 @@ export default function CourtSchedule() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => c.id && handleToggleAvailable(c.id, c.isAvailable)}
-                        className={`w-8 h-8 rounded-full ${c.isAvailable ? 'bg-green-600' : 'bg-danger'}`}
+                        className={`w-8 h-8 rounded-full ${c.isAvailable ? 'bg-primary-600' : 'bg-danger'}`}
                         title={c.isAvailable ? '利用可能' : '使用不可'}
                       />
                       <span className="font-medium text-sm">{c.name}</span>
@@ -185,7 +185,7 @@ export default function CourtSchedule() {
               <h3 className="font-bold text-gray-900 text-sm mb-2">未割当の試合 ({unassignedMatches.length})</h3>
               <ul className="space-y-2 max-h-60 overflow-auto">
                 {unassignedMatches.map(m => (
-                  <li key={m.matchId} className="text-xs bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                  <li key={m.matchId} className="text-xs bg-primary-50 border border-primary-200 rounded-md px-2 py-1.5">
                     <div className="flex justify-between items-center">
                       <span className="font-mono text-gray-500">#{m.matchOrder}</span>
                       <select
@@ -217,7 +217,7 @@ export default function CourtSchedule() {
                   <div key={c.courtId} className={`bg-white rounded-xl shadow-sm border-2 ${c.isAvailable ? 'border-border-main' : 'border-red-200 opacity-60'} flex flex-col`}>
                     <div className="px-4 py-3 border-b border-border-main flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${c.isAvailable ? 'bg-green-600' : 'bg-danger'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full ${c.isAvailable ? 'bg-primary-600' : 'bg-danger'}`} />
                         <h3 className="font-bold text-gray-900">{c.name}</h3>
                       </div>
                       <span className="text-xs text-gray-500">{courtMatches.length}試合</span>

@@ -23,10 +23,10 @@ export default function ConfirmDialog({ open, title, message, danger, confirmLab
       <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px]" onClick={onCancel} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden m-auto animate-[confirmSlideUp_0.2s_ease-out]">
         {/* Header */}
-        <div className={`px-5 py-4 ${danger ? 'bg-gradient-to-r from-red-50 to-orange-50' : 'bg-gradient-to-r from-amber-50 to-orange-50'}`}>
+        <div className={`px-5 py-4 ${danger ? 'bg-gradient-to-r from-primary-50 to-white' : 'bg-gradient-to-r from-primary-50 to-white'}`}>
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl shadow-sm flex items-center justify-center ${danger ? 'bg-red-100' : 'bg-white/80'}`}>
-              <Icon className={`w-5 h-5 ${danger ? 'text-red-500' : 'text-orange-500'}`} />
+              <Icon className={`w-5 h-5 ${danger ? 'text-red-500' : 'text-primary-500'}`} />
             </div>
             <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
           </div>
@@ -50,7 +50,7 @@ export default function ConfirmDialog({ open, title, message, danger, confirmLab
             className={`flex-1 py-2.5 text-sm font-bold text-white rounded-xl shadow-sm transition-all ${
               danger
                 ? 'bg-gradient-to-r from-red-500 to-red-400 hover:from-red-600 hover:to-red-500'
-                : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
+                : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700'
             }`}
           >
             {confirmLabel}

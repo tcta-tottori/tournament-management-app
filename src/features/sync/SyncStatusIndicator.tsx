@@ -1,6 +1,6 @@
 // =============================================
 // 同期ステータスインジケーター
-// ヘッダーバーに表示する小さなステータスアイコン
+// 赤背景のメニュー内に表示する小さなステータスアイコン
 // =============================================
 
 import { useState } from 'react';
@@ -22,7 +22,7 @@ export default function SyncStatusIndicator() {
     <>
       <button
         onClick={() => setPanelOpen(true)}
-        className="relative flex items-center gap-1 px-2 py-1 rounded-lg transition-all hover:bg-white/10"
+        className="relative flex items-center gap-1 px-2 py-1 rounded-lg transition-all hover:bg-white/20"
         title={
           isDisconnectedWarn
             ? `同期が切断中${hasPending ? `（未送信 ${pendingChanges}件）` : ''}`
@@ -34,22 +34,22 @@ export default function SyncStatusIndicator() {
         }
       >
         {isDisconnectedWarn ? (
-          <AlertTriangle className="w-3.5 h-3.5 text-red-300 animate-pulse" />
+          <AlertTriangle className="w-3.5 h-3.5 text-white animate-pulse" />
         ) : isConnecting ? (
-          <Loader2 className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+          <Loader2 className="w-3.5 h-3.5 text-white/80 animate-spin" />
         ) : isConnected ? (
-          <Wifi className="w-3.5 h-3.5 text-emerald-300" />
+          <Wifi className="w-3.5 h-3.5 text-white" />
         ) : (
-          <WifiOff className="w-3.5 h-3.5 text-white/40" />
+          <WifiOff className="w-3.5 h-3.5 text-white/55" />
         )}
         {isConnected && !hasPending && (
-          <span className="text-[10px] font-bold text-emerald-300">
+          <span className="text-[10px] font-bold text-white">
             {peers.length + 1}
           </span>
         )}
         {/* 未送信件数バッジ */}
         {hasPending && (
-          <span className="text-[10px] font-bold text-amber-200">
+          <span className="text-[10px] font-bold text-white">
             {pendingChanges}
           </span>
         )}

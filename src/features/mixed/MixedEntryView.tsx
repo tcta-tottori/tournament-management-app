@@ -24,7 +24,7 @@ function EditableCell({ value, onSave, className = '' }: {
           if (e.key === 'Enter') { onSave(input); setEditing(false); }
           if (e.key === 'Escape') { setInput(value); setEditing(false); }
         }}
-        className="w-full px-1.5 py-0.5 border border-emerald-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+        className="w-full px-1.5 py-0.5 border border-primary-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
         autoFocus
       />
     );
@@ -33,7 +33,7 @@ function EditableCell({ value, onSave, className = '' }: {
   return (
     <span
       onClick={e => { e.stopPropagation(); setInput(value); setEditing(true); }}
-      className={`cursor-pointer hover:bg-emerald-50 px-1 py-0.5 rounded transition-colors ${className}`}
+      className={`cursor-pointer hover:bg-primary-50 px-1 py-0.5 rounded transition-colors ${className}`}
       title="クリックで編集"
     >
       {value || <span className="text-gray-300 italic text-xs">-</span>}
@@ -54,7 +54,7 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
     return (
       <button
         onClick={e => { e.stopPropagation(); setOpen(true); }}
-        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
         title="リーグ移動"
       >
         <ArrowRightLeft size={13} />
@@ -66,7 +66,7 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
     <div className="relative" onClick={e => e.stopPropagation()}>
       <select
         autoFocus
-        className="text-xs border border-emerald-400 rounded-lg px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+        className="text-xs border border-primary-400 rounded-lg px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
         onChange={e => {
           if (e.target.value) {
             if (confirm(`${team.teamName} を ${e.target.value}リーグに移動しますか？\n（該当リーグの試合データはリセットされます）`)) {
@@ -102,8 +102,8 @@ function EntryDefButtons({ status, onSetStatus, size = 'normal' }: {
         onClick={() => onSetStatus(status === 'entry' ? 'none' : 'entry')}
         className={`${base} rounded-lg font-bold transition-all active:scale-95 ${
           status === 'entry'
-            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200 hover:from-emerald-600 hover:to-teal-600'
-            : 'bg-white text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200 hover:border-emerald-300'
+            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-200 hover:from-primary-600 hover:to-primary-700'
+            : 'bg-white text-gray-400 hover:bg-primary-50 hover:text-primary-600 border border-gray-200 hover:border-primary-300'
         }`}
       >
         Entry
@@ -112,8 +112,8 @@ function EntryDefButtons({ status, onSetStatus, size = 'normal' }: {
         onClick={() => onSetStatus(status === 'def' ? 'none' : 'def')}
         className={`${base} rounded-lg font-bold transition-all active:scale-95 ${
           status === 'def'
-            ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md shadow-orange-200 hover:from-orange-600 hover:to-red-600'
-            : 'bg-white text-gray-400 hover:bg-orange-50 hover:text-orange-600 border border-gray-200 hover:border-orange-300'
+            ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-md shadow-gray-200 hover:from-gray-700 hover:to-gray-800'
+            : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600 border border-gray-200 hover:border-gray-300'
         }`}
       >
         DEF
@@ -124,28 +124,21 @@ function EntryDefButtons({ status, onSetStatus, size = 'normal' }: {
 
 /** チームセルの背景色（PC） */
 function cellBg(status: 'none' | 'entry' | 'def'): string {
-  if (status === 'entry') return 'bg-gradient-to-br from-emerald-50/80 to-teal-50/60';
-  if (status === 'def') return 'bg-gradient-to-br from-orange-50/80 to-red-50/40';
+  if (status === 'entry') return 'bg-gradient-to-br from-primary-50/80 to-primary-50/60';
+  if (status === 'def') return 'bg-gradient-to-br from-gray-100/80 to-gray-50/40';
   return 'bg-white';
 }
 
 /** スマホの行背景色 */
 function rowBg(status: 'none' | 'entry' | 'def'): string {
-  if (status === 'entry') return 'bg-emerald-50/50';
-  if (status === 'def') return 'bg-orange-50/50';
+  if (status === 'entry') return 'bg-primary-50/50';
+  if (status === 'def') return 'bg-gray-100/60';
   return '';
 }
 
-/** リーグバッジカラー（Blue先頭で全ページ統一） */
+/** リーグバッジカラー（サイトのトンマナに合わせ、全リーグ共通の無彩色） */
 const LEAGUE_COLORS = [
-  { from: 'from-blue-600', to: 'to-indigo-700', light: 'from-blue-50 to-indigo-50', border: 'border-blue-200' },
-  { from: 'from-emerald-600', to: 'to-teal-700', light: 'from-emerald-50 to-teal-50', border: 'border-emerald-200' },
-  { from: 'from-purple-600', to: 'to-violet-700', light: 'from-purple-50 to-violet-50', border: 'border-purple-200' },
-  { from: 'from-rose-600', to: 'to-pink-700', light: 'from-rose-50 to-pink-50', border: 'border-rose-200' },
-  { from: 'from-amber-600', to: 'to-orange-700', light: 'from-amber-50 to-orange-50', border: 'border-amber-200' },
-  { from: 'from-cyan-600', to: 'to-sky-700', light: 'from-cyan-50 to-sky-50', border: 'border-cyan-200' },
-  { from: 'from-lime-600', to: 'to-green-700', light: 'from-lime-50 to-green-50', border: 'border-lime-200' },
-  { from: 'from-fuchsia-600', to: 'to-purple-700', light: 'from-fuchsia-50 to-purple-50', border: 'border-fuchsia-200' },
+  { from: 'from-gray-600', to: 'to-gray-700', light: 'from-gray-50 to-white', border: 'border-gray-200' },
 ];
 
 export default function MixedEntryView() {
@@ -202,8 +195,8 @@ export default function MixedEntryView() {
               onClick={() => setAllTeamsStatus(allEntry ? 'none' : 'entry')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
                 allEntry
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200 hover:from-emerald-600 hover:to-teal-600'
-                  : 'bg-white text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 border border-gray-200 hover:border-emerald-300'
+                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-200 hover:from-primary-600 hover:to-primary-700'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 border border-gray-200 hover:border-primary-300'
               }`}
             >
               <Users size={15} />
@@ -217,13 +210,13 @@ export default function MixedEntryView() {
               {allTeams.length}ペア / {leagues.length}リーグ
             </span>
             {totalEntry > 0 && (
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-primary-700 font-bold">
                 <CheckCircle size={12} />
                 Entry {totalEntry}
               </span>
             )}
             {totalDef > 0 && (
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-orange-100 text-orange-600 font-bold">
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-primary-600 font-bold">
                 <AlertTriangle size={12} />
                 DEF {totalDef}
               </span>
@@ -287,12 +280,12 @@ export default function MixedEntryView() {
                       {league.teams.length}ペア
                     </span>
                     {entryCount > 0 && (
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded-full">
                         {entryCount}
                       </span>
                     )}
                     {defCount > 0 && (
-                      <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded-full">
                         DEF {defCount}
                       </span>
                     )}
@@ -309,14 +302,14 @@ export default function MixedEntryView() {
                           if (e.key === 'Enter') { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }
                           if (e.key === 'Escape') setEditingCourtId(null);
                         }}
-                        className="px-1.5 py-0.5 text-xs border border-emerald-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
+                        className="px-1.5 py-0.5 text-xs border border-primary-400 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 w-28"
                         autoFocus
                       />
                     </div>
                   ) : (
                     <button
                       onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors mt-0.5"
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 transition-colors mt-0.5"
                     >
                       <MapPin size={11} />
                       {league.courtName || '(コート未設定)'}
@@ -328,8 +321,8 @@ export default function MixedEntryView() {
                   onClick={() => setLeagueAllStatus(league.leagueId, leagueAllEntry ? 'none' : 'entry')}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 shrink-0 ${
                     leagueAllEntry
-                      ? 'bg-emerald-500 text-white shadow-sm hover:bg-emerald-600'
-                      : 'bg-white text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 border border-gray-200'
+                      ? 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
+                      : 'bg-white text-gray-500 hover:bg-primary-50 hover:text-primary-600 border border-gray-200'
                   }`}
                 >
                   <UserCheck size={12} />
@@ -359,14 +352,14 @@ export default function MixedEntryView() {
                                 if (e.key === 'Enter') { updateCourtName(league.leagueId, courtInput); setEditingCourtId(null); }
                                 if (e.key === 'Escape') setEditingCourtId(null);
                               }}
-                              className="px-1.5 py-0.5 text-xs border border-emerald-400 rounded-lg focus:outline-none w-20 text-center"
+                              className="px-1.5 py-0.5 text-xs border border-primary-400 rounded-lg focus:outline-none w-20 text-center"
                               autoFocus
                             />
                           </div>
                         ) : (
                           <button
                             onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                            className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors mb-1.5 mx-auto"
+                            className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-primary-600 transition-colors mb-1.5 mx-auto"
                           >
                             <MapPin size={10} />
                             {league.courtName || '(コート未設定)'}
@@ -376,8 +369,8 @@ export default function MixedEntryView() {
                           onClick={() => setLeagueAllStatus(league.leagueId, leagueAllEntry ? 'none' : 'entry')}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 ${
                             leagueAllEntry
-                              ? 'bg-emerald-500 text-white shadow-sm hover:bg-emerald-600'
-                              : 'bg-white text-gray-500 hover:bg-emerald-50 border border-gray-200'
+                              ? 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
+                              : 'bg-white text-gray-500 hover:bg-primary-50 border border-gray-200'
                           }`}
                         >
                           <UserCheck size={10} />
@@ -546,7 +539,7 @@ function GameRuleConfig({ leagues, tournamentInfo, updateGameRule }: {
                 value={gameRules[teamCount] ?? defaultRules[teamCount] ?? ''}
                 onChange={e => updateGameRule(teamCount, e.target.value)}
                 placeholder={`${teamCount}チームリーグのゲームルール`}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-primary-400 focus:ring-1 focus:ring-primary-200 outline-none"
               />
             </div>
           ))}
@@ -568,7 +561,7 @@ function GameRuleConfig({ leagues, tournamentInfo, updateGameRule }: {
                     const unset = teamCountGroups.find(([c]) => !gameRules[c]);
                     if (unset) updateGameRule(unset[0], preset);
                   }}
-                  className="text-[10px] px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-colors"
+                  className="text-[10px] px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
                 >
                   {preset}
                 </button>

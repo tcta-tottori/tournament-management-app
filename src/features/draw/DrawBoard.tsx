@@ -408,7 +408,7 @@ function NormalDrawBoard() {
                      ドローサイズ: {drawData.drawSize}
                    </div>
                    {hasUnsavedChanges && (
-                     <div className="flex items-center gap-1.5 text-warning text-sm font-medium bg-amber-50 px-3 py-1.5 rounded-md">
+                     <div className="flex items-center gap-1.5 text-warning text-sm font-medium bg-primary-50 px-3 py-1.5 rounded-md">
                        <AlertCircle className="w-4 h-4" />
                        未保存の変更があります
                      </div>
@@ -467,7 +467,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleExportResultJpeg}
                 disabled={!drawData}
-                className="flex items-center gap-1.5 bg-orange-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Image className="w-4 h-4" />
                 <span className="hidden sm:inline">結果</span>JPEG
@@ -475,7 +475,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleExportResultExcel}
                 disabled={!drawData}
-                className="flex items-center gap-1.5 bg-teal-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span className="hidden sm:inline">結果</span>Excel
@@ -483,7 +483,7 @@ function NormalDrawBoard() {
               <button
                 onClick={handleSave}
                 disabled={!hasUnsavedChanges || isSaving}
-                className="flex items-center gap-1.5 bg-green-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
+                className="flex items-center gap-1.5 bg-primary-600 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors text-xs sm:text-sm"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? '保存中...' : '保存'}

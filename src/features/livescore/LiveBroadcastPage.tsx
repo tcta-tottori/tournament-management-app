@@ -291,7 +291,7 @@ export default function LiveBroadcastPage() {
           )}
         </div>
         {!connected && (
-          <p className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+          <p className="mt-2 text-[11px] text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 leading-relaxed">
             同期に接続していないため、入力はこの端末の中だけで記録されます。
             観戦ページへ配信するには、ヘッダーの同期からルームに接続してください。
           </p>
@@ -435,7 +435,7 @@ export default function LiveBroadcastPage() {
                   <button
                     onClick={() => void handleSyncCourt(live, match!)}
                     disabled={busyKey === `court-${live.id}`}
-                    className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 disabled:opacity-40"
+                    className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-2.5 py-1.5 hover:bg-primary-100 disabled:opacity-40"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     コートが「{formatCourtLabel(courtNameOf(match!.courtId)) || '未割当'}」に変わっています — 配信情報を更新
@@ -444,7 +444,7 @@ export default function LiveBroadcastPage() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     onClick={() => openInput(live)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#2d6a4f] to-[#0f3326] rounded-lg px-3 py-2 hover:brightness-110"
+                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#d2504c] to-[#c63834] rounded-lg px-3 py-2 hover:brightness-110"
                   >
                     <Radio className="w-3.5 h-3.5" />スコア入力を開く
                   </button>
@@ -505,7 +505,7 @@ export default function LiveBroadcastPage() {
               <div key={`${m.eventId}-${m.matchId}`} className="bg-white rounded-xl border border-gray-200 p-3">
                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    m.status === 'playing' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                    m.status === 'playing' ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-700'
                   }`}>
                     {m.status === 'playing' ? '試合中' : '準備完了'}
                   </span>
@@ -524,7 +524,7 @@ export default function LiveBroadcastPage() {
                 <button
                   onClick={() => void handleStart(m)}
                   disabled={busyKey === `start-${m.id}`}
-                  className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#2d6a4f] to-[#0f3326] rounded-lg px-3 py-2 hover:brightness-110 disabled:opacity-40"
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#d2504c] to-[#c63834] rounded-lg px-3 py-2 hover:brightness-110 disabled:opacity-40"
                 >
                   <Play className="w-3.5 h-3.5" />配信を開始
                 </button>

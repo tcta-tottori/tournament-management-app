@@ -284,7 +284,7 @@ export default function ScheduleImport() {
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-ocean rounded-lg hover:bg-blue-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-ocean rounded-lg hover:bg-gray-800 transition-colors"
         >
           <Upload className="w-4 h-4" />
           <span>ファイルを選択</span>
@@ -355,8 +355,8 @@ export default function ScheduleImport() {
       {importResult && (
         <div className={`p-3 rounded-lg text-sm ${
           importResult.success
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+            ? 'bg-primary-50 text-primary-800 border border-primary-200'
+            : 'bg-primary-50 text-primary-800 border border-primary-200'
         }`}>
           <div className="flex items-start gap-2">
             {importResult.success

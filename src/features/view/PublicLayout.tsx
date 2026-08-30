@@ -192,8 +192,8 @@ export default function PublicLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-main overflow-hidden">
-      {/* ヘッダー（本アプリと同一） */}
-      <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
+      {/* ヘッダー（本アプリと同一・PCのみ。スマホは流れる表示バーに集約） */}
+      <header className="header-main hidden lg:flex items-center gap-3 px-5 h-[56px] shrink-0 z-30">
         <HeaderBackdrop />
         <button className="header-hamburger-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="メニューを開く">
           <Menu style={{ width: 24, height: 24 }} />
@@ -210,9 +210,14 @@ export default function PublicLayout() {
       </header>
 
       {/* 流れる表示バー（本アプリと同一） */}
-      <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
+      <div className="info-bar flex items-center shrink-0 h-11 lg:h-9 overflow-hidden text-xs sticky top-0 z-20">
         <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
           <div className="info-ticker flex items-center h-full whitespace-nowrap">
+            {/* スマホはヘッダーが無いので、先頭に大会名を流す */}
+            <span className="info-ticker-item info-ticker-lead">
+              <span>{tournamentName || '観戦用ページ'}</span>
+              <span className="info-ticker-dot" />
+            </span>
             {tickerItems.length > 0 ? tickerItems.map((item, i) => (
               <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                 {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
@@ -220,9 +225,24 @@ export default function PublicLayout() {
                 {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
               </span>
             )) : (
-              <span className="info-ticker-item"><span>{tournamentName || '観戦用ページ'}</span></span>
+              <span className="info-ticker-item info-ticker-fallback"><span>{tournamentName || '観戦用ページ'}</span></span>
             )}
           </div>
+        </div>
+
+        {/* スマホ: 右端に現在ページ名とメニューボタン */}
+        <div className="flex lg:hidden items-center gap-1.5 shrink-0 pl-2 pr-2">
+          <div className="header-page-name info-bar-page-name min-w-0">
+            <CurrentIcon style={{ width: 15, height: 15 }} className="shrink-0" />
+            <span className="truncate">{current.label}</span>
+          </div>
+          <button
+            className="header-hamburger-btn header-hamburger-btn-sm"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="メニューを開く"
+          >
+            <Menu style={{ width: 20, height: 20 }} />
+          </button>
         </div>
       </div>
 
@@ -242,7 +262,7 @@ export default function PublicLayout() {
               <button key={item.path}
                 className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
                 onClick={() => go(item.path)}>
-                <item.icon className="shrink-0" style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 4px rgba(212,225,87,0.5))' : undefined }} />
+                <item.icon className="shrink-0" style={{ width: 18, height: 18 }} />
                 <span>{item.label}</span>
               </button>
             );
@@ -251,7 +271,7 @@ export default function PublicLayout() {
         <div className="hamburger-drawer-footer">
           <div className="drawer-action-row">
             {sync.hasRoom && <SyncBadge sync={sync} />}
-            <span className="text-[10px] bg-white/10 border border-white/15 rounded-full px-2.5 py-1 font-bold text-white/80">観戦用ページ</span>
+            <span className="text-[10px] bg-white/15 border border-white/30 rounded-full px-2.5 py-1 font-bold text-white">観戦用ページ</span>
           </div>
           <img src={`${import.meta.env.BASE_URL}logo-tcta.png`} alt="鳥取市テニス協会"
             className="hamburger-drawer-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -330,7 +350,7 @@ function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
       <button
         onClick={handleRetry}
         disabled={retrying}
-        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-60 transition-colors"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
         再読み込み
@@ -344,9 +364,10 @@ function SyncBadge({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
   const connecting = sync.connectionState === 'connecting' || sync.connectionState === 'reconnecting';
   const label = connected ? 'ライブ受信中' : connecting ? '接続中...' : sync.serverConfigured ? '切断' : 'ローカル同期';
   const Icon = connected ? Wifi : WifiOff;
+  // 白地のヘッダーに合わせ、受信中だけ赤、それ以外は無彩色にする
   const color = connected
-    ? 'bg-emerald-500/25 border-emerald-300/60 text-emerald-50'
-    : connecting ? 'bg-amber-500/25 border-amber-300/60 text-amber-50' : 'bg-white/15 border-white/20 text-white/80';
+    ? 'bg-primary-50 border-primary-200 text-primary-700'
+    : connecting ? 'bg-gray-50 border-gray-200 text-gray-600' : 'bg-white border-gray-200 text-gray-500';
   return (
     <span className={`flex items-center gap-1 text-[10px] md:text-xs rounded-full px-2 py-1 font-bold border ${color}`} title={`ルーム: ${sync.roomCode}`}>
       <Icon className="w-3 h-3" />{label}

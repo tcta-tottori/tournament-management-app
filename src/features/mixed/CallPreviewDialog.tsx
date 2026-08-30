@@ -240,13 +240,13 @@ export default function CallPreviewDialog({
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[92vw] max-w-lg max-h-[85vh] overflow-hidden flex flex-col z-[210]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-4 py-2.5 bg-blue-600 text-white flex items-center justify-between shrink-0">
+        <div className="px-4 py-2.5 bg-gray-600 text-white flex items-center justify-between shrink-0">
           <div>
             <h3 className="text-sm font-bold flex items-center gap-2">
               <Volume2 size={14} />
               コールプレビュー
             </h3>
-            <p className="text-[10px] text-blue-200 mt-0.5">{catLabel} {roundLabel}</p>
+            <p className="text-[10px] text-gray-200 mt-0.5">{catLabel} {roundLabel}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
             <X size={16} />
@@ -254,7 +254,7 @@ export default function CallPreviewDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-          <p className="text-[10px] text-gray-500">苗字の読み仮名を確認・修正してください。コールは<span className="font-bold text-amber-600">苗字のみ</span>で行います。</p>
+          <p className="text-[10px] text-gray-500">苗字の読み仮名を確認・修正してください。コールは<span className="font-bold text-primary-600">苗字のみ</span>で行います。</p>
 
           {[{ team: team1, prefix: 't1', league: match.team1League },
             { team: team2, prefix: 't2', league: match.team2League }].map(({ team, prefix, league }) => (
@@ -280,7 +280,7 @@ export default function CallPreviewDialog({
                       type="text"
                       value={entry.furigana}
                       onChange={e => updateFurigana(entry.key, e.target.value)}
-                      className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none"
+                      className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 outline-none"
                       placeholder={entry.type === 'name' ? '苗字の読み仮名' : '読み仮名'}
                     />
                   </div>
@@ -289,8 +289,8 @@ export default function CallPreviewDialog({
             </div>
           ))}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-            <p className="text-[10px] font-bold text-blue-600 mb-1">読み上げテキスト</p>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+            <p className="text-[10px] font-bold text-gray-600 mb-1">読み上げテキスト</p>
             <p className="text-[11px] text-gray-800 leading-relaxed whitespace-pre-wrap">{previewText}</p>
           </div>
         </div>
@@ -300,7 +300,7 @@ export default function CallPreviewDialog({
             キャンセル
           </button>
           <button onClick={handleSaveAndSpeak} disabled={saving}
-            className="flex-1 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5">
+            className="flex-1 py-2 rounded-lg text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5">
             {saving ? <><Save size={12} />保存中...</> : <><Volume2 size={12} />保存してコール</>}
           </button>
         </div>

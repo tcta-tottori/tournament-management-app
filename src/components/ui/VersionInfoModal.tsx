@@ -23,8 +23,29 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'Ver 2.4',
     date: '2026-07-26',
-    highlights: '賞状の印刷メニュー・音声コールを内蔵音声に・リーグのコート運用・3位決定戦',
+    highlights: '画面の配色を協会サイトに統一・賞状の印刷メニュー・音声コールを内蔵音声に・リーグのコート運用・3位決定戦',
     timeGroups: [
+      {
+        time: '—',
+        summary: 'ヘッダーとメニュー',
+        changes: [
+          { type: 'design', text: 'ヘッダーの背景を協会サイトのキービジュアル（白地に赤・淡赤・白の四角が浮かぶ構図）のアニメーションにしました。四角が左から右へゆっくり流れ、ズームしながら現れて消えます' },
+          { type: 'design', text: 'メニュー（スライドメニュー・PCのサイドバー）とメニューボタンを赤背景・白文字にしました。現在地は白地に赤文字で反転します' },
+          { type: 'design', text: 'PCではメニューを画面の上端から立て、ヘッダーの高さぶんまで表示するようにしました' },
+          { type: 'design', text: 'スマホではヘッダーをやめ、流れる表示バーに大会名を流し、右端に現在のページ名とメニューボタンを置きました（画面を縦に広く使えます）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: '画面の配色（協会サイトに統一）',
+        changes: [
+          { type: 'design', text: 'アプリ全体の配色を協会サイトと同じ「白ベース＋赤の差し色」に統一しました（結果画像と同じトンマナ）' },
+          { type: 'design', text: 'ヘッダー・メニュー・サイドバーを白地にし、下端の赤いラインと現在地の赤で見出しを立てました' },
+          { type: 'design', text: 'リーグごと・種目ごとの色分け（虹色）と金・銀・銅のメダル配色をやめ、枠線やバッジは無彩色のグレーに。赤は勝者・1位・進行中など要点だけに使います' },
+          { type: 'design', text: 'ライブスコアのスコアボードを墨地＋赤に変更。協会HPに貼り付けたときもサイトになじむようにしました' },
+          { type: 'chore', text: 'コート使用終了の警告点滅（黄→赤）と、時間割Excelに合わせた種目の色分けは、見分けが必要なため従来どおりです' },
+        ],
+      },
       {
         time: '—',
         summary: '印刷メニュー（賞状）',
@@ -546,9 +567,9 @@ const CHANGELOG: ChangelogEntry[] = [
 ];
 
 const TYPE_CONFIG = {
-  feat:   { label: '新機能', icon: Sparkles,   color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  fix:    { label: '修正',   icon: Bug,         color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
-  design: { label: 'デザイン', icon: Paintbrush, color: 'text-violet-600', bg: 'bg-violet-50',  border: 'border-violet-200' },
+  feat:   { label: '新機能', icon: Sparkles,   color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-200' },
+  fix:    { label: '修正',   icon: Bug,         color: 'text-primary-600',   bg: 'bg-primary-50',   border: 'border-primary-200' },
+  design: { label: 'デザイン', icon: Paintbrush, color: 'text-gray-600', bg: 'bg-gray-50',  border: 'border-gray-200' },
   chore:  { label: 'その他', icon: Wrench,      color: 'text-gray-500',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 } as const;
 
@@ -591,18 +612,18 @@ export default function VersionInfoModal({ open, onClose }: Props) {
 
         {/* ヘッダー */}
         <div className="relative overflow-hidden shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-[#0a2618]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800" />
           <div className="absolute inset-0 opacity-20"
-            style={{ background: 'radial-gradient(circle at 30% 40%, rgba(212,225,87,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(61,126,166,0.3) 0%, transparent 50%)' }} />
+            style={{ background: 'radial-gradient(circle at 30% 40%, rgba(198,56,52,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(118,118,118,0.3) 0%, transparent 50%)' }} />
           <div className="absolute -top-6 -right-6 w-28 h-28 border border-white/[0.08] rounded-full" />
           <div className="absolute -bottom-4 -left-4 w-20 h-20 border border-white/[0.06] rounded-full" />
 
           <div className="relative px-5 pt-5 pb-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-full bg-accent/20 border border-accent/30">
-                  <Sparkles className="w-3 h-3 text-accent" />
-                  <span className="text-[11px] font-bold text-accent tracking-wide">大会運営システム</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-full bg-white/15 border border-white/25">
+                  <Sparkles className="w-3 h-3 text-white" />
+                  <span className="text-[11px] font-bold text-white tracking-wide">大会運営システム</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <h2 className="text-2xl font-bold text-white">Ver 2.4</h2>

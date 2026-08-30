@@ -200,7 +200,7 @@ export default function DrawGenerator() {
               </div>
 
               {savedDraw ? (
-                <div className="bg-green-50 text-green-600 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-green-200">
+                <div className="bg-primary-50 text-primary-600 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 border border-primary-200">
                   <Save className="w-4 h-4" />
                   保存済みドローあり
                 </div>
@@ -225,7 +225,7 @@ export default function DrawGenerator() {
                 <button
                   onClick={handleSaveDraw}
                   disabled={!generatedDraw || isSaving}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   {isSaving ? '保存中...' : '確定して保存'}

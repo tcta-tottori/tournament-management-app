@@ -167,8 +167,8 @@ export default function BulkCallOverlay() {
 
   return (
     <div className="fixed top-[56px] right-3 z-50 w-80">
-      <div className="bg-white rounded-xl shadow-2xl border border-emerald-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 flex items-center gap-2">
+      <div className="bg-white rounded-xl shadow-2xl border border-primary-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-2.5 flex items-center gap-2">
           <div className="relative">
             {isPreparing
               ? <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -207,33 +207,33 @@ export default function BulkCallOverlay() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-gray-500 font-medium">進捗</span>
-              <span className="text-xs font-bold text-emerald-600">{progress}%</span>
+              <span className="text-xs font-bold text-primary-600">{progress}%</span>
             </div>
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-700"
+                className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-700"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
 
           {isPreparing && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <Loader2 className="w-4 h-4 text-emerald-500 shrink-0 animate-spin" />
-              <p className="text-[11px] text-emerald-700 font-medium">
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
+              <Loader2 className="w-4 h-4 text-primary-500 shrink-0 animate-spin" />
+              <p className="text-[11px] text-primary-700 font-medium">
                 全{items.length}コート分の音声を読み込んでから、続けてコールします
               </p>
             </div>
           )}
 
           {current && isActive && !isPreparing && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <Volume2 className="w-4 h-4 text-emerald-500 shrink-0 animate-pulse" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
+              <Volume2 className="w-4 h-4 text-primary-500 shrink-0 animate-pulse" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-emerald-800 truncate">
+                <p className="text-xs font-bold text-primary-800 truncate">
                   {current.courtName}番コート
                 </p>
-                <p className="text-[10px] text-emerald-600 truncate">
+                <p className="text-[10px] text-primary-600 truncate">
                   {current.player1Name} vs {current.player2Name}
                 </p>
               </div>
@@ -247,11 +247,11 @@ export default function BulkCallOverlay() {
                   key={`${item.courtName}-${item.matchId}`}
                   className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold transition-all ${
                     isPreparing
-                      ? (i < preparedCount ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400')
+                      ? (i < preparedCount ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400')
                       : i < currentIndex
-                        ? 'bg-emerald-100 text-emerald-600'
+                        ? 'bg-primary-100 text-primary-600'
                         : i === currentIndex
-                          ? 'bg-emerald-600 text-white ring-2 ring-emerald-300 animate-pulse'
+                          ? 'bg-primary-600 text-white ring-2 ring-primary-300 animate-pulse'
                           : 'bg-gray-100 text-gray-400'
                   }`}
                 >

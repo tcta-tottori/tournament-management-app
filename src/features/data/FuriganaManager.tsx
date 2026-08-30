@@ -238,24 +238,24 @@ export default function FuriganaManager() {
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-medium text-gray-800 flex items-center gap-1">
-          <Database className="w-4 h-4 text-emerald-600" />
+          <Database className="w-4 h-4 text-primary-600" />
           ふりがなDB管理
         </h3>
-        <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
+        <span className="text-xs font-semibold bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
           登録数: {furiganaDict?.length || 0}件
         </span>
       </div>
 
       {status && (
         <div className={`mb-4 p-3 rounded-md text-sm flex items-start gap-2 ${
-          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          status.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-primary-50 text-primary-700 border border-primary-200'
         }`}>
           {status.isError ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />}
           <div className="flex-1">
             <span className="font-medium">{status.message}</span>
             {status.progress !== undefined && (
-               <div className="w-full bg-emerald-200 rounded-full h-1.5 mt-2">
-                 <div className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${status.progress}%` }}></div>
+               <div className="w-full bg-primary-200 rounded-full h-1.5 mt-2">
+                 <div className="bg-primary-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${status.progress}%` }}></div>
                </div>
             )}
           </div>
@@ -266,24 +266,24 @@ export default function FuriganaManager() {
         <button
           onClick={handleAIAssign}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-100 rounded-lg transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-gray-50 to-white hover:from-gray-100 hover:to-white border border-gray-100 rounded-lg transition-colors disabled:opacity-50"
         >
-          <Cpu className="w-6 h-6 text-indigo-600" />
-          <span className="text-sm font-semibold text-indigo-900">AI自動付与</span>
-          <span className="text-xs text-indigo-600 text-center">未登録の選手にkuromojiでふりがなを生成</span>
+          <Cpu className="w-6 h-6 text-gray-600" />
+          <span className="text-sm font-semibold text-gray-900">AI自動付与</span>
+          <span className="text-xs text-gray-600 text-center">未登録の選手にkuromojiでふりがなを生成</span>
         </button>
 
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-100 rounded-lg transition-colors disabled:opacity-50 relative"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-primary-50 to-white hover:from-primary-100 hover:to-white border border-primary-100 rounded-lg transition-colors disabled:opacity-50 relative"
         >
           <div className="flex items-center gap-1">
-            <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
-            <Upload className="w-4 h-4 text-emerald-600" />
+            <FileSpreadsheet className="w-6 h-6 text-primary-600" />
+            <Upload className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-emerald-900">Excelインポート</span>
-          <span className="text-xs text-emerald-600 text-center">修正したExcelを読み込み優先更新</span>
+          <span className="text-sm font-semibold text-primary-900">Excelインポート</span>
+          <span className="text-xs text-primary-600 text-center">修正したExcelを読み込み優先更新</span>
           <input 
             type="file" 
             accept=".xlsx, .xls"
@@ -296,14 +296,14 @@ export default function FuriganaManager() {
         <button
           onClick={handleExportMissing}
           disabled={isProcessing}
-          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-100 rounded-lg transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center p-3 gap-2 bg-gradient-to-br from-primary-50 to-white hover:from-primary-100 hover:to-white border border-primary-100 rounded-lg transition-colors disabled:opacity-50"
         >
           <div className="flex items-center gap-1">
-            <FileSpreadsheet className="w-6 h-6 text-orange-600" />
-            <Download className="w-4 h-4 text-orange-600" />
+            <FileSpreadsheet className="w-6 h-6 text-primary-600" />
+            <Download className="w-4 h-4 text-primary-600" />
           </div>
-          <span className="text-sm font-semibold text-orange-900">未登録エクスポート</span>
-          <span className="text-xs text-orange-600 text-center">ふりがなが無い選手Excelに出力</span>
+          <span className="text-sm font-semibold text-primary-900">未登録エクスポート</span>
+          <span className="text-xs text-primary-600 text-center">ふりがなが無い選手Excelに出力</span>
         </button>
       </div>
 
@@ -321,9 +321,9 @@ export default function FuriganaManager() {
                   <div className="w-1/2 font-medium text-gray-800 flex items-center gap-2">
                     {dict.name}
                     {dict.type === 'auto' ? (
-                      <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded">AI</span>
+                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">AI</span>
                     ) : (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded">Excel</span>
+                      <span className="text-[10px] bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded">Excel</span>
                     )}
                   </div>
                   <div className="w-1/2 text-gray-600">{dict.furigana}</div>

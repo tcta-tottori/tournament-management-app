@@ -120,47 +120,47 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
   };
 
   const btnClass = size === 'sm'
-    ? 'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 shadow-sm hover:bg-sky-100 active:scale-95 transition-all whitespace-nowrap'
-    : 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 shadow-sm hover:shadow hover:bg-sky-100 hover:border-sky-300 transition-all active:scale-95 whitespace-nowrap';
+    ? 'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 active:scale-95 transition-all whitespace-nowrap'
+    : 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:shadow hover:bg-gray-100 hover:border-gray-300 transition-all active:scale-95 whitespace-nowrap';
 
   return (
     <>
       <button onClick={(e) => { e.stopPropagation(); setIsOpen(true); }} className={btnClass}>
-        <ImageIcon size={size === 'sm' ? 12 : 14} className="text-sky-600" />
+        <ImageIcon size={size === 'sm' ? 12 : 14} className="text-gray-600" />
         {label}
       </button>
 
       {isOpen && createPortal(
         <div
-          className="fixed inset-0 bg-sky-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-6xl max-h-[92vh] border border-sky-100"
+            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-6xl max-h-[92vh] border border-gray-100"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-4 py-3 bg-gradient-to-r from-sky-50 to-white border-b border-sky-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-sky-900 text-sm flex items-center gap-2 min-w-0">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-sky-400 to-sky-600 text-white shadow-sm shrink-0">
+            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2 min-w-0">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm shrink-0">
                   <ImageIcon size={13} />
                 </span>
                 <span className="truncate">{opts.event.name} 結果プレビュー</span>
               </h3>
               <div className="flex items-center gap-2 shrink-0">
                 {/* 操作はこのバーに集約する（ロゴの有無・保存・閉じる） */}
-                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-sky-700 whitespace-nowrap">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={showLogo}
                     onChange={e => toggleLogo(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-sky-600 cursor-pointer"
+                    className="w-3.5 h-3.5 accent-gray-600 cursor-pointer"
                   />
                   協会ロゴを入れる
                 </label>
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg shadow hover:from-sky-600 hover:to-sky-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow hover:from-gray-600 hover:to-gray-700 transition-colors active:scale-95"
                     title="JPEGで保存"
                     aria-label="JPEGで保存"
                   >
@@ -169,7 +169,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 text-sky-500 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   aria-label="閉じる"
                   title="閉じる"
                 >
@@ -179,8 +179,8 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
             </div>
 
             {/* 大会名の修整（画像右上に印字される文字列） */}
-            <div className="px-4 py-2.5 border-b border-sky-100 bg-white shrink-0">
-              <label className="text-[10px] font-semibold text-sky-700/70 block mb-1">
+            <div className="px-4 py-2.5 border-b border-gray-100 bg-white shrink-0">
+              <label className="text-[10px] font-semibold text-gray-700/70 block mb-1">
                 大会名（画像に印字されます）
               </label>
               <div className="flex items-center gap-2">
@@ -191,12 +191,12 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                   onBlur={() => setAppliedName(nameDraft)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setAppliedName(nameDraft); } }}
                   placeholder="大会名を入力"
-                  className="flex-1 min-w-0 border border-sky-200 rounded-lg px-3 py-1.5 text-[13px] font-medium bg-sky-50/40 focus:bg-white focus:border-sky-400 focus:ring-[3px] focus:ring-sky-500/10 outline-none transition-all"
+                  className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-1.5 text-[13px] font-medium bg-gray-50/40 focus:bg-white focus:border-gray-400 focus:ring-[3px] focus:ring-gray-500/10 outline-none transition-all"
                 />
                 <button
                   onClick={handleSaveName}
                   disabled={!nameDraft.trim() || nameDraft.trim() === opts.tournament.name}
-                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-40 disabled:hover:bg-sky-600 transition-colors active:scale-95"
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-gray-600 hover:bg-gray-700 disabled:opacity-40 disabled:hover:bg-gray-600 transition-colors active:scale-95"
                   title="大会データにも保存する"
                 >
                   {nameSaved ? <Check size={13} /> : <Save size={13} />}
@@ -214,7 +214,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
 
             <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
               {isLoading && (
-                <div className="flex flex-col items-center gap-2 text-sky-400">
+                <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Loader2 size={32} className="animate-spin" />
                   <span className="text-sm font-medium">画像を生成中...</span>
                 </div>
@@ -226,7 +226,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 <img
                   src={dataUrl}
                   alt={`${opts.event.name}結果`}
-                  className="max-w-full h-auto object-contain shadow-sm border border-sky-100 bg-white rounded"
+                  className="max-w-full h-auto object-contain shadow-sm border border-gray-100 bg-white rounded"
                   style={{ maxHeight: '100%' }}
                 />
               )}

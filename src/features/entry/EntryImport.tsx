@@ -245,14 +245,14 @@ export default function EntryImport({ onClose }: EntryImportProps) {
   const renderStatusBadge = (row: ImportRow) => {
     if (row.status === 'matched' && row.matchedEventId) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
           一致
         </span>
       );
     }
     if (row.status === 'partial') {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
           {row.matchedPlayerId && row.isDoubles && !row.matchedPartnerId ? 'パートナー未一致' : '種目不一致'}
         </span>
       );
@@ -268,7 +268,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
     if (!row.isDoubles || !row.rawPartnerName) return null;
     if (row.matchedPartnerId) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
           一致
         </span>
       );
@@ -287,7 +287,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+            <FileSpreadsheet className="w-5 h-5 text-gray-600" />
             エントリーデータの一括インポート
           </h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -300,19 +300,19 @@ export default function EntryImport({ onClose }: EntryImportProps) {
           {!summary ? (
              <div
                className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
-                 isDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:bg-gray-50'
+                 isDragOver ? 'border-gray-500 bg-gray-50' : 'border-gray-300 hover:bg-gray-50'
                }`}
                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
                onDragLeave={() => setIsDragOver(false)}
                onDrop={handleDrop}
              >
                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
-               <Upload className={`w-12 h-12 mx-auto mb-4 ${isDragOver ? 'text-indigo-500' : 'text-gray-400'}`} />
+               <Upload className={`w-12 h-12 mx-auto mb-4 ${isDragOver ? 'text-gray-500' : 'text-gray-400'}`} />
                <h3 className="text-lg font-bold text-gray-700 mb-2">Excel/CSVファイルをアップロード</h3>
                <p className="text-sm text-gray-500 mb-6">ここへファイルをドラッグ＆ドロップ、または下のボタンから選択</p>
                <button
                  onClick={() => fileInputRef.current?.click()}
-                 className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors"
+                 className="px-6 py-2.5 bg-gray-600 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-colors"
                >
                  ファイルを選択
                </button>
@@ -330,11 +330,11 @@ export default function EntryImport({ onClose }: EntryImportProps) {
           ) : (
             <div className="flex flex-col h-full gap-4">
                {/* Summary Alert */}
-               <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex items-start gap-3">
-                 <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+               <div className="bg-gray-50 border border-gray-100 p-4 rounded-lg flex items-start gap-3">
+                 <CheckCircle2 className="w-5 h-5 text-gray-600 shrink-0 mt-0.5" />
                  <div>
-                   <h4 className="font-bold text-indigo-900">ファイルの読み込みが完了しました</h4>
-                   <p className="text-sm text-indigo-700 mt-1">
+                   <h4 className="font-bold text-gray-900">ファイルの読み込みが完了しました</h4>
+                   <p className="text-sm text-gray-700 mt-1">
                      全 {summary.total} 件中、
                      <strong className="font-bold">{summary.matched} 件</strong> が完全一致、
                      <strong className="font-bold">{summary.partial} 件</strong> が部分一致です。
@@ -349,7 +349,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
                      <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                        <tr>
                          <th className="px-4 py-2.5 text-left border-b w-10">
-                           <input type="checkbox" className="rounded text-indigo-600"
+                           <input type="checkbox" className="rounded text-gray-600"
                              checked={importRows.every(r => r.selected)}
                              onChange={e => setImportRows(importRows.map(r => ({ ...r, selected: e.target.checked })))}
                            />
@@ -365,7 +365,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
                        {importRows.map((row, idx) => (
                          <tr key={idx} className={row.selected ? '' : 'bg-gray-50 opacity-50'}>
                            <td className="px-4 py-2">
-                             <input type="checkbox" className="rounded text-indigo-600"
+                             <input type="checkbox" className="rounded text-gray-600"
                                checked={row.selected}
                                onChange={e => {
                                  const copy = [...importRows];
@@ -423,7 +423,7 @@ export default function EntryImport({ onClose }: EntryImportProps) {
           <button
             onClick={handleRegister}
             disabled={!summary || importRows.filter(r => r.selected).length === 0 || isProcessing}
-            className="px-5 py-2 font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2 font-medium bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isProcessing ? (
                <><RefreshCw className="w-4 h-4 animate-spin" /> 処理中...</>

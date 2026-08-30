@@ -627,7 +627,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ---- ブラケット枠 ----
   const bracketAreaY = paddingY + headerH;
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+  ctx.shadowColor = 'rgba(20,20,20, 0.08)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, bracketAreaY, tableW, bracketH, 18, COL.white);
@@ -1196,7 +1196,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   // ---- カード ----
   const cardY = paddingY + headerH;
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+  ctx.shadowColor = 'rgba(20,20,20, 0.08)';
   ctx.shadowBlur = 22;
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, cardY, tableW, cardH, 18, COL.white);
