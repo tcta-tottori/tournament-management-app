@@ -543,13 +543,13 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     };
   })();
   // ブロックの高さ（見出し → 勝者 → 横線 → 選手行）。
-  // ダブルスはペアを1人ずつ2行で表示するため、その分の高さを見込む。
+  // 勝者は優勝表示と同じく苗字のみの1行、所属はその下に1人ずつ並べる。
   const thirdWinner = thirdBlock
     ? (thirdBlock.left.entryId === thirdBlock.winnerEntryId ? thirdBlock.left : thirdBlock.right)
     : null;
-  const thirdNameLines = thirdWinner ? pairNameLines(thirdWinner.name, isDoubles).length : 0;
+  const thirdNameLines = thirdWinner ? 1 : 0;
   const thirdAffLines = thirdWinner
-    ? pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, thirdNameLines).length
+    ? pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, isDoubles ? 2 : 1).length
     : 0;
   const thirdRowLines = isDoubles ? 2 : 1;
   const thirdBlockH = thirdBlock && thirdWinner
@@ -916,13 +916,13 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     const labelY = blockTop + 10 + T.labelPx / 2;
     drawText(ctx, '3位決定戦', centerX, labelY, T.labelPx, 'center', COL.gray500, 'bold');
 
-    // 勝者（3位）: 氏名（ダブルスは2行）→ 所属 → スコア
-    const winnerLines = pairNameLines(thirdWinner.name, isDoubles);
+    // 勝者（3位）: 氏名（ダブルスは苗字のみ1行）→ 所属 → スコア
+    const winnerLines = [isDoubles ? surnameLabel(thirdWinner.name) : thirdWinner.name];
     let cursor = labelY + T.labelPx / 2 + 8;
     const nameYs = winnerLines.map((_, i) => cursor + T.namePx / 2 + i * (T.namePx + 3));
     cursor = nameYs[nameYs.length - 1] + T.namePx / 2;
     // 所属（ダブルスは1人ずつ2行）
-    const winnerAffLines = pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, winnerLines.length);
+    const winnerAffLines = pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, isDoubles ? 2 : 1);
     const affYs = winnerAffLines.map((_, i) => cursor + 6 + T.affPx / 2 + i * (T.affPx + 3));
     if (affYs.length > 0) cursor = affYs[affYs.length - 1] + T.affPx / 2;
     const scoreY = score.main ? cursor + 4 + T.scorePx / 2 : cursor;
