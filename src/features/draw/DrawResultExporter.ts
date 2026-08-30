@@ -296,6 +296,15 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   for (let side = 0; side < 2; side++) {
     const base = side * halfSlots;
     let row = 0;
+    // 2人ドロー（決勝だけ）は片側1スロットなので、ペアの繰り返しには入れない。
+    // 入れてしまうと左右の山をまたいでペアにしてしまい、
+    // 左右の行が1行ずれて決勝の線が段違いになる。
+    if (halfSlots === 1) {
+      slotRow[base] = 0;
+      row = (slotMap.get(base + 1)?.isBye ?? true) ? 0 : 1;
+      halfRows[side] = row;
+      continue;
+    }
     for (let m = 0; m < halfSlots / 2; m++) {
       const t = base + m * 2;
       const b = t + 1;
