@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Swords, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList, RefreshCw, Activity, BarChart2 } from 'lucide-react';
+import { Trophy, Swords, Radio, Info, Wifi, WifiOff, Network, Menu, X, AlertTriangle, ClipboardList, RefreshCw, Activity, BarChart2, ArrowRight } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -192,32 +192,34 @@ export default function PublicLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-main overflow-hidden">
-      {/* ヘッダー（本アプリと同一・PCのみ。スマホは流れる表示バーに集約） */}
-      <header className="header-main hidden lg:flex items-center gap-3 px-5 h-[56px] shrink-0 z-30">
+      {/* ヘッダー（本アプリと同一。PC=ページ名+大会名 / スマホ=大会名+メニューボタン） */}
+      <header className="header-main flex items-center gap-3 px-4 lg:px-5 h-[56px] shrink-0 z-30">
         <HeaderBackdrop />
-        <button className="header-hamburger-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="メニューを開く">
-          <Menu style={{ width: 24, height: 24 }} />
-        </button>
         <div className="header-page-name min-w-0">
           <CurrentIcon style={{ width: 16, height: 16 }} className="shrink-0" />
           <span className="truncate">{current.label}</span>
         </div>
-        <div className="flex-1" />
         <div className="header-title-right min-w-0">
           <p className="header-org-name">鳥取市テニス協会</p>
           <h1 className="header-title truncate">{tournamentName || '大会運営システム'}</h1>
         </div>
+        {/* メニューボタン（開くと × に変わる） */}
+        <button
+          className="header-menu-btn"
+          onClick={() => setMenuOpen(v => !v)}
+          aria-label={menuOpen ? 'メニューを閉じる' : 'メニューを開く'}
+          aria-expanded={menuOpen}
+        >
+          {menuOpen
+            ? <X style={{ width: 26, height: 26 }} strokeWidth={2} />
+            : <Menu style={{ width: 26, height: 26 }} strokeWidth={2} />}
+        </button>
       </header>
 
       {/* 流れる表示バー（本アプリと同一） */}
-      <div className="info-bar flex items-center shrink-0 h-11 lg:h-9 overflow-hidden text-xs sticky top-0 z-20">
+      <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
         <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
           <div className="info-ticker flex items-center h-full whitespace-nowrap">
-            {/* スマホはヘッダーが無いので、先頭に大会名を流す */}
-            <span className="info-ticker-item info-ticker-lead">
-              <span>{tournamentName || '観戦用ページ'}</span>
-              <span className="info-ticker-dot" />
-            </span>
             {tickerItems.length > 0 ? tickerItems.map((item, i) => (
               <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                 {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
@@ -225,56 +227,35 @@ export default function PublicLayout() {
                 {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
               </span>
             )) : (
-              <span className="info-ticker-item info-ticker-fallback"><span>{tournamentName || '観戦用ページ'}</span></span>
+              <span className="info-ticker-item"><span>{tournamentName || '観戦用ページ'}</span></span>
             )}
           </div>
         </div>
-
-        {/* スマホ: 右端に現在ページ名とメニューボタン */}
-        <div className="flex lg:hidden items-center gap-1.5 shrink-0 pl-2 pr-2">
-          <div className="header-page-name info-bar-page-name min-w-0">
-            <CurrentIcon style={{ width: 15, height: 15 }} className="shrink-0" />
-            <span className="truncate">{current.label}</span>
-          </div>
-          <button
-            className="header-hamburger-btn header-hamburger-btn-sm"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="メニューを開く"
-          >
-            <Menu style={{ width: 20, height: 20 }} />
-          </button>
-        </div>
       </div>
 
-      {/* ハンバーガーメニュー */}
-      <div className={`hamburger-overlay ${menuOpen ? 'hamburger-overlay-visible' : ''}`} onClick={() => setMenuOpen(false)} />
-      <div className={`hamburger-drawer ${menuOpen ? 'hamburger-drawer-open' : ''}`}>
-        <div className="hamburger-drawer-header">
-          <span>メニュー</span>
-          <button className="hamburger-icon-btn" onClick={() => setMenuOpen(false)} aria-label="メニューを閉じる">
-            <X style={{ width: 20, height: 20 }} />
-          </button>
-        </div>
-        <div className="hamburger-drawer-list">
+      {/* 全画面メニュー（ヘッダーは出したまま、その下いっぱいに開く） */}
+      <div className={`fullmenu ${menuOpen ? 'fullmenu-open' : ''}`}>
+        <div className="fullmenu-list">
           {menuItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button key={item.path}
-                className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
+                className={`fullmenu-item ${isActive ? 'fullmenu-item-active' : ''}`}
                 onClick={() => go(item.path)}>
-                <item.icon className="shrink-0" style={{ width: 18, height: 18 }} />
+                <item.icon className="shrink-0" style={{ width: 20, height: 20 }} />
                 <span>{item.label}</span>
+                <ArrowRight className="fullmenu-arrow" style={{ width: 18, height: 18 }} />
               </button>
             );
           })}
         </div>
-        <div className="hamburger-drawer-footer">
+        <div className="fullmenu-footer">
           <div className="drawer-action-row">
             {sync.hasRoom && <SyncBadge sync={sync} />}
             <span className="text-[10px] bg-white/15 border border-white/30 rounded-full px-2.5 py-1 font-bold text-white">観戦用ページ</span>
           </div>
           <img src={`${import.meta.env.BASE_URL}logo-tcta.png`} alt="鳥取市テニス協会"
-            className="hamburger-drawer-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            className="fullmenu-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         </div>
       </div>
 
