@@ -46,6 +46,15 @@ const CHANGELOG: ChangelogEntry[] = [
       },
       {
         time: '—',
+        summary: '音声コール',
+        changes: [
+          { type: 'feat', text: '読み上げをブラウザ内蔵音声（Web Speech API）に対応。通信・APIキー不要で待ち時間ゼロ、会場の電波が悪くてもコールできる（標準設定）' },
+          { type: 'feat', text: '音声設定でエンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを選択できるように' },
+          { type: 'fix', text: 'Gemini の生成に失敗してもブラウザ内蔵音声で読み上げ直し、コールが無音のままにならないように' },
+        ],
+      },
+      {
+        time: '—',
         summary: 'コート状況・観戦用ページ',
         changes: [
           { type: 'feat', text: 'コート状況の対戦カードに「男子A級 1R」のような種目＋ラウンドのバッジを表示' },

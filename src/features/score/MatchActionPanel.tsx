@@ -5,7 +5,7 @@ import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { propagateByes } from '../draw/rebuildMatches';
 import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import {
   Play,
@@ -94,7 +94,7 @@ export default function MatchActionPanel({
   const [callNameReadings, setCallNameReadings] = useState<Record<string, string>>({});
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop } = useCallTts();
 
   // 所属ふりがなマップ（コール文のふりがな注釈用）
   const affiliationFuriganaMap = useLiveQuery(async () => {

@@ -8,7 +8,7 @@ import type { Match, Court, Event, RoundGameRule } from '../../db/database';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { buildCallText, familyReading, familyName, kataToHira, toSpeechText } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import { useBulkCallStore } from '../../stores/bulkCallStore';
 import type { BulkCallItem } from '../../stores/bulkCallStore';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -389,8 +389,8 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   );
 
   // --- 音声コール ---
-  // Gemini TTS では話速・音程は「音声設定」のスタイル指示で制御するため、
-  // ここでは互換のための固定値のみ保持する
+  // 話速・音程は「音声設定」（ブラウザ内蔵音声のスライダー／Gemini のスタイル指示）で
+  // 制御するため、ここでは互換のための固定値のみ保持する
   const voiceSettings: VoiceSettings = {
     rate: 1.0,
     pitch: 1.0,
@@ -407,7 +407,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   const [callAffReadings, setCallAffReadings] = useState<Record<string, string>>({});
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
 
-  const { speak, stop, isLoading: isCallLoading } = useGeminiTts();
+  const { speak, stop, isLoading: isCallLoading } = useCallTts();
 
   // 所属ふりがなマップ
   const affiliationFuriganaMap = useLiveQuery(

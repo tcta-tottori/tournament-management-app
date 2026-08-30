@@ -4,7 +4,7 @@ import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
@@ -156,7 +156,7 @@ export default function ScoreInputDialog({
   // ソフトキーボードが出ている間も、見えている領域にダイアログ全体を収める
   const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(!!match);
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop } = useCallTts();
   const navigate = useNavigate();
 
   // この試合のライブスコアが既に開始されているか（ボタン文言の出し分け用）

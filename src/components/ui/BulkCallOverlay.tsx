@@ -3,7 +3,7 @@ import { Megaphone, Square, Volume2, Loader2 } from 'lucide-react';
 import { useBulkCallStore, type BulkCallItem } from '../../stores/bulkCallStore';
 import { db } from '../../db/database';
 import { findOccupyingMatch } from '../../db/courtOccupancy';
-import { geminiTts } from '../../features/broadcast/geminiTts';
+import { callTts, type PreparedCall } from '../../features/broadcast/callTts';
 
 /** 音声生成の並列数（多すぎるとAPIのレート制限に掛かるため控えめに） */
 const PREFETCH_CONCURRENCY = 4;
@@ -16,17 +16,18 @@ function callTextOf(item: BulkCallItem, index: number): string {
 }
 
 /**
- * 全コート分の音声を先に生成する。
+ * 全コート分の音声を先に用意する。
  * コートごとに生成→再生を繰り返すとコート間に生成待ちの間が空くため、
  * 先に全部を並列で作ってから続けて再生する。
+ * （ブラウザ内蔵音声は生成待ちが無いので、この工程は即座に終わる）
  */
 async function prefetchAll(
   items: BulkCallItem[],
   repeatCount: number,
   signal: { aborted: boolean },
   onProgress: (done: number) => void,
-): Promise<(Blob | null)[]> {
-  const blobs: (Blob | null)[] = new Array(items.length).fill(null);
+): Promise<(PreparedCall | null)[]> {
+  const prepared: (PreparedCall | null)[] = new Array(items.length).fill(null);
   let nextIndex = 0;
   let done = 0;
 
@@ -36,11 +37,11 @@ async function prefetchAll(
       if (i >= items.length || signal.aborted) return;
       const text = callTextOf(items[i], i);
       try {
-        blobs[i] = await geminiTts.synthesize(text, { repeatCount });
+        prepared[i] = await callTts.synthesize(text, { repeatCount });
       } catch {
         // 一時的な失敗は1回だけ再試行する
         try {
-          if (!signal.aborted) blobs[i] = await geminiTts.synthesize(text, { repeatCount });
+          if (!signal.aborted) prepared[i] = await callTts.synthesize(text, { repeatCount });
         } catch (err) {
           console.error('[一斉コール] 音声生成に失敗', items[i].courtName, err);
         }
@@ -53,7 +54,7 @@ async function prefetchAll(
   await Promise.all(
     Array.from({ length: Math.min(PREFETCH_CONCURRENCY, items.length) }, worker),
   );
-  return blobs;
+  return prepared;
 }
 
 export default function BulkCallOverlay() {
@@ -74,16 +75,16 @@ export default function BulkCallOverlay() {
 
     // --- 1) 全コート分の音声をまとめて生成 ---
     useBulkCallStore.getState().setPhase('preparing');
-    const blobs = await prefetchAll(
+    const preparedCalls = await prefetchAll(
       allItems,
       repeatCount,
       abortRef.current,
       (n) => useBulkCallStore.getState().setPreparedCount(n),
     );
 
-    // 1件も生成できなかった場合はコールを中止する（無音のまま試合が開始されるのを防ぐ）
-    if (!abortRef.current.aborted && blobs.every(b => b === null)) {
-      alert('音声の生成に失敗しました。音声設定（APIキー・中継サーバー）をご確認ください。');
+    // 1件も用意できなかった場合はコールを中止する（無音のまま試合が開始されるのを防ぐ）
+    if (!abortRef.current.aborted && preparedCalls.every(c => c === null)) {
+      alert('音声を用意できませんでした。音声設定をご確認ください。');
       useBulkCallStore.getState().abort();
       runningRef.current = false;
       return;
@@ -111,10 +112,10 @@ export default function BulkCallOverlay() {
         }
       }
 
-      // 音声再生（生成済み）
-      const blob = blobs[i];
-      if (blob) {
-        await geminiTts.playBlob(blob);
+      // 音声再生（用意済み）
+      const prepared = preparedCalls[i];
+      if (prepared) {
+        await callTts.playPrepared(prepared);
         if (abortRef.current.aborted) break;
         if (i < allItems.length - 1) {
           await new Promise(resolve => setTimeout(resolve, GAP_MS));
@@ -139,7 +140,7 @@ export default function BulkCallOverlay() {
   }, [isActive, aborted, runSequence]);
 
   const handleAbort = useCallback(() => {
-    geminiTts.stop();
+    callTts.stop();
     abort();
   }, [abort]);
 
