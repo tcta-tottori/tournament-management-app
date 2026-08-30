@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X, Printer, Settings2 } from 'lucide-react';
+import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X, Printer, Settings2, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
 import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
@@ -296,16 +296,38 @@ export default function MixedBracketView() {
     setTiebreakInput(match.tiebreakScore?.toString() ?? '');
   };
 
+  /**
+   * コート割当ポップアップを開く。
+   * 既にコートが決まっている試合から開いたときは、今のコートを選んだ状態にして
+   * そのまま別のコートへ振り替えられるようにする（コートの入れ違い・移動の修正用）。
+   */
+  const openCourtAssign = (match: BracketMatch) => {
+    if (!match.team1Id || !match.team2Id || match.isBye) return;
+    setEditingMatch(null);
+    setCourtAssignMatch(match);
+    setCourtAssignValue(bracketCourtAssignments[match.matchId]?.courtName || '');
+  };
+
   const handleCourtAssignConfirm = () => {
     if (!courtAssignMatch || !courtAssignValue) return;
+    const before = bracketCourtAssignments[courtAssignMatch.matchId]?.courtName;
     assignBracketMatchToCourt(courtAssignMatch.matchId, courtAssignValue);
-    // コール確認: コート決定後にコールするか聞く
-    const doCalling = window.confirm(`${courtAssignValue}でコールしますか？`);
-    if (doCalling) {
-      setCallMatch(courtAssignMatch);
-      setCallCourt(courtAssignValue);
-      setCallTime('');
+    // コール確認: 新しくコートに入れたときだけ聞く（コートの修正では聞かない）
+    if (!before) {
+      const doCalling = window.confirm(`${courtAssignValue}でコールしますか？`);
+      if (doCalling) {
+        setCallMatch(courtAssignMatch);
+        setCallCourt(courtAssignValue);
+        setCallTime('');
+      }
     }
+    setCourtAssignMatch(null);
+  };
+
+  /** コート割当を解除する（間違ったコートに入れてしまったときの取り消し） */
+  const handleCourtRelease = () => {
+    if (!courtAssignMatch) return;
+    useMixedStore.getState().removeBracketMatchFromCourt(courtAssignMatch.matchId);
     setCourtAssignMatch(null);
   };
 
@@ -587,6 +609,7 @@ export default function MixedBracketView() {
         <BracketDisplay
           bracket={currentBracket}
           onMatchClick={openScoreEditor}
+          onCourtClick={openCourtAssign}
           getRoundLabel={getRoundLabel}
           allTeams={useMixedStore.getState().allTeams}
           courtAssignments={bracketCourtAssignments}
@@ -599,8 +622,13 @@ export default function MixedBracketView() {
         const allTeamsData = useMixedStore.getState().allTeams;
         const t1 = allTeamsData.find(t => t.teamId === courtAssignMatch.team1Id);
         const t2 = allTeamsData.find(t => t.teamId === courtAssignMatch.team2Id);
-        // 使用中コートを除外
-        const usedCourts = new Set(Object.values(bracketCourtAssignments).map(ca => ca.courtName));
+        // 使用中コートを除外（ただし、この試合が今入っているコートは選べるままにする）
+        const currentCourt = bracketCourtAssignments[courtAssignMatch.matchId]?.courtName;
+        const usedCourts = new Set(
+          Object.entries(bracketCourtAssignments)
+            .filter(([mid]) => mid !== courtAssignMatch.matchId)
+            .map(([, ca]) => ca.courtName)
+        );
         const courtOpts = Array.from({ length: 16 }, (_, i) => `${i + 1}コート`);
         const leagueInProgress = new Set<string>();
         for (const l of leagues) {
@@ -616,7 +644,7 @@ export default function MixedBracketView() {
               className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-[380px] max-w-[92vw] max-h-[85vh] overflow-y-auto z-[110] p-5"
               onClick={e => e.stopPropagation()}
             >
-              <h3 className="text-sm font-bold text-gray-800 mb-3">コートを決定</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">{currentCourt ? 'コートを変更' : 'コートを決定'}</h3>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs">
                 <div className="flex items-center gap-2 mb-1">
                   {courtAssignMatch.team1League && <span className="w-4 h-4 rounded bg-gray-200 text-[8px] font-bold text-gray-600 flex items-center justify-center">{courtAssignMatch.team1League}</span>}
@@ -631,7 +659,7 @@ export default function MixedBracketView() {
               <label className="text-xs font-bold text-gray-600 block mb-2">コートを選択 <span className="text-gray-400 font-normal">（使用中は選択不可）</span></label>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {courtOpts.map(c => {
-                  const isUsed = usedCourts.has(c) || leagueInProgress.has(c);
+                  const isUsed = c !== currentCourt && (usedCourts.has(c) || leagueInProgress.has(c));
                   return (
                     <button key={c} onClick={() => !isUsed && setCourtAssignValue(c)}
                       disabled={isUsed}
@@ -639,16 +667,25 @@ export default function MixedBracketView() {
                         ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
                           courtAssignValue === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
                           'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                    >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
+                    >{c.replace('コート', '')}
+                      {isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}
+                      {c === currentCourt && <span className="block text-[7px] text-emerald-500">現在</span>}
+                    </button>
                   );
                 })}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setCourtAssignMatch(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200">キャンセル</button>
-                <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue}
+                <button onClick={handleCourtAssignConfirm} disabled={!courtAssignValue || courtAssignValue === currentCourt}
                   className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >決定</button>
+                >{currentCourt ? '変更' : '決定'}</button>
               </div>
+              {currentCourt && (
+                <button onClick={handleCourtRelease}
+                  className="w-full mt-2 py-2 text-xs font-bold text-red-500 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-colors">
+                  コートから出す（割当を解除）
+                </button>
+              )}
               <button onClick={() => {
                 // スキップしてスコア入力へ
                 setCourtAssignMatch(null);
@@ -779,6 +816,12 @@ export default function MixedBracketView() {
                 printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, { date: dateStr, name: tournamentInfo?.name || '' });
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
+              </button>
+              {/* コートを間違えた・移動したときにここから直せる */}
+              <button onClick={() => openCourtAssign(editingMatch)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs hover:bg-emerald-100 active:scale-[0.98] transition-all">
+                <MapPin size={12} />
+                {bracketCourtAssignments[editingMatch.matchId] ? 'コート変更' : 'コート決定'}
               </button>
               <button onClick={() => {
                 const ca = bracketCourtAssignments[editingMatch.matchId];
@@ -1225,9 +1268,11 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
 }
 
 /** ブラケット描画コンポーネント */
-function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtAssignments, compact = false, startRound = 0 }: {
+function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, allTeams, courtAssignments, compact = false, startRound = 0 }: {
   bracket: PlacementBracket;
   onMatchClick: (match: BracketMatch) => void;
+  /** コート表示をタップしたとき（コートの変更・解除）。未指定なら通常のカードタップと同じ */
+  onCourtClick?: (match: BracketMatch) => void;
   getRoundLabel: (round: number, total: number) => string;
   allTeams: { teamId: string; teamName: string; male: { name: string; affiliation: string }; female: { name: string; affiliation: string }; pairNumber: number; leagueId: string }[];
   courtAssignments: Record<string, { courtName: string; startedAt: number }>;
@@ -1562,10 +1607,16 @@ function BracketDisplay({ bracket, onMatchClick, getRoundLabel, allTeams, courtA
                         `} style={{ height: STATUS_HEIGHT }}>
                           {isPlaying ? (
                             <>
-                              <span className="flex items-center gap-1 shrink-0">
+                              {/* コート表示をタップするとコートを変更・解除できる */}
+                              <button
+                                onClick={e => { if (onCourtClick) { e.stopPropagation(); onCourtClick(match); } }}
+                                className="flex items-center gap-1 shrink-0 rounded px-1 -ml-1 hover:bg-green-100 transition-colors"
+                                title={onCourtClick ? 'コートを変更する' : undefined}
+                              >
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                 <span className="font-bold text-green-700">{ca.courtName.replace('コート', '')}コート</span>
-                              </span>
+                                {onCourtClick && <MapPin size={9} className="text-green-500" />}
+                              </button>
                               <span className="ml-auto font-mono text-green-600">{elapsedStr}</span>
                             </>
                           ) : match.status === 'finished' ? (

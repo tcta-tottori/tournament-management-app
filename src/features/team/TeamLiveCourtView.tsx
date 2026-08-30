@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTeamStore } from './teamStore';
+import CourtChangeDialog from '../../components/ui/CourtChangeDialog';
 import { MapPin, Play, CheckCircle, Trophy, BarChart2, Users } from 'lucide-react';
 import type { TeamLeague, TeamLeagueMatch } from './types';
 
@@ -58,7 +59,10 @@ function getLeagueCourtStatus(_league: TeamLeague, lMatches: TeamLeagueMatch[]) 
 }
 
 export default function TeamLiveCourtView() {
-  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments } = useTeamStore();
+  const { leagues, leagueMatches, allTeams, brackets, tournamentInfo, bracketCourtAssignments, assignBracketMatchToCourt } = useTeamStore();
+  // 進行中の対戦を別のコートへ移すためのダイアログ
+  const [courtMove, setCourtMove] = useState<{ matchId: string; label: string } | null>(null);
+  const [courtMoveSelected, setCourtMoveSelected] = useState<string[]>([]);
 
   const [selectedCourt, setSelectedCourt] = useState<number | null>(null);
 
@@ -379,6 +383,17 @@ export default function TeamLiveCourtView() {
                     <div className="text-lg font-black font-mono text-green-700">{h}:{String(m).padStart(2, '0')}</div>
                   </div>
                 </div>
+                {/* コートを間違えた・移動したときはここから振り替える */}
+                <button
+                  onClick={() => {
+                    setCourtMove({ matchId: bm.matchId, label: `${bm.team1Name} vs ${bm.team2Name}` });
+                    setCourtMoveSelected(ca.courtNames.map(c => c.replace('コート', '')));
+                    setSelectedCourt(null);
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 active:scale-[0.98] transition-all"
+                >
+                  <MapPin className="w-3.5 h-3.5" />コートを変更
+                </button>
               </div>
             );
           }
@@ -456,6 +471,32 @@ export default function TeamLiveCourtView() {
           </div>
         );
       })()}
+
+      {/* 進行中の対戦のコート変更（団体戦は複数面を使うので複数選択） */}
+      {courtMove && (
+        <CourtChangeDialog
+          title="コートを変更"
+          subtitle={courtMove.label}
+          multi
+          selected={courtMoveSelected}
+          busy={Object.fromEntries(
+            Object.entries(bracketCourtAssignments)
+              .filter(([mid]) => mid !== courtMove.matchId)
+              .flatMap(([, ca]) => ca.courtNames.map(c => [c.replace('コート', ''), '使用中']))
+          )}
+          onToggle={c => setCourtMoveSelected(prev =>
+            prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+          )}
+          onConfirm={courts => {
+            assignBracketMatchToCourt(
+              courtMove.matchId,
+              [...courts].sort((a, b) => parseInt(a) - parseInt(b)).map(c => `${c}コート`),
+            );
+            setCourtMove(null);
+          }}
+          onClose={() => setCourtMove(null)}
+        />
+      )}
     </div>
   );
 }

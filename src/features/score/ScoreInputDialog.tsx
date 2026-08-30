@@ -860,45 +860,43 @@ export default function ScoreInputDialog({
         {/* Score Input — コート未選択・未開始でもスコアを入力できる */}
         <div ref={scoreBoxRef} className={`px-4 sm:px-6 ${keyboardOpen ? 'pb-2' : 'pb-4'} scroll-mt-2`}>
           <div className={`bg-gray-50 rounded-xl space-y-3 ${keyboardOpen ? 'p-3' : 'p-3 sm:p-4'}`}>
-            {/* コート — 終了後は非表示 */}
-            {!isFinished && (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">コート</span>
-                {(() => {
-                  // 空きコート = 使用可能 かつ 試合中でない（埋まっているコートは常に「その他」へ）。
-                  // 現在割り当てられているコートも、試合中で埋まっていれば「使用中」として表示する。
-                  const emptyCourts = courts.filter(c =>
-                    c.isAvailable && !occupiedCourtIds.has(c.courtId));
-                  const otherCourts = courts.filter(c =>
-                    !(c.isAvailable && !occupiedCourtIds.has(c.courtId)));
-                  return (
-                    <select
-                      value={match.courtId ?? ''}
-                      onChange={e => handleAssignCourt(e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                    >
-                      <option value="">未割当</option>
-                      {emptyCourts.length > 0 && (
-                        <optgroup label="空きコート">
-                          {emptyCourts.map(c => (
-                            <option key={c.courtId} value={c.courtId}>{c.name}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {otherCourts.length > 0 && (
-                        <optgroup label="その他（使用中・使用不可）">
-                          {otherCourts.map(c => (
-                            <option key={c.courtId} value={c.courtId}>
-                              {c.name}{occupiedCourtIds.has(c.courtId) ? '（使用中）' : c.isAvailable ? '' : '（使用不可）'}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                  );
-                })()}
-              </div>
-            )}
+            {/* コート — 終了後も直せるようにする（記録したコートが違っていたときの修正用） */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-xs text-gray-500 w-12 sm:w-14 shrink-0">{isFinished ? 'コート修正' : 'コート'}</span>
+              {(() => {
+                // 空きコート = 使用可能 かつ 試合中でない（埋まっているコートは常に「その他」へ）。
+                // 現在割り当てられているコートも、試合中で埋まっていれば「使用中」として表示する。
+                const emptyCourts = courts.filter(c =>
+                  c.isAvailable && !occupiedCourtIds.has(c.courtId));
+                const otherCourts = courts.filter(c =>
+                  !(c.isAvailable && !occupiedCourtIds.has(c.courtId)));
+                return (
+                  <select
+                    value={match.courtId ?? ''}
+                    onChange={e => handleAssignCourt(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg text-sm px-2.5 py-1.5 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                  >
+                    <option value="">未割当</option>
+                    {emptyCourts.length > 0 && (
+                      <optgroup label="空きコート">
+                        {emptyCourts.map(c => (
+                          <option key={c.courtId} value={c.courtId}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherCourts.length > 0 && (
+                      <optgroup label="その他（使用中・使用不可）">
+                        {otherCourts.map(c => (
+                          <option key={c.courtId} value={c.courtId}>
+                            {c.name}{occupiedCourtIds.has(c.courtId) ? '（使用中）' : c.isAvailable ? '' : '（使用不可）'}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                );
+              })()}
+            </div>
 
             {/* セットスコア入力 — コート未選択・未開始でも入力できる */}
             <div className="space-y-2">
