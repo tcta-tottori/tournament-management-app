@@ -1155,30 +1155,32 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   }
 
   const CELL_W = 96;
-  const NAME_W = clamp(maxNameW + 46, 220, 460);
   const NAME_PX = 14;
   const NAME_LINE_STEP = NAME_PX + 3;
   const ROW_H = isDoubles ? 56 : 46;
   const STAT_W = 88;
   const RANK_W = 72;
 
+  const paddingX = 30;
+  const paddingY = 26;
+  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
+
+  // リーグ表は外枠そのものを表の枠として使う（枠が二重にならないように）。
+  // 表の幅は外枠の幅にそろえ、余った幅は選手名の列へ回す。
+  const baseNameW = clamp(maxNameW + 46, 220, 460);
+  const naturalGridW = baseNameW + n * CELL_W + STAT_W + RANK_W;
+  const tableW = Math.max(naturalGridW, 820);
+  const NAME_W = baseNameW + (tableW - naturalGridW);
+
   // 協会ロゴはリーグ表の左上（選手名列のヘッダー）の中に入れる。
   // ロゴが入る分だけヘッダー行を高くする。
   const cornerLogo = showLogo ? fitLogo(logos.tcta, NAME_W - 28, 46) : { w: 0, h: 0 };
   const HDR_H = Math.max(44, Math.ceil(cornerLogo.h + 12));
 
-  const paddingX = 30;
-  const paddingY = 26;
-  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
-  const sidePad = 22;
-
-  const gridW = NAME_W + n * CELL_W + STAT_W + RANK_W;
+  const CARD_R = 18;
+  const gridW = tableW;
   const gridH = HDR_H + n * ROW_H;
-  const tableW = Math.max(gridW + sidePad * 2, 820);
-
-  const cardTopPad = 18;
-  const cardBottomPad = 18;
-  const cardH = gridH + cardTopPad + cardBottomPad;
+  const cardH = gridH;
 
   // 協会ロゴは表の中（左上）へ移したので、下の余白は最小限にする
   const footerH = 4;
@@ -1219,19 +1221,21 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   ctx.shadowOffsetY = 6;
   roundRect(ctx, paddingX, cardY, tableW, cardH, 18, COL.white);
   ctx.restore();
-  drawResultFrame(ctx, paddingX, cardY, tableW, cardH, 18);
 
-  const gridX = paddingX + (tableW - gridW) / 2;
-  const gridY = cardY + cardTopPad;
+  const gridX = paddingX;
+  const gridY = cardY;
+
+  // 以降の塗り・罫線は外枠の角丸からはみ出さないようにクリップして描く
+  ctx.save();
+  roundRect(ctx, gridX, gridY, gridW, gridH, CARD_R);
+  ctx.clip();
 
   // ヘッダー行の背景
   const hdrGrad = ctx.createLinearGradient(gridX, gridY, gridX, gridY + HDR_H);
   hdrGrad.addColorStop(0, COL.gray100);
   hdrGrad.addColorStop(1, COL.gray50);
-  roundRect(ctx, gridX, gridY, gridW, HDR_H, 10, hdrGrad);
-  // ヘッダー下部は角丸にしない
   ctx.fillStyle = hdrGrad;
-  ctx.fillRect(gridX, gridY + HDR_H - 10, gridW, 10);
+  ctx.fillRect(gridX, gridY, gridW, HDR_H);
 
   const statX = gridX + NAME_W + n * CELL_W;
   const rankX = statX + STAT_W;
@@ -1249,12 +1253,12 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   if (showLogo && cornerLogo.w > 0) {
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(gridX + 10, gridY);
+    ctx.moveTo(gridX + CARD_R, gridY);
     ctx.lineTo(gridX + NAME_W, gridY);
     ctx.lineTo(gridX + NAME_W, gridY + HDR_H);
     ctx.lineTo(gridX, gridY + HDR_H);
-    ctx.lineTo(gridX, gridY + 10);
-    ctx.quadraticCurveTo(gridX, gridY, gridX + 10, gridY);
+    ctx.lineTo(gridX, gridY + CARD_R);
+    ctx.quadraticCurveTo(gridX, gridY, gridX + CARD_R, gridY);
     ctx.closePath();
     ctx.fillStyle = COL.white;
     ctx.fill();
@@ -1288,7 +1292,9 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     const y = gridY + HDR_H + row * ROW_H;
     drawLine(ctx, gridX, y, gridX + gridW, y, COL.gray200, 1);
   }
-  roundRect(ctx, gridX, gridY, gridW, gridH, 10, undefined, COL.gray200, 1.5);
+  ctx.restore();
+  // 表の枠は外枠そのもの（1本だけ）
+  drawResultFrame(ctx, paddingX, cardY, tableW, cardH, CARD_R);
 
   // データ行
   for (let row = 0; row < n; row++) {
