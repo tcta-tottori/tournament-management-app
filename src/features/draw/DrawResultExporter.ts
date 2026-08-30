@@ -49,6 +49,8 @@ type SlotInfo = {
   position: number;
   name: string;
   affiliation: string;
+  /** ダブルスで2人の所属が異なるときのみ [1人目, 2人目]。それ以外は空配列 */
+  affiliationParts: string[];
   seed: number;
   isBye: boolean;
   entryId: string | null;
@@ -59,6 +61,7 @@ function buildSlotMap(draw: Draw, entries: Entry[], players: Player[]): Map<numb
   for (const s of draw.slots) {
     let name = 'bye';
     let affiliation = '';
+    let affiliationParts: string[] = [];
     if (!s.isBye && s.entryId) {
       const entry = entries.find(e => e.entryId === s.entryId);
       if (entry) {
@@ -66,12 +69,15 @@ function buildSlotMap(draw: Draw, entries: Entry[], players: Player[]): Map<numb
         const isDoubles = !!entry.partnerId;
         const p2 = isDoubles ? players.find(p => p.playerId === entry.partnerId) : null;
         name = isDoubles && p1 && p2 ? `${p1.name}・${p2.name}` : (p1?.name || '(不明)');
-        affiliation = isDoubles && p1 && p2 && p1.affiliation !== p2.affiliation
-          ? `${p1.affiliation}/${p2.affiliation}`
-          : (p1?.affiliation || '');
+        if (isDoubles && p1 && p2 && p1.affiliation !== p2.affiliation) {
+          affiliation = `${p1.affiliation}/${p2.affiliation}`;
+          affiliationParts = [p1.affiliation, p2.affiliation];
+        } else {
+          affiliation = p1?.affiliation || '';
+        }
       }
     }
-    map.set(s.position, { position: s.position, name, affiliation, seed: s.seed, isBye: s.isBye, entryId: s.entryId });
+    map.set(s.position, { position: s.position, name, affiliation, affiliationParts, seed: s.seed, isBye: s.isBye, entryId: s.entryId });
   }
   return map;
 }
@@ -160,6 +166,17 @@ function pairNameLines(name: string, isDoubles: boolean): string[] {
   if (!isDoubles) return [name];
   const parts = name.split(/\s*[/／・]\s*/).map(t => t.trim()).filter(Boolean);
   return parts.length === 2 ? parts : [name];
+}
+
+/**
+ * ダブルスの所属（「A/B」表記）を1人ずつの2行に分ける。
+ * 2人が同じ所属のとき（1つしか無い）や分けられない場合は1行のまま返す。
+ * 氏名の行数に合わせるため、氏名が1行なら分けない。
+ */
+function pairAffiliationLines(affiliation: string, parts: string[] | undefined, nameLineCount: number): string[] {
+  if (nameLineCount >= 2 && parts && parts.length === 2) return parts;
+  if (!affiliation) return [];
+  return [affiliation];
 }
 
 /**
@@ -261,8 +278,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // entryId → 所属 の逆引き（優勝者の所属表示用）
   const affById = new Map<string, string>();
+  const affPartsById = new Map<string, string[]>();
   for (const s of slotMap.values()) {
     if (s.entryId) affById.set(s.entryId, s.affiliation);
+    if (s.entryId) affPartsById.set(s.entryId, s.affiliationParts);
   }
 
 
@@ -278,8 +297,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     meas.font = fontOf('bold', NAME_PX);
     let w = Math.max(...pairNameLines(s.name, isDoubles).map(t => meas.measureText(t).width));
     if (s.affiliation) {
+      const affLines = pairAffiliationLines(s.affiliation, s.affiliationParts, pairNameLines(s.name, isDoubles).length);
       meas.font = fontOf('normal', AFF_PX);
-      w += 5 + meas.measureText(`（${s.affiliation}）`).width;
+      w += 5 + Math.max(...affLines.map(t => meas.measureText(`（${t}）`).width));
     }
     if (w > maxNameW) maxNameW = w;
   }
@@ -416,6 +436,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ---- 中央の優勝表示（カードではなく、中央から立ち上がる線＋テキスト） ----
   const champName = champNode && !champNode.isBye ? champNode.name : '';
   const champAff = champEntryId ? (affById.get(champEntryId) || '') : '';
+  const champAffParts = champEntryId ? affPartsById.get(champEntryId) : undefined;
   const CHAMP_NAME_PX = 20;
   const CHAMP_SCORE_PX = 19;
 
@@ -428,7 +449,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // ダブルスはペアを1人ずつ2行で表示する
   const champLines = champName ? pairNameLines(champName, isDoubles) : [];
+  const champAffLines = pairAffiliationLines(champAff, champAffParts, champLines.length);
   const CHAMP_LINE_STEP = CHAMP_NAME_PX + 3;
+  const CHAMP_AFF_PX = 12;
+  const CHAMP_AFF_STEP = CHAMP_AFF_PX + 3;
   const champNameH = champLines.length > 0
     ? champLines.length * CHAMP_NAME_PX + (champLines.length - 1) * 3
     : 0;
@@ -436,9 +460,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   let champTextW = champLines.length > 0
     ? Math.max(...champLines.map(t => meas.measureText(t).width))
     : 0;
-  if (champAff) {
-    meas.font = fontOf('normal', 12);
-    champTextW = Math.max(champTextW, meas.measureText(`（${champAff}）`).width);
+  if (champAffLines.length > 0) {
+    meas.font = fontOf('normal', CHAMP_AFF_PX);
+    champTextW = Math.max(champTextW, ...champAffLines.map(t => meas.measureText(`（${t}）`).width));
   }
   // 優勝表示の左右幅。名前が収まる分だけにして、左右の山の間の余白を詰める。
   const CENTER_W = clamp(champTextW + 36, 196, 430);
@@ -449,7 +473,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const champBlockH = champName
     ? CHAMP_TICK + 2
       + (finalScoreText ? CHAMP_SCORE_PX + 4 : 0)
-      + (champAff ? 15 : 0)
+      + (champAffLines.length > 0 ? champAffLines.length * CHAMP_AFF_STEP + 3 : 0)
       + champNameH + 5 + CHAMP_CHIP_H
     : 0;
 
@@ -493,6 +517,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       number: posByEntry.get(entryId) ?? 0,
       name: nameByEntry.get(entryId) || '',
       affiliation: affById.get(entryId) || '',
+      affiliationParts: affPartsById.get(entryId),
     });
     const a = sideOf(third.player1EntryId);
     const b = sideOf(third.player2EntryId);
@@ -511,11 +536,14 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     ? (thirdBlock.left.entryId === thirdBlock.winnerEntryId ? thirdBlock.left : thirdBlock.right)
     : null;
   const thirdNameLines = thirdWinner ? pairNameLines(thirdWinner.name, isDoubles).length : 0;
+  const thirdAffLines = thirdWinner
+    ? pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, thirdNameLines).length
+    : 0;
   const thirdRowLines = isDoubles ? 2 : 1;
   const thirdBlockH = thirdBlock && thirdWinner
     ? 10 + T.labelPx + 8
       + thirdNameLines * T.namePx + (thirdNameLines - 1) * 3
-      + (thirdWinner.affiliation ? T.affPx + 9 : 0)
+      + (thirdAffLines > 0 ? thirdAffLines * (T.affPx + 3) + 6 : 0)
       + (thirdBlock.score.main ? T.scorePx + 4 : 0)
       + T.tick + 2
       + thirdRowLines * T.rowNamePx + (thirdRowLines - 1) * 3
@@ -568,6 +596,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     headerH,
     logos,
     titleEnFallback: 'TOURNAMENT',
+    // 外枠のすぐ上に横線が重なって二重線に見えるため、罫線は引かない
+    headerRule: false,
   });
 
   // ---- ブラケット枠 ----
@@ -782,12 +812,19 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         isChamp ? COL.win : COL.gray800, isChamp ? 'black' : 'bold', nameMaxW);
     });
 
-    if (slot.affiliation) {
+    const affLines = pairAffiliationLines(slot.affiliation, slot.affiliationParts, lines.length);
+    if (affLines.length > 0) {
       const affX = nameX + nameW + 5;
       const affMaxW = x0 + NAME_W - 10 - affX;
       if (affMaxW > 16) {
-        // 所属は氏名（2行のときはその中央）に合わせる
-        drawText(ctx, `（${slot.affiliation}）`, affX, cy + 0.5, AFF_PX, 'left', COL.gray500, 'normal', affMaxW);
+        // 所属も2行のときは氏名の各行に合わせて並べる（1つだけなら氏名の中央）
+        const affTop = affLines.length === lines.length
+          ? topY
+          : cy - ((affLines.length - 1) * NAME_LINE_STEP) / 2;
+        affLines.forEach((t, i) => {
+          if (!t) return;   // 片方だけ所属が未登録のときは行を空けて位置を揃える
+          drawText(ctx, `（${t}）`, affX, affTop + i * NAME_LINE_STEP + 0.5, AFF_PX, 'left', COL.gray500, 'normal', affMaxW);
+        });
       }
     }
   };
@@ -801,8 +838,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     let cursor = apexY - CHAMP_TICK - 2;
     const scoreY = cursor - CHAMP_SCORE_PX / 2;
     if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 4;
-    const affY = champAff ? cursor - 5 : cursor;
-    if (champAff) cursor = affY - 5 - 5;
+    // 所属（ダブルスは1人ずつ2行）。下から上へ積む。
+    const affYs = champAffLines.map((_, i) =>
+      cursor - 5 - CHAMP_AFF_PX / 2 - (champAffLines.length - 1 - i) * CHAMP_AFF_STEP);
+    if (affYs.length > 0) cursor = affYs[0] - CHAMP_AFF_PX / 2 - 5;
     // 氏名は下から上へ積む（ダブルスは2行）
     const lastNameY = cursor - CHAMP_NAME_PX / 2;
     const nameYs = champLines.map((_, i) => lastNameY - (champLines.length - 1 - i) * CHAMP_LINE_STEP);
@@ -825,9 +864,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     champLines.forEach((line, i) => {
       drawText(ctx, line, centerX, nameYs[i], CHAMP_NAME_PX, 'center', COL.gray900, 'black', CENTER_W - 16);
     });
-    if (champAff) {
-      drawText(ctx, `（${champAff}）`, centerX, affY, 12, 'center', COL.gray500, 'normal', CENTER_W - 16);
-    }
+    champAffLines.forEach((t, i) => {
+      if (!t) return;
+      drawText(ctx, `（${t}）`, centerX, affYs[i], CHAMP_AFF_PX, 'center', COL.gray500, 'normal', CENTER_W - 16);
+    });
     if (finalScoreText) {
       drawText(ctx, finalScoreText, centerX, scoreY, CHAMP_SCORE_PX, 'center', COL.win, 'black');
       // タイブレークの得点・Ret / W.O は負けた側の外側へ小さく添える
@@ -869,8 +909,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     let cursor = labelY + T.labelPx / 2 + 8;
     const nameYs = winnerLines.map((_, i) => cursor + T.namePx / 2 + i * (T.namePx + 3));
     cursor = nameYs[nameYs.length - 1] + T.namePx / 2;
-    const affY = thirdWinner.affiliation ? cursor + 7 : cursor;
-    if (thirdWinner.affiliation) cursor = affY + 7;
+    // 所属（ダブルスは1人ずつ2行）
+    const winnerAffLines = pairAffiliationLines(thirdWinner.affiliation, thirdWinner.affiliationParts, winnerLines.length);
+    const affYs = winnerAffLines.map((_, i) => cursor + 6 + T.affPx / 2 + i * (T.affPx + 3));
+    if (affYs.length > 0) cursor = affYs[affYs.length - 1] + T.affPx / 2;
     const scoreY = score.main ? cursor + 4 + T.scorePx / 2 : cursor;
     if (score.main) cursor = scoreY + T.scorePx / 2;
     const rowCenterY = cursor + T.tick + 2
@@ -880,9 +922,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     winnerLines.forEach((line, i) => {
       drawText(ctx, line, centerX, nameYs[i], T.namePx, 'center', COL.gray900, 'black', winnerMaxW);
     });
-    if (thirdWinner.affiliation) {
-      drawText(ctx, `（${thirdWinner.affiliation}）`, centerX, affY, T.affPx, 'center', COL.gray500, 'normal', winnerMaxW);
-    }
+    winnerAffLines.forEach((t, i) => {
+      if (!t) return;
+      drawText(ctx, `（${t}）`, centerX, affYs[i], T.affPx, 'center', COL.gray500, 'normal', winnerMaxW);
+    });
     if (score.main) {
       drawText(ctx, score.main, centerX, scoreY, T.scorePx, 'center', COL.win, 'black');
       if (score.note) {
@@ -907,13 +950,17 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
         Math.max(...lines.map(t => meas.measureText(t).width)),
         halfMaxW * 0.72,
       );
+      const affLines = pairAffiliationLines(p.affiliation, p.affiliationParts, lines.length);
       let affW = 0;
-      if (p.affiliation) {
+      if (affLines.length > 0) {
         meas.font = fontOf('normal', T.rowAffPx);
-        affW = Math.min(meas.measureText(`（${p.affiliation}）`).width, halfMaxW * 0.34);
+        affW = Math.min(
+          Math.max(...affLines.map(t => meas.measureText(`（${t}）`).width)),
+          halfMaxW * 0.34,
+        );
       }
       const numW = p.number ? 16 : 0;
-      return { lines, nameW, affW, numW, total: numW + nameW + (affW ? affW + 5 : 0) };
+      return { lines, affLines, nameW, affW, numW, total: numW + nameW + (affW ? affW + 5 : 0) };
     };
     const drawSide = (p: typeof left, startX: number, isWinner: boolean) => {
       const m = measureSide(p);
@@ -929,8 +976,14 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
           isWinner ? COL.win : COL.gray800, isWinner ? 'black' : 'bold', m.nameW);
       });
       x += m.nameW;
-      if (p.affiliation) {
-        drawText(ctx, `（${p.affiliation}）`, x + 5, rowCenterY + 0.5, T.rowAffPx, 'left', COL.gray500, 'normal', m.affW);
+      if (m.affLines.length > 0) {
+        const affTop = m.affLines.length === m.lines.length
+          ? topY
+          : rowCenterY - ((m.affLines.length - 1) * lineStep) / 2;
+        m.affLines.forEach((t, i) => {
+          if (!t) return;
+          drawText(ctx, `（${t}）`, x + 5, affTop + i * lineStep + 0.5, T.rowAffPx, 'left', COL.gray500, 'normal', m.affW);
+        });
         x += 5 + m.affW;
       }
       return x;
@@ -1138,8 +1191,22 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     ctx.fillRect(gridX, gridY + HDR_H + row * ROW_H, gridW, ROW_H);
   }
 
-  // 左上（選手名列のヘッダー）に協会ロゴ
+  // 左上（選手名列のヘッダー）に協会ロゴ。
+  // 見出し行の網掛けの上に置くとロゴの周りが枠のように見えるため、
+  // セルだけ白で塗りつぶしてから重ねる。
   if (showLogo && cornerLogo.w > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(gridX + 10, gridY);
+    ctx.lineTo(gridX + NAME_W, gridY);
+    ctx.lineTo(gridX + NAME_W, gridY + HDR_H);
+    ctx.lineTo(gridX, gridY + HDR_H);
+    ctx.lineTo(gridX, gridY + 10);
+    ctx.quadraticCurveTo(gridX, gridY, gridX + 10, gridY);
+    ctx.closePath();
+    ctx.fillStyle = COL.white;
+    ctx.fill();
+    ctx.restore();
     ctx.drawImage(
       logos.tcta!,
       gridX + (NAME_W - cornerLogo.w) / 2,

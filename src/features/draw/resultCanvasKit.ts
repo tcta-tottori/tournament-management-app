@@ -423,7 +423,17 @@ export interface ResultHeaderOptions {
   titleEnFallback?: string;
   /** 会場バッジの表示倍率（既定 1） */
   venueScale?: number;
+  /** ヘッダー下の罫線を引くか（既定 true）。表の外枠と二重線になる場合は false */
+  headerRule?: boolean;
 }
+
+/**
+ * 見出し・大会名の文字を組むときに前提とする表の幅。
+ * 実際の表幅（tableW）はドローサイズで変わるが、それに合わせて文字を
+ * 縮めると「16ドローと32ドローで見出しの大きさが違う」ことになるため、
+ * 文字の詰め幅はこの固定値だけで決める。
+ */
+const HEADER_LAYOUT_W = 820;
 
 /**
  * 結果画像のヘッダーを描画する（白ベース＋赤の差し色）。
@@ -434,7 +444,7 @@ export interface ResultHeaderOptions {
 export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderOptions): void {
   const {
     title, tournamentName, venue, paddingX, paddingY, tableW, headerH, logos,
-    subtitle, titlePx = 46, venueScale = 1,
+    subtitle, titlePx = 46, venueScale = 1, headerRule = true,
   } = o;
   const titleEn = o.titleEn ?? headingEnglish(title, o.titleEnFallback);
 
@@ -455,7 +465,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   const markSize = Math.max(16, Math.round(titlePx * 0.46));
   const markGap = Math.max(10, Math.round(titlePx * 0.24));
   // 右側の大会名と重ならない範囲まで、はみ出す場合だけ縮める
-  const maxTitleW = Math.max(180, tableW * 0.46) - markSize - markGap;
+  const maxTitleW = Math.max(180, HEADER_LAYOUT_W * 0.46) - markSize - markGap;
   let titleW = measureMixed(ctx, runs, bigPx, smallPx, '900', '800');
   if (titleW > maxTitleW) {
     const k = maxTitleW / titleW;
@@ -483,7 +493,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   // ---- 右: 大会名 + 小見出し + 会場 ----
   const rightX = paddingX + tableW;
   if (tournamentName) {
-    const nameMaxW = Math.max(200, tableW - headingW - 48);
+    const nameMaxW = Math.max(200, HEADER_LAYOUT_W - headingW - 48);
     drawText(ctx, tournamentName, rightX, nameY, NAME_PX, 'right', COL.gray800, 'bold', nameMaxW);
   }
   if (subtitle) {
@@ -499,7 +509,7 @@ export function drawResultHeader(ctx: CanvasRenderingContext2D, o: ResultHeaderO
   });
 
   // ---- ヘッダー下の罫線 ----
-  drawHeaderRule(ctx, paddingX, paddingY + headerH - 4, tableW);
+  if (headerRule) drawHeaderRule(ctx, paddingX, paddingY + headerH - 4, tableW);
 }
 
 /**
