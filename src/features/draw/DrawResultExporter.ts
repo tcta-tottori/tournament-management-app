@@ -274,8 +274,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   for (let p = 1; p <= drawSize; p++) {
     const s = slotMap.get(p);
     if (!s || s.isBye) continue;
+    // ダブルスはペアを1人ずつ2行で出すので、幅は長い方の行で決まる
     meas.font = fontOf('bold', NAME_PX);
-    let w = meas.measureText(s.name).width;
+    let w = Math.max(...pairNameLines(s.name, isDoubles).map(t => meas.measureText(t).width));
     if (s.affiliation) {
       meas.font = fontOf('normal', AFF_PX);
       w += 5 + meas.measureText(`（${s.affiliation}）`).width;
@@ -286,7 +287,11 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const NAME_W = clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380);
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
-  const ROW_H = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
+  const ROW_H_BASE = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
+  /** 氏名を2行で出すときの行送り */
+  const NAME_LINE_STEP = NAME_PX + 3;
+  // ダブルスは氏名が2行になるぶん、行の高さに余裕を持たせる
+  const ROW_H = isDoubles ? ROW_H_BASE + 6 : ROW_H_BASE;
   // スコアは合流点（縦線の中央）を挟んで上下に置く。
   // 2回戦以降は上下のラインが大きく離れるため、それぞれのラインに寄せると
   // 上下のスコアが遠く離れて対戦結果として読み取りにくい。
@@ -421,8 +426,16 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const finalScore = bracketScoreParts(finalMatch, finL?.entryId);
   const finalScoreText = finalScore.main;
 
+  // ダブルスはペアを1人ずつ2行で表示する
+  const champLines = champName ? pairNameLines(champName, isDoubles) : [];
+  const CHAMP_LINE_STEP = CHAMP_NAME_PX + 3;
+  const champNameH = champLines.length > 0
+    ? champLines.length * CHAMP_NAME_PX + (champLines.length - 1) * 3
+    : 0;
   meas.font = fontOf('black', CHAMP_NAME_PX);
-  let champTextW = meas.measureText(champName).width;
+  let champTextW = champLines.length > 0
+    ? Math.max(...champLines.map(t => meas.measureText(t).width))
+    : 0;
   if (champAff) {
     meas.font = fontOf('normal', 12);
     champTextW = Math.max(champTextW, meas.measureText(`（${champAff}）`).width);
@@ -437,7 +450,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     ? CHAMP_TICK + 2
       + (finalScoreText ? CHAMP_SCORE_PX + 4 : 0)
       + (champAff ? 15 : 0)
-      + CHAMP_NAME_PX + 5 + CHAMP_CHIP_H
+      + champNameH + 5 + CHAMP_CHIP_H
     : 0;
 
   // ---- 全体レイアウト ----
@@ -759,14 +772,21 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     const nameX = x0 + NUM_W;
     const nameMaxW = NAME_W - NUM_W - 12;
     const isChamp = !!champEntryId && slot.entryId === champEntryId;
+    // ダブルスはペアを1人ずつ2行に分けて表示する
+    const lines = pairNameLines(slot.name, isDoubles);
     ctx.font = fontOf(isChamp ? 'black' : 'bold', NAME_PX);
-    const nameW = Math.min(ctx.measureText(slot.name).width, nameMaxW);
-    drawText(ctx, slot.name, nameX, cy, NAME_PX, 'left', isChamp ? COL.win : COL.gray800, isChamp ? 'black' : 'bold', nameMaxW);
+    const nameW = Math.min(Math.max(...lines.map(t => ctx.measureText(t).width)), nameMaxW);
+    const topY = cy - ((lines.length - 1) * NAME_LINE_STEP) / 2;
+    lines.forEach((line, i) => {
+      drawText(ctx, line, nameX, topY + i * NAME_LINE_STEP, NAME_PX, 'left',
+        isChamp ? COL.win : COL.gray800, isChamp ? 'black' : 'bold', nameMaxW);
+    });
 
     if (slot.affiliation) {
       const affX = nameX + nameW + 5;
       const affMaxW = x0 + NAME_W - 10 - affX;
       if (affMaxW > 16) {
+        // 所属は氏名（2行のときはその中央）に合わせる
         drawText(ctx, `（${slot.affiliation}）`, affX, cy + 0.5, AFF_PX, 'left', COL.gray500, 'normal', affMaxW);
       }
     }
@@ -783,8 +803,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     if (finalScoreText) cursor = scoreY - CHAMP_SCORE_PX / 2 - 4;
     const affY = champAff ? cursor - 5 : cursor;
     if (champAff) cursor = affY - 5 - 5;
-    const nameY = cursor - CHAMP_NAME_PX / 2;
-    cursor = nameY - CHAMP_NAME_PX / 2 - 5;
+    // 氏名は下から上へ積む（ダブルスは2行）
+    const lastNameY = cursor - CHAMP_NAME_PX / 2;
+    const nameYs = champLines.map((_, i) => lastNameY - (champLines.length - 1 - i) * CHAMP_LINE_STEP);
+    cursor = nameYs[0] - CHAMP_NAME_PX / 2 - 5;
 
     // 優勝バッジ（小さな日本語より読みやすいので英語表記にする）
     const chipLabel = 'WINNER';
@@ -800,7 +822,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2, chipGrad);
     drawText(ctx, chipLabel, centerX, chipY + chipH / 2 + 0.5, chipPx, 'center', COL.white, 'black');
 
-    drawText(ctx, champName, centerX, nameY, CHAMP_NAME_PX, 'center', COL.gray900, 'black', CENTER_W - 16);
+    champLines.forEach((line, i) => {
+      drawText(ctx, line, centerX, nameYs[i], CHAMP_NAME_PX, 'center', COL.gray900, 'black', CENTER_W - 16);
+    });
     if (champAff) {
       drawText(ctx, `（${champAff}）`, centerX, affY, 12, 'center', COL.gray500, 'normal', CENTER_W - 16);
     }
