@@ -153,6 +153,16 @@ interface Seg { x1: number; y1: number; x2: number; y2: number; win: boolean }
 interface Tag { x: number; y: number; text: string; align: CanvasTextAlign; win: boolean; size?: number }
 
 /**
+ * ダブルスのペア名を1人ずつの2行に分ける（「A・B」「A / B」の両表記に対応）。
+ * 2人に分けられない場合は1行のまま返す。
+ */
+function pairNameLines(name: string, isDoubles: boolean): string[] {
+  if (!isDoubles) return [name];
+  const parts = name.split(/\s*[/／・]\s*/).map(t => t.trim()).filter(Boolean);
+  return parts.length === 2 ? parts : [name];
+}
+
+/**
  * ブラケットのスコアを「左側の獲得ゲーム − 右側の獲得ゲーム」の並びに直す。
  * タイブレークの得点と Ret / W.O は負けた側のものなので、
  * 負けた側の外側へ添えられるよう note / noteLeft も返す。
@@ -446,19 +456,10 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     : 18;
   const bracketBodyH = maxRows * ROW_H;   // BYE を詰めた実際の高さ
 
-  // 中央下部（枠内）に置く協会ロゴ
-  const centerLogo = showLogo
-    ? fitLogo(logos.tcta, Math.min(CENTER_W - 24, 300), 76)
-    : { w: 0, h: 0 };
-  const spaceBelowApex = bracketBodyH - apexRel;
-  const bracketBottomPad = Math.max(16, Math.ceil(centerLogo.h + 24 - spaceBelowApex));
-  const bracketH = bracketTopPad + bracketBodyH + bracketBottomPad;
-
   // ---- 3位決定戦（決勝と同じ形式を少し小さくして表の下に置く） ----
   // 左右に選手を並べ、中央の横線の上に勝者（＝3位）を出す。
   const T = {
     labelPx: 11,        // 「3位決定戦」の見出し
-    chipH: 17, chipPx: 10.5,
     namePx: 16, affPx: 11, scorePx: 15, notePx: 11,
     rowNamePx: 12, rowAffPx: 10, numPx: 10,
     tick: 8,
@@ -491,14 +492,33 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       score: bracketScoreParts(third, left.entryId),
     };
   })();
-  // ブロックの高さ（見出し → 勝者 → 横線 → 選手行）
-  const thirdBlockH = thirdBlock
-    ? T.labelPx + 10
-      + T.chipH + 5 + T.namePx
-      + (thirdBlock.left.affiliation || thirdBlock.right.affiliation ? T.affPx + 5 : 0)
+  // ブロックの高さ（見出し → 勝者 → 横線 → 選手行）。
+  // ダブルスはペアを1人ずつ2行で表示するため、その分の高さを見込む。
+  const thirdWinner = thirdBlock
+    ? (thirdBlock.left.entryId === thirdBlock.winnerEntryId ? thirdBlock.left : thirdBlock.right)
+    : null;
+  const thirdNameLines = thirdWinner ? pairNameLines(thirdWinner.name, isDoubles).length : 0;
+  const thirdRowLines = isDoubles ? 2 : 1;
+  const thirdBlockH = thirdBlock && thirdWinner
+    ? 10 + T.labelPx + 8
+      + thirdNameLines * T.namePx + (thirdNameLines - 1) * 3
+      + (thirdWinner.affiliation ? T.affPx + 9 : 0)
       + (thirdBlock.score.main ? T.scorePx + 4 : 0)
-      + T.tick + 2 + T.rowNamePx + 12
+      + T.tick + 2
+      + thirdRowLines * T.rowNamePx + (thirdRowLines - 1) * 3
+      + 14
     : 0;
+
+  // 中央下部（枠内）に置く協会ロゴ
+  const centerLogo = showLogo
+    ? fitLogo(logos.tcta, Math.min(CENTER_W - 24, 300), 76)
+    : { w: 0, h: 0 };
+  const spaceBelowApex = bracketBodyH - apexRel;
+  const bracketBottomPad = Math.max(16, Math.ceil(centerLogo.h + 24 - spaceBelowApex));
+  // トーナメント表そのものの高さ（協会ロゴはこの範囲の下端に置く）
+  const bracketBodyTotalH = bracketTopPad + bracketBodyH + bracketBottomPad;
+  // 3位決定戦は枠の中（トーナメント表の下）に入れる
+  const bracketH = bracketBodyTotalH + thirdBlockH;
 
   // ---- フッター（シード一覧） ----
   const seedItems = draw.slots
@@ -508,7 +528,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     .filter(t => !t.endsWith('.'));
   const seedPx = 12;
   const seedLines = wrapItems(meas, 'シード　', seedItems, tableW - 24, seedPx, 2);
-  const footerH = (seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4) + thirdBlockH;
+  const footerH = seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4;
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + bracketH + footerH + 14;
@@ -804,49 +824,40 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     ctx.drawImage(
       logos.tcta!,
       centerX - centerLogo.w / 2,
-      bracketAreaY + bracketH - centerLogo.h - 12,
+      bracketAreaY + bracketBodyTotalH - centerLogo.h - 12,
       centerLogo.w,
       centerLogo.h,
     );
   }
 
-  // ---- 3位決定戦（表の下・決勝と同じ形式を少し小さく） ----
-  let footerTopY = bracketAreaY + bracketH + 8;
-  if (thirdBlock) {
+  // ---- 3位決定戦（枠内・トーナメント表の下に決勝と同じ形式で少し小さく） ----
+  if (thirdBlock && thirdWinner) {
     const { left, right, winnerEntryId, score } = thirdBlock;
     const leftWins = left.entryId === winnerEntryId;
+    const blockTop = bracketAreaY + bracketBodyTotalH;
 
     // 見出し
-    const labelY = footerTopY + T.labelPx / 2 + 2;
+    const labelY = blockTop + 10 + T.labelPx / 2;
     drawText(ctx, '3位決定戦', centerX, labelY, T.labelPx, 'center', COL.gray500, 'bold');
 
-    // 勝者ブロック（チップ → 氏名 → 所属 → スコア）と、その下の横線
-    const chipY = labelY + T.labelPx / 2 + 8;
-    const winner = leftWins ? left : right;
-    let cursor = chipY + T.chipH + 5;
-    const nameY = cursor + T.namePx / 2;
-    cursor = nameY + T.namePx / 2;
-    const affY = winner.affiliation ? cursor + 5 : cursor;
-    if (winner.affiliation) cursor = affY + 5;
+    // 勝者（3位）: 氏名（ダブルスは2行）→ 所属 → スコア
+    const winnerLines = pairNameLines(thirdWinner.name, isDoubles);
+    let cursor = labelY + T.labelPx / 2 + 8;
+    const nameYs = winnerLines.map((_, i) => cursor + T.namePx / 2 + i * (T.namePx + 3));
+    cursor = nameYs[nameYs.length - 1] + T.namePx / 2;
+    const affY = thirdWinner.affiliation ? cursor + 7 : cursor;
+    if (thirdWinner.affiliation) cursor = affY + 7;
     const scoreY = score.main ? cursor + 4 + T.scorePx / 2 : cursor;
     if (score.main) cursor = scoreY + T.scorePx / 2;
-    const rowY = cursor + T.tick + 2 + T.rowNamePx / 2;
-
-    // 3位バッジ（決勝の WINNER と同じ意匠）
-    const chipLabel = '3位';
-    meas.font = fontOf('black', T.chipPx);
-    const chipW = Math.ceil(meas.measureText(chipLabel).width) + 24;
-    const chipX = centerX - chipW / 2;
-    const chipGrad = ctx.createLinearGradient(chipX, chipY, chipX, chipY + T.chipH);
-    chipGrad.addColorStop(0, COL.champ1);
-    chipGrad.addColorStop(1, COL.champ3);
-    roundRect(ctx, chipX, chipY, chipW, T.chipH, T.chipH / 2, chipGrad);
-    drawText(ctx, chipLabel, centerX, chipY + T.chipH / 2 + 0.5, T.chipPx, 'center', COL.white, 'black');
+    const rowCenterY = cursor + T.tick + 2
+      + (thirdRowLines * T.rowNamePx + (thirdRowLines - 1) * 3) / 2;
 
     const winnerMaxW = Math.min(tableW - 80, 460);
-    drawText(ctx, winner.name, centerX, nameY, T.namePx, 'center', COL.gray900, 'black', winnerMaxW);
-    if (winner.affiliation) {
-      drawText(ctx, `（${winner.affiliation}）`, centerX, affY, T.affPx, 'center', COL.gray500, 'normal', winnerMaxW);
+    winnerLines.forEach((line, i) => {
+      drawText(ctx, line, centerX, nameYs[i], T.namePx, 'center', COL.gray900, 'black', winnerMaxW);
+    });
+    if (thirdWinner.affiliation) {
+      drawText(ctx, `（${thirdWinner.affiliation}）`, centerX, affY, T.affPx, 'center', COL.gray500, 'normal', winnerMaxW);
     }
     if (score.main) {
       drawText(ctx, score.main, centerX, scoreY, T.scorePx, 'center', COL.win, 'black');
@@ -858,58 +869,65 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
       }
     }
 
-    // 左右の選手（番号 → 氏名 → 所属）。右側はブロックごと右端に寄せる。
+    // 左右の選手（番号 → 氏名（ダブルスは2行）→ 所属）。右側はブロックごと右端に寄せる。
     const sideInset = Math.min(60, tableW * 0.06);
     const xLeftStart = paddingX + sideInset;
     const xRightEnd = paddingX + tableW - sideInset;
     const halfMaxW = centerX - xLeftStart - 26;
+    const lineStep = T.rowNamePx + 3;
 
     const measureSide = (p: typeof left) => {
+      const lines = pairNameLines(p.name, isDoubles);
       meas.font = fontOf('black', T.rowNamePx);
-      const nameW = Math.min(meas.measureText(p.name).width, halfMaxW * 0.72);
+      const nameW = Math.min(
+        Math.max(...lines.map(t => meas.measureText(t).width)),
+        halfMaxW * 0.72,
+      );
       let affW = 0;
       if (p.affiliation) {
         meas.font = fontOf('normal', T.rowAffPx);
         affW = Math.min(meas.measureText(`（${p.affiliation}）`).width, halfMaxW * 0.34);
       }
       const numW = p.number ? 16 : 0;
-      return { nameW, affW, numW, total: numW + nameW + (affW ? affW + 5 : 0) };
+      return { lines, nameW, affW, numW, total: numW + nameW + (affW ? affW + 5 : 0) };
     };
     const drawSide = (p: typeof left, startX: number, isWinner: boolean) => {
       const m = measureSide(p);
+      const topY = rowCenterY - ((m.lines.length - 1) * lineStep) / 2;
       let x = startX;
       if (p.number) {
-        drawText(ctx, String(p.number), x + m.numW - 5, rowY, T.numPx, 'right', COL.gray400, 'medium');
+        // 番号は氏名（2行のときはその中央）に合わせる
+        drawText(ctx, String(p.number), x + m.numW - 5, rowCenterY, T.numPx, 'right', COL.gray400, 'medium');
         x += m.numW;
       }
-      drawText(ctx, p.name, x, rowY, T.rowNamePx, 'left',
-        isWinner ? COL.win : COL.gray800, isWinner ? 'black' : 'bold', m.nameW);
+      m.lines.forEach((line, i) => {
+        drawText(ctx, line, x, topY + i * lineStep, T.rowNamePx, 'left',
+          isWinner ? COL.win : COL.gray800, isWinner ? 'black' : 'bold', m.nameW);
+      });
       x += m.nameW;
       if (p.affiliation) {
-        drawText(ctx, `（${p.affiliation}）`, x + 5, rowY + 0.5, T.rowAffPx, 'left', COL.gray500, 'normal', m.affW);
+        drawText(ctx, `（${p.affiliation}）`, x + 5, rowCenterY + 0.5, T.rowAffPx, 'left', COL.gray500, 'normal', m.affW);
         x += 5 + m.affW;
       }
       return x;
     };
     const leftEndX = drawSide(left, xLeftStart, leftWins);
-    const rightW = measureSide(right).total;
-    drawSide(right, Math.max(centerX + 26, xRightEnd - rightW), !leftWins);
+    const rightStartX = Math.max(centerX + 26, xRightEnd - measureSide(right).total);
+    drawSide(right, rightStartX, !leftWins);
 
     // 横線（勝った側は赤・太め）＋ 勝者へ立ち上がる縦線
-    const lineL1 = leftEndX + 10;
-    const lineR2 = Math.max(centerX + 26, xRightEnd - rightW) - 10;
     ctx.lineCap = 'round';
-    drawLine(ctx, lineL1, rowY, centerX, rowY, leftWins ? COL.win : COL.gray300, leftWins ? 2.6 : 1.4);
-    drawLine(ctx, centerX, rowY, lineR2, rowY, leftWins ? COL.gray300 : COL.win, leftWins ? 1.4 : 2.6);
-    drawLine(ctx, centerX, rowY, centerX, rowY - T.tick, COL.win, 2.6);
+    drawLine(ctx, leftEndX + 10, rowCenterY, centerX, rowCenterY,
+      leftWins ? COL.win : COL.gray300, leftWins ? 2.6 : 1.4);
+    drawLine(ctx, centerX, rowCenterY, rightStartX - 10, rowCenterY,
+      leftWins ? COL.gray300 : COL.win, leftWins ? 1.4 : 2.6);
+    drawLine(ctx, centerX, rowCenterY, centerX, rowCenterY - T.tick, COL.win, 2.6);
     ctx.lineCap = 'butt';
-
-    footerTopY += thirdBlockH;
   }
 
-  // ---- フッター（シード一覧・中央揃え） ----
+  // ---- フッター（シード一覧・枠外に中央揃え） ----
   {
-    let y = footerTopY + seedPx / 2 + 4;
+    let y = bracketAreaY + bracketH + 8 + seedPx / 2 + 4;
     for (const line of seedLines) {
       drawText(ctx, line, paddingX + tableW / 2, y, seedPx, 'center', COL.gray500, 'medium');
       y += seedPx + 6;
