@@ -290,7 +290,7 @@ export default function AppLayout() {
 
       {/* ===== PC: 画面の上端から立てる常設メニュー（ヘッダーの高さぶんも含む） ===== */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
+        className={`side-menu hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
           sidebarCollapsed ? 'w-[64px]' : 'w-56'
         }`}
         style={{ background: 'linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%)' }}
@@ -366,32 +366,16 @@ export default function AppLayout() {
 
       {/* ===== 右側: ヘッダー + 流れる表示バー + 本体 ===== */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* ===== ヘッダー（PC=ページ名+大会名 / スマホ=大会名+メニューボタン） ===== */}
-        <header className="header-main flex items-center gap-3 px-4 lg:px-5 h-[56px] shrink-0 z-30">
+        {/* ===== ヘッダー（左=メニュータイトル / 右=メニューボタン。大会名は下の表示バーへ） ===== */}
+        <header className="header-main flex items-center gap-3 px-4 lg:px-5 shrink-0 z-30">
           <HeaderBackdrop />
 
-          {/* 左: 現在ページ名（PCのみ。開閉はサイドバー側のボタンで行う） */}
-          {currentPageLabel && (
-            <div className="header-page-name min-w-0">
-              {CurrentPageIcon && (
-                <CurrentPageIcon style={{ width: 16, height: 16 }} className="shrink-0" />
-              )}
-              <span className="truncate">{currentPageLabel}</span>
-            </div>
-          )}
-
-          {/* 協会名 + 大会名（スマホは左寄せ・PCは右寄せ） */}
-          <div className="header-title-right">
-            {(() => {
-              const tName = isMixedImported ? mixedTournamentInfo?.name : isTeamImported ? teamTournamentInfo?.name : tournament?.name;
-              const mainName = tName
-                ? tName.replace(/\(.*?\)|（.*?）/g, '').trim()
-                : '大会運営システム';
-              return (<>
-                <p className="header-org-name">鳥取市テニス協会</p>
-                <h1 className="header-title" title={mainName}>{mainName}</h1>
-              </>);
-            })()}
+          {/* 左: 現在ページ名（メニュータイトル） */}
+          <div className="header-page-name min-w-0">
+            {CurrentPageIcon && (
+              <CurrentPageIcon style={{ width: 18, height: 18 }} className="shrink-0" />
+            )}
+            <span className="truncate">{currentPageLabel || '大会運営システム'}</span>
           </div>
 
           {/* 右: メニューボタン（スマホのみ・開くと × に変わる） */}
@@ -419,17 +403,18 @@ export default function AppLayout() {
             <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
               <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
                 <div className="info-ticker flex items-center h-full whitespace-nowrap">
+                  {/* 大会名はヘッダーではなくここに流す */}
+                  <span className="info-ticker-item info-ticker-lead">
+                    <span>{displayName || '大会運営システム'}</span>
+                    <span className="info-ticker-dot" />
+                  </span>
                   {activeTickerItems.length > 0 ? activeTickerItems.map((item, i) => (
                     <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                       {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
                       <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
                       {i < activeTickerItems.length - 1 && <span className="info-ticker-dot" />}
                     </span>
-                  )) : (
-                    <span className="info-ticker-item">
-                      <span>{displayName || '大会運営システム'}</span>
-                    </span>
-                  )}
+                  )) : null}
                 </div>
               </div>
             </div>
