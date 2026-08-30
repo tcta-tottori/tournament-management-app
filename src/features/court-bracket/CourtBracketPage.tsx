@@ -8,7 +8,7 @@ import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
 import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil, Medal, UserPen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil, Medal, UserPen, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -22,6 +22,7 @@ import PlayerNameDialog, { type PlayerNameTarget } from '../../components/ui/Pla
 import { buildLeagueCourtMap, freeLeagueCourts, MAX_LEAGUE_COURTS } from '../draw/leagueCourts';
 import { isThirdPlaceMatch, THIRD_PLACE_LABEL, wantsThirdPlace } from '../draw/thirdPlace';
 import EventResultPreview from '../results/EventResultPreview';
+import { sortEventsByClass } from '../data/eventOrder';
 import { isEventComplete } from '../results/eventCompletion';
 import {
   getGameRuleText, getGameRulesText, getMatchFormat, getRoundName,
@@ -37,6 +38,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const [selectedEventIdx, setSelectedEventIdx] = useState<number>(0);
   // スコア入力対象の試合キー "round-position"
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
+  /** クラス名をタップして開くクラス一覧 */
+  const [classListOpen, setClassListOpen] = useState(false);
+  /** 右下の編集ボタンで開くメニュー（あたり修正・名前修正など） */
+  const [editMenuOpen, setEditMenuOpen] = useState(false);
 
   // === あたり（対戦の組み合わせ）修正モード ===
   // 取り込んだドロー表と実際の組み合わせが違っていた場合に、
@@ -49,12 +54,14 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   /** 修正操作の履歴（「1つ戻す」用） */
   const [draftHistory, setDraftHistory] = useState<DrawSlotData[][]>([]);
 
-  const events = useLiveQuery(
+  const rawEvents = useLiveQuery(
     () => currentTournamentId
       ? db.events.where('tournamentId').equals(currentTournamentId).toArray()
       : [],
     [currentTournamentId]
   ) || [];
+  // クラスは「男子→女子」「アルファベット→年齢」の順に並べる
+  const events = useMemo(() => sortEventsByClass(rawEvents), [rawEvents]);
 
   const selectedEventId = events[selectedEventIdx]?.eventId || '';
   const selectedEvent = events[selectedEventIdx];
@@ -606,25 +613,23 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           </button>
 
           <div className="flex-1 min-w-0 text-center">
-            <h2 className="text-base font-bold text-gray-800 truncate">
-              <Trophy className="w-4 h-4 inline-block mr-1 text-primary-500" />
-              {selectedEvent?.name || '種目を選択'}
-            </h2>
+            {/* クラス名をタップすると、下にクラス一覧が開く */}
+            <button
+              onClick={() => setClassListOpen(v => !v)}
+              className="max-w-full inline-flex items-center gap-1 text-base font-bold text-gray-900 rounded px-1 hover:bg-gray-100 transition-colors"
+              aria-expanded={classListOpen}
+              title="タップしてクラスを選ぶ"
+            >
+              <Trophy className="w-4 h-4 shrink-0 text-primary-500" />
+              <span className="truncate">{selectedEvent?.name || '種目を選択'}</span>
+              <ChevronDown
+                className={`w-4 h-4 shrink-0 text-gray-500 transition-transform ${classListOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
             {selectedEvent && (
-              enableScoreInput ? (
-                <button
-                  onClick={() => setRulesDialogOpen(true)}
-                  title="ゲームルールを修正"
-                  className="mt-0.5 max-w-full inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-primary-700 hover:bg-primary-50 rounded px-1 -mx-1 py-0.5 transition-colors"
-                >
-                  <span className="truncate">{getGameRulesText(selectedEvent)}</span>
-                  <Pencil className="w-2.5 h-2.5 shrink-0 text-primary-500" />
-                </button>
-              ) : (
-                <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                  {getGameRulesText(selectedEvent)}
-                </p>
-              )
+              <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                {getGameRulesText(selectedEvent)}
+              </p>
             )}
           </div>
 
@@ -635,6 +640,29 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
+
+        {/* クラス一覧（見出しをタップすると開く） */}
+        {classListOpen && (
+          <div className="mt-1.5 max-h-[45vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm divide-y divide-gray-100">
+            {events.map((evt, i) => (
+              <button
+                key={evt.eventId}
+                onClick={() => { setSelectedEventIdx(i); setClassListOpen(false); }}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors ${
+                  i === selectedEventIdx ? 'bg-primary-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <Trophy className={`w-4 h-4 shrink-0 ${i === selectedEventIdx ? 'text-primary-500' : 'text-gray-300'}`} />
+                <span className={`flex-1 min-w-0 truncate text-sm ${
+                  i === selectedEventIdx ? 'font-bold text-primary-700' : 'font-medium text-gray-800'
+                }`}>
+                  {evt.name}
+                </span>
+                <ChevronRight className="w-4 h-4 shrink-0 text-gray-300" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* 進捗バー + コート使用状況 */}
         <div className="flex items-center gap-3 mt-1.5 text-[10px]">
@@ -650,99 +678,151 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             </span>
           </div>
           {progress.playing > 0 && (
-            <span className="flex items-center gap-0.5 text-primary-600 font-bold">
+            <span className="flex items-center gap-0.5 text-gray-700 font-bold">
               <Timer className="w-3 h-3" />
               {progress.playing}試合中
             </span>
           )}
         </div>
 
-        {/* 表示回戦の絞り込み + 結果画像プレビュー */}
-        {(canAdjustRounds || resultPreviewOpts) && (
-          <div className="flex items-center justify-between gap-2 mt-1.5">
-            {canAdjustRounds ? (
-              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-1 py-0.5">
+        {/* 表示範囲の切り替え（大きく中央）と、編集メニュー（右下） */}
+        {!editMode && (canAdjustRounds || resultPreviewOpts || (enableScoreInput && drawSize > 0)) && (
+          <div className="relative mt-2 flex items-center justify-center min-h-[38px]">
+            {canAdjustRounds && (
+              <div className="inline-flex items-center gap-0.5 rounded-full border border-gray-300 bg-white px-1 py-0.5 shadow-sm">
                 <button
                   onClick={() => setStartRound(Math.max(0, startRound - 1))}
                   disabled={startRound === 0}
-                  className="p-0.5 rounded-full text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="p-1.5 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-25 disabled:hover:bg-transparent"
                   title="前の回戦を表示する"
                   aria-label="前の回戦を表示する"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setStartRound(null)}
-                  className="flex items-center gap-1 px-1.5 text-[10px] font-bold text-gray-600 whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm font-bold text-gray-900 whitespace-nowrap"
                   title="タップで自動（決着済みの回戦を省略）に戻す"
                 >
                   {startRound === 0
-                    ? <Eye className="w-3 h-3 text-gray-400" />
-                    : <EyeOff className="w-3 h-3 text-primary-500" />}
+                    ? <Eye className="w-4 h-4 text-gray-400" />
+                    : <EyeOff className="w-4 h-4 text-primary-500" />}
                   {startRoundLabel}
                 </button>
                 <button
                   onClick={() => setStartRound(Math.min(maxStartRound, startRound + 1))}
                   disabled={startRound >= maxStartRound}
-                  className="p-0.5 rounded-full text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="p-1.5 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-25 disabled:hover:bg-transparent"
                   title="終わった回戦を隠す"
                   aria-label="終わった回戦を隠す"
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
-            ) : <span />}
-            {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} size="sm" />}
+            )}
+
+            {/* 右下: 結果画像プレビューと編集メニュー */}
+            <div className="absolute right-0 bottom-0 flex items-center gap-1.5">
+              {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} size="sm" />}
+              {enableScoreInput && drawSize > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setEditMenuOpen(v => !v)}
+                    className={`flex items-center justify-center w-9 h-9 rounded-full border transition-colors ${
+                      editMenuOpen || nameEditMode
+                        ? 'bg-primary-500 border-primary-500 text-white'
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="あたり・名前・ゲームルールの修正"
+                    aria-label="修正メニューを開く"
+                    aria-expanded={editMenuOpen}
+                  >
+                    <SlidersHorizontal className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
+                  </button>
+
+                  {editMenuOpen && (
+                    <>
+                      {/* 外側をタップして閉じる */}
+                      <button
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setEditMenuOpen(false)}
+                        aria-label="メニューを閉じる"
+                      />
+                      {/* 上に開くとヘッダーの外にはみ出して隠れるため、下向きに開く */}
+                      <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                          <span className="text-[11px] font-bold text-gray-500">修正メニュー</span>
+                          <button onClick={() => setEditMenuOpen(false)} className="p-0.5 text-gray-400 hover:text-gray-700" aria-label="閉じる">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {!isRoundRobin && (
+                          <button
+                            onClick={() => { setEditMenuOpen(false); startEdit(); }}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-800 hover:bg-gray-50 text-left"
+                          >
+                            <Shuffle className="w-4 h-4 shrink-0 text-primary-500" />
+                            あたりを修正
+                          </button>
+                        )}
+                        {!isRoundRobin && drawSize >= 4 && (
+                          <button
+                            onClick={() => { setEditMenuOpen(false); void toggleThirdPlace(); }}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-800 hover:bg-gray-50 text-left"
+                          >
+                            <Medal className="w-4 h-4 shrink-0 text-primary-500" />
+                            3位決定戦
+                            <span className={`ml-auto text-[11px] font-bold ${hasThirdPlace ? 'text-primary-600' : 'text-gray-400'}`}>
+                              {hasThirdPlace ? 'あり' : 'なし'}
+                            </span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { setEditMenuOpen(false); setNameEditMode(v => !v); }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-800 hover:bg-gray-50 text-left"
+                        >
+                          <UserPen className="w-4 h-4 shrink-0 text-primary-500" />
+                          名前を修正
+                          {nameEditMode && <span className="ml-auto text-[11px] font-bold text-primary-600">修正中</span>}
+                        </button>
+                        <button
+                          onClick={() => { setEditMenuOpen(false); setRulesDialogOpen(true); }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-800 hover:bg-gray-50 text-left"
+                        >
+                          <Pencil className="w-4 h-4 shrink-0 text-primary-500" />
+                          ゲームルールを変更
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* あたり（対戦の組み合わせ）修正・3位決定戦・名前の修正 */}
-        {enableScoreInput && drawSize > 0 && (
+        {/* 名前の修正中は、枠をタップして直せることを知らせる */}
+        {!editMode && nameEditMode && (
+          <div className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+            <UserPen className="w-3.5 h-3.5 shrink-0 text-primary-500" />
+            <span className="text-[11px] font-bold text-gray-800">名前を修正中</span>
+            <span className="text-[10px] text-gray-600 flex-1">枠をタップすると氏名・ふりがな・所属を直せます</span>
+            <button
+              onClick={() => setNameEditMode(false)}
+              className="text-[10px] font-bold text-gray-600 border border-gray-300 bg-white rounded-full px-2 py-0.5 hover:bg-gray-100"
+            >
+              やめる
+            </button>
+          </div>
+        )}
+
+        {/* あたり（対戦の組み合わせ）修正中の操作 */}
+        {enableScoreInput && drawSize > 0 && editMode && (
           <div className="mt-1.5">
-            {!editMode ? (
-              <div className="flex items-center gap-1.5 flex-wrap">
-              {!isRoundRobin && (
-              <button
-                onClick={startEdit}
-                className="flex items-center gap-1 text-[10px] font-bold text-gray-600 border border-gray-200 bg-gray-50 rounded-full px-2 py-1 hover:bg-gray-100"
-                title="ドロー表と対戦の組み合わせが違う場合に、枠を入れ替えて直します"
-              >
-                <Shuffle className="w-3 h-3" />あたりを修正
-              </button>
-              )}
-              {/* 3位決定戦（準決勝の敗者同士）の有無 */}
-              {!isRoundRobin && drawSize >= 4 && (
-                <button
-                  onClick={() => void toggleThirdPlace()}
-                  className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
-                    hasThirdPlace
-                      ? 'bg-primary-50 text-primary-700 border-primary-300 hover:bg-primary-100'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                  }`}
-                  title="準決勝で負けた2組で3位決定戦を行う場合に追加します"
-                >
-                  <Medal className="w-3 h-3" />
-                  3位決定戦{hasThirdPlace ? 'あり' : 'なし'}
-                </button>
-              )}
-              {/* 選手名の修正（エントリー確定後でも直せる） */}
-              <button
-                onClick={() => setNameEditMode(v => !v)}
-                className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
-                  nameEditMode
-                    ? 'bg-primary-500 text-white border-primary-500 hover:bg-primary-600'
-                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                }`}
-                title="氏名・ふりがな・所属を直します（エントリー確定後でも修正できます）"
-              >
-                <UserPen className="w-3 h-3" />
-                {nameEditMode ? '名前を修正中（枠をタップ）' : '名前を修正'}
-              </button>
-              </div>
-            ) : (
+            {(
               <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold text-primary-700 flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
                     <Shuffle className="w-3 h-3" />あたり修正中
                   </span>
                   <span className="text-[10px] text-gray-600 flex-1 min-w-[150px]">
@@ -862,7 +942,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                         key={c.courtId}
                         className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                           isFree
-                            ? 'bg-primary-50 text-primary-700 border-primary-300'
+                            ? 'bg-primary-50 text-gray-800 border-primary-300'
                             : 'bg-primary-600 text-white border-primary-600'
                         }`}
                       >
@@ -916,7 +996,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex-1 min-w-0 text-center">
-                          <span className={`text-sm truncate ${w1 ? 'font-bold text-primary-700' : 'font-semibold text-gray-900'}`}>{m.player1Name}</span>
+                          <span className={`text-sm truncate ${w1 ? 'font-bold text-gray-800' : 'font-semibold text-gray-900'}`}>{m.player1Name}</span>
                         </div>
                         <div className="shrink-0 text-center min-w-[52px]">
                           {isFinished && m.score
@@ -924,15 +1004,15 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                             : <span className="text-[11px] font-bold text-gray-300">vs</span>}
                         </div>
                         <div className="flex-1 min-w-0 text-center">
-                          <span className={`text-sm truncate ${w2 ? 'font-bold text-primary-700' : 'font-semibold text-gray-900'}`}>{m.player2Name}</span>
+                          <span className={`text-sm truncate ${w2 ? 'font-bold text-gray-800' : 'font-semibold text-gray-900'}`}>{m.player2Name}</span>
                         </div>
                       </div>
                       <div className="flex items-center justify-center gap-2 mt-1">
                         {court && (isPlaying || isFinished) && (
-                          <span className="text-[10px] font-bold text-primary-700">{court.name}番コート</span>
+                          <span className="text-[10px] font-bold text-gray-800">{court.name}番コート</span>
                         )}
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                          isPlaying ? 'bg-primary-100 text-primary-700'
+                          isPlaying ? 'bg-primary-100 text-gray-800'
                           : isFinished ? 'bg-gray-200 text-gray-500'
                           : 'bg-gray-100 text-gray-500'}`}>
                           {isPlaying ? '試合中' : isFinished ? '終了' : '待機'}

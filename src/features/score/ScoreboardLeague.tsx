@@ -370,15 +370,15 @@ export default function ScoreboardLeague({
               key={idx}
               className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
                 isDone
-                  ? 'bg-primary-100 text-primary-700'
+                  ? 'bg-primary-100 text-gray-800'
                   : isPlaying
-                    ? 'bg-primary-100 text-primary-700 animate-pulse'
+                    ? 'bg-primary-100 text-gray-800 animate-pulse'
                     : isCurrent
-                      ? 'bg-primary-200 text-primary-800 font-bold league-match-blink'
+                      ? 'bg-primary-200 text-gray-900 font-bold league-match-blink'
                       : 'bg-gray-100 text-gray-500'
               }`}
             >
-              {isCurrent && <span className="text-primary-600 mr-0.5">▶</span>}
+              {isCurrent && <span className="text-gray-700 mr-0.5">▶</span>}
               <span className={isDone ? 'line-through' : ''}>
                 {toCircledNum(a + 1)}-{toCircledNum(b + 1)}
               </span>
@@ -389,7 +389,7 @@ export default function ScoreboardLeague({
       </div>
       {allMatchesDone && (
         <div className="text-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-bold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-100 text-gray-800 rounded-full text-xs font-bold">
             🏆 全試合完了
           </span>
         </div>

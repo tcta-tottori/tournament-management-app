@@ -27,12 +27,36 @@ const CHANGELOG: ChangelogEntry[] = [
     timeGroups: [
       {
         time: '—',
+        summary: '画面の見た目の調整',
+        changes: [
+          { type: 'design', text: 'メニューのアイコンを白で太く・大きくし、開いたときに上から順に出てくるようにしました' },
+          { type: 'design', text: 'メニュー下部の音声・観戦用などのボタンを、アイコン大きめ・文字小さめに整えました。協会ロゴも白抜きの画像に差し替えています' },
+          { type: 'design', text: '画面の文字を基本的に黒にし、赤はアイコンや現在地などの差し色に絞りました' },
+          { type: 'chore', text: 'データ画面の「データ管理」の見出しを削除しました（ページ名はヘッダーに出ます）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'ドロー画面',
+        changes: [
+          { type: 'feat', text: 'クラス名をタップすると、下にクラス一覧が開いて選べるようになりました' },
+          { type: 'feat', text: 'クラスの並び順を「男子→女子」、各性別の中は「アルファベット（A・B・C…）→年齢（45・55・65…）」に統一しました' },
+          { type: 'design', text: '表示範囲の切り替え（全回戦表示／準決勝以降）を大きく中央に置きました' },
+          { type: 'design', text: 'あたりの修正・3位決定戦・名前の修正・ゲームルールの変更を、右下の編集ボタンから開くメニューにまとめました' },
+        ],
+      },
+      {
+        time: '—',
         summary: 'ヘッダーとメニュー',
         changes: [
           { type: 'design', text: 'ヘッダーの背景を協会サイトのキービジュアル（白地に赤・淡赤・白の四角が浮かぶ構図）のアニメーションにしました。四角が左から右へゆっくり流れ、ズームしながら現れて消えます' },
           { type: 'design', text: 'メニュー（スライドメニュー・PCのサイドバー）とメニューボタンを赤背景・白文字にしました。現在地は白地に赤文字で反転します' },
           { type: 'design', text: 'PCではメニューを画面の上端から立て、ヘッダーの高さぶんまで表示するようにしました' },
-          { type: 'design', text: 'スマホではヘッダーをやめ、流れる表示バーに大会名を流し、右端に現在のページ名とメニューボタンを置きました（画面を縦に広く使えます）' },
+          { type: 'design', text: 'ヘッダーは左に現在のページ名、右にメニューボタン（スマホ）を置く形にし、大会名は流れる表示バーの先頭に流すようにしました' },
+          { type: 'design', text: 'スマホではヘッダーを端末のステータスバーの下まで敷き、境目が出ないようにしました（四角のアニメーションもステータスバーの高さまで表示されます）' },
+          { type: 'design', text: '四角のアニメーションを速くし、大きくなって消えるもの・小さくなって消えるもの・道半ばから現れるものを混ぜました' },
+          { type: 'design', text: 'スマホのメニューボタンを協会サイトと同じ白地に黒線にし、開くと × に変わるようにしました。ボタンまわりはヘッダーの意匠を白くぼかして見やすくしています' },
+          { type: 'design', text: 'スマホのメニューを全画面表示にし、1行ずつ矢印付きで並べる協会サイトと同じ形にしました' },
         ],
       },
       {
@@ -59,6 +83,7 @@ const CHANGELOG: ChangelogEntry[] = [
           { type: 'feat', text: 'PCに入れたフォントを使えるように。無料の「衡山毛筆フォント行書」などを入れると本格的な筆字で名入れできます' },
           { type: 'feat', text: '一覧に無いフォントも「名前で指定」欄に入力すれば使えるようにしました' },
           { type: 'chore', text: '賞状に刷るのは既定で氏名のみにしました（賞位・クラス名・所属は「印刷する項目」で追加できます）' },
+          { type: 'feat', text: '氏名の位置を固定し、賞位・クラス名・所属はその上に積み上げるようにしました。項目を増やしても氏名がずれません' },
           { type: 'chore', text: 'ペアの氏名の区切りを全角スペースのみにしました（「・」「組」を付けない）' },
           { type: 'feat', text: 'ダブルスは氏名を入れ替えた賞状をもう1枚自動で印刷。2人それぞれに渡せます' },
           { type: 'feat', text: '決勝が終わったクラスの入賞者を一括追加、名前を後から書く「ひな形」追加にも対応' },
@@ -567,8 +592,8 @@ const CHANGELOG: ChangelogEntry[] = [
 ];
 
 const TYPE_CONFIG = {
-  feat:   { label: '新機能', icon: Sparkles,   color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-200' },
-  fix:    { label: '修正',   icon: Bug,         color: 'text-primary-600',   bg: 'bg-primary-50',   border: 'border-primary-200' },
+  feat:   { label: '新機能', icon: Sparkles,   color: 'text-gray-700', bg: 'bg-primary-50', border: 'border-primary-200' },
+  fix:    { label: '修正',   icon: Bug,         color: 'text-gray-700',   bg: 'bg-primary-50',   border: 'border-primary-200' },
   design: { label: 'デザイン', icon: Paintbrush, color: 'text-gray-600', bg: 'bg-gray-50',  border: 'border-gray-200' },
   chore:  { label: 'その他', icon: Wrench,      color: 'text-gray-500',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 } as const;
@@ -662,7 +687,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-primary-700">{entry.version}</span>
+                      <span className="text-sm font-bold text-gray-800">{entry.version}</span>
                       <span className="text-[11px] text-gray-400">{entry.date}</span>
                       {entry === CHANGELOG[0] && (
                         <span className="px-1.5 py-0.5 text-[9px] font-bold text-white bg-primary-500 rounded-full uppercase tracking-wider">New</span>
@@ -696,7 +721,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                           >
                             <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span className="text-[11px] font-mono text-gray-500 shrink-0 tabular-nums">{group.time}</span>
-                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-primary-700 font-medium' : 'text-gray-600'}`}>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>
                               {group.summary}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -740,7 +765,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
             href="https://github.com/TCTA-Tottori/tournament-management-app"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5 transition-colors"
+            className="text-[11px] text-gray-700 hover:text-gray-800 font-medium flex items-center gap-0.5 transition-colors"
           >
             GitHub
             <ChevronRight className="w-3 h-3" />

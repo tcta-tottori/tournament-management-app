@@ -39,7 +39,7 @@ function renderCategoryShortLabel(label: string): React.ReactNode {
 }
 
 const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; text: string; icon: typeof Trophy }> = {
-  '1st': { grad: 'from-primary-400 to-primary-500', bg: 'bg-primary-50', text: 'text-primary-700', icon: Trophy },
+  '1st': { grad: 'from-primary-400 to-primary-500', bg: 'bg-primary-50', text: 'text-gray-800', icon: Trophy },
   '2nd': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Medal },
   '3rd': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Award },
   '4th': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Sparkles },
@@ -51,12 +51,12 @@ const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; tex
  */
 const LEAGUE_BADGE_STYLES = [
   { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
-  { bg: 'bg-primary-100', text: 'text-primary-700', border: 'border-primary-200' },
+  { bg: 'bg-primary-100', text: 'text-gray-800', border: 'border-primary-200' },
   { bg: 'bg-gray-100',  text: 'text-gray-700',  border: 'border-gray-200' },
-  { bg: 'bg-primary-100',    text: 'text-primary-700',    border: 'border-primary-200' },
-  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
+  { bg: 'bg-primary-100',    text: 'text-gray-800',    border: 'border-primary-200' },
+  { bg: 'bg-primary-100',   text: 'text-gray-800',   border: 'border-primary-200' },
   { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
-  { bg: 'bg-primary-100',    text: 'text-primary-700',    border: 'border-primary-200' },
+  { bg: 'bg-primary-100',    text: 'text-gray-800',    border: 'border-primary-200' },
   { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
 ];
 
@@ -65,13 +65,13 @@ const FALLBACK_LEAGUE_STYLE = { bg: 'bg-gray-100', text: 'text-gray-600', border
 /** 種目カラー（予選リーグと統一） */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   MIX: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
-  WD:  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
+  WD:  { bg: 'bg-primary-100',   text: 'text-gray-800',   border: 'border-primary-200' },
   MD:  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
   // 団体戦（クラブ対抗）の種目。未定義だと配色参照でクラッシュするため必須。
   D3:  { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-200' },
   D2:  { bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-200' },
-  D1:  { bg: 'bg-primary-100',   text: 'text-primary-700',   border: 'border-primary-200' },
-  S2:  { bg: 'bg-primary-100',  text: 'text-primary-700',  border: 'border-primary-200' },
+  D1:  { bg: 'bg-primary-100',   text: 'text-gray-800',   border: 'border-primary-200' },
+  S2:  { bg: 'bg-primary-100',  text: 'text-gray-800',  border: 'border-primary-200' },
   S1:  { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-200' },
 };
 
@@ -342,7 +342,7 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-gray-800 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST
         </button>
@@ -369,7 +369,7 @@ export default function TeamBracketView() {
               }
             }
           }}
-          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-primary-700 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
+          className="flex items-center justify-center py-2.5 rounded-xl text-xs font-black tracking-wider bg-gradient-to-b from-primary-50 to-primary-100/60 text-gray-800 border border-primary-200/80 shadow-sm hover:shadow hover:border-primary-300 active:scale-95 transition-all"
         >
           TEST（ALL）
         </button>
@@ -645,12 +645,12 @@ export default function TeamBracketView() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                       {isFinished && (
-                                        <span className="flex items-center gap-0.5 text-primary-600 font-bold">
+                                        <span className="flex items-center gap-0.5 text-gray-700 font-bold">
                                           <Check className="w-2.5 h-2.5" />完了
                                         </span>
                                       )}
                                       {isPlaying && (
-                                        <span className="flex items-center gap-1 text-primary-600 font-bold animate-pulse">
+                                        <span className="flex items-center gap-1 text-gray-700 font-bold animate-pulse">
                                           <span className="w-2 h-2 rounded-full bg-primary-500" />
                                           対戦中
                                         </span>
@@ -793,7 +793,7 @@ export default function TeamBracketView() {
                                         const h = Math.floor(el / 60);
                                         const m = el % 60;
                                         return (
-                                          <span className="font-mono text-[10px] font-black text-primary-600 tabular-nums">
+                                          <span className="font-mono text-[10px] font-black text-gray-700 tabular-nums">
                                             {h}:{String(m).padStart(2, '0')}
                                           </span>
                                         );
@@ -891,7 +891,7 @@ export default function TeamBracketView() {
                       disabled={isUsed}
                       className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
                         ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
-                          isSelected ? 'border-primary-500 bg-primary-50 text-primary-700' :
+                          isSelected ? 'border-primary-500 bg-primary-50 text-gray-800' :
                           'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >
                       {c.replace('コート', '')}
@@ -902,7 +902,7 @@ export default function TeamBracketView() {
               </div>
               {courtAssignSelected.length > 0 && (
                 <div className="mb-3 text-[10px] text-gray-500 text-center">
-                  選択中: <span className="font-bold text-primary-600">{courtAssignSelected.sort((a, b) => parseInt(a) - parseInt(b)).join('・')}</span>
+                  選択中: <span className="font-bold text-gray-700">{courtAssignSelected.sort((a, b) => parseInt(a) - parseInt(b)).join('・')}</span>
                 </div>
               )}
               <div className="flex gap-2">
@@ -1350,7 +1350,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-primary-200 overflow-hidden">
       <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-2.5 border-b border-primary-100 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-primary-800 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
           <Shuffle size={14} className="text-primary-600" />
           1位トーナメント 抽選
         </h3>
@@ -1376,7 +1376,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
                       disabled={isAssigned || spinning}
                       className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                         isAssigned ? 'bg-primary-50 border-primary-200 text-primary-500 line-through opacity-60' :
-                        isSelected ? 'bg-primary-100 border-primary-400 text-primary-800 ring-1 ring-primary-300' :
+                        isSelected ? 'bg-primary-100 border-primary-400 text-gray-900 ring-1 ring-primary-300' :
                         'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -1390,7 +1390,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
             {/* ルーレットボタン */}
             {activeTeam && !spinning && (
               <div className="mb-3 flex items-center gap-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded-lg">
-                <span className="text-[10px] text-primary-700 flex-1 truncate">
+                <span className="text-[10px] text-gray-800 flex-1 truncate">
                   <span className="font-bold">{activeTeam.leagueId}</span> {activeTeam.teamName}
                 </span>
                 <button
@@ -1402,7 +1402,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
               </div>
             )}
             {spinning && (
-              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-primary-700 animate-pulse">
+              <div className="mb-3 py-2 bg-primary-100 border border-primary-300 rounded-lg text-center text-xs font-bold text-gray-800 animate-pulse">
                 抽選中...
               </div>
             )}
@@ -1478,7 +1478,7 @@ function TeamRouletteDrawPanel({ bracket, onRebuild }: {
           </>
         ) : (
           <div className="text-center py-4">
-            <div className="text-primary-600 font-bold text-sm mb-2">抽選完了</div>
+            <div className="text-gray-700 font-bold text-sm mb-2">抽選完了</div>
             <p className="text-xs text-gray-500">トーナメント表に反映されました</p>
           </div>
         )}
@@ -1716,7 +1716,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
         </div>
 
         {(hasInProgress || hasFinished) && (
-          <div className="mb-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded text-[10px] text-primary-700 font-bold">
+          <div className="mb-2 px-2 py-1.5 bg-primary-50 border border-primary-200 rounded text-[10px] text-gray-800 font-bold">
             ⚠ 確定すると{hasInProgress ? '対戦中の試合と' : ''}入力済みのスコアがリセットされます。
           </div>
         )}
@@ -1772,7 +1772,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
                               )}
                             </>
                           ) : canPlaceTeam ? (
-                            <span className="text-primary-600">← ここに配置</span>
+                            <span className="text-gray-700">← ここに配置</span>
                           ) : (
                             <span className="text-gray-300">―</span>
                           )}
@@ -1801,7 +1801,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
         {/* 未配置チームプール（自カテゴリ） */}
         {localUnassigned.length > 0 && (
           <div className="mb-2 p-2 rounded-lg border border-primary-200 bg-primary-50/50">
-            <div className="text-[9px] text-primary-700 font-bold mb-1.5">
+            <div className="text-[9px] text-gray-800 font-bold mb-1.5">
               未配置チーム（タップ → 配置先スロットをタップ）
             </div>
             <div className="flex flex-wrap gap-1">
@@ -1817,7 +1817,7 @@ function TeamBracketReorderPanel({ bracket, allBrackets, customLabels, onClose, 
                     }}
                     className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
                       isSelected
-                        ? 'bg-primary-200 border-primary-500 text-primary-900 ring-2 ring-primary-300'
+                        ? 'bg-primary-200 border-primary-500 text-gray-900 ring-2 ring-primary-300'
                         : 'bg-white border-gray-200 text-gray-700 hover:border-primary-300'
                     }`}
                   >

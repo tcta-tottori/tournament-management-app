@@ -1746,7 +1746,7 @@ ${printableMatches.map(m => {
     waiting: { text: '待機', color: 'bg-gray-100 text-gray-500' },
     ready: { text: '準備完了', color: 'bg-primary-50 text-primary-500' },
     playing: { text: '試合中', color: 'bg-primary-100 text-primary-500' },
-    finished: { text: '終了', color: 'bg-primary-50 text-primary-600' },
+    finished: { text: '終了', color: 'bg-primary-50 text-gray-700' },
     walkover: { text: '不戦勝', color: 'bg-primary-100 text-warning' },
   };
 
@@ -1883,7 +1883,7 @@ ${printableMatches.map(m => {
 
                     let statusDisplay: { text: string; color: string };
                     if (isPlaying) {
-                      statusDisplay = { text: '試合中', color: 'bg-primary-100 text-primary-700' };
+                      statusDisplay = { text: '試合中', color: 'bg-primary-100 text-gray-800' };
                     } else if (isFinished) {
                       statusDisplay = st;
                     } else if (!hasPlayers) {
@@ -1996,7 +1996,7 @@ ${printableMatches.map(m => {
                             {schedTime && <span className="text-[10px] text-gray-400 font-mono">{schedTime}</span>}
                             <div className="flex-1" />
                             {elapsedLabel && (
-                              <span className="absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-700 text-[11px] font-bold font-mono">
+                              <span className="absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary-100 text-gray-800 text-[11px] font-bold font-mono">
                                 <Clock className="w-3 h-3" />
                                 {elapsedLabel}
                               </span>
@@ -2013,7 +2013,7 @@ ${printableMatches.map(m => {
                               {evt && (
                                 <button
                                   onClick={() => openRuleEditor(evt)}
-                                  className="p-1.5 text-primary-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg border border-primary-200 transition-all"
+                                  className="p-1.5 text-primary-500 hover:text-gray-700 hover:bg-primary-50 rounded-lg border border-primary-200 transition-all"
                                   title="試合ルール"
                                 >
                                   <BookOpen className="w-4 h-4" />
@@ -2024,8 +2024,8 @@ ${printableMatches.map(m => {
                                   onClick={() => openCallModal(m)}
                                   className={`p-1.5 rounded-lg border transition-all ${
                                     callTargetMatchId === matchKey(m)
-                                      ? 'text-primary-600 bg-primary-50 border-primary-300'
-                                      : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50'
+                                      ? 'text-gray-700 bg-primary-50 border-primary-300'
+                                      : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50'
                                   }`}
                                   title="音声コール"
                                 >
@@ -2085,7 +2085,7 @@ ${printableMatches.map(m => {
                 >
                   <div className="flex items-center gap-3">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-primary-100 text-primary-600'
+                      isActive ? 'bg-white/20 text-white' : 'bg-primary-100 text-gray-700'
                     }`}>
                       <ListOrdered className="w-4 h-4" />
                     </div>
@@ -2154,7 +2154,7 @@ ${printableMatches.map(m => {
                                 <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-700 text-white text-[10px] font-bold">{round}</span>
                                 <span className="text-xs font-bold text-gray-700 tracking-wide">{roundLabel}</span>
                                 {evt.roundGameRules && evt.roundGameRules.length > 0 && (
-                                  <span className="text-[10px] text-primary-600 font-medium bg-primary-50 px-1.5 py-0.5 rounded">
+                                  <span className="text-[10px] text-gray-700 font-medium bg-primary-50 px-1.5 py-0.5 rounded">
                                     {(() => {
                                       const rules = evt.roundGameRules;
                                       if (rules.length === 1) return rules[0].ruleText;
@@ -2206,7 +2206,7 @@ ${printableMatches.map(m => {
                                     <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
                                         {autoWinner === 1 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-primary-800' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 1 ? 'font-bold text-gray-900' : autoWinner === 2 ? 'text-gray-400' : 'font-medium'}`}>
                                           {m.player1Name}
                                         </span>
                                       </div>
@@ -2215,7 +2215,7 @@ ${printableMatches.map(m => {
                                     <td className="py-2.5 px-2">
                                       <div className="flex items-center gap-1">
                                         {autoWinner === 2 && <Trophy className="w-3.5 h-3.5 text-primary-500 shrink-0" />}
-                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-primary-800' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
+                                        <span className={`whitespace-nowrap text-sm ${autoWinner === 2 ? 'font-bold text-gray-900' : autoWinner === 1 ? 'text-gray-400' : 'font-medium'}`}>
                                           {m.player2Name}
                                         </span>
                                       </div>
@@ -2254,7 +2254,7 @@ ${printableMatches.map(m => {
                                         </div>
                                         {isTiebreakScore && (
                                           <div className="flex items-center gap-1 text-xs text-gray-500">
-                                            <span className="text-primary-600 font-bold">TB</span>
+                                            <span className="text-gray-700 font-bold">TB</span>
                                             {tiebreakLoserSide === 1 && (
                                               <>
                                                 <input
@@ -2299,7 +2299,7 @@ ${printableMatches.map(m => {
                                     </td>
                                     <td className="py-2.5 px-2 text-center">
                                       {autoWinner ? (
-                                        <span className="text-[10px] text-primary-600 font-bold bg-primary-100 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-[10px] text-gray-700 font-bold bg-primary-100 px-1.5 py-0.5 rounded-full">
                                           {autoWinner === 1 ? 'P1' : 'P2'}勝
                                         </span>
                                       ) : (
@@ -2344,7 +2344,7 @@ ${printableMatches.map(m => {
                                         m.status === 'finished'
                                           ? 'bg-gray-200 text-gray-500'
                                           : m.status === 'playing'
-                                            ? 'bg-primary-100 text-primary-700'
+                                            ? 'bg-primary-100 text-gray-800'
                                             : 'bg-gray-100 text-gray-500'
                                       }`}>
                                         {m.matchOrder}
@@ -2402,8 +2402,8 @@ ${printableMatches.map(m => {
                                             }}
                                             className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                               m.status === 'finished'
-                                                ? 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50 hover:border-primary-300'
-                                                : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50 hover:border-primary-300'
+                                                ? 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
+                                                : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
                                             }`}
                                             title={m.status === 'finished' ? 'スコア修正' : 'スコア入力'}
                                           >
@@ -2428,8 +2428,8 @@ ${printableMatches.map(m => {
                                               }}
                                               className={`p-1.5 rounded-lg border transition-all shadow-sm hover:shadow ${
                                                 isCallTarget
-                                                  ? 'text-primary-600 bg-primary-50 border-primary-300'
-                                                  : 'text-primary-400 border-primary-200 hover:text-primary-600 hover:bg-primary-50 hover:border-primary-300'
+                                                  ? 'text-gray-700 bg-primary-50 border-primary-300'
+                                                  : 'text-primary-400 border-primary-200 hover:text-gray-700 hover:bg-primary-50 hover:border-primary-300'
                                               }`}
                                               title="音声コール"
                                             >

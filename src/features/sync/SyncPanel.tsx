@@ -305,9 +305,9 @@ export default function SyncPanel({ open, onClose }: Props) {
                 <div className="bg-gradient-to-br from-primary-50 to-white rounded-xl p-4 border border-primary-200">
                   <div className="flex items-center gap-2 mb-1.5">
                     <Globe className="w-4 h-4 text-primary-600" />
-                    <h3 className="text-xs font-bold text-primary-800">インターネット公開</h3>
+                    <h3 className="text-xs font-bold text-gray-900">インターネット公開</h3>
                   </div>
-                  <p className="text-[10px] text-primary-700 mb-3 leading-relaxed">
+                  <p className="text-[10px] text-gray-800 mb-3 leading-relaxed">
                     ボタンひとつで、現在の大会データをインターネットに公開します。
                     観戦者は{PUBLIC_ROOM ? '固定の観戦用URL' : '発行された観戦用URL'}を開くだけで、
                     どこからでもリアルタイムに閲覧できます。
@@ -416,7 +416,7 @@ export default function SyncPanel({ open, onClose }: Props) {
               {/* 説明 */}
               <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-primary-50 border border-primary-100">
                 <Info className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
-                <div className="text-[10px] text-primary-700 leading-relaxed">
+                <div className="text-[10px] text-gray-800 leading-relaxed">
                   <p className="font-bold mb-0.5">マルチデバイス同期について</p>
                   <p>同じルームに接続した端末間で、エントリー・スコア等のデータがリアルタイムに同期されます。</p>
                   <p className="mt-1">別端末間の同期には中継サーバーが必要です。同一端末の別タブ間はサーバー不要で同期できます。</p>

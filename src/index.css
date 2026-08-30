@@ -119,12 +119,21 @@
 /* ===========================================================
    ヘッダー — 白地 + 下端に赤のライン（サイトのヘッダーと同じ構成）
    =========================================================== */
+/* ヘッダーの高さ。端末のステータスバーぶん（safe-area）を上に足して、
+   スマホでステータスバーとヘッダーの境目が出ないようにする。 */
 .header-main {
   position: relative;
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   background: #ffffff;
   border-bottom: 1px solid var(--border-main);
   box-shadow: 0 1px 3px rgba(20, 20, 20, 0.04);
   overflow: hidden;
+}
+
+/* PCの常設メニューもヘッダーと同じだけ上に余白を取り、上端を揃える */
+.side-menu {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .header-main > * {
@@ -148,8 +157,15 @@
    ヘッダー背景の意匠 — 赤と白のキューブが流れるアニメーション
    -----------------------------------------------------------
    協会サイトのキービジュアル（白地に赤・淡赤・白の四角がランダムに
-   浮かぶ構図）を、DOM の四角に置き換えて動かしている。
-   ひとつずつ左から右へゆっくり流れながら、拡大とともに現れて消える。
+   浮かぶ構図）を、キューブの群れごと右下へゆっくり流している。
+   四角ひとつずつが現れて消えるのではなく、絵全体が同じ速さで
+   流れるので、動きが途切れずにずっと続いて見える。
+
+   継ぎ目なくループさせるしくみ:
+   HeaderBackdrop.tsx が四角の並びを「タイル1枚」として作り、SVG の
+   pattern で縦横に敷き詰めている。流す距離をちょうどタイル1枚ぶん
+   （--tile-w / --tile-h）にすると、流し終わりの絵が流し始めと
+   まったく同じになるため、先頭に戻ってもどこにも継ぎ目が出ない。
    ヘッダーの文字を読みにくくしないよう、全体は淡く敷いている。
    =========================================================== */
 .header-motif {
@@ -164,88 +180,42 @@
   background: linear-gradient(100deg, #ffffff 0%, #ffffff 55%, var(--brand-red-soft) 100%);
 }
 
-/* 四角の集合だけを淡くする（下地のグラデーションはそのまま） */
-.header-motif-layer {
+/* 左右の端は白くフェードさせ、タイトルとメニューボタンを浮かせる */
+.header-motif::after {
+  content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.62;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.72) 16%, rgba(255, 255, 255, 0) 38%),
+    linear-gradient(270deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 7%, rgba(255, 255, 255, 0) 20%);
+  z-index: 2;
 }
 
-/* 四角ひとつ分。--x/--y で置き場所、--s で大きさ、--o で濃さを渡す */
-.header-motif-item {
+/* 四角を敷き詰めた面。
+   左上にタイル1枚ぶん大きく取り出しておき、右下へ流れても隅が空かないようにする。
+   四角の集合だけを淡くする（下地のグラデーションはそのまま）。 */
+.header-motif-flow {
   position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: var(--s);
-  height: var(--s);
-  opacity: 0;
-  will-change: transform, opacity;
-  animation: header-motif-drift var(--dur, 22s) linear var(--delay, 0s) infinite;
+  left: calc(-1 * var(--tile-w));
+  top: calc(-1 * var(--tile-h));
+  width: calc(100% + var(--tile-w));
+  height: calc(100% + var(--tile-h));
+  opacity: 0.62;
+  will-change: transform;
+  animation: header-motif-drift var(--flow-dur) linear infinite;
 }
 
-/* 左から右へゆっくり流れながら、ズームして現れて消える */
+/* タイル1枚ぶん（右へ --tile-w・下へ --tile-h）流したら元の絵に戻る＝継ぎ目のないループ */
 @keyframes header-motif-drift {
-  0% {
-    transform: translate3d(-9vw, 0, 0) scale(0.5);
-    opacity: 0;
-  }
-  18% {
-    opacity: var(--o, 1);
-  }
-  78% {
-    opacity: var(--o, 1);
-  }
-  100% {
-    transform: translate3d(9vw, 0, 0) scale(1.45);
-    opacity: 0;
-  }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(var(--tile-w), var(--tile-h), 0); }
 }
 
-/* --- 四角のバリエーション（キービジュアルと同じ4種類＋ドット） --- */
-
-/* 赤のキューブ（右下に段差を付けて立体に見せる） */
-.header-motif-solid {
-  background: linear-gradient(135deg, #e04a46 0%, #c63834 100%);
-  box-shadow:
-    1px 1px 0 #ad2c29,
-    2px 2px 0 #9c2724,
-    3px 3px 0 #8c2220,
-    4px 5px 6px rgba(140, 34, 32, 0.18);
-}
-
-/* 白のキューブ */
-.header-motif-white {
-  background: linear-gradient(135deg, #ffffff 0%, #f4f4f4 100%);
-  box-shadow:
-    1px 1px 0 #ececec,
-    2px 2px 0 #e2e2e2,
-    3px 3px 0 #d6d6d6,
-    4px 5px 8px rgba(20, 20, 20, 0.12);
-}
-
-/* 半透明の淡い赤の板 */
-.header-motif-soft {
-  background: rgba(198, 56, 52, 0.22);
-  border: 1px solid rgba(198, 56, 52, 0.28);
-}
-
-/* 赤い線だけの四角 */
-.header-motif-outline {
-  border: 1px solid var(--brand-red);
-}
-
-/* 赤いドットのグリッド */
-.header-motif-dots {
-  background-image: radial-gradient(circle, var(--brand-red) 0.9px, transparent 0.9px);
-  background-size: 5px 5px;
-}
-
-/* 動きを減らす設定のときは静止させる（位置と濃さはそのまま活かす） */
+/* 動きを減らす設定のときは静止させる（絵柄はそのまま活かす） */
 @media (prefers-reduced-motion: reduce) {
-  .header-motif-item {
+  .header-motif-flow {
     animation: none;
-    opacity: var(--o, 1);
-    transform: none;
   }
 }
 
@@ -259,55 +229,8 @@
   box-shadow: 0 1px 3px rgba(20, 20, 20, 0.08);
 }
 
-.header-org-name {
-  /* 親（ヘッダー右ブロック）より広がらないようにする。
-     広がると大会名ごと左にはみ出し、ページ名と重なってしまう。 */
-  max-width: 100%;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 1.2;
-  color: var(--brand-red);
-  text-shadow: 0 0 5px #fff, 0 0 10px #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* スマホ: 大会名は最大2行まで。文字数の多いページ名（決勝トーナメント等）と
-   並んでも重ならないよう、残り幅の中に収める。 */
-.header-title {
-  max-width: 100%;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--ink);
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  text-shadow: 0 0 6px #fff, 0 0 12px #fff;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-
-@media (min-width: 640px) {
-  .header-org-name {
-    font-size: 10px;
-    letter-spacing: 0.15em;
-  }
-  .header-title {
-    font-size: 18px;
-    line-height: 1.3;
-    letter-spacing: 0.04em;
-    /* PCは1行＋末尾省略 */
-    display: block;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-}
-
+/* ===== メニュー内の小さなリンクボタン（音声・観戦用・協会HPなど） ===== */
+/* 赤い地の上に置くので、白い文字＋うっすら白い下地にする */
 .header-link {
   display: flex;
   align-items: center;
@@ -328,6 +251,7 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* バージョンバッジ。赤い地の上なので白地に赤文字にする */
 .header-version {
   font-size: 12px;
   font-weight: 800;
@@ -339,78 +263,53 @@
   letter-spacing: 0.08em;
 }
 
-/* ===== ヘッダー左: ハンバーガーボタン + 現在ページ名 ===== */
-.header-hamburger-btn {
+/* ===== ヘッダー右端のメニューボタン（スマホ） ===== */
+/* 協会サイトと同じく、白地に黒い線だけのボタン。開くと×に変わる */
+.header-menu-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  color: #ffffff;
-  background: var(--brand-red);
-  border: 1px solid var(--brand-red);
-  box-shadow: 0 1px 3px rgba(140, 34, 32, 0.25);
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  color: #141414;
+  background: transparent;
+  border: none;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
-.header-hamburger-btn:hover {
-  background: var(--brand-red-dark);
-  border-color: var(--brand-red-dark);
+@media (hover: hover) {
+  .header-menu-btn:hover {
+    color: var(--brand-red);
+  }
 }
-
-/* 流れる表示バーの中に置く小さめのメニューボタン（スマホ用） */
-.header-hamburger-btn-sm {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+.header-menu-btn:active {
+  opacity: 0.6;
 }
 
-/* 流れる表示バーの中に置くページ名。ヘッダー用の上限（46%）は狭すぎるので広げる */
-.header-page-name.info-bar-page-name {
-  max-width: 46vw;
-  text-shadow: none;
+/* 運営アプリはPCに常設メニューがあるので、PCではボタンを出さない */
+@media (min-width: 1024px) {
+  .header-menu-btn-mobile-only {
+    display: none;
+  }
 }
 
+/* ===== ヘッダー左: 現在ページ名（メニュータイトル） ===== */
 .header-page-name {
   display: flex;
   align-items: center;
-  gap: 5px;
-  /* ページ名は省略せず表示する（極端に長い場合のみ上限で省略）。
-     大会名側は残り幅に合わせて折り返すので重ならない。 */
-  flex: 0 0 auto;
-  max-width: 46%;
+  gap: 6px;
+  flex: 1 1 auto;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--ink);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   text-shadow: 0 0 6px #fff, 0 0 12px #fff;
 }
 .header-page-name svg {
   color: var(--brand-red);
-}
-
-@media (min-width: 640px) {
-  .header-page-name {
-    gap: 6px;
-    font-size: 15px;
-    letter-spacing: 0.03em;
-  }
-}
-
-/* ===== ヘッダー右: 協会名 + 大会名（右揃え） ===== */
-.header-title-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  text-align: right;
-  /* 残り幅をすべて使い、はみ出さない（ページ名との重なり防止） */
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
 }
 
 /* ===== ドロワー下部: 操作ボタン4つ ===== */
@@ -503,117 +402,175 @@
 }
 
 /* ===========================================================
-   ハンバーガーメニュー
+   スマホ: 全画面メニュー
+   -----------------------------------------------------------
+   協会サイトと同じ構成。ヘッダーは出したままで、その下いっぱいに
+   メニューを開く（ヘッダーのボタンは × に変わる）。
    =========================================================== */
-
-/* info-bar左端に配置するインラインボタン */
-.hamburger-inline-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px 0 12px;
-  height: 100%;
-  background: #ffffff;
-  border: none;
-  border-right: 1px solid var(--border-main);
-  color: #404040;
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-  z-index: 1;
-  transition: background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.hamburger-inline-btn:hover {
-  background: #f4f4f4;
-}
-
-.hamburger-inline-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.03em;
-}
-
-.hamburger-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.85);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.hamburger-icon-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-}
-
-/* オーバーレイ */
-.hamburger-overlay {
+.fullmenu {
   position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(20, 20, 20, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.hamburger-overlay-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* 左スライドドロワー — 赤背景・白文字 */
-.hamburger-drawer {
-  position: fixed;
-  top: 0;
+  top: calc(56px + env(safe-area-inset-top, 0px));
   left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 50;
-  width: 280px;
-  max-width: 80vw;
-  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
-  border-right: none;
-  box-shadow: none;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  z-index: 45;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
 }
 
-.hamburger-drawer-open {
-  transform: translateX(0);
-  box-shadow: 8px 0 32px rgba(20, 20, 20, 0.25);
+.fullmenu-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
-.hamburger-drawer-header {
+/* 運営アプリはPCに常設メニューがあるので、PCでは全画面メニューを出さない */
+@media (min-width: 1024px) {
+  .fullmenu-mobile-only {
+    display: none;
+  }
+}
+
+/* 観戦用ページはPCでも使うため、広い画面では右側のパネルにする */
+@media (min-width: 1024px) {
+  .fullmenu:not(.fullmenu-mobile-only) {
+    left: auto;
+    width: 380px;
+    box-shadow: -8px 0 32px rgba(20, 20, 20, 0.18);
+    transform: translateX(12px);
+  }
+  .fullmenu:not(.fullmenu-mobile-only).fullmenu-open {
+    transform: translateX(0);
+  }
+}
+
+.fullmenu-list {
+  flex: 1;
+  /* min-height:0 が無いと中身の高さぶん伸びてしまい、下の説明欄と重なる */
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+}
+
+/* 一行ぶんの項目。左にアイコンと名前、右に矢印（サイトと同じ形） */
+.fullmenu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  font-size: 13px;
+  gap: 14px;
+  width: 100%;
+  padding: 17px 20px;
+  font-size: 17px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
 }
 
-.hamburger-drawer-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 8px 24px;
+/* アイコンは白で太め・大きめ（文字と同じ強さで並ぶように） */
+.fullmenu-item > svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.4;
+  flex-shrink: 0;
 }
 
-.hamburger-drawer-item {
+.fullmenu-item:hover,
+.fullmenu-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 現在地は白地に赤文字で反転させる */
+.fullmenu-item-active {
+  color: var(--brand-red);
+  background: #ffffff;
+}
+
+.fullmenu-item-active:hover,
+.fullmenu-item-active:active {
+  background: #ffffff;
+}
+
+/* 右端の矢印 */
+.fullmenu-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* 開いたときに上から順に出てくる（--i は上からの並び順） */
+@keyframes fullmenu-item-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fullmenu-open .fullmenu-item {
+  animation: fullmenu-item-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+.fullmenu-open .fullmenu-footer {
+  animation: fullmenu-item-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--footer-delay, 0ms));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullmenu-open .fullmenu-item,
+  .fullmenu-open .fullmenu-footer {
+    animation: none;
+  }
+}
+
+.fullmenu-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+/* 下部の説明ボタン（音声・観戦用・協会HPなど）。
+   アイコンはメニューと同じ太さ・大きさ、文字は小さめにする。 */
+.fullmenu-footer .header-link {
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.fullmenu-footer .header-link svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.4;
+}
+.fullmenu-footer .drawer-action-row {
+  gap: 6px;
+}
+
+/* 協会ロゴ（白抜き版の画像をそのまま使う） */
+.fullmenu-logo {
+  max-width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ===========================================================
+   PC: 常設サイドバーの項目
+   =========================================================== */
+.side-menu-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -630,42 +587,21 @@
   text-align: left;
 }
 
-.hamburger-drawer-item:hover {
+.side-menu-item:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.16);
 }
 
 /* 現在地は白地に赤文字で反転させる */
-.hamburger-drawer-item-active {
+.side-menu-item-active {
   color: var(--brand-red) !important;
   background: #ffffff;
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(20, 20, 20, 0.18);
 }
 
-.hamburger-drawer-item-active:hover {
+.side-menu-item-active:hover {
   background: #ffffff;
-}
-
-/* ドロワー下部ロゴ */
-.hamburger-drawer-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  flex-shrink: 0;
-}
-
-.hamburger-drawer-logo {
-  max-width: 160px;
-  height: auto;
-  object-fit: contain;
-  /* ロゴ画像（白地に黒文字＋赤のマーク）を白抜きにして赤地に載せる。
-     グレースケール→反転で「黒地に白文字」にし、screen 合成で黒を透かす。 */
-  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
-  mix-blend-mode: screen;
 }
 
 /* ===========================================================
@@ -766,19 +702,10 @@
   color: var(--brand-red);
 }
 
-/* スマホはヘッダーが無いので、先頭に大会名を流す（PCではヘッダーに出るので隠す） */
+/* 先頭に流す大会名。ヘッダーにはメニュータイトルを出すので、大会名はここに置く */
 .info-ticker-lead {
   font-weight: 700;
   color: var(--brand-red);
-}
-@media (min-width: 1024px) {
-  .info-ticker-lead { display: none; }
-}
-
-/* 流す項目が無いときの予備表示。スマホは先頭の大会名があるので出さない */
-.info-ticker-fallback { display: none; }
-@media (min-width: 1024px) {
-  .info-ticker-fallback { display: inline-flex; }
 }
 
 /* ティッカーエリア — 左右フェードアウト */

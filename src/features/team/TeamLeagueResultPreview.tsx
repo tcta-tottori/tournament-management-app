@@ -147,7 +147,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                     onClick={() => setShowEdit(v => !v)}
                     className={`relative flex items-center justify-center w-9 h-9 rounded-lg shadow transition-colors active:scale-95 border ${
                       showEdit
-                        ? 'bg-primary-100 text-primary-800 border-primary-300 hover:bg-primary-200'
+                        ? 'bg-primary-100 text-gray-900 border-primary-300 hover:bg-primary-200'
                         : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
                     title="選手名を手動編集"
@@ -220,13 +220,13 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
             {showEdit && view === 'detail' && (
               <div className="border-b border-primary-200 bg-primary-50/50 shrink-0">
                 <div className="px-4 py-3 flex items-center justify-between">
-                  <div className="text-xs font-bold text-primary-800">
+                  <div className="text-xs font-bold text-gray-900">
                     表示名を編集（空欄またはデフォルトで自動短縮: 苗字最大3文字）
                   </div>
                   <button
                     onClick={resetOverrides}
                     disabled={Object.keys(playerOverrides).length === 0}
-                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-primary-700 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-gray-800 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <RotateCcw size={11} />
                     すべてリセット
@@ -234,7 +234,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 </div>
                 <div className="px-4 pb-3 max-h-48 overflow-y-auto">
                   {allPlayerNames.length === 0 ? (
-                    <div className="text-[11px] text-primary-700/70 italic">選手名が登録されていません</div>
+                    <div className="text-[11px] text-gray-800/70 italic">選手名が登録されていません</div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                       {allPlayerNames.map(name => {
@@ -243,7 +243,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                         const isOverridden = playerOverrides[name] !== undefined;
                         return (
                           <label key={name} className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-primary-900/70 truncate" title={name}>
+                            <span className="text-[9px] font-bold text-gray-900/70 truncate" title={name}>
                               {name}
                             </span>
                             <input

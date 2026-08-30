@@ -254,7 +254,7 @@ export default function CallPreviewDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-          <p className="text-[10px] text-gray-500">苗字の読み仮名を確認・修正してください。コールは<span className="font-bold text-primary-600">苗字のみ</span>で行います。</p>
+          <p className="text-[10px] text-gray-500">苗字の読み仮名を確認・修正してください。コールは<span className="font-bold text-gray-700">苗字のみ</span>で行います。</p>
 
           {[{ team: team1, prefix: 't1', league: match.team1League },
             { team: team2, prefix: 't2', league: match.team2League }].map(({ team, prefix, league }) => (

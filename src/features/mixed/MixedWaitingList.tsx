@@ -7,13 +7,13 @@ import CallPreviewDialog from './CallPreviewDialog';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-primary-100 text-primary-700', 'B': 'bg-gray-100 text-gray-700',
-  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-primary-700',
-  'E': 'bg-primary-100 text-primary-700', 'F': 'bg-gray-100 text-gray-700',
-  'G': 'bg-primary-100 text-primary-700', 'H': 'bg-gray-100 text-gray-700',
-  'I': 'bg-primary-100 text-primary-700', 'J': 'bg-gray-100 text-gray-700',
-  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-primary-700',
-  'M': 'bg-primary-100 text-primary-700',
+  'A': 'bg-primary-100 text-gray-800', 'B': 'bg-gray-100 text-gray-700',
+  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-gray-800',
+  'E': 'bg-primary-100 text-gray-800', 'F': 'bg-gray-100 text-gray-700',
+  'G': 'bg-primary-100 text-gray-800', 'H': 'bg-gray-100 text-gray-700',
+  'I': 'bg-primary-100 text-gray-800', 'J': 'bg-gray-100 text-gray-700',
+  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-gray-800',
+  'M': 'bg-primary-100 text-gray-800',
 };
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -22,9 +22,9 @@ const CATEGORY_LABELS: Record<PlacementCategory, string> = {
 
 
 const CATEGORY_COLORS: Record<PlacementCategory, string> = {
-  '1st': 'bg-primary-100 text-primary-700 border-primary-300',
+  '1st': 'bg-primary-100 text-gray-800 border-primary-300',
   '2nd': 'bg-gray-100 text-gray-700 border-gray-300',
-  '3rd': 'bg-primary-100 text-primary-700 border-primary-300',
+  '3rd': 'bg-primary-100 text-gray-800 border-primary-300',
   '4th': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
@@ -265,7 +265,7 @@ export default function MixedWaitingList() {
                 <button onClick={() => handleOpenCourtAssign(wm)} disabled={isSpeaking}
                   className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all ${
                     isSpeakingThis ? 'bg-gray-600 text-white animate-pulse' :
-                    'bg-primary-50 border border-primary-200 text-primary-700 hover:bg-primary-100'}`}>
+                    'bg-primary-50 border border-primary-200 text-gray-800 hover:bg-primary-100'}`}>
                   {isSpeakingThis ? <><Volume2 size={12} />コール中...</> : <><MapPin size={12} />コート入れ &amp; コール</>}
                 </button>
                 <button onClick={() => handlePrint(wm)}
@@ -310,7 +310,7 @@ export default function MixedWaitingList() {
                         disabled={isUsed}
                         className={`py-2 text-xs font-bold rounded-lg border-2 transition-all
                           ${isUsed ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed' :
-                            courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-primary-700' :
+                            courtAssignValue === c ? 'border-primary-500 bg-primary-50 text-gray-800' :
                             'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                       >{c.replace('コート', '')}{isUsed && <span className="block text-[7px] text-gray-300">使用中</span>}</button>
                     );

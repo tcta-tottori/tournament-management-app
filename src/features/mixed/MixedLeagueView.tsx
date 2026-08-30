@@ -136,7 +136,7 @@ export default function MixedLeagueView() {
 
     return {
       text,
-      color: won ? 'text-primary-700 font-bold' : 'text-red-600',
+      color: won ? 'text-gray-800 font-bold' : 'text-red-600',
       bg: `${won ? 'bg-primary-50' : 'bg-red-50'} cursor-pointer`,
       isCurrent: false,
     };
@@ -151,7 +151,7 @@ export default function MixedLeagueView() {
             <th className="px-3 py-2 text-left text-xs text-gray-500">ペア名 / 所属</th>
             {selectedLeague.teams.map((_, i) => (
               <th key={i} className="px-2 py-2 text-center text-xs text-gray-500 w-20">
-                <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-100 text-primary-700 rounded-full text-xs font-bold">
+                <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-100 text-gray-800 rounded-full text-xs font-bold">
                   {i + 1}
                 </span>
               </th>
@@ -169,10 +169,10 @@ export default function MixedLeagueView() {
               <tr key={team.teamId} className="border-t border-gray-100 hover:bg-gray-50/50">
                 <td className="px-3 py-2">
                   <div className="flex flex-col items-center">
-                    <span className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-primary-700 rounded-full text-sm font-bold">
+                    <span className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-gray-800 rounded-full text-sm font-bold">
                       {rowIdx + 1}
                     </span>
-                    <span className="text-[10px] font-bold text-primary-600 mt-0.5">No.{team.pairNumber}</span>
+                    <span className="text-[10px] font-bold text-gray-700 mt-0.5">No.{team.pairNumber}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2">
@@ -396,7 +396,7 @@ export default function MixedLeagueView() {
 
         {/* エントリー未完了警告 */}
         {!allEntryDone && (
-          <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 text-sm text-primary-700 flex items-center gap-2">
+          <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 text-sm text-gray-800 flex items-center gap-2">
             <span className="text-lg">⚠</span>
             <div>
               <div className="font-bold">エントリーが完了していません</div>
@@ -425,16 +425,16 @@ export default function MixedLeagueView() {
                     className={`
                       flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border
                       ${isFinished
-                        ? 'bg-primary-50 border-primary-200 text-primary-700'
+                        ? 'bg-primary-50 border-primary-200 text-gray-800'
                         : isPlaying
-                          ? 'bg-primary-50 border-primary-200 text-primary-700 animate-pulse'
+                          ? 'bg-primary-50 border-primary-200 text-gray-800 animate-pulse'
                           : isCurrent
-                            ? 'bg-primary-200 text-primary-800 font-bold border-primary-300 league-match-blink'
+                            ? 'bg-primary-200 text-gray-900 font-bold border-primary-300 league-match-blink'
                             : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                       }
                     `}
                   >
-                    {isCurrent && !isFinished && <span className="text-primary-700">▶</span>}
+                    {isCurrent && !isFinished && <span className="text-gray-800">▶</span>}
                     <span className="font-mono text-xs">第{mo.matchNumber}試合</span>
                     <span className="font-bold">
                       {String.fromCodePoint(0x2460 + mo.team1Index - 1)}-{String.fromCodePoint(0x2460 + mo.team2Index - 1)}
@@ -480,7 +480,7 @@ export default function MixedLeagueView() {
 
           {/* Current match indicator */}
           {currentMatch && currentMatchNumber && (
-            <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-primary-800">
+            <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-gray-900">
               現在: 第{currentMatchNumber}試合（{currentMatchTeam1?.teamName || '?'} vs {currentMatchTeam2?.teamName || '?'}）{finishedCount}/{totalCount} 完了
             </div>
           )}
@@ -514,7 +514,7 @@ export default function MixedLeagueView() {
                     </td>
                     <td className="py-2 px-2 font-medium text-gray-800">{s.teamName}</td>
                     <td className="py-2 px-2 text-center font-mono text-gray-700">{s.wins}-{s.losses}</td>
-                    <td className="py-2 px-2 text-center font-mono text-primary-600">{s.gamesWon}</td>
+                    <td className="py-2 px-2 text-center font-mono text-gray-700">{s.gamesWon}</td>
                     <td className="py-2 px-2 text-center font-mono text-red-500">{s.gamesLost}</td>
                     {leagueComplete && (
                       <td className="py-2 px-2 text-center font-mono text-gray-600">
@@ -642,7 +642,7 @@ export default function MixedLeagueView() {
             </div>
             {/* Current match info in fullscreen */}
             {currentMatch && currentMatchNumber && (
-              <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-primary-800">
+              <div className="mt-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-gray-900">
                 現在: 第{currentMatchNumber}試合（{currentMatchTeam1?.teamName || '?'} vs {currentMatchTeam2?.teamName || '?'}）{finishedCount}/{totalCount} 完了
               </div>
             )}

@@ -29,7 +29,7 @@ export default function MixedStandingsView() {
     'bg-gray-50 border-gray-100',
     'bg-gray-50 border-gray-100',
   ];
-  const rankText = ['text-primary-700', 'text-gray-600', 'text-gray-600', 'text-gray-500', 'text-gray-400'];
+  const rankText = ['text-gray-800', 'text-gray-600', 'text-gray-600', 'text-gray-500', 'text-gray-400'];
 
   return (
     <div className="space-y-6">
@@ -43,12 +43,12 @@ export default function MixedStandingsView() {
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               {totalFinished}/{totalMatches} 試合完了
-              {allLeaguesComplete && <span className="text-primary-600 font-medium ml-2">（全リーグ完了）</span>}
+              {allLeaguesComplete && <span className="text-gray-700 font-medium ml-2">（全リーグ完了）</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
             {!allLeaguesComplete && (
-              <div className="flex items-center gap-2 text-primary-600 text-sm bg-primary-50 px-3 py-2 rounded-lg">
+              <div className="flex items-center gap-2 text-gray-700 text-sm bg-primary-50 px-3 py-2 rounded-lg">
                 <AlertCircle size={16} />
                 全リーグの試合を完了してください
               </div>
@@ -140,7 +140,7 @@ export default function MixedStandingsView() {
           <h3 className="text-lg font-bold text-gray-800 mb-4">順位別チーム振り分け</h3>
           <div className="grid grid-cols-4 gap-4">
             {[
-              { rank: 1, label: '1位トーナメント', chip: 'bg-primary-100 text-primary-700' },
+              { rank: 1, label: '1位トーナメント', chip: 'bg-primary-100 text-gray-800' },
               { rank: 2, label: '2位トーナメント', chip: 'bg-gray-200 text-gray-800' },
               { rank: 3, label: '3位トーナメント', chip: 'bg-gray-100 text-gray-700' },
               { rank: 4, label: '4・5位トーナメント', chip: 'bg-gray-50 text-gray-600' },

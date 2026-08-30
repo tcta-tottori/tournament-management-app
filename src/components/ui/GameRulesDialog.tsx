@@ -192,7 +192,7 @@ export default function GameRulesDialog({ event, onClose }: Props) {
 
           <button
             onClick={() => setRules([...rules, { roundLabel: '', ruleText: '', games: 6 }])}
-            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-primary-600 border border-dashed border-primary-300 rounded-xl hover:bg-primary-50 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-gray-700 border border-dashed border-primary-300 rounded-xl hover:bg-primary-50 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             ルールを追加

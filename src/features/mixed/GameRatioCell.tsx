@@ -44,12 +44,12 @@ export function GameRatioCell({ gamesWon, gamesLost, className = '', teamName, m
                 <div className="text-[10px] font-bold text-gray-500 mb-1">各対戦</div>
                 {matchDetails.map((md, i) => (
                   <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${md.isWin ? 'bg-primary-50' : 'bg-red-50'}`}>
-                    <span className={`text-[10px] font-bold ${md.isWin ? 'text-primary-600' : 'text-red-500'}`}>
+                    <span className={`text-[10px] font-bold ${md.isWin ? 'text-gray-700' : 'text-red-500'}`}>
                       {md.isWin ? '○' : '●'}
                     </span>
                     <span className="text-gray-700 flex-1 truncate">vs {md.opponentName}</span>
                     <span className="font-mono font-bold shrink-0">
-                      <span className="text-primary-600">{md.won}</span>
+                      <span className="text-gray-700">{md.won}</span>
                       <span className="text-gray-400">-</span>
                       <span className="text-red-500">{md.lost}</span>
                     </span>
@@ -62,7 +62,7 @@ export function GameRatioCell({ gamesWon, gamesLost, className = '', teamName, m
             <div className="bg-gray-50 rounded-xl p-4 mb-4">
               <div className="flex items-center justify-center gap-4 mb-3">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-primary-600">{gamesWon}</div>
+                  <div className="text-3xl font-bold text-gray-700">{gamesWon}</div>
                   <div className="text-[10px] text-gray-400 mt-0.5 flex items-center justify-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-primary-400 inline-block" />取得
                   </div>

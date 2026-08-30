@@ -31,15 +31,24 @@ export function fillBodyText(template: string, entry: CertEntry): string {
     .replace(/\{affiliation\}/g, entry.affiliation);
 }
 
-/** 1枚分のページHTML */
+/**
+ * 1枚分のページHTML
+ *
+ * 氏名の位置を「上下位置」に固定し、賞位・クラス名・所属はその上へ積み上げる。
+ * 項目を増やしても氏名が下にずれないので、賞状用紙に合わせた位置合わせが崩れない。
+ */
 function pageHtml(entry: CertEntry, layout: CertLayout): string {
   // 氏名以外は「印刷する項目」で選ばれているものだけ出す（既定は氏名のみ）
-  const lines: string[] = [];
-  if (layout.showCategory && entry.category.trim()) lines.push(`<div class="cert-category">${esc(entry.category)}</div>`);
-  if (layout.showRank && entry.rank.trim()) lines.push(`<div class="cert-rank">${esc(entry.rank)}</div>`);
-  if (layout.showAffiliation && entry.affiliation.trim()) lines.push(`<div class="cert-affiliation">${esc(entry.affiliation)}</div>`);
-  if (entry.names.trim()) lines.push(`<div class="cert-name">${esc(entry.names)}</div>`);
-  const block = `<div class="cert-block">${lines.join('')}</div>`;
+  const above: string[] = [];
+  if (layout.showCategory && entry.category.trim()) above.push(`<div class="cert-line cert-category">${esc(entry.category)}</div>`);
+  if (layout.showRank && entry.rank.trim()) above.push(`<div class="cert-line cert-rank">${esc(entry.rank)}</div>`);
+  if (layout.showAffiliation && entry.affiliation.trim()) above.push(`<div class="cert-line cert-affiliation">${esc(entry.affiliation)}</div>`);
+  const nameHtml = entry.names.trim() ? `<div class="cert-line cert-name">${esc(entry.names)}</div>` : '';
+
+  const block = nameHtml
+    ? `<div class="cert-block">${above.length ? `<div class="cert-above">${above.join('')}</div>` : ''}${nameHtml}</div>`
+    // 氏名が空のとき（名前を後から手書きするひな形）は、残りをそのまま基準位置に置く
+    : `<div class="cert-block cert-block-flow">${above.join('')}</div>`;
 
   if (layout.overlay) {
     // 賞状用紙に文字だけ重ねる
@@ -74,15 +83,9 @@ function styleHtml(layout: CertLayout): string {
   const blockPosition = vertical
     ? `top:${layout.blockTop}%; left:50%; transform:translateX(calc(-50% + ${layout.offsetX}mm));
        height:${Math.max(20, verticalBottom - layout.blockTop)}%; width:auto;
-       writing-mode:vertical-rl; text-orientation:upright;
-       display:flex; flex-direction:column; align-items:center; justify-content:flex-start;`
+       writing-mode:vertical-rl; text-orientation:upright;`
     : `top:${layout.blockTop}%; left:50%; transform:translateX(calc(-50% + ${layout.offsetX}mm));
-       width:86%;
-       display:flex; flex-direction:column; align-items:center; justify-content:flex-start;`;
-
-  const gapRule = vertical
-    ? `margin-left:${layout.lineGap}mm;`
-    : `margin-bottom:${layout.lineGap}mm;`;
+       width:86%;`;
 
   /**
    * 字間を付けた行のセンタリング補正。
@@ -114,13 +117,28 @@ function styleHtml(layout: CertLayout): string {
   }
   .page:last-child { page-break-after: auto; break-after: auto; }
 
+  /* 氏名の位置がそのまま「上下位置」になる（このブロックは氏名だけを持つ） */
   .cert-block { position: absolute; ${blockPosition} }
   /* 縦書きで折り返すと行が重なって読めなくなるので、縦書きのときは折り返さない
      （長すぎる場合は文字サイズを下げて調整する） */
-  .cert-block > div { white-space: ${vertical ? 'nowrap' : 'pre-wrap'}; text-align: center; ${gapRule} }
-  .cert-block > div:last-child { margin: 0; }
+  .cert-line { white-space: ${vertical ? 'nowrap' : 'pre-wrap'}; text-align: center; ${strokeRule} }
 
-  .cert-block > div { ${strokeRule} }
+  /* 賞位・クラス名・所属は氏名のすぐ上（縦書きでは右）へ積み上げる。
+     論理プロパティなので、横書き・縦書きのどちらでも同じ指定で効く。 */
+  .cert-above {
+    position: absolute;
+    inset-block-end: 100%;
+    inset-inline-start: 0; inset-inline-end: 0;
+    padding-block-end: ${layout.lineGap}mm;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .cert-above > .cert-line { margin-block-end: ${layout.lineGap}mm; }
+  .cert-above > .cert-line:last-child { margin-block-end: 0; }
+
+  /* 氏名が無いとき（ひな形）は、残りの行をそのまま基準位置に並べる */
+  .cert-block-flow { display: flex; flex-direction: column; align-items: center; }
+  .cert-block-flow > .cert-line { margin-block-end: ${layout.lineGap}mm; }
+  .cert-block-flow > .cert-line:last-child { margin-block-end: 0; }
   .cert-category { font-size: ${layout.categorySize}pt; ${spacing(layout.tracking)} }
   .cert-rank { font-size: ${layout.rankSize}pt; ${spacing(layout.tracking + 0.2)} }
   .cert-affiliation { font-size: ${layout.affiliationSize}pt; ${spacing(layout.tracking)} }
@@ -186,12 +204,13 @@ export function buildCertificatePreviewHtml(entry: CertEntry, layout: CertLayout
     `
   html, body { background: #f4f4f4; }
   .page { box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
-  /* 印字ブロックの位置が分かるよう、プレビューだけ薄いガイドを出す */
-  .cert-block::before {
+  /* 印字位置が分かるよう、プレビューだけ薄いガイドを出す（氏名と、その上の行） */
+  .cert-block::before, .cert-above::before {
     content: ''; position: absolute; inset: -3mm -4mm;
     border: 0.3mm dashed rgba(217,119,6,0.45); border-radius: 2mm;
     pointer-events: none;
   }
+
   </style>`,
   );
 }

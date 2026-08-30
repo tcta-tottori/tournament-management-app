@@ -70,7 +70,7 @@ function PlayerCardLine({ info, fallbackName }: { info?: CallPlayerInfo; fallbac
   return (
     <div>
       <div className="text-sm font-bold text-gray-800">
-        {info?.number ? <span className="text-primary-600 mr-1">{info.number}.</span> : null}
+        {info?.number ? <span className="text-gray-700 mr-1">{info.number}.</span> : null}
         {name}
       </div>
       {info?.affiliation && <div className="text-[11px] text-gray-500 mt-0.5">{info.affiliation}</div>}
@@ -173,7 +173,7 @@ export default function CallSettingsModal({
               <div className="min-w-0">
                 <label className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mb-1">
                   <MapPin className="w-3 h-3 shrink-0" />コート
-                  {courtAssigned && <span className="text-primary-600 font-medium">（修正可）</span>}
+                  {courtAssigned && <span className="text-gray-700 font-medium">（修正可）</span>}
                 </label>
                 <select value={courtNumber} onChange={e => onCourtChange?.(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50/50 focus:bg-white focus:border-primary-400 outline-none transition-all">
