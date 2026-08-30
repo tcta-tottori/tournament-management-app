@@ -8,7 +8,7 @@ import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
 import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -16,6 +16,9 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import { useStandbyMap, matchKey } from '../referee/standbyRanking';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
+import LeagueCourtDialog from '../../components/ui/LeagueCourtDialog';
+import GameRulesDialog from '../../components/ui/GameRulesDialog';
+import { buildLeagueCourtMap, freeLeagueCourts, MAX_LEAGUE_COURTS } from '../draw/leagueCourts';
 import EventResultPreview from '../results/EventResultPreview';
 import { isEventComplete } from '../results/eventCompletion';
 import {
@@ -385,6 +388,14 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   /** コート選択ダイアログの対象 "round-position" */
   const [courtPickKey, setCourtPickKey] = useState<string | null>(null);
 
+  // 大会全体のドロー（他のリーグが専有しているコートを避けるために使う）
+  const allDraws = useLiveQuery(async () => {
+    if (!currentTournamentId) return [];
+    const evs = await db.events.where('tournamentId').equals(currentTournamentId).toArray();
+    const ids = evs.map(e => e.eventId);
+    return ids.length > 0 ? db.draws.where('eventId').anyOf(ids).toArray() : [];
+  }, [currentTournamentId]) || [];
+
   // 大会全体の進行中試合（他種目のコート使用も見て空きコートを判定する）
   const playingMatches = useLiveQuery(async () => {
     if (!currentTournamentId) return [];
@@ -395,9 +406,26 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     return all.filter(m => m.status === 'playing');
   }, [currentTournamentId]) || [];
 
+  // リーグ戦のコート割り当て（eventId → コートID）
+  const leagueCourtMap = useMemo(() => buildLeagueCourtMap(allDraws), [allDraws]);
+  /** この種目（リーグ）に割り当てたコート */
+  const assignedLeagueCourts = useMemo(() => {
+    const ids = leagueCourtMap.get(selectedEventId) || [];
+    return ids
+      .map(id => courts.find(c => c.courtId === id))
+      .filter((c): c is NonNullable<typeof c> => !!c);
+  }, [leagueCourtMap, selectedEventId, courts]);
+  /** 割り当てコートのうち、いま試合が入っていないもの */
+  const freeAssignedCourts = useMemo(
+    () => freeLeagueCourts(leagueCourtMap.get(selectedEventId) || [], courts, playingMatches),
+    [leagueCourtMap, selectedEventId, courts, playingMatches],
+  );
+
   /**
-   * コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+   * コート選択ダイアログ用のコート一覧（番号順・同名コートは1つにまとめる）。
    * 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
+   * リーグにコートを割り当てている種目では、そのコートだけを候補にする。
+   * 逆に他のリーグが専有しているコートは、この種目からは選べない。
    */
   const courtPickList = useMemo(() => {
     const idToName = new Map(courts.map(c => [c.courtId, c.name]));
@@ -406,19 +434,32 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       const n = m.courtId ? idToName.get(m.courtId) : undefined;
       if (n) usedNames.add(n);
     }
-    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+    // 他のリーグが専有しているコート名
+    const reservedNames = new Set<string>();
+    for (const [eventId, ids] of leagueCourtMap) {
+      if (eventId === selectedEventId) continue;
+      for (const id of ids) {
+        const n = idToName.get(id);
+        if (n) reservedNames.add(n);
+      }
+    }
+    const ownIds = leagueCourtMap.get(selectedEventId) || [];
+    const target = ownIds.length > 0
+      ? courts.filter(c => ownIds.includes(c.courtId))
+      : courts;
+    const sorted = [...target].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
     const seen = new Set<string>();
     const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
     for (const c of sorted) {
       if (seen.has(c.name)) continue;
       seen.add(c.name);
-      const status = c.isAvailable === false
+      const status = c.isAvailable === false || reservedNames.has(c.name)
         ? 'unavailable'
         : usedNames.has(c.name) ? 'playing' : 'empty';
       list.push({ courtId: c.courtId, name: c.name, status });
     }
     return list;
-  }, [courts, playingMatches]);
+  }, [courts, playingMatches, leagueCourtMap, selectedEventId]);
 
   /** コート選択ダイアログの対象試合 */
   const courtPickMatch = useMemo(() => {
@@ -436,24 +477,60 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     setCourtPickKey(`${round}-${position}`);
   };
 
+  /** 指定した試合を指定コートへ投入する（1コート2試合にならないよう確認してから） */
+  const enterMatchToCourt = async (matchDbId: number, courtId: string) => {
+    const court = (courts || []).find(c => c.courtId === courtId);
+    if (!court) return;
+    // 他種目を含め、そのコートで進行中の試合があれば投入しない（1コート2試合を防ぐ）
+    const occupied = await findOccupyingMatch(court.courtId, matchDbId);
+    if (occupied) {
+      alert(occupiedMessage(court.name, occupied));
+      return;
+    }
+    await db.matches.update(matchDbId, {
+      courtId: court.courtId,
+      status: 'playing',
+      updatedAt: Date.now(),
+    });
+  };
+
   // 選んだコートへ実際に投入する
   const enterSelectedCourt = async (courtId: string) => {
     const target = courtPickMatch;
     setCourtPickKey(null);
     if (!target?.id) return;
-    const court = (courts || []).find(c => c.courtId === courtId);
-    if (!court) return;
-    // 他種目を含め、そのコートで進行中の試合があれば投入しない（1コート2試合を防ぐ）
-    const occupied = await findOccupyingMatch(court.courtId, target.id);
-    if (occupied) {
-      alert(occupiedMessage(court.name, occupied));
-      return;
-    }
-    await db.matches.update(target.id, {
-      courtId: court.courtId,
-      status: 'playing',
+    await enterMatchToCourt(target.id, courtId);
+  };
+
+  // --- ゲームルール編集（対戦順シートと共通のダイアログ）---
+  // 取り込んだドロー表のルールが違っていたときに、その場で直せるようにする。
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+
+  // --- リーグ戦: 割り当てたコートへ次の対戦を入れる ---
+  /** リーグの使用コート割り当てダイアログ */
+  const [leagueCourtDialogOpen, setLeagueCourtDialogOpen] = useState(false);
+
+  /** リーグの使用コートを保存する（空配列なら割り当て解除） */
+  const saveLeagueCourts = async (courtIds: string[]) => {
+    setLeagueCourtDialogOpen(false);
+    if (!drawData?.id) return;
+    await db.draws.update(drawData.id, {
+      leagueCourtIds: courtIds.slice(0, MAX_LEAGUE_COURTS),
       updatedAt: Date.now(),
     });
+  };
+
+  /**
+   * 待機中のリーグ戦をコートに入れる。
+   * 空いている割り当てコートが1面ならそのまま投入し、2面空いていれば選んでもらう。
+   */
+  const enterLeagueMatch = (match: { id?: number; round: number; position: number }) => {
+    if (match.id == null) return;
+    if (freeAssignedCourts.length === 1) {
+      void enterMatchToCourt(match.id, freeAssignedCourts[0].courtId);
+      return;
+    }
+    setCourtPickKey(`${match.round}-${match.position}`);
   };
 
   if (!currentTournamentId) {
@@ -486,9 +563,20 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
               {selectedEvent?.name || '種目を選択'}
             </h2>
             {selectedEvent && (
-              <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                {getGameRulesText(selectedEvent)}
-              </p>
+              enableScoreInput ? (
+                <button
+                  onClick={() => setRulesDialogOpen(true)}
+                  title="ゲームルールを修正"
+                  className="mt-0.5 max-w-full inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                >
+                  <span className="truncate">{getGameRulesText(selectedEvent)}</span>
+                  <Pencil className="w-2.5 h-2.5 shrink-0 text-amber-500" />
+                </button>
+              ) : (
+                <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                  {getGameRulesText(selectedEvent)}
+                </p>
+              )
             )}
           </div>
 
@@ -679,6 +767,42 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">
+            {/* リーグの使用コート（1〜2面を固定で使い、空いたら次の対戦を入れる） */}
+            <div className="flex items-center gap-2 flex-wrap rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-primary-600" />使用コート
+              </span>
+              {assignedLeagueCourts.length > 0 ? (
+                <>
+                  {assignedLeagueCourts.map(c => {
+                    const isFree = freeAssignedCourts.some(f => f.courtId === c.courtId);
+                    return (
+                      <span
+                        key={c.courtId}
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                          isFree
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : 'bg-green-600 text-white border-green-600'
+                        }`}
+                      >
+                        {c.name}番コート{isFree ? '（空き）' : '（試合中）'}
+                      </span>
+                    );
+                  })}
+                </>
+              ) : (
+                <span className="text-[11px] text-gray-500">未割り当て（試合ごとにコートを選ぶ運用のまま）</span>
+              )}
+              {enableScoreInput && (
+                <button
+                  onClick={() => setLeagueCourtDialogOpen(true)}
+                  className="ml-auto text-[10px] font-bold text-gray-600 border border-gray-200 bg-gray-50 rounded-full px-2 py-1 hover:bg-gray-100"
+                >
+                  {assignedLeagueCourts.length > 0 ? 'コートを変更' : 'コートを割り当て'}
+                </button>
+              )}
+            </div>
+
             {/* リーグ表（星取表・セルタップで直接スコア入力） */}
             <RoundRobinRenderer
               slots={slots}
@@ -731,6 +855,30 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                           : 'bg-gray-100 text-gray-500'}`}>
                           {isPlaying ? '試合中' : isFinished ? '終了' : '待機'}
                         </span>
+                        {/* 待機中の対戦は、割り当てコートが空いていればここから入れられる */}
+                        {enableScoreInput && !isPlaying && !isFinished && assignedLeagueCourts.length > 0 && (
+                          <span
+                            role="button"
+                            aria-disabled={freeAssignedCourts.length === 0}
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (freeAssignedCourts.length === 0) return;
+                              enterLeagueMatch(m);
+                            }}
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${
+                              freeAssignedCourts.length === 0
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'bg-green-600 text-white border-green-600 hover:bg-green-700 cursor-pointer'
+                            }`}
+                          >
+                            <Play className="w-3 h-3" />
+                            {freeAssignedCourts.length === 0
+                              ? 'コート使用中'
+                              : freeAssignedCourts.length === 1
+                                ? `${freeAssignedCourts[0].name}番コートに入れる`
+                                : 'コートに入れる'}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
@@ -756,8 +904,39 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           getRoundName={(round) => getRoundName(round, totalRounds)}
           isLeague={isRoundRobin}
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
+          onEditRules={selectedEvent ? () => setRulesDialogOpen(true) : undefined}
           requiredGames={resolveRequiredGames(getGameRuleText(selectedEvent, selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
+        />
+      )}
+
+      {/* ゲームルール編集（種目名の下のルール表示をタップ） */}
+      {rulesDialogOpen && selectedEvent && (
+        <GameRulesDialog event={selectedEvent} onClose={() => setRulesDialogOpen(false)} />
+      )}
+
+      {/* リーグの使用コート割り当て */}
+      {leagueCourtDialogOpen && (
+        <LeagueCourtDialog
+          eventName={selectedEvent?.name || ''}
+          courts={[...courts]
+            .sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0))
+            .map(c => {
+              const otherLeague = [...leagueCourtMap.entries()]
+                .find(([eventId, ids]) => eventId !== selectedEventId && ids.includes(c.courtId));
+              const otherName = otherLeague
+                ? events.find(e => e.eventId === otherLeague[0])?.name || ''
+                : undefined;
+              return {
+                courtId: c.courtId,
+                name: c.name,
+                unavailable: c.isAvailable === false,
+                takenBy: otherName,
+              };
+            })}
+          selectedCourtIds={assignedLeagueCourts.map(c => c.courtId)}
+          onSave={(ids) => void saveLeagueCourts(ids)}
+          onClose={() => setLeagueCourtDialogOpen(false)}
         />
       )}
 
@@ -765,7 +944,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       {courtPickMatch && (
         <CourtPickDialog
           eventName={selectedEvent?.name || ''}
-          roundName={getRoundName(courtPickMatch.round, totalRounds)}
+          roundName={isRoundRobin ? 'リーグ戦' : getRoundName(courtPickMatch.round, totalRounds)}
           player1Name={courtPickMatch.player1Name}
           player2Name={courtPickMatch.player2Name}
           courts={courtPickList}

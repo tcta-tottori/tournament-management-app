@@ -7,7 +7,7 @@ import { MATCH_TYPE_SHORT, buildTeamBracketCallText, getBracketRoundLabel, resol
 import { findMembersByTeamName } from './clubExcelParser';
 import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
@@ -107,7 +107,7 @@ export default function TeamBracketView() {
   // ブラケット名のインライン編集
   const [editingLabelCategory, setEditingLabelCategory] = useState<PlacementCategory | null>(null);
   const [editingLabelValue, setEditingLabelValue] = useState('');
-  const { speak } = useGeminiTts();
+  const { speak } = useCallTts();
   const startCall = useTeamCallStore(s => s.start);
   const finishCall = useTeamCallStore(s => s.finish);
 

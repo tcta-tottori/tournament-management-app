@@ -16,10 +16,10 @@ import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../../features/sy
 import VersionInfoModal from '../ui/VersionInfoModal';
 import BulkCallOverlay from '../ui/BulkCallOverlay';
 import VoiceSettingsDialog from '../ui/VoiceSettingsDialog';
-import GeminiLoadingIndicator from '../ui/GeminiLoadingIndicator';
+import VoiceLoadingIndicator from '../ui/VoiceLoadingIndicator';
 import SyncStatusIndicator from '../../features/sync/SyncStatusIndicator';
 import HeaderBackdrop from './HeaderBackdrop';
-import { geminiTts } from '../../features/broadcast/geminiTts';
+import { callTts } from '../../features/broadcast/callTts';
 
 const ALL_MAIN_TABS = [
   { id: 'S-01', path: '/data', label: 'データ', icon: Database },
@@ -81,7 +81,7 @@ export default function AppLayout() {
 
   // モバイルの自動再生制約対策: 最初のユーザー操作でオーディオをアンロックする
   useEffect(() => {
-    const unlock = () => { geminiTts.unlockAudio(); };
+    const unlock = () => { callTts.unlockAudio(); };
     document.addEventListener('click', unlock, { once: true, capture: true });
     document.addEventListener('touchstart', unlock, { once: true, capture: true });
     return () => {
@@ -410,7 +410,7 @@ export default function AppLayout() {
             <button
               onClick={() => setVoiceSettingsOpen(true)}
               className="header-link"
-              title="音声設定（Gemini TTS）"
+              title="音声設定"
               aria-label="音声設定"
             >
               <Volume2 className="w-3.5 h-3.5" />
@@ -497,7 +497,7 @@ export default function AppLayout() {
           <div className="border-t border-white/10 p-2 flex flex-col gap-1.5 shrink-0">
             {sidebarCollapsed ? (
               <>
-                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded" title="音声設定（Gemini TTS）">
+                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded" title="音声設定">
                   <Volume2 className="w-4 h-4" />
                 </button>
                 <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-amber-300/80 hover:text-amber-300 text-center py-1" title="バージョン情報">
@@ -508,7 +508,7 @@ export default function AppLayout() {
               <>
                 <div className="flex items-center flex-wrap gap-1.5">
                   <SyncStatusIndicator />
-                  <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定（Gemini TTS）" aria-label="音声設定">
+                  <button onClick={() => setVoiceSettingsOpen(true)} className="header-link" title="音声設定" aria-label="音声設定">
                     <Volume2 className="w-3.5 h-3.5" />
                     <span>音声</span>
                   </button>
@@ -542,8 +542,8 @@ export default function AppLayout() {
       {/* 一斉コール フローティングオーバーレイ */}
       <BulkCallOverlay />
 
-      {/* Gemini TTS 音声取得中のグローバルインジケータ */}
-      <GeminiLoadingIndicator />
+      {/* コール音声の準備中を知らせるグローバルインジケータ */}
+      <VoiceLoadingIndicator />
     </div>
   );
 }

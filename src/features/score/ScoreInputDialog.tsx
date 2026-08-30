@@ -4,7 +4,7 @@ import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
 import { buildCallText, buildWalkoverCallText, buildRetirementCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import type { MatchCall, VoiceSettings } from '../broadcast/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as appDb } from '../../db/database';
@@ -21,6 +21,7 @@ import {
   Timer,
   ChevronRight,
   BookOpen,
+  Pencil,
   UserX,
   AlertCircle,
   Radio,
@@ -66,6 +67,11 @@ interface ScoreInputDialogProps {
   isLeague?: boolean; // リーグ戦の場合は次ラウンド進出を行わない
   /** 現在の試合に適用されるゲームルール文字列 */
   gameRuleText?: string;
+  /**
+   * ゲームルールの修正を開く。渡すとルール表示の右端に鉛筆ボタンが出る。
+   * 取り込んだルールが違っていたとき、スコアを入れる場で直せるようにするため。
+   */
+  onEditRules?: () => void;
   /**
    * 対象回戦に適用される規定ゲーム数。呼び出し側が回戦別ルールを解決して渡す。
    * 省略時は gameRuleText から抽出（全角数字は正規化）してフォールバックする。
@@ -121,6 +127,7 @@ export default function ScoreInputDialog({
   bestOf = 1,
   isLeague = false,
   gameRuleText,
+  onEditRules,
   requiredGames: requiredGamesProp,
   matchFormat = 'game',
 }: ScoreInputDialogProps) {
@@ -156,7 +163,7 @@ export default function ScoreInputDialog({
   // ソフトキーボードが出ている間も、見えている領域にダイアログ全体を収める
   const { height: viewportHeight, offsetTop: viewportOffsetTop, keyboardOpen } = useVisualViewport(!!match);
 
-  const { isSpeaking, speak, stop } = useGeminiTts();
+  const { isSpeaking, speak, stop } = useCallTts();
   const navigate = useNavigate();
 
   // この試合のライブスコアが既に開始されているか（ボタン文言の出し分け用）
@@ -815,7 +822,16 @@ export default function ScoreInputDialog({
           <div className={`px-4 sm:px-6 pb-0 ${keyboardOpen ? 'pt-2' : 'pt-3'}`}>
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
               <BookOpen className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="text-xs font-bold text-amber-800">{gameRuleText}</span>
+              <span className="text-xs font-bold text-amber-800 flex-1 min-w-0">{gameRuleText}</span>
+              {onEditRules && (
+                <button
+                  onClick={onEditRules}
+                  title="ゲームルールを修正"
+                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-white border border-amber-300 rounded-full px-2 py-0.5 hover:bg-amber-100 transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />修正
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Volume2, Edit3, Save, X } from 'lucide-react';
 import { db } from '../../db/database';
-import { geminiTts } from '../broadcast/geminiTts';
+import { callTts } from '../broadcast/callTts';
 import {
   buildSurnameReadingMap,
   collectKnownSurnames,
@@ -199,7 +199,7 @@ export default function CallPreviewDialog({
   // 「保存してコール」を押してから音が出るまでの待ち時間をなくすため。
   useEffect(() => {
     if (!previewText) return;
-    const t = setTimeout(() => geminiTts.prefetch(previewText), 600);
+    const t = setTimeout(() => callTts.prefetch(previewText), 600);
     return () => clearTimeout(t);
   }, [previewText]);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Mic, RefreshCw, Square, Volume2, X, Key, Server, Search } from 'lucide-react';
+import { Mic, RefreshCw, Square, Volume2, X, Key, Server, Search, Laptop, Cloud } from 'lucide-react';
 import {
   GEMINI_VOICES,
   GEMINI_TTS_MODELS,
@@ -8,10 +8,14 @@ import {
   IS_MODEL_LOCKED,
   getVoiceSettings,
   setVoiceSettings,
+  type VoiceEngine,
   type VoiceMode,
 } from '../../features/broadcast/voiceConfig';
-import { geminiTts } from '../../features/broadcast/geminiTts';
-import { useGeminiTts } from '../../features/broadcast/useGeminiTts';
+import {
+  isBrowserTtsSupported, listVoices, loadVoices, type BrowserVoiceOption,
+} from '../../features/broadcast/browserTts';
+import { callTts } from '../../features/broadcast/callTts';
+import { useCallTts } from '../../features/broadcast/useCallTts';
 
 interface Props {
   open: boolean;
@@ -20,6 +24,7 @@ interface Props {
 
 export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const initial = getVoiceSettings();
+  const [engine, setEngine] = useState<VoiceEngine>(initial.engine);
   const [mode, setMode] = useState<VoiceMode>(initial.mode);
   const [apiKey, setApiKey] = useState(initial.apiKey);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -27,6 +32,11 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   const [model, setModel] = useState(initial.model);
   const [voiceName, setVoiceName] = useState(initial.voiceName);
   const [styleInstruction, setStyleInstruction] = useState(initial.styleInstruction);
+  const [browserVoiceURI, setBrowserVoiceURI] = useState(initial.browserVoiceURI);
+  const [browserRate, setBrowserRate] = useState(initial.browserRate);
+  const [browserPitch, setBrowserPitch] = useState(initial.browserPitch);
+  const [fallbackToBrowser, setFallbackToBrowser] = useState(initial.fallbackToBrowser);
+  const [browserVoices, setBrowserVoices] = useState<BrowserVoiceOption[]>([]);
   const [status, setStatus] = useState<{ available: boolean; model?: string; error?: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [availableModels, setAvailableModels] = useState<{
@@ -34,7 +44,11 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   }[] | null>(null);
   const [listingModels, setListingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const { isSpeaking, isLoading, speak, stop, lastError, clearError, lastModel, lastLatencyMs } = useGeminiTts();
+  const {
+    isSpeaking, isLoading, speak, stop, lastError, clearError,
+    lastModel, lastLatencyMs, lastEngine, lastFallbackReason,
+  } = useCallTts();
+  const browserSupported = isBrowserTtsSupported();
 
   const persist = useCallback((patch: Parameters<typeof setVoiceSettings>[0]) => {
     setVoiceSettings(patch);
@@ -45,7 +59,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
     setListingModels(true);
     setModelsError(null);
     try {
-      const res = await geminiTts.listAvailableModels();
+      const res = await callTts.listAvailableModels();
       if (res.error) setModelsError(res.error);
       setAvailableModels(res.models);
     } finally {
@@ -57,12 +71,19 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (open) {
       const cur = getVoiceSettings();
+      setEngine(cur.engine);
       setMode(cur.mode);
       setApiKey(cur.apiKey);
       setServerUrl(cur.serverUrl);
       setModel(cur.model);
       setVoiceName(cur.voiceName);
       setStyleInstruction(cur.styleInstruction);
+      setBrowserVoiceURI(cur.browserVoiceURI);
+      setBrowserRate(cur.browserRate);
+      setBrowserPitch(cur.browserPitch);
+      setFallbackToBrowser(cur.fallbackToBrowser);
+      // 音声一覧は非同期に読み込まれるので、開いたタイミングで取り直す
+      loadVoices().then(() => setBrowserVoices(listVoices()));
     }
   }, [open]);
 
@@ -70,7 +91,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
     persist({ mode, apiKey, serverUrl, model });
     setChecking(true);
     try {
-      const res = await geminiTts.checkAvailability();
+      const res = await callTts.checkAvailability();
       setStatus(res);
     } finally {
       setChecking(false);
@@ -78,19 +99,31 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
   }, [persist, mode, apiKey, serverUrl, model]);
 
   useEffect(() => {
-    if (open) handleCheck();
+    // ブラウザ内蔵音声は接続確認が不要（ネットワークを使わない）
+    if (open && engine === 'gemini') handleCheck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, mode]);
+  }, [open, mode, engine]);
 
   if (!open) return null;
 
   const handleTest = () => {
-    persist({ mode, apiKey, serverUrl, model, voiceName, styleInstruction });
+    persist({
+      engine, mode, apiKey, serverUrl, model, voiceName, styleInstruction,
+      browserVoiceURI, browserRate, browserPitch, fallbackToBrowser,
+    });
     clearError();
     speak('音声テストです。放送コールシステムをご利用いただきありがとうございます。', { repeatCount: 1 });
   };
 
-  const testDisabled = mode === 'direct' ? !apiKey : !status?.available;
+  /** Gemini を実際に呼べる状態か（未設定ならブラウザ内蔵音声で鳴る） */
+  const geminiReady = mode === 'direct' ? !!apiKey : !!serverUrl;
+
+  // どちらかのエンジンで鳴らせるならテストできる
+  //（内蔵音声が無い端末は Gemini、Gemini 未設定なら内蔵音声で鳴る）
+  const canSpeak = engine === 'browser'
+    ? browserSupported || geminiReady
+    : geminiReady || (fallbackToBrowser && browserSupported);
+  const testDisabled = !canSpeak;
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4" onClick={onClose}>
@@ -101,7 +134,7 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
         <div className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Volume2 className="w-5 h-5" />
-            <h3 className="font-black">音声設定（Gemini TTS）</h3>
+            <h3 className="font-black">音声設定</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/20 transition-colors">
             <X className="w-5 h-5" />
@@ -109,6 +142,122 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
+          {/* 読み上げエンジンの選択 */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-2">読み上げエンジン</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { setEngine('browser'); persist({ engine: 'browser' }); }}
+                disabled={!browserSupported}
+                className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  engine === 'browser'
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                }`}
+              >
+                <Laptop className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold">ブラウザ内蔵音声（推奨）</div>
+                  <div className="text-[10px] leading-tight">
+                    ネット・APIキー不要。待ち時間ゼロで確実に鳴る
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => { setEngine('gemini'); persist({ engine: 'gemini' }); }}
+                className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border-2 text-left transition-all ${
+                  engine === 'gemini'
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-200'
+                }`}
+              >
+                <Cloud className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold">Gemini TTS</div>
+                  <div className="text-[10px] leading-tight">
+                    自然な声。ネットワークとAPIキーが必要
+                  </div>
+                </div>
+              </button>
+            </div>
+            {!browserSupported && (
+              <p className="text-[10px] text-amber-700 mt-1.5">
+                この端末（ブラウザ）は内蔵音声に対応していないため、Gemini TTS をご利用ください。
+              </p>
+            )}
+            {engine === 'gemini' && browserSupported && !geminiReady && (
+              <p className="text-[10px] text-amber-700 mt-1.5">
+                {mode === 'direct' ? 'API キー' : '中継サーバー URL'}が未設定のため、実際にはブラウザ内蔵音声でコールします。
+              </p>
+            )}
+          </div>
+
+          {/* --- ブラウザ内蔵音声の設定 --- */}
+          {engine === 'browser' && (
+            <>
+              <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-snug">
+                端末に入っている音声で読み上げます。通信しないため、会場の電波が悪くても
+                ボタンを押した瞬間にコールできます。
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">音声</label>
+                <select
+                  value={browserVoiceURI}
+                  onChange={e => { setBrowserVoiceURI(e.target.value); persist({ browserVoiceURI: e.target.value }); }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                >
+                  <option value="">自動（日本語の音声を優先）</option>
+                  {browserVoices.map(v => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name}（{v.lang}{v.localService ? '・端末内蔵' : '・オンライン'}）
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  「端末内蔵」の音声はオフラインでも使えます。候補が少ない場合は端末の
+                  読み上げ音声（日本語）を追加すると増えます。
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    話速 <span className="font-mono text-[10px] text-gray-500">{browserRate.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range" min={0.5} max={2} step={0.05}
+                    value={browserRate}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      setBrowserRate(v);
+                      persist({ browserRate: v });
+                    }}
+                    className="w-full accent-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    高さ <span className="font-mono text-[10px] text-gray-500">{browserPitch.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range" min={0.5} max={2} step={0.05}
+                    value={browserPitch}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      setBrowserPitch(v);
+                      persist({ browserPitch: v });
+                    }}
+                    className="w-full accent-emerald-500"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* --- Gemini TTS の設定 --- */}
+          {engine === 'gemini' && (
+          <>
           {/* ビルド時埋め込みの説明（API キーがロック済み） */}
           {IS_KEY_LOCKED && (
             <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-snug">
@@ -353,13 +502,37 @@ export default function VoiceSettingsDialog({ open, onClose }: Props) {
             </p>
           </div>
 
+          {/* 失敗時のフォールバック */}
+          <label className="flex items-start gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer">
+            <input
+              type="checkbox"
+              checked={fallbackToBrowser}
+              onChange={e => { setFallbackToBrowser(e.target.checked); persist({ fallbackToBrowser: e.target.checked }); }}
+              className="mt-0.5 accent-emerald-500"
+            />
+            <span className="text-[11px] text-gray-700 leading-snug">
+              <span className="font-bold">失敗したらブラウザ内蔵音声でコールする</span>
+              <br />
+              通信エラーや API の不調でも、コールが無音のままにならないようにします（推奨）。
+            </span>
+          </label>
+          </>
+          )}
+
           {/* 直近の生成結果（実際に使われたモデルと所要時間） */}
           {(lastModel || lastLatencyMs > 0) && (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[11px] text-gray-700 leading-snug">
-              <div className="font-bold text-gray-800 mb-0.5">直近の音声生成</div>
+              <div className="font-bold text-gray-800 mb-0.5">
+                直近のコール音声{lastEngine === 'browser' ? '（ブラウザ内蔵音声）' : lastEngine === 'gemini' ? '（Gemini TTS）' : ''}
+              </div>
               <div className="font-mono text-[10px] break-all">{lastModel || '（不明）'}</div>
               {lastLatencyMs > 0 && (
                 <div className="text-gray-500">生成にかかった時間: {(lastLatencyMs / 1000).toFixed(1)} 秒</div>
+              )}
+              {lastFallbackReason && (
+                <div className="text-amber-700 mt-1 break-all">
+                  Gemini に失敗したためブラウザ内蔵音声で読み上げました: {lastFallbackReason}
+                </div>
               )}
             </div>
           )}

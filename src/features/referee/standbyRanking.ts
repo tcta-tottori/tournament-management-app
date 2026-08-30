@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Match, type Court } from '../../db/database';
+import { db, type Match, type Court, type Draw } from '../../db/database';
+import { buildLeagueCourtMap, buildReservedCourtNames } from '../draw/leagueCourts';
 
 /** 控え／入るコートのランキング情報 */
 export interface StandbyEntry {
@@ -30,6 +31,15 @@ const toMin = (t?: string | null) => {
   return mm ? parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) : Number.POSITIVE_INFINITY;
 };
 
+export interface StandbyOptions {
+  /**
+   * リーグ戦のコート割り当て（eventId → コートID）。
+   * 割り当てのあるリーグの試合はそのコートにしか入らず、
+   * 逆にそのコートは他の種目の「入るコート」候補から外れる。
+   */
+  leagueCourtIds?: Map<string, string[]>;
+}
+
 /**
  * 「対戦順に並んだ試合リスト」からコート割当と控え番号を算出する。
  * orderedMatches は表示と同じ対戦順で渡すこと（採番＝表示順にするため再ソートしない）。
@@ -37,8 +47,20 @@ const toMin = (t?: string | null) => {
  * 戻り値の Map のキーは matchKey(試合)（= `eventId::matchId`）。
  * matchId は種目内でしか一意でないため、matchId 単独をキーにしてはいけない。
  */
-export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): Map<string, StandbyEntry> {
+export function assignStandbyInOrder(
+  orderedMatches: Match[],
+  courts: Court[],
+  options: StandbyOptions = {},
+): Map<string, StandbyEntry> {
   const courtNameById = new Map(courts.map(c => [c.courtId, c.name]));
+  const leagueCourtIds = options.leagueCourtIds ?? new Map<string, string[]>();
+  // 種目ごとの専有コート名（リーグに割り当てたコート）
+  const reservedByName = buildReservedCourtNames(leagueCourtIds, courts);
+  const leagueCourtNames = new Map<string, string[]>();
+  for (const [eventId, ids] of leagueCourtIds) {
+    const names = ids.map(id => courtNameById.get(id)).filter((n): n is string => !!n);
+    if (names.length > 0) leagueCourtNames.set(eventId, names);
+  }
 
   // 現在使用中（試合中）のコート名 → 空きコート名を算出
   const playingCourtNames = new Set<string>();
@@ -74,17 +96,16 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
   const enterByMatch = new Map<string, string>();
   for (const m of waiting) {
     if (remaining.size === 0) break;
+    // リーグに割り当てたコートがあれば、その中の空きにしか入れない
+    const leagueNames = leagueCourtNames.get(m.eventId);
+    const candidates = leagueNames
+      ? leagueNames.filter(n => remaining.has(n))
+      : emptyCourtsSorted.filter(n => remaining.has(n) && !reservedByName.has(n));
+    if (candidates.length === 0) continue;
     const own = m.courtId ? courtNameById.get(m.courtId) : undefined;
-    let court: string | undefined;
-    if (own && remaining.has(own)) {
-      court = own;
-    } else {
-      court = emptyCourtsSorted.find(n => remaining.has(n));
-    }
-    if (court) {
-      enterByMatch.set(matchKey(m), court);
-      remaining.delete(court);
-    }
+    const court = own && candidates.includes(own) ? own : candidates[0];
+    enterByMatch.set(matchKey(m), court);
+    remaining.delete(court);
   }
 
   // 控え番号は大会全体で待機試合を対戦順に上から1..MAX_STANDBY で採番する（全体で控え1〜5）。
@@ -113,7 +134,11 @@ export function assignStandbyInOrder(orderedMatches: Match[], courts: Court[]): 
  * 全種目の試合とコートから、対戦順（開始時刻→対戦順(matchOrder)→ラウンド→ポジション）に
  * 沿って控え状況を算出する。ドロー画面など、対戦順リストを持たない画面で使用する。
  */
-export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string, StandbyEntry> {
+export function computeStandbyMap(
+  matches: Match[],
+  courts: Court[],
+  options: StandbyOptions = {},
+): Map<string, StandbyEntry> {
   const ordered = [...matches].sort((a, b) => {
     const ta = toMin(a.scheduledTime), tb = toMin(b.scheduledTime);
     if (ta !== tb) return ta - tb;
@@ -122,18 +147,24 @@ export function computeStandbyMap(matches: Match[], courts: Court[]): Map<string
     if (a.round !== b.round) return a.round - b.round;
     return (a.position || 0) - (b.position || 0);
   });
-  return assignStandbyInOrder(ordered, courts);
+  return assignStandbyInOrder(ordered, courts, options);
 }
 
 /** 大会全体の控えランキングを購読するフック */
 export function useStandbyMap(tournamentId: string | null): Map<string, StandbyEntry> {
   const data = useLiveQuery(async () => {
-    if (!tournamentId) return { matches: [] as Match[], courts: [] as Court[] };
+    if (!tournamentId) return { matches: [] as Match[], courts: [] as Court[], draws: [] as Draw[] };
     const events = await db.events.where('tournamentId').equals(tournamentId).toArray();
     const eventIds = events.map(e => e.eventId);
     const matches = eventIds.length ? await db.matches.where('eventId').anyOf(eventIds).toArray() : [];
     const courts = await db.courts.where('tournamentId').equals(tournamentId).toArray();
-    return { matches, courts };
-  }, [tournamentId]) || { matches: [] as Match[], courts: [] as Court[] };
-  return useMemo(() => computeStandbyMap(data.matches, data.courts), [data]);
+    const draws = eventIds.length ? await db.draws.where('eventId').anyOf(eventIds).toArray() : [];
+    return { matches, courts, draws };
+  }, [tournamentId]) || { matches: [] as Match[], courts: [] as Court[], draws: [] as Draw[] };
+  return useMemo(
+    () => computeStandbyMap(data.matches, data.courts, {
+      leagueCourtIds: buildLeagueCourtMap(data.draws),
+    }),
+    [data],
+  );
 }

@@ -4,7 +4,7 @@ import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X,
 import { useMixedStore } from './mixedStore';
 import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
-import { useGeminiTts } from '../broadcast/useGeminiTts';
+import { useCallTts } from '../broadcast/useCallTts';
 import CallPreviewDialog, { toCourtCallName } from './CallPreviewDialog';
 import CallStatusPopup from '../../components/ui/CallStatusPopup';
 import MixedBracketResultPreview from './MixedBracketResultPreview';
@@ -227,7 +227,7 @@ export default function MixedBracketView() {
   const [callMatch, setCallMatch] = useState<BracketMatch | null>(null);
   const [callCourt, setCallCourt] = useState('');
   const [callTime, setCallTime] = useState('');
-  const { speak, stop, isSpeaking, isLoading: isCallLoading } = useGeminiTts();
+  const { speak, stop, isSpeaking, isLoading: isCallLoading } = useCallTts();
   // コール中に画面下部へ出す情報（シングルス大会と同じ表示にするため試合ごと保持する）
   const [callingInfo, setCallingInfo] = useState<{ match: BracketMatch; courtName: string; roundLabel: string } | null>(null);
   const [courtAssignMatch, setCourtAssignMatch] = useState<BracketMatch | null>(null);
