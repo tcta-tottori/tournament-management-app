@@ -556,14 +556,21 @@ function LayoutPanel({
                         ? 'bg-amber-500 text-white border-amber-500 font-bold'
                         : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
                     }`}
-                    style={{ fontFamily: f.stack }}
+                    style={{ fontFamily: f.stack, fontWeight: layout.fontWeight }}
                   >{f.label}</button>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        {selectedFont?.note && <p className="mt-1.5 text-[10px] text-slate-400">{selectedFont.note}</p>}
+        {selectedFont && (
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            {selectedFont.note}
+            {selectedFont.hasRealWeights
+              ? '／太さ違いあり（「太さ」でしっかり変わります）'
+              : '／太さ違いが無いフォントです（「太さ微調整」で太らせられます）'}
+          </p>
+        )}
       </div>
 
       {/* 用紙・モード */}
@@ -595,12 +602,19 @@ function LayoutPanel({
         <RangeField label="上下位置" value={layout.blockTop} min={0} max={85} step={1} unit="%" onChange={v => onChange({ blockTop: v })} />
         <RangeField label="左右位置" value={layout.offsetX} min={-60} max={60} step={1} unit="mm" onChange={v => onChange({ offsetX: v })} />
         <RangeField label="行間" value={layout.lineGap} min={0} max={30} step={1} unit="mm" onChange={v => onChange({ lineGap: v })} />
-        <RangeField label="字間" value={layout.tracking} min={0} max={1} step={0.05} unit="em" onChange={v => onChange({ tracking: v })} />
-        <RangeField label="クラス名" value={layout.categorySize} min={8} max={72} step={1} unit="pt" onChange={v => onChange({ categorySize: v })} />
-        <RangeField label="賞位" value={layout.rankSize} min={8} max={90} step={1} unit="pt" onChange={v => onChange({ rankSize: v })} />
-        <RangeField label="氏名" value={layout.nameSize} min={8} max={90} step={1} unit="pt" onChange={v => onChange({ nameSize: v })} />
-        <RangeField label="所属" value={layout.affiliationSize} min={6} max={48} step={1} unit="pt" onChange={v => onChange({ affiliationSize: v })} />
+        {/* マイナスにすると字間を詰められる（長い氏名を1行に収めたいとき用） */}
+        <RangeField label="字間" value={layout.tracking} min={-0.4} max={1} step={0.01} unit="em" onChange={v => onChange({ tracking: v })} />
+        <RangeField label="太さ" value={layout.fontWeight} min={100} max={900} step={100} unit="" onChange={v => onChange({ fontWeight: v })} />
+        <RangeField label="太さ微調整" value={layout.strokeWidth} min={0} max={2} step={0.05} unit="px" onChange={v => onChange({ strokeWidth: v })} />
+        <RangeField label="クラス名" value={layout.categorySize} min={8} max={90} step={1} unit="pt" onChange={v => onChange({ categorySize: v })} />
+        <RangeField label="賞位" value={layout.rankSize} min={8} max={110} step={1} unit="pt" onChange={v => onChange({ rankSize: v })} />
+        <RangeField label="氏名" value={layout.nameSize} min={8} max={110} step={1} unit="pt" onChange={v => onChange({ nameSize: v })} />
+        <RangeField label="所属" value={layout.affiliationSize} min={6} max={60} step={1} unit="pt" onChange={v => onChange({ affiliationSize: v })} />
       </div>
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        「太さ」で太字にできます。毛筆フォントは太さ違いが配信されていないものが多いので、
+        足りないときは「太さ微調整」で輪郭を太らせてください。字間はマイナスにすると詰まります。
+      </p>
 
       {/* 全体レイアウト時だけ使う項目 */}
       {!layout.overlay && (

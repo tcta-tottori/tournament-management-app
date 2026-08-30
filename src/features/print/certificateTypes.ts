@@ -63,15 +63,27 @@ export interface CertLayout {
   rankSize: number;
   nameSize: number;
   affiliationSize: number;
-  /** 字間(em) */
+  /** 字間(em)。マイナスにすると詰められる */
   tracking: number;
   /** 行間(mm) */
   lineGap: number;
+  /** 文字の太さ（font-weight 100〜900） */
+  fontWeight: number;
+  /**
+   * 太さの微調整(px)。文字の輪郭を太らせる。
+   * 毛筆フォントは太さ違いが配信されていないものが多いため、
+   * font-weight だけでは足りない分をここで補う。
+   */
+  strokeWidth: number;
 }
 
-/** 既定のレイアウト（従来の賞状印刷に合わせた値） */
+/**
+ * 既定のレイアウト。
+ * 実際の大会で位置合わせをした設定をそのまま初期値にしている
+ * （A4縦・賞状用紙に文字だけ重ねる運用）。
+ */
 export const DEFAULT_CERT_LAYOUT: CertLayout = {
-  fontId: 'yuji-mai',
+  fontId: 'yuji-syuku',
   paper: 'a4-portrait',
   overlay: true,
   vertical: false,
@@ -80,14 +92,16 @@ export const DEFAULT_CERT_LAYOUT: CertLayout = {
   eventName: '',
   dateText: '',
   organizer: '鳥取市テニス協会',
-  blockTop: 35,
+  blockTop: 43,
   offsetX: 0,
   categorySize: 28,
   rankSize: 32,
-  nameSize: 36,
+  nameSize: 43,
   affiliationSize: 16,
-  tracking: 0.4,
-  lineGap: 5,
+  tracking: 0,
+  lineGap: 4,
+  fontWeight: 400,
+  strokeWidth: 0,
 };
 
 /** 空の賞状エントリーを作る */
