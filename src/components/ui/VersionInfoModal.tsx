@@ -23,7 +23,7 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'Ver 2.4',
     date: '2026-07-26',
-    highlights: '賞状の印刷メニューを追加・コート変更に対応・ドロー表示の刷新',
+    highlights: '賞状の印刷メニューを追加・コート変更に対応・音声コールを内蔵音声に・リーグのコート運用',
     timeGroups: [
       {
         time: '—',
