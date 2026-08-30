@@ -192,8 +192,8 @@ export default function PublicLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-main overflow-hidden">
-      {/* ヘッダー（本アプリと同一） */}
-      <header className="header-main flex items-center gap-3 px-4 sm:px-5 h-[56px] shrink-0 z-30">
+      {/* ヘッダー（本アプリと同一・PCのみ。スマホは流れる表示バーに集約） */}
+      <header className="header-main hidden lg:flex items-center gap-3 px-5 h-[56px] shrink-0 z-30">
         <HeaderBackdrop />
         <button className="header-hamburger-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="メニューを開く">
           <Menu style={{ width: 24, height: 24 }} />
@@ -210,9 +210,14 @@ export default function PublicLayout() {
       </header>
 
       {/* 流れる表示バー（本アプリと同一） */}
-      <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
+      <div className="info-bar flex items-center shrink-0 h-11 lg:h-9 overflow-hidden text-xs sticky top-0 z-20">
         <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
           <div className="info-ticker flex items-center h-full whitespace-nowrap">
+            {/* スマホはヘッダーが無いので、先頭に大会名を流す */}
+            <span className="info-ticker-item info-ticker-lead">
+              <span>{tournamentName || '観戦用ページ'}</span>
+              <span className="info-ticker-dot" />
+            </span>
             {tickerItems.length > 0 ? tickerItems.map((item, i) => (
               <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                 {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
@@ -220,9 +225,24 @@ export default function PublicLayout() {
                 {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
               </span>
             )) : (
-              <span className="info-ticker-item"><span>{tournamentName || '観戦用ページ'}</span></span>
+              <span className="info-ticker-item info-ticker-fallback"><span>{tournamentName || '観戦用ページ'}</span></span>
             )}
           </div>
+        </div>
+
+        {/* スマホ: 右端に現在ページ名とメニューボタン */}
+        <div className="flex lg:hidden items-center gap-1.5 shrink-0 pl-2 pr-2">
+          <div className="header-page-name info-bar-page-name min-w-0">
+            <CurrentIcon style={{ width: 15, height: 15 }} className="shrink-0" />
+            <span className="truncate">{current.label}</span>
+          </div>
+          <button
+            className="header-hamburger-btn header-hamburger-btn-sm"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="メニューを開く"
+          >
+            <Menu style={{ width: 20, height: 20 }} />
+          </button>
         </div>
       </div>
 

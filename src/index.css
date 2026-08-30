@@ -360,6 +360,19 @@
   border-color: var(--brand-red-dark);
 }
 
+/* 流れる表示バーの中に置く小さめのメニューボタン（スマホ用） */
+.header-hamburger-btn-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+/* 流れる表示バーの中に置くページ名。ヘッダー用の上限（46%）は狭すぎるので広げる */
+.header-page-name.info-bar-page-name {
+  max-width: 46vw;
+  text-shadow: none;
+}
+
 .header-page-name {
   display: flex;
   align-items: center;
@@ -649,10 +662,10 @@
   max-width: 160px;
   height: auto;
   object-fit: contain;
-  /* 赤地の上でロゴの赤が沈むため、白いチップに載せる */
-  background: #ffffff;
-  padding: 8px 12px;
-  border-radius: 8px;
+  /* ロゴ画像（白地に黒文字＋赤のマーク）を白抜きにして赤地に載せる。
+     グレースケール→反転で「黒地に白文字」にし、screen 合成で黒を透かす。 */
+  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
+  mix-blend-mode: screen;
 }
 
 /* ===========================================================
@@ -751,6 +764,21 @@
   position: relative;
   z-index: 1;
   color: var(--brand-red);
+}
+
+/* スマホはヘッダーが無いので、先頭に大会名を流す（PCではヘッダーに出るので隠す） */
+.info-ticker-lead {
+  font-weight: 700;
+  color: var(--brand-red);
+}
+@media (min-width: 1024px) {
+  .info-ticker-lead { display: none; }
+}
+
+/* 流す項目が無いときの予備表示。スマホは先頭の大会名があるので出さない */
+.info-ticker-fallback { display: none; }
+@media (min-width: 1024px) {
+  .info-ticker-fallback { display: inline-flex; }
 }
 
 /* ティッカーエリア — 左右フェードアウト */
