@@ -8,7 +8,7 @@ import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
 import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -17,6 +17,7 @@ import { resolveRequiredGames } from '../score/gameRules';
 import { useStandbyMap, matchKey } from '../referee/standbyRanking';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
 import LeagueCourtDialog from '../../components/ui/LeagueCourtDialog';
+import GameRulesDialog from '../../components/ui/GameRulesDialog';
 import { buildLeagueCourtMap, freeLeagueCourts, MAX_LEAGUE_COURTS } from '../draw/leagueCourts';
 import EventResultPreview from '../results/EventResultPreview';
 import { isEventComplete } from '../results/eventCompletion';
@@ -501,6 +502,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     await enterMatchToCourt(target.id, courtId);
   };
 
+  // --- ゲームルール編集（対戦順シートと共通のダイアログ）---
+  // 取り込んだドロー表のルールが違っていたときに、その場で直せるようにする。
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+
   // --- リーグ戦: 割り当てたコートへ次の対戦を入れる ---
   /** リーグの使用コート割り当てダイアログ */
   const [leagueCourtDialogOpen, setLeagueCourtDialogOpen] = useState(false);
@@ -558,9 +563,20 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
               {selectedEvent?.name || '種目を選択'}
             </h2>
             {selectedEvent && (
-              <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                {getGameRulesText(selectedEvent)}
-              </p>
+              enableScoreInput ? (
+                <button
+                  onClick={() => setRulesDialogOpen(true)}
+                  title="ゲームルールを修正"
+                  className="mt-0.5 max-w-full inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-amber-700 hover:bg-amber-50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                >
+                  <span className="truncate">{getGameRulesText(selectedEvent)}</span>
+                  <Pencil className="w-2.5 h-2.5 shrink-0 text-amber-500" />
+                </button>
+              ) : (
+                <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                  {getGameRulesText(selectedEvent)}
+                </p>
+              )
             )}
           </div>
 
@@ -888,9 +904,15 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           getRoundName={(round) => getRoundName(round, totalRounds)}
           isLeague={isRoundRobin}
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
+          onEditRules={selectedEvent ? () => setRulesDialogOpen(true) : undefined}
           requiredGames={resolveRequiredGames(getGameRuleText(selectedEvent, selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
         />
+      )}
+
+      {/* ゲームルール編集（種目名の下のルール表示をタップ） */}
+      {rulesDialogOpen && selectedEvent && (
+        <GameRulesDialog event={selectedEvent} onClose={() => setRulesDialogOpen(false)} />
       )}
 
       {/* リーグの使用コート割り当て */}

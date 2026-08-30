@@ -13,6 +13,7 @@ import {
 import { assignVenueCourtNames } from './scheduleEngine';
 import { generateScheduleFromDraws, inferScheduleBaseFromDraws, AUTO_GENERATED_SCHEDULE_LABEL } from './generateSchedule';
 import ScoreInputDialog, { type ScoreInputMatch } from '../score/ScoreInputDialog';
+import GameRulesDialog from '../../components/ui/GameRulesDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 
 /** 回戦番号から日本語ラウンド名を返す */
@@ -206,6 +207,8 @@ export default function ScheduleSheet() {
   const [actionIndex, setActionIndex] = useState<number | null>(null);
   // スコア入力対象のスケジュールindex
   const [scoreIndex, setScoreIndex] = useState<number | null>(null);
+  // ゲームルール編集の対象種目（スコア入力の「修正」から開く）
+  const [rulesEventId, setRulesEventId] = useState<string | null>(null);
   // 入れ替えモード: 入れ替え元のスケジュールindex（null=通常）
   const [swapSourceIndex, setSwapSourceIndex] = useState<number | null>(null);
 
@@ -1483,10 +1486,18 @@ export default function ScheduleSheet() {
           getRoundName={(round) => getRoundNameJp(round, scoreInputContext.totalRounds)}
           isLeague={scoreInputContext.isLeague}
           gameRuleText={scoreInputContext.gameRuleText}
+          onEditRules={scoreInputContext.evt ? () => setRulesEventId(scoreInputContext.evt!.eventId) : undefined}
           requiredGames={scoreInputContext.requiredGames}
           matchFormat={scoreInputContext.matchFormat}
         />
       )}
+
+      {/* ゲームルール編集（ドロー画面・対戦順シートと共通） */}
+      {rulesEventId && (() => {
+        const ruleEvt = events.find(e => e.eventId === rulesEventId);
+        if (!ruleEvt) return null;
+        return <GameRulesDialog event={ruleEvt} onClose={() => setRulesEventId(null)} />;
+      })()}
 
       {/* Edit Cell Modal */}
       {editingCell && createPortal(
