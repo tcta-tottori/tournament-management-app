@@ -221,7 +221,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     if (s.entryId) affById.set(s.entryId, s.affiliation);
   }
 
-  const hasSeed = draw.slots.some(s => s.seed > 0 && !s.isBye);
 
   // ---- 事前計測（選手名の最大幅からネーム列の幅を決める） ----
   const meas = document.createElement('canvas').getContext('2d')!;
@@ -239,7 +238,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     if (w > maxNameW) maxNameW = w;
   }
-  const NUM_W = hasSeed ? 46 : 26;         // 番号（＋シードバッジ）の幅
+  const NUM_W = 26;                        // ドロー番号の幅
   const NAME_W = clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380);
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
@@ -670,18 +669,6 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
     // 番号
     drawText(ctx, String(pos), x0 + 20, cy, 11, 'right', COL.gray400, 'medium');
-
-    // シードバッジ
-    if (hasSeed && slot.seed > 0) {
-      const d = 18;
-      const sx = x0 + 24;
-      const sy = cy - d / 2;
-      const g = ctx.createLinearGradient(sx, sy, sx, sy + d);
-      g.addColorStop(0, COL.champ1);
-      g.addColorStop(1, COL.champ3);
-      roundRect(ctx, sx, sy, d, d, d / 2, g);
-      drawText(ctx, String(slot.seed), sx + d / 2, sy + d / 2 + 0.5, 10.5, 'center', COL.white, 'black');
-    }
 
     const nameX = x0 + NUM_W;
     const nameMaxW = NAME_W - NUM_W - 12;
