@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Printer, Plus, Trash2, Copy, Search, Award, Settings2,
-  ChevronUp, ChevronDown, Eye, RotateCcw, Users, ListChecks,
+  ChevronUp, ChevronDown, Eye, RotateCcw, Users, ListChecks, ArrowLeftRight,
 } from 'lucide-react';
 import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
@@ -29,7 +29,7 @@ import {
 import { buildCertificateHtml, buildCertificatePreviewHtml } from './certificateHtml';
 import {
   collectIndividualCandidates, collectMixedCandidates, collectTeamCandidates,
-  winnersOnly, type CertCandidate,
+  swapPairName, winnersOnly, type CertCandidate,
 } from './certificateCandidates';
 
 /** 賞位のよく使う選択肢（自由入力も可） */
@@ -218,10 +218,32 @@ export default function PrintCenter() {
     });
   }, []);
 
+  // 実際に何か印字される行だけを対象にする（白紙のページを刷らないため）
   const selectedEntries = useMemo(
-    () => entries.filter(e => e.selected && (e.names.trim() || e.rank.trim() || e.category.trim())),
-    [entries],
+    () => entries.filter(e => e.selected && (
+      e.names.trim()
+      || (layout.showRank && e.rank.trim())
+      || (layout.showCategory && e.category.trim())
+      || (layout.showAffiliation && e.affiliation.trim())
+    )),
+    [entries, layout.showRank, layout.showCategory, layout.showAffiliation],
   );
+
+  /**
+   * 実際に刷る枚数ぶんに展開する。
+   * ダブルス（氏名が全角スペースで2つに分かれる）は、設定が入っていれば
+   * 氏名を入れ替えた分をもう1枚足す（2人それぞれに渡すため）。
+   */
+  const printPages = useMemo(() => {
+    if (!layout.swapDoubles) return selectedEntries;
+    const pages: CertEntry[] = [];
+    for (const e of selectedEntries) {
+      pages.push(e);
+      const swapped = swapPairName(e.names);
+      if (swapped) pages.push({ ...e, id: `${e.id}-swap`, names: swapped });
+    }
+    return pages;
+  }, [selectedEntries, layout.swapDoubles]);
 
   const previewEntry = useMemo(
     () => entries.find(e => e.id === previewId) || entries[0] || null,
@@ -230,8 +252,8 @@ export default function PrintCenter() {
 
   // --- 印刷 ---
   const handlePrint = useCallback(() => {
-    if (selectedEntries.length === 0) return;
-    const html = buildCertificateHtml(selectedEntries, layout);
+    if (printPages.length === 0) return;
+    const html = buildCertificateHtml(printPages, layout);
     const win = window.open('', '_blank', 'width=900,height=1100');
     if (!win) {
       alert('印刷用ウィンドウを開けませんでした。ブラウザのポップアップブロックを解除してください。');
@@ -244,7 +266,7 @@ export default function PrintCenter() {
     const fonts = win.document.fonts;
     if (fonts) fonts.ready.then(() => setTimeout(doPrint, 400)).catch(() => setTimeout(doPrint, 1200));
     else setTimeout(doPrint, 1200);
-  }, [selectedEntries, layout]);
+  }, [printPages, layout]);
 
   return (
     <div className="p-2 sm:p-4 space-y-3">
@@ -269,10 +291,10 @@ export default function PrintCenter() {
             </button>
             <button
               onClick={handlePrint}
-              disabled={selectedEntries.length === 0}
+              disabled={printPages.length === 0}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-white text-amber-700 text-xs font-black shadow disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 active:scale-95 transition-all"
             >
-              <Printer className="w-4 h-4" />{selectedEntries.length}枚を印刷
+              <Printer className="w-4 h-4" />{printPages.length}枚を印刷
             </button>
           </div>
         </div>
@@ -366,7 +388,9 @@ export default function PrintCenter() {
             <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
               <Printer className="w-4 h-4 text-slate-400" />
               <span className="text-xs font-bold text-slate-700">印刷リスト</span>
-              <span className="text-[10px] text-slate-400">（チェックした{selectedEntries.length}枚を印刷）</span>
+              <span className="text-[10px] text-slate-400">
+                （チェックした{selectedEntries.length}件 → {printPages.length}枚を印刷）
+              </span>
               {entries.length > 0 && (
                 <button
                   onClick={() => { if (window.confirm('印刷リストを全て削除しますか？')) { setEntries([]); setPreviewId(null); } }}
@@ -387,6 +411,7 @@ export default function PrintCenter() {
                   entry={entry}
                   index={idx}
                   isPreview={previewEntry?.id === entry.id}
+                  swapDoubles={layout.swapDoubles}
                   onSelect={() => setPreviewId(entry.id)}
                   onChange={patch => updateEntry(entry.id, patch)}
                   onRemove={() => removeEntry(entry.id)}
@@ -438,17 +463,20 @@ export default function PrintCenter() {
 // 賞状1件の編集行
 // ---------------------------------------------------------------------------
 function EntryRow({
-  entry, index, isPreview, onSelect, onChange, onRemove, onDuplicate, onMove,
+  entry, index, isPreview, swapDoubles, onSelect, onChange, onRemove, onDuplicate, onMove,
 }: {
   entry: CertEntry;
   index: number;
   isPreview: boolean;
+  /** ダブルスの入れ替え印刷が有効か（この行が2枚になるかの表示に使う） */
+  swapDoubles: boolean;
   onSelect: () => void;
   onChange: (patch: Partial<CertEntry>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
+  const swapped = swapPairName(entry.names);
   return (
     <div
       onClick={onSelect}
@@ -482,6 +510,13 @@ function EntryRow({
           className="flex-1 min-w-0 text-[11px] border border-slate-200 rounded px-1.5 py-1 focus:border-amber-400 outline-none"
         />
         <div className="flex items-center shrink-0">
+          {swapped && (
+            <button
+              onClick={e => { e.stopPropagation(); onChange({ names: swapped }); }}
+              className="p-1 text-slate-300 hover:text-amber-600"
+              title="ペアの氏名の順番を入れ替える"
+            ><ArrowLeftRight className="w-3.5 h-3.5" /></button>
+          )}
           <button onClick={e => { e.stopPropagation(); onMove(-1); }} className="p-1 text-slate-300 hover:text-slate-600" title="上へ"><ChevronUp className="w-3.5 h-3.5" /></button>
           <button onClick={e => { e.stopPropagation(); onMove(1); }} className="p-1 text-slate-300 hover:text-slate-600" title="下へ"><ChevronDown className="w-3.5 h-3.5" /></button>
           <button onClick={e => { e.stopPropagation(); onDuplicate(); }} className="p-1 text-slate-300 hover:text-blue-500" title="複製"><Copy className="w-3.5 h-3.5" /></button>
@@ -500,9 +535,15 @@ function EntryRow({
           value={entry.names}
           onClick={e => e.stopPropagation()}
           onChange={e => onChange({ names: e.target.value })}
-          placeholder="氏名（例: 田中・山本　組）"
+          placeholder="氏名（ダブルスは間を全角スペースで。例: 岸本 健悟　安田 彰汰）"
           className="flex-1 min-w-0 text-xs font-bold border border-slate-200 rounded px-2 py-1 focus:border-amber-400 outline-none"
         />
+        {swapDoubles && swapped && entry.selected && (
+          <span
+            className="shrink-0 text-[9px] font-black text-amber-700 bg-amber-100 rounded-full px-1.5 py-0.5"
+            title={`入れ替えた「${swapped}」も印刷されます`}
+          >×2</span>
+        )}
       </div>
       <datalist id="cert-rank-presets">
         {RANK_PRESETS.map(r => <option key={r} value={r} />)}
@@ -620,6 +661,30 @@ function LayoutPanel({
           縦書き
         </label>
       </div>
+
+      {/* 賞状に載せる項目。既定は氏名のみ（クラス名・賞位は賞状用紙に刷り込み済みのことが多い） */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[11px] font-bold text-slate-600">印刷する項目</span>
+        <span className="text-[11px] text-slate-400">氏名（常に印刷）</span>
+        <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+          <input type="checkbox" checked={layout.showRank} onChange={e => onChange({ showRank: e.target.checked })} className="accent-amber-500" />
+          賞位
+        </label>
+        <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+          <input type="checkbox" checked={layout.showCategory} onChange={e => onChange({ showCategory: e.target.checked })} className="accent-amber-500" />
+          クラス名
+        </label>
+        <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+          <input type="checkbox" checked={layout.showAffiliation} onChange={e => onChange({ showAffiliation: e.target.checked })} className="accent-amber-500" />
+          所属
+        </label>
+      </div>
+
+      {/* ダブルスの2枚出し */}
+      <label className="flex items-center gap-1.5 text-[11px] text-slate-600" title="ペアの2人それぞれに、自分の名前が先に来た賞状を渡すための設定です">
+        <input type="checkbox" checked={layout.swapDoubles} onChange={e => onChange({ swapDoubles: e.target.checked })} className="accent-amber-500" />
+        ダブルスは氏名を入れ替えてもう1枚印刷する（1組 → 2枚）
+      </label>
 
       {/* 位置・サイズ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-2">

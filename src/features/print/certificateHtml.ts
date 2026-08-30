@@ -33,10 +33,11 @@ export function fillBodyText(template: string, entry: CertEntry): string {
 
 /** 1枚分のページHTML */
 function pageHtml(entry: CertEntry, layout: CertLayout): string {
+  // 氏名以外は「印刷する項目」で選ばれているものだけ出す（既定は氏名のみ）
   const lines: string[] = [];
-  if (entry.category.trim()) lines.push(`<div class="cert-category">${esc(entry.category)}</div>`);
-  if (entry.rank.trim()) lines.push(`<div class="cert-rank">${esc(entry.rank)}</div>`);
-  if (entry.affiliation.trim()) lines.push(`<div class="cert-affiliation">${esc(entry.affiliation)}</div>`);
+  if (layout.showCategory && entry.category.trim()) lines.push(`<div class="cert-category">${esc(entry.category)}</div>`);
+  if (layout.showRank && entry.rank.trim()) lines.push(`<div class="cert-rank">${esc(entry.rank)}</div>`);
+  if (layout.showAffiliation && entry.affiliation.trim()) lines.push(`<div class="cert-affiliation">${esc(entry.affiliation)}</div>`);
   if (entry.names.trim()) lines.push(`<div class="cert-name">${esc(entry.names)}</div>`);
   const block = `<div class="cert-block">${lines.join('')}</div>`;
 

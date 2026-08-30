@@ -27,14 +27,44 @@ export interface CertCandidate {
   rankHint?: string;
 }
 
+/**
+ * ペアの2人を区切る文字。
+ * 賞状はペアの間を全角スペースだけで空けるので、この文字で統一する。
+ * 入れ替え印刷（swapPairName）もこの区切りを目印にしている。
+ */
+export const PAIR_SEPARATOR = '　';
+
 /** 「田中 太郎」→「田中」 */
 export function familyName(name: string): string {
   return name.trim().split(/[\s　]+/)[0] || name.trim();
 }
 
-/** ミックスのペア表記「田中・山本　組」 */
+/**
+ * ペア表記を賞状用にそろえる。
+ * 「山田 太郎 / 佐藤 次郎」「田中・山本　組」のような表記を
+ * 「山田 太郎　佐藤 次郎」（間は全角スペースのみ）にする。
+ */
+export function toPairName(raw: string): string {
+  return raw
+    .split(/\s*[/／・]\s*/)          // 「/」「／」「・」区切りを分解
+    .map(n => n.replace(/　?組$/, '').trim())  // 末尾の「組」を落とす
+    .filter(Boolean)
+    .join(PAIR_SEPARATOR);
+}
+
+/** ミックスのペア表記「田中　山本」（姓のみ・間は全角スペース） */
 export function mixedPairName(t: MixedTeam): string {
-  return `${familyName(t.male.name)}・${familyName(t.female.name)}　組`;
+  return `${familyName(t.male.name)}${PAIR_SEPARATOR}${familyName(t.female.name)}`;
+}
+
+/**
+ * ダブルスの氏名を入れ替える（「A　B」→「B　A」）。
+ * 全角スペースで2つに分かれないとき（シングルス等）は null を返す。
+ */
+export function swapPairName(name: string): string | null {
+  const parts = name.split(PAIR_SEPARATOR).map(p => p.trim()).filter(Boolean);
+  if (parts.length !== 2) return null;
+  return `${parts[1]}${PAIR_SEPARATOR}${parts[0]}`;
 }
 
 const MIXED_CATEGORY_LABEL: Record<string, string> = {
@@ -186,8 +216,9 @@ export function collectIndividualCandidates(
         out.push({
           key: `ind-${eventId}-${nm}`,
           category: evName,
-          name: nm,
-          affiliation: (side.aff || '').trim(),
+          // ダブルスは「山田 太郎 / 佐藤 次郎」で入っているので賞状用の表記にそろえる
+          name: toPairName(nm),
+          affiliation: toPairName((side.aff || '').trim()),
           group: evName,
           rankHint: hints.get(nm),
         });

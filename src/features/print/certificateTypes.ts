@@ -50,6 +50,19 @@ export interface CertLayout {
   overlay: boolean;
   /** 縦書きにする */
   vertical: boolean;
+  /**
+   * 賞状に印刷する項目。氏名は必ず印刷し、それ以外は既定で印刷しない。
+   * （市販の賞状用紙にはクラス名・賞位が刷り込まれていることが多く、
+   *   運用上は名前だけ入れれば足りるため）
+   */
+  showCategory: boolean;
+  showRank: boolean;
+  showAffiliation: boolean;
+  /**
+   * ダブルスは氏名を入れ替えてもう1枚印刷する。
+   * 2人それぞれに、自分の名前が先に来た賞状を渡すための設定。
+   */
+  swapDoubles: boolean;
   /** 題字（overlay=false のとき印刷） */
   title: string;
   /** 本文テンプレート。{rank} {category} {names} {affiliation} を差し込める */
@@ -94,6 +107,10 @@ export const DEFAULT_CERT_LAYOUT: CertLayout = {
   paper: 'a4-portrait',
   overlay: true,
   vertical: false,
+  showCategory: false,
+  showRank: false,
+  showAffiliation: false,
+  swapDoubles: true,
   title: '表 彰 状',
   bodyText: 'あなたは本大会において\n頭書のとおり優秀な成績を収められました\nよってここにこれを賞します',
   eventName: '',
