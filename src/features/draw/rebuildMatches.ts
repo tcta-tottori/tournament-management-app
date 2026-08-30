@@ -12,6 +12,7 @@
 
 import { db } from '../../db/database';
 import type { Draw, Match } from '../../db/database';
+import { syncThirdPlaceMatch, THIRD_PLACE_MATCH_ID, wantsThirdPlace } from './thirdPlace';
 
 /** ドローのスロット（entryId / BYE / シード） */
 type SlotLike = { position: number; entryId: string | null; seed: number; isBye: boolean };
@@ -154,6 +155,7 @@ export async function buildMatchesFromDraw(
 
   // 2回戦以降
   const totalRounds = Math.log2(draw.drawSize);
+  const event = await db.events.where('eventId').equals(eventId).first();
   for (let round = 2; round <= totalRounds; round++) {
     const matchesInRound = draw.drawSize / Math.pow(2, round);
     for (let m = 0; m < matchesInRound; m++) {
@@ -170,6 +172,23 @@ export async function buildMatchesFromDraw(
         refereeId: null, refereeName: '', updatedAt: Date.now(),
       });
     }
+  }
+
+  // 3位決定戦（準決勝の敗者同士）。決勝と同じ回戦に position=2 の枠として足す。
+  // 勝ち上がりは position を 2 で割って次の枠を決めるため、この枠は誰の進出先にも
+  // ならず、通常のトーナメント進行には影響しない。対戦カードは
+  // syncThirdPlaceMatch() が準決勝の結果から埋める。
+  if (totalRounds >= 2 && wantsThirdPlace(draw, event)) {
+    newMatches.push({
+      eventId, matchId: THIRD_PLACE_MATCH_ID, round: totalRounds, matchOrder: matchOrder++,
+      position: 2,
+      player1EntryId: null, player2EntryId: null,
+      player1Name: '', player2Name: '',
+      player1Affiliation: '', player2Affiliation: '',
+      score: '', winnerEntryId: null,
+      courtId: null, scheduledTime: null, status: 'waiting',
+      refereeId: null, refereeName: '', updatedAt: Date.now(),
+    });
   }
 
   return newMatches;
@@ -435,7 +454,19 @@ export async function rebuildEventMatches(eventId: string): Promise<RebuildResul
   }
 
   // 2回戦以降で相手が来ない試合（相手側の枝が全て BYE）も次へ送る
-  if (!isLeague) await propagateByes(eventId);
+  // 併せて3位決定戦の対戦カードも組み直す
+  if (!isLeague) await refreshBracketProgress(eventId);
 
   return { generated: mergedMatches.length, preserved, reset: resetCount };
+}
+
+/**
+ * 結果が変わったあとにトーナメントの進行を整える共通処理。
+ * - 相手が来ない試合を不戦勝として次の回戦へ送る
+ * - 3位決定戦の対戦カードを準決勝の結果に合わせる
+ * スコアの確定・取り消しを行う画面はすべてここを呼ぶ。
+ */
+export async function refreshBracketProgress(eventId: string): Promise<void> {
+  await propagateByes(eventId);
+  await syncThirdPlaceMatch(eventId);
 }

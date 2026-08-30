@@ -43,6 +43,11 @@ interface CourtBracketViewProps {
   selectedSlotPosition?: number | null;
   /** 修正モードで枠がタップされたとき */
   onSlotSelect?: (position: number) => void;
+  /**
+   * 名前修正モード。1回戦の枠をタップすると選手名の修正を開く。
+   * （あたり修正モードとは別で、枠の入れ替えは行わない）
+   */
+  nameEditMode?: boolean;
 }
 
 const SLOT_HEIGHT = 36;
@@ -76,6 +81,7 @@ export default function CourtBracketView({
   editMode = false,
   selectedSlotPosition = null,
   onSlotSelect,
+  nameEditMode = false,
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
@@ -193,7 +199,7 @@ export default function CourtBracketView({
 
   const visibleColumns = roundsCount - leafRound;
   const containerWidth = offsetX * 2 + visibleColumns * (slotW + xSpacing) + slotW;
-  const containerHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
+  const baseHeight = nextCompactY + SLOT_HEIGHT + OFFSET_Y;
 
   // entryId → ドロー情報（番号・氏名・所属）。全選手は1回戦スロットに存在するので
   // 2回戦以降でも entryId から氏名・所属を引ける。
@@ -382,14 +388,18 @@ export default function CourtBracketView({
     const x = getX(0);
     const y = leafY[i];
     const isSelected = editMode && selectedSlotPosition === slot.position;
-    const editProps = editMode && onSlotSelect
+    // 名前修正モードでは、選手の入っている枠だけタップできる
+    const nameEditable = nameEditMode && !isEmpty;
+    const editProps = (editMode || nameEditable) && onSlotSelect
       ? { onClick: () => onSlotSelect(slot.position), role: 'button' as const }
       : {};
     const editCls = editMode
       ? isSelected
         ? ' ring-2 ring-primary-500 bg-primary-50 cursor-pointer'
         : ' cursor-pointer hover:ring-2 hover:ring-primary-200'
-      : '';
+      : nameEditable
+        ? ' cursor-pointer hover:ring-2 hover:ring-amber-300'
+        : '';
 
     slotElements.push(
       <div key={`s-${slot.position}`}
@@ -481,20 +491,25 @@ export default function CourtBracketView({
     </div>
   );
 
-  // --- 2回戦以降のマッチノード ---
+  // --- 対戦ノード（2回戦以降・3位決定戦）---
   const matchElements: React.ReactNode[] = [];
-  for (let r = Math.max(1, leafRound); r <= roundsCount; r++) {
-    const numNodes = drawSize / Math.pow(2, r);
-    for (let m = 0; m < numNodes; m++) {
-      // BYE だけの枝には枠を描かない（実際の対戦カードと重なってずれて見えるため）
-      if (isEmptySubtree(r, m)) continue;
-      const x = getX(r);
-      const y = getCompactY(r, m);
-      const matchResult = findMatch(r, m + 1);
+
+  /**
+   * 1つの対戦ノードを描く。
+   * 通常のトーナメントの枠と、決勝の下に置く3位決定戦の枠で共通に使う。
+   */
+  const renderMatchNode = (
+    key: string,
+    matchResult: MatchResult | undefined,
+    x: number,
+    y: number,
+    opts: { isFinal?: boolean; emptyLabel?: string } = {},
+  ): React.ReactNode => {
+    {
+      const isFinal = !!opts.isFinal;
       const isFinished = matchResult && (matchResult.status === 'finished' || matchResult.status === 'walkover');
       const isPlaying = matchResult?.status === 'playing';
       const isReady = matchResult?.status === 'ready';
-      const isFinal = r === roundsCount;
       const bothPlayers = !!(matchResult?.player1Name && matchResult?.player2Name);
       const isVs = bothPlayers && !isFinished; // 両者確定・未確定 → vs 表示（背高カード）
 
@@ -573,12 +588,13 @@ export default function CourtBracketView({
         );
       } else {
         // 選手未確定
+        const emptyLabel = opts.emptyLabel ?? (isFinal ? '決勝' : '');
         content = (
           <div className="flex items-center gap-1 w-full min-w-0 px-2">
-            {isFinal ? (
+            {emptyLabel ? (
               <>
-                <Trophy className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                <span className="text-[11px] text-gray-400 font-bold">決勝</span>
+                {isFinal && <Trophy className="w-3.5 h-3.5 text-gray-300 shrink-0" />}
+                <span className="text-[11px] text-gray-400 font-bold">{emptyLabel}</span>
               </>
             ) : (
               <span className="text-[11px] text-gray-400 truncate flex-1">&nbsp;</span>
@@ -587,8 +603,8 @@ export default function CourtBracketView({
         );
       }
 
-      matchElements.push(
-        <div key={`m-${r}-${m}`}
+      return (
+        <div key={key}
           {...clickProps}
           className={`absolute flex items-center overflow-hidden rounded transition-all${clickCls} ${cardClass}${
             // 修正モード中は「保存前の古い対戦」であることが分かるよう薄く表示する
@@ -600,7 +616,51 @@ export default function CourtBracketView({
         </div>
       );
     }
+  };
+
+  for (let r = Math.max(1, leafRound); r <= roundsCount; r++) {
+    const numNodes = drawSize / Math.pow(2, r);
+    for (let m = 0; m < numNodes; m++) {
+      // BYE だけの枝には枠を描かない（実際の対戦カードと重なってずれて見えるため）
+      if (isEmptySubtree(r, m)) continue;
+      matchElements.push(
+        renderMatchNode(`m-${r}-${m}`, findMatch(r, m + 1), getX(r), getCompactY(r, m), {
+          isFinal: r === roundsCount,
+        }),
+      );
+    }
   }
+
+  // --- 3位決定戦（決勝の下に置く）---
+  // 決勝と同じ回戦の position=2 に入っている。準決勝の敗者同士なので、
+  // トーナメントの線とはつなげず独立した枠として描く。
+  const thirdPlaceMatch = findMatch(roundsCount, 2);
+  let thirdPlaceTop = 0;
+  if (thirdPlaceMatch) {
+    const finalY = getCompactY(roundsCount, 0);
+    thirdPlaceTop = Math.max(finalY + CARD_H_VS + 56, nextCompactY - CARD_H_VS);
+    matchElements.push(
+      <div
+        key="third-place-label"
+        className="absolute text-[10px] font-bold text-gray-500 text-center"
+        // カードは vs 表示のとき上に伸びる（中心を thirdPlaceTop に合わせる）ので、
+        // その分を見込んで見出しを置く
+        style={{ left: getX(roundsCount), top: thirdPlaceTop - CARD_H_VS / 2 - 14, width: slotW }}
+      >
+        3位決定戦
+      </div>,
+    );
+    matchElements.push(
+      renderMatchNode('third-place', thirdPlaceMatch, getX(roundsCount), thirdPlaceTop, {
+        emptyLabel: '3位決定戦',
+      }),
+    );
+  }
+
+  // 3位決定戦の枠が下にはみ出さないよう高さを確保する
+  const containerHeight = thirdPlaceMatch
+    ? Math.max(baseHeight, thirdPlaceTop + CARD_H_VS + OFFSET_Y)
+    : baseHeight;
 
   return (
     <div className="relative overflow-auto" style={{ width: '100%', height: '100%' }}>
