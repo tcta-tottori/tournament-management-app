@@ -1030,22 +1030,11 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
       drawText(ctx, `${s.wins}-${s.losses}`, statX + STAT_W / 2, cy, 14, 'center', COL.gray700, 'bold');
     }
 
-    // 順位
+    // 順位（バッジは付けず、文字だけで表示する）
     if (rank && played) {
       const isTop = rank === 1;
-      if (isTop) {
-        const bw = 44;
-        const bh = 24;
-        const bx = rankX + (RANK_W - bw) / 2;
-        const by = cy - bh / 2;
-        const g = ctx.createLinearGradient(bx, by, bx, by + bh);
-        g.addColorStop(0, COL.champ1);
-        g.addColorStop(1, COL.champ3);
-        roundRect(ctx, bx, by, bw, bh, bh / 2, g);
-        drawText(ctx, '1位', rankX + RANK_W / 2, cy + 0.5, 13, 'center', COL.white, 'black');
-      } else {
-        drawText(ctx, `${rank}位`, rankX + RANK_W / 2, cy, 14, 'center', COL.gray600, 'bold');
-      }
+      drawText(ctx, `${rank}位`, rankX + RANK_W / 2, cy, isTop ? 15 : 14, 'center',
+        isTop ? COL.gray900 : COL.gray600, isTop ? 'black' : 'bold');
     }
   }
 

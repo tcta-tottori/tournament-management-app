@@ -22,16 +22,6 @@ function tryLoadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/**
- * 上位3位の順位チップ。
- * 白ベース＋赤の差し色に合わせ、1位だけ赤ベタ、2〜3位は白地＋グレーの枠にする。
- */
-const RANK_CHIP = [
-  { fill: COL.red500, edge: COL.red600, text: COL.white },   // 1位
-  { fill: COL.white, edge: COL.gray400, text: COL.gray800 }, // 2位
-  { fill: COL.white, edge: COL.gray300, text: COL.gray700 }, // 3位
-];
-
 /** リーグ順位表サマリーを描画した Canvas から Data URL (JPEG) を生成 */
 export async function generateTeamLeagueSummaryDataUrl(
   league: TeamLeague,
@@ -220,9 +210,6 @@ export async function generateTeamLeagueSummaryDataUrl(
     const s = rows[i];
     const rowTop = tableY + colHeaderH + rowH * i;
     const cy = rowTop + rowH / 2;
-    const isMedal = s.rank >= 1 && s.rank <= 3;
-    const chip = isMedal ? RANK_CHIP[s.rank - 1] : null;
-
     // 行背景（1位だけ淡い赤、その他はゼブラ）
     if (s.rank === 1) {
       const g = ctx.createLinearGradient(tableX, rowTop, tableX + tableW, rowTop);
@@ -240,17 +227,10 @@ export async function generateTeamLeagueSummaryDataUrl(
       ctx.beginPath(); ctx.moveTo(tableX + 8, rowTop); ctx.lineTo(tableX + tableW - 8, rowTop); ctx.stroke();
     }
 
-    // 順位（上位3位は丸チップ、その他は数字＋位）
-    if (chip) {
-      const chipR = 22;
-      const chipX = xRank + rankColW / 2;
-      const chipY = cy;
-      ctx.beginPath(); ctx.arc(chipX, chipY, chipR, 0, Math.PI * 2);
-      ctx.fillStyle = chip.fill; ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = chip.edge; ctx.stroke();
-      drawText(String(s.rank), chipX, chipY - 1, 26, 'center', chip.text, 'black');
-    } else if (s.rank > 0) {
-      drawNumWithLabel([{ num: String(s.rank), label: '位' }], xRank + rankColW / 2, cy, 34, 14, COL.gray800, COL.gray500);
+    // 順位（バッジは付けず、数字＋「位」だけで表示する）
+    if (s.rank > 0) {
+      drawNumWithLabel([{ num: String(s.rank), label: '位' }], xRank + rankColW / 2, cy, 34, 14,
+        s.rank === 1 ? COL.gray900 : COL.gray800, COL.gray500);
     } else {
       drawText('-', xRank + rankColW / 2, cy, 20, 'center', COL.gray300, 'normal');
     }
