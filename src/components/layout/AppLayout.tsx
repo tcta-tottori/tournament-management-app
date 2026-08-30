@@ -391,11 +391,7 @@ export default function AppLayout() {
               >
                 <item.icon
                   className="shrink-0"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    filter: isActive ? 'drop-shadow(0 0 3px rgba(198,56,52,0.35))' : undefined,
-                  }}
+                  style={{ width: 18, height: 18 }}
                 />
                 <span>{item.label}</span>
               </button>
@@ -456,14 +452,14 @@ export default function AppLayout() {
           className={`hidden lg:flex flex-col shrink-0 transition-[width] duration-200 ${
             sidebarCollapsed ? 'w-[64px]' : 'w-56'
           }`}
-          style={{ background: '#ffffff', borderRight: '1px solid var(--border-main)' }}
+          style={{ background: 'linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%)' }}
         >
           {/* 折りたたみトグル */}
-          <div className={`flex items-center h-10 shrink-0 border-b border-border-main ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'}`}>
-            {!sidebarCollapsed && <span className="text-[11px] font-bold text-gray-500 tracking-wide">メニュー</span>}
+          <div className={`flex items-center h-10 shrink-0 border-b border-white/20 ${sidebarCollapsed ? 'justify-center' : 'justify-between px-3'}`}>
+            {!sidebarCollapsed && <span className="text-[11px] font-bold text-white/75 tracking-wide">メニュー</span>}
             <button
               onClick={() => setSidebarCollapsed(v => !v)}
-              className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded transition-colors"
+              className="p-1.5 text-white/75 hover:text-white hover:bg-white/20 rounded transition-colors"
               title={sidebarCollapsed ? 'メニューを展開' : 'アイコンのみに縮小'}
               aria-label={sidebarCollapsed ? 'メニューを展開' : 'メニューを縮小'}
             >
@@ -485,7 +481,7 @@ export default function AppLayout() {
                 >
                   <item.icon
                     className="shrink-0"
-                    style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 3px rgba(198,56,52,0.35))' : undefined }}
+                    style={{ width: 18, height: 18 }}
                   />
                   {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                 </button>
@@ -494,13 +490,13 @@ export default function AppLayout() {
           </nav>
 
           {/* フッター：操作ボタン・バージョン */}
-          <div className="border-t border-border-main p-2 flex flex-col gap-1.5 shrink-0">
+          <div className="border-t border-white/20 p-2 flex flex-col gap-1.5 shrink-0">
             {sidebarCollapsed ? (
               <>
-                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded" title="音声設定">
+                <button onClick={() => setVoiceSettingsOpen(true)} className="flex items-center justify-center p-2 text-white/75 hover:text-white hover:bg-white/20 rounded" title="音声設定">
                   <Volume2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-primary-500 hover:text-primary-700 text-center py-1" title="バージョン情報">
+                <button onClick={() => setVersionModalOpen(true)} className="text-[9px] font-black text-white/80 hover:text-white text-center py-1" title="バージョン情報">
                   2.4
                 </button>
               </>

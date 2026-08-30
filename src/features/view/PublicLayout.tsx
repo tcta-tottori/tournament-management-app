@@ -242,7 +242,7 @@ export default function PublicLayout() {
               <button key={item.path}
                 className={`hamburger-drawer-item ${isActive ? 'hamburger-drawer-item-active' : ''}`}
                 onClick={() => go(item.path)}>
-                <item.icon className="shrink-0" style={{ width: 18, height: 18, filter: isActive ? 'drop-shadow(0 0 3px rgba(198,56,52,0.35))' : undefined }} />
+                <item.icon className="shrink-0" style={{ width: 18, height: 18 }} />
                 <span>{item.label}</span>
               </button>
             );
@@ -251,7 +251,7 @@ export default function PublicLayout() {
         <div className="hamburger-drawer-footer">
           <div className="drawer-action-row">
             {sync.hasRoom && <SyncBadge sync={sync} />}
-            <span className="text-[10px] bg-primary-50 border border-primary-200 rounded-full px-2.5 py-1 font-bold text-primary-700">観戦用ページ</span>
+            <span className="text-[10px] bg-white/15 border border-white/30 rounded-full px-2.5 py-1 font-bold text-white">観戦用ページ</span>
           </div>
           <img src={`${import.meta.env.BASE_URL}logo-tcta.png`} alt="鳥取市テニス協会"
             className="hamburger-drawer-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
