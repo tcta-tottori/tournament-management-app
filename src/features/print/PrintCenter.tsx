@@ -21,7 +21,7 @@ import { db } from '../../db/database';
 import { useAppStore } from '../../stores/appStore';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
-import { CERT_FONTS, loadCertificateFont, type CertFontGroup } from './certificateFonts';
+import { buildFontStack, CERT_FONTS, getCertFont, loadCertificateFont, type CertFontGroup } from './certificateFonts';
 import {
   DEFAULT_CERT_LAYOUT, PAPER_SIZE, newCertEntry,
   type CertEntry, type CertLayout, type CertPaper,
@@ -556,7 +556,7 @@ function LayoutPanel({
                         ? 'bg-amber-500 text-white border-amber-500 font-bold'
                         : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
                     }`}
-                    style={{ fontFamily: f.stack, fontWeight: layout.fontWeight }}
+                    style={{ fontFamily: buildFontStack(f, layout.customFont), fontWeight: layout.fontWeight }}
                   >{f.label}</button>
                 ))}
               </div>
@@ -571,6 +571,30 @@ function LayoutPanel({
               : '／太さ違いが無いフォントです（「太さ微調整」で太らせられます）'}
           </p>
         )}
+
+        {/* 一覧に無いフォントも使えるようにする（PCに入れた毛筆フォントなど） */}
+        <div className="mt-2 flex items-start gap-2">
+          <span className="shrink-0 w-[76px] pt-1.5 text-[10px] font-bold text-slate-400">名前で指定</span>
+          <div className="flex-1 min-w-0">
+            <input
+              value={layout.customFont}
+              onChange={e => onChange({ customFont: e.target.value })}
+              placeholder="例: 衡山毛筆フォント行書（PCに入れたフォント名をそのまま入力）"
+              className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none"
+              style={layout.customFont.trim()
+                ? { fontFamily: buildFontStack(getCertFont(layout.fontId), layout.customFont) }
+                : undefined}
+            />
+            <p className="mt-1 text-[10px] text-slate-400">
+              PCにインストールしたフォントを、上の一覧に無くても使えます。入っていない端末では上で選んだフォントで表示されます。
+              {layout.customFont.trim() && (
+                <button onClick={() => onChange({ customFont: '' })} className="ml-1 text-slate-400 underline hover:text-slate-600">
+                  指定を消す
+                </button>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* 用紙・モード */}

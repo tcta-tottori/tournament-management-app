@@ -219,6 +219,37 @@ export const CERT_FONTS: CertFont[] = [
   },
 
   // ── PCに入っているフォント（Web読み込み不要） ────────────────
+  // 賞状の名入れで定番の無料毛筆フォント。武蔵システム（opentype.jp）で配布されており
+  // JIS第1・第2水準の漢字を全て収録している。フォントデータの再配布はできないため
+  // Webフォントとしては配れない。印刷に使うPCに入れてもらってここから選ぶ。
+  {
+    id: 'local-kouzan-gyosho',
+    label: '衡山毛筆 行書（要インストール）',
+    group: 'PCのフォント',
+    stack: '"衡山毛筆フォント行書", "KouzanGyoshoOTF", "KouzanGyosho", "HG行書体", "游明朝", serif',
+    note: '賞状の定番。無料でJIS第2水準まで収録（opentype.jp で配布）',
+  },
+  {
+    id: 'local-kouzan-sosho',
+    label: '衡山毛筆 草書（要インストール）',
+    group: 'PCのフォント',
+    stack: '"衡山毛筆フォント草書", "KouzanSoshoOTF", "KouzanSosho", "HG行書体", "游明朝", serif',
+    note: '崩しの強い草書。同じく無料',
+  },
+  {
+    id: 'local-kouzan',
+    label: '衡山毛筆（要インストール）',
+    group: 'PCのフォント',
+    stack: '"衡山毛筆フォント", "KouzanMouhitsuFontOTF", "KouzanMouhitu", "HG正楷書体-PRO", "游明朝", serif',
+    note: '楷書寄りで読みやすい毛筆。同じく無料',
+  },
+  {
+    id: 'local-soseki',
+    label: '青柳疎石（要インストール）',
+    group: 'PCのフォント',
+    stack: '"青柳疎石フォント", "AoyagiSosekiFont", "HG行書体", "游明朝", serif',
+    note: '線が細く払いの鋭い毛筆。同じく無料',
+  },
   {
     id: 'local-gyosho',
     label: 'HG行書体（PC内蔵）',
@@ -255,6 +286,20 @@ export const CERT_FONTS: CertFont[] = [
     note: 'どの端末でもほぼ確実に出る明朝',
   },
 ];
+
+/**
+ * 実際に使う font-family を組み立てる。
+ * 自分で入力したフォント名（PCに入れた毛筆フォント等）があればそれを最優先にし、
+ * 入っていない端末でも崩れないよう、選択中のフォントを後ろに残す。
+ */
+export function buildFontStack(font: CertFont, customFontName?: string): string {
+  const custom = (customFontName || '').trim();
+  if (!custom) return font.stack;
+  // 「衡山毛筆フォント行書, HG行書体」のようにカンマ区切りで複数指定もできる
+  const names = custom.split(',').map(n => n.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+  if (names.length === 0) return font.stack;
+  return `${names.map(n => `"${n}"`).join(', ')}, ${font.stack}`;
+}
 
 /** 既定フォント（現行の賞状印刷の設定に合わせた筆楷書） */
 export const DEFAULT_CERT_FONT_ID = 'yuji-syuku';

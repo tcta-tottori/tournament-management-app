@@ -39,6 +39,12 @@ export const PAPER_SIZE: Record<CertPaper, { label: string; width: number; heigh
  */
 export interface CertLayout {
   fontId: string;
+  /**
+   * 自分で入力したフォント名（任意）。
+   * PCにインストールした毛筆フォント（衡山毛筆フォント行書など）を
+   * 一覧に無くても使えるようにするための指定。
+   */
+  customFont: string;
   paper: CertPaper;
   /** 文字だけ印刷（賞状用紙に重ねる） */
   overlay: boolean;
@@ -84,6 +90,7 @@ export interface CertLayout {
  */
 export const DEFAULT_CERT_LAYOUT: CertLayout = {
   fontId: 'yuji-syuku',
+  customFont: '',
   paper: 'a4-portrait',
   overlay: true,
   vertical: false,

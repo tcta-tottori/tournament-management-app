@@ -5,7 +5,7 @@
 // プレビューは <iframe srcdoc> に入れて縮小表示する。
 // =============================================================================
 
-import { certFontCssUrls, getCertFont } from './certificateFonts';
+import { buildFontStack, certFontCssUrls, getCertFont } from './certificateFonts';
 import { PAPER_SIZE, type CertEntry, type CertLayout } from './certificateTypes';
 
 /** HTMLに埋め込む文字列をエスケープする */
@@ -101,7 +101,7 @@ function styleHtml(layout: CertLayout): string {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { background: #fff; }
   body {
-    font-family: ${font.stack}; color: #000;
+    font-family: ${buildFontStack(font, layout.customFont)}; color: #000;
     font-weight: ${layout.fontWeight};
     -webkit-font-smoothing: antialiased;
   }
