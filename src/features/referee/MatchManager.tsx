@@ -16,6 +16,7 @@ import type { ScoreInputMatch } from '../score/ScoreInputDialog';
 import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder, matchKey } from './standbyRanking';
+import { buildLeagueCourtMap } from '../draw/leagueCourts';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
 import CallStatusPopup from '../../components/ui/CallStatusPopup';
 import { fillTestScores } from '../score/testScoreFiller';
@@ -245,6 +246,13 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return ds > 0 && (ds & (ds - 1)) !== 0;
   }, [allDraws]);
 
+  // リーグ戦のコート割り当て（eventId → コートID）。
+  // 割り当てのあるリーグはそのコートだけで回し、他の種目はそのコートを使わない。
+  const leagueCourtMap = useMemo(
+    () => buildLeagueCourtMap([...allDraws.values()]),
+    [allDraws],
+  );
+
   // コートは現在の大会に紐づくものだけを対象にする。
   // db.courts.toArray()（全大会分）だと他大会・過去セッションの残存コートまで
   // 「空きコート」として数えてしまい、控え計算で全試合が「◯番コートへ」になり
@@ -384,8 +392,8 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   // 控え／入るコートのランキング。表示中の対戦順(globalSortedMatches)そのままで採番し、
   // 控え番号と表示位置を必ず一致させる。
   const standbyInfo = useMemo(
-    () => assignStandbyInOrder(globalSortedMatches, courts),
-    [globalSortedMatches, courts],
+    () => assignStandbyInOrder(globalSortedMatches, courts, { leagueCourtIds: leagueCourtMap }),
+    [globalSortedMatches, courts, leagueCourtMap],
   );
 
   // --- 音声コール ---
@@ -854,22 +862,34 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     return set;
   }, [allMatchesFlat, courtIdToName]);
 
-  // コート選択ダイアログ用の全コート一覧（番号順・同名コートは1つにまとめる）。
+  // コート選択ダイアログ用のコート一覧（番号順・同名コートは1つにまとめる）。
   // 空き＝選択可、試合中／使用しないコートはグレーで選択できない。
-  const courtPickList = useMemo(() => {
-    const sorted = [...courts].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
+  // リーグにコートを割り当てている種目は、その割り当てコートだけを候補にする。
+  // 他のリーグが専有しているコートは、その種目以外からは選べない。
+  const buildCourtPickList = useCallback((eventId: string) => {
+    const ownIds = leagueCourtMap.get(eventId) || [];
+    const reservedNames = new Set<string>();
+    for (const [evId, ids] of leagueCourtMap) {
+      if (evId === eventId) continue;
+      for (const id of ids) {
+        const n = courtIdToName.get(id);
+        if (n) reservedNames.add(n);
+      }
+    }
+    const target = ownIds.length > 0 ? courts.filter(c => ownIds.includes(c.courtId)) : courts;
+    const sorted = [...target].sort((a, b) => (parseInt(a.name, 10) || 0) - (parseInt(b.name, 10) || 0));
     const seen = new Set<string>();
     const list: { courtId: string; name: string; status: 'empty' | 'playing' | 'unavailable' }[] = [];
     for (const c of sorted) {
       if (seen.has(c.name)) continue;
       seen.add(c.name);
-      const status = c.isAvailable === false
+      const status = c.isAvailable === false || reservedNames.has(c.name)
         ? 'unavailable'
         : playingCourtNames.has(c.name) ? 'playing' : 'empty';
       list.push({ courtId: c.courtId, name: c.name, status });
     }
     return list;
-  }, [courts, playingCourtNames]);
+  }, [courts, playingCourtNames, leagueCourtMap, courtIdToName]);
 
   // 待機試合を指定コートに入れる（試合開始）
   // matchId は種目内でしか一意でないため、種目をまたぐ検索では matchKey（eventId::matchId）で照合する。
@@ -2715,7 +2735,7 @@ ${printableMatches.map(m => {
             roundName={getRoundName(pm.round, evTotalRounds)}
             player1Name={pm.player1Name}
             player2Name={pm.player2Name}
-            courts={courtPickList}
+            courts={buildCourtPickList(pm.eventId)}
             onSelect={(courtId) => handleEnterCourt(matchKey(pm), courtId)}
             onClose={() => setCourtPickMatchId(null)}
             onScoreInput={() => {
