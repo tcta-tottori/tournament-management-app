@@ -6,7 +6,14 @@ import {
   buildEventResultFileName,
 } from '../draw/DrawResultExporter';
 import type { ResultExportOptions } from '../draw/DrawResultExporter';
-import { getAssociationLogoEnabled, setAssociationLogoEnabled } from '../draw/resultCanvasKit';
+import {
+  getAssociationLogoEnabled,
+  setAssociationLogoEnabled,
+  getBracketWidthScale,
+  setBracketWidthScale,
+  BRACKET_WIDTH_MIN,
+  BRACKET_WIDTH_MAX,
+} from '../draw/resultCanvasKit';
 import { db } from '../../db/database';
 
 interface Props {
@@ -30,6 +37,9 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
   const [error, setError] = useState<string | null>(null);
   // 協会ロゴを入れるかどうか（設定は次回以降も保持する）
   const [showLogo, setShowLogo] = useState(getAssociationLogoEnabled);
+  // トーナメント表の表示幅（ゲージで調整。設定は次回以降も保持する）
+  const isRoundRobin = opts.draw.drawType === 'roundRobin';
+  const [widthScale, setWidthScale] = useState(getBracketWidthScale);
   // 画像に印字する大会名（この場で修整できる）
   const [nameDraft, setNameDraft] = useState(opts.tournament.name);
   const [appliedName, setAppliedName] = useState(opts.tournament.name);
@@ -39,6 +49,11 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
   const toggleLogo = (next: boolean) => {
     setShowLogo(next);
     setAssociationLogoEnabled(next);
+  };
+
+  const changeWidth = (next: number) => {
+    setWidthScale(next);
+    setBracketWidthScale(next);
   };
 
   // 開いた時点の大会名を初期値にする（保存後に入力欄が巻き戻らないよう1回だけ）
@@ -65,7 +80,8 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     ...opts,
     tournament: { ...opts.tournament, name: appliedName.trim() || opts.tournament.name },
     showAssociationLogo: showLogo,
-  }), [opts, appliedName, showLogo]);
+    bracketWidthScale: widthScale,
+  }), [opts, appliedName, showLogo, widthScale]);
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -147,7 +163,25 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 <span className="truncate">{opts.event.name} 結果プレビュー</span>
               </h3>
               <div className="flex items-center gap-2 shrink-0">
-                {/* 操作はこのバーに集約する（ロゴの有無・保存・閉じる） */}
+                {/* 操作はこのバーに集約する（表示幅・ロゴの有無・保存・閉じる） */}
+                {!isRoundRobin && (
+                  <label className="flex items-center gap-1.5 select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
+                    表示幅
+                    <input
+                      type="range"
+                      min={BRACKET_WIDTH_MIN}
+                      max={BRACKET_WIDTH_MAX}
+                      step={0.05}
+                      value={widthScale}
+                      onChange={e => changeWidth(Number(e.target.value))}
+                      className="w-28 accent-gray-600 cursor-pointer"
+                      title="トーナメント表の横幅を調整します"
+                    />
+                    <span className="tabular-nums text-gray-500 w-9 text-right">
+                      {Math.round(widthScale * 100)}%
+                    </span>
+                  </label>
+                )}
                 <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
                   <input
                     type="checkbox"

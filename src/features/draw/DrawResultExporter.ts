@@ -23,6 +23,9 @@ import {
   fitLogo,
   fontOf,
   getAssociationLogoEnabled,
+  getBracketWidthScale,
+  BRACKET_WIDTH_MIN,
+  BRACKET_WIDTH_MAX,
   loadResultLogos,
   roundRect,
   drawResultFrame,
@@ -41,6 +44,11 @@ export interface ResultExportOptions {
    * 未指定なら保存済みの設定（getAssociationLogoEnabled）に従う。
    */
   showAssociationLogo?: boolean;
+  /**
+   * トーナメント表の表示幅の倍率（選手名の列と回戦の列の幅に効く）。
+   * 未指定なら保存済みの設定（getBracketWidthScale）に従う。
+   */
+  bracketWidthScale?: number;
 }
 
 // ===== 共通ヘルパー =====
@@ -326,8 +334,14 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     if (w > maxNameW) maxNameW = w;
   }
+  // 表示幅の倍率（プレビューのゲージで調整できる）
+  const widthScale = clamp(
+    opts.bracketWidthScale ?? getBracketWidthScale(),
+    BRACKET_WIDTH_MIN,
+    BRACKET_WIDTH_MAX,
+  );
   const NUM_W = 26;                        // ドロー番号の幅
-  const NAME_W = clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380);
+  const NAME_W = Math.round(clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380) * widthScale);
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
   const ROW_H_BASE = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
@@ -377,7 +391,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     return w;
   })();
-  const COL_W = clamp(Math.ceil(scoreTokenW) + 20, 44, 74);
+  const COL_W = Math.round(clamp(Math.ceil(scoreTokenW) + 20, 44, 74) * widthScale);
 
   // ---- 選手行の割り当て（BYE の空きを詰める） ----
   // BYE のスロットにも1行ずつ確保すると、ドロー表どおりに並べたときに

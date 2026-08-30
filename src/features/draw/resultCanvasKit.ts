@@ -212,6 +212,34 @@ export function setAssociationLogoEnabled(enabled: boolean): void {
   }
 }
 
+/** トーナメント表の表示幅の倍率の保存キー */
+const BRACKET_WIDTH_KEY = 'resultImage.bracketWidthScale';
+
+/** 表示幅の倍率の下限・上限・既定 */
+export const BRACKET_WIDTH_MIN = 0.7;
+export const BRACKET_WIDTH_MAX = 1.6;
+export const BRACKET_WIDTH_DEFAULT = 1;
+
+/** トーナメント表の表示幅の倍率（既定: 1.0） */
+export function getBracketWidthScale(): number {
+  try {
+    const raw = Number(localStorage.getItem(BRACKET_WIDTH_KEY));
+    if (!Number.isFinite(raw) || raw <= 0) return BRACKET_WIDTH_DEFAULT;
+    return Math.min(BRACKET_WIDTH_MAX, Math.max(BRACKET_WIDTH_MIN, raw));
+  } catch {
+    return BRACKET_WIDTH_DEFAULT;
+  }
+}
+
+/** トーナメント表の表示幅の倍率を保存する */
+export function setBracketWidthScale(scale: number): void {
+  try {
+    localStorage.setItem(BRACKET_WIDTH_KEY, String(scale));
+  } catch {
+    // localStorage が使えない環境では保存しない
+  }
+}
+
 /** 画像を maxW × maxH に収まるサイズへ縮小した寸法を返す */
 export function fitLogo(
   img: HTMLImageElement | null,
