@@ -665,7 +665,7 @@ function LayoutPanel({
       {/* 賞状に載せる項目。既定は氏名のみ（クラス名・賞位は賞状用紙に刷り込み済みのことが多い） */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-[11px] font-bold text-slate-600">印刷する項目</span>
-        <span className="text-[11px] text-slate-400">氏名（常に印刷）</span>
+        <span className="text-[11px] text-slate-400">氏名（常に印刷・位置は固定）</span>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
           <input type="checkbox" checked={layout.showRank} onChange={e => onChange({ showRank: e.target.checked })} className="accent-amber-500" />
           賞位
@@ -688,7 +688,7 @@ function LayoutPanel({
 
       {/* 位置・サイズ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-2">
-        <RangeField label="上下位置" value={layout.blockTop} min={0} max={85} step={1} unit="%" onChange={v => onChange({ blockTop: v })} />
+        <RangeField label="氏名の上下位置" value={layout.blockTop} min={0} max={85} step={1} unit="%" onChange={v => onChange({ blockTop: v })} />
         <RangeField label="左右位置" value={layout.offsetX} min={-60} max={60} step={1} unit="mm" onChange={v => onChange({ offsetX: v })} />
         <RangeField label="行間" value={layout.lineGap} min={0} max={30} step={1} unit="mm" onChange={v => onChange({ lineGap: v })} />
         {/* マイナスにすると字間を詰められる（長い氏名を1行に収めたいとき用） */}
@@ -701,7 +701,9 @@ function LayoutPanel({
         <RangeField label="所属" value={layout.affiliationSize} min={6} max={60} step={1} unit="pt" onChange={v => onChange({ affiliationSize: v })} />
       </div>
       <p className="text-[10px] text-slate-400 leading-relaxed">
-        「太さ」で太字にできます。毛筆フォントは太さ違いが配信されていないものが多いので、
+        氏名の位置は「氏名の上下位置」で決まり、賞位・クラス名・所属はその上に積み上がります。
+        項目を増やしても氏名はずれないので、一度合わせた位置はそのまま使えます。
+        「太さ」で太字にでき、毛筆フォントは太さ違いが配信されていないものが多いので、
         足りないときは「太さ微調整」で輪郭を太らせてください。字間はマイナスにすると詰まります。
       </p>
 
