@@ -94,7 +94,7 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-gray-500">進捗</span>
-                <span className="text-sm font-bold text-primary-600">{Math.round(progress)}%</span>
+                <span className="text-sm font-bold text-gray-700">{Math.round(progress)}%</span>
               </div>
               <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -123,7 +123,7 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
                 <div className="min-w-0 flex-1">
                   <span className={`text-sm ${
                     step.status === 'loading' ? 'text-gray-800 font-medium' :
-                    step.status === 'done' ? 'text-primary-700' :
+                    step.status === 'done' ? 'text-gray-800' :
                     step.status === 'error' ? 'text-red-600' :
                     'text-gray-400'
                   }`}>
@@ -139,7 +139,7 @@ export default function ProcessingModal({ open, title, steps, progress, result, 
           {result && (
             <div className={`mt-4 p-3.5 rounded-xl text-sm ${
               result.success
-                ? 'bg-primary-50 text-primary-800 border border-primary-100'
+                ? 'bg-primary-50 text-gray-900 border border-primary-100'
                 : 'bg-red-50 text-red-800 border border-red-100'
             }`}>
               <div className="flex items-start gap-2.5">

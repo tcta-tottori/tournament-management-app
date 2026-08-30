@@ -198,7 +198,7 @@ function TennisCourtBlockH({
   cs: CourtStatus; isSelected: boolean; onSelect: () => void; eventName?: string; roundLabel?: string; isTimeOver?: boolean;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-    playing: { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-primary-800', glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]' },
+    playing: { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-gray-900', glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]' },
     ready: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-700', glow: '' },
     empty: { bg: 'bg-white/80', border: 'border-primary-200', text: 'text-gray-600', glow: '' },
     unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
@@ -238,8 +238,8 @@ function TennisCourtBlockH({
           <div className={`text-xl font-black ${style.text} leading-none`}>{courtNum}</div>
           {elapsed && (
             <div className="flex items-center gap-0.5 mt-0.5">
-              <Timer className={`w-2.5 h-2.5 ${isTimeOver ? 'text-red-600' : 'text-primary-600'}`} />
-              <span className={`text-[9px] font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-primary-700'}`}>{elapsed}</span>
+              <Timer className={`w-2.5 h-2.5 ${isTimeOver ? 'text-red-600' : 'text-gray-700'}`} />
+              <span className={`text-[9px] font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-gray-800'}`}>{elapsed}</span>
             </div>
           )}
         </div>
@@ -252,9 +252,9 @@ function TennisCourtBlockH({
                 {roundLabel && <span className="text-[8px] font-black bg-white/25 rounded-sm px-0.5 shrink-0">{roundLabel}</span>}
               </span>
             )}
-            <p className="text-[10px] font-bold text-primary-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
+            <p className="text-[10px] font-bold text-gray-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
             <p className="text-[7px] font-medium text-primary-500 leading-none">vs</p>
-            <p className="text-[10px] font-bold text-primary-900 truncate leading-tight">{cs.currentMatch.player2Name}</p>
+            <p className="text-[10px] font-bold text-gray-900 truncate leading-tight">{cs.currentMatch.player2Name}</p>
           </div>
         ) : cs.nextMatch ? (
           <div className="flex-1 min-w-0 border-l border-gray-100/60 pl-2 space-y-0">
@@ -294,7 +294,7 @@ function TennisCourtBlock({
   isTimeOver?: boolean;
 }) {
   const statusStyles: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-    playing: { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-primary-800', glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]' },
+    playing: { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-gray-900', glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]' },
     ready: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-700', glow: '' },
     empty: { bg: 'bg-white/80', border: 'border-primary-200', text: 'text-gray-600', glow: '' },
     unavailable: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-400', glow: '' },
@@ -348,9 +348,9 @@ function TennisCourtBlock({
                 {roundLabel && <span className="text-[8px] sm:text-[9px] font-black bg-white/25 rounded-sm px-0.5 shrink-0">{roundLabel}</span>}
               </span>
             )}
-            <p className="text-[10px] sm:text-xs font-bold text-primary-900 truncate w-full text-center leading-tight">{cs.currentMatch.player1Name}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-900 truncate w-full text-center leading-tight">{cs.currentMatch.player1Name}</p>
             <p className="text-[8px] sm:text-[9px] font-medium text-primary-500 leading-none">vs</p>
-            <p className="text-[10px] sm:text-xs font-bold text-primary-900 truncate w-full text-center leading-tight">{cs.currentMatch.player2Name}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-900 truncate w-full text-center leading-tight">{cs.currentMatch.player2Name}</p>
           </div>
         ) : cs.nextMatch ? (
           <div className="w-full flex-1 flex flex-col items-center justify-center min-h-0 gap-0.5">
@@ -372,8 +372,8 @@ function TennisCourtBlock({
         {/* Bottom: elapsed time */}
         {elapsed ? (
           <div className="w-full flex items-center justify-center gap-1">
-            <Timer className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${isTimeOver ? 'text-red-600' : 'text-primary-600'}`} />
-            <span className={`text-[10px] sm:text-xs font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-primary-700'}`}>{elapsed}</span>
+            <Timer className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${isTimeOver ? 'text-red-600' : 'text-gray-700'}`} />
+            <span className={`text-[10px] sm:text-xs font-mono font-bold tabular-nums ${isTimeOver ? 'text-red-700' : 'text-gray-800'}`}>{elapsed}</span>
           </div>
         ) : (
           <div className="h-3 sm:h-4" />
@@ -695,13 +695,13 @@ function LiveDashboardInner() {
             {scheduleDelay.isOnSchedule ? (
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary-400 animate-pulse" />
-                <span className="text-sm font-bold text-primary-600">予定通り</span>
+                <span className="text-sm font-bold text-gray-700">予定通り</span>
               </div>
             ) : scheduleDelay.maxDelay > 0 ? (
               <div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-primary-400" />
-                  <span className="text-lg font-black text-primary-600">
+                  <span className="text-lg font-black text-gray-700">
                     {minutesToDisplay(scheduleDelay.maxDelay)}
                   </span>
                 </div>
@@ -712,7 +712,7 @@ function LiveDashboardInner() {
             ) : (
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary-400" />
-                <span className="text-sm font-bold text-primary-600">予定通り</span>
+                <span className="text-sm font-bold text-gray-700">予定通り</span>
               </div>
             )}
             {scheduleDelay.nextScheduledTime && (
@@ -770,7 +770,7 @@ function LiveDashboardInner() {
               <div key={blockIdx} className="flex items-start">
                 {/* ブロック: コートを縦に並べる（番号降順：上が大きい） */}
                 <div className="bg-primary-50/60 rounded-xl border border-primary-200 p-2.5 shadow-sm">
-                  <div className="text-[10px] text-primary-600 font-bold mb-2 px-1 text-center">
+                  <div className="text-[10px] text-gray-700 font-bold mb-2 px-1 text-center">
                     {block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}〜{block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}
                   </div>
                   {/* 対戦情報の有無でカード幅が変わらないよう、全ブロックを同じ幅に揃える */}
@@ -800,7 +800,7 @@ function LiveDashboardInner() {
                   <div className="flex flex-col items-center justify-end mx-2 self-end pb-3">
                     <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm">
                       <div className="w-2.5 h-2.5 rounded-sm bg-primary-400" />
-                      <span className="text-xs font-bold text-primary-700 [writing-mode:vertical-rl]">本部</span>
+                      <span className="text-xs font-bold text-gray-800 [writing-mode:vertical-rl]">本部</span>
                     </div>
                   </div>
                 )}
@@ -823,7 +823,7 @@ function LiveDashboardInner() {
               <div key={blockIdx} className="contents">
                 <div className="bg-primary-50/60 rounded-xl border border-primary-200 p-3 w-full max-w-lg">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-gray-700 bg-primary-100 px-2 py-0.5 rounded-full">
                       {block[0]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + 1)}〜{block[block.length - 1]?.court.name.replace(/[^\d]/g, '') || (blockIdx * 4 + block.length)}
                     </span>
                   </div>
@@ -852,7 +852,7 @@ function LiveDashboardInner() {
                     <div className="flex-1 h-px bg-primary-300" />
                     <div className="flex items-center gap-1.5 bg-primary-50 border border-primary-300 rounded-lg px-3 py-1.5 shadow-sm">
                       <div className="w-2.5 h-2.5 rounded-sm bg-primary-400" />
-                      <span className="text-xs font-bold text-primary-700">本部</span>
+                      <span className="text-xs font-bold text-gray-800">本部</span>
                     </div>
                     <div className="flex-1 h-px bg-primary-300" />
                   </div>
@@ -885,7 +885,7 @@ function LiveDashboardInner() {
                 </span>
               )}
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                selectedDetail.status === 'playing' ? 'bg-primary-100 text-primary-800' :
+                selectedDetail.status === 'playing' ? 'bg-primary-100 text-gray-900' :
                 selectedDetail.status === 'ready' ? 'bg-gray-100 text-primary-500' :
                 selectedDetail.status === 'unavailable' ? 'bg-gray-100 text-gray-500' :
                 'bg-gray-50 text-gray-500'
@@ -907,14 +907,14 @@ function LiveDashboardInner() {
 
           {selectedDetail.currentMatch && (
             <div className="bg-primary-50 rounded-xl p-4 border border-primary-200 mb-3">
-              <div className="text-xs font-medium text-primary-700 mb-1.5 flex items-center gap-1">
+              <div className="text-xs font-medium text-gray-800 mb-1.5 flex items-center gap-1">
                 <Play className="w-3 h-3" /> 現在の試合
                 <span className="text-gray-500 ml-2">{getEventName(selectedDetail.currentMatch.eventId)}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="font-bold text-primary-900">{selectedDetail.currentMatch.player1Name}</span>
+                <span className="font-bold text-gray-900">{selectedDetail.currentMatch.player1Name}</span>
                 <span className="text-primary-400 text-xs font-bold">VS</span>
-                <span className="font-bold text-primary-900">{selectedDetail.currentMatch.player2Name}</span>
+                <span className="font-bold text-gray-900">{selectedDetail.currentMatch.player2Name}</span>
                 {selectedDetail.currentMatch.score && (
                   <span className="font-mono text-primary-500 ml-2">{selectedDetail.currentMatch.score}</span>
                 )}
@@ -940,9 +940,9 @@ function LiveDashboardInner() {
                   <span className="font-medium truncate">{m.player2Name}</span>
                   {m.score && <span className="font-mono text-primary-500 shrink-0">{m.score}</span>}
                   <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${
-                    m.status === 'playing' ? 'bg-primary-100 text-primary-700' :
+                    m.status === 'playing' ? 'bg-primary-100 text-gray-800' :
                     m.status === 'finished' ? 'bg-gray-100 text-primary-500' :
-                    m.status === 'walkover' ? 'bg-primary-100 text-primary-700' :
+                    m.status === 'walkover' ? 'bg-primary-100 text-gray-800' :
                     m.status === 'ready' ? 'bg-gray-50 text-gray-600' :
                     'bg-gray-100 text-gray-500'
                   }`}>
@@ -974,7 +974,7 @@ function LiveDashboardInner() {
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-sm text-gray-900 truncate flex-1">{ep.event.name}</h3>
                   {ep.playing > 0 && (
-                    <span className="text-[10px] bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded-full font-medium shrink-0 ml-2 flex items-center gap-0.5">
+                    <span className="text-[10px] bg-primary-100 text-gray-700 px-1.5 py-0.5 rounded-full font-medium shrink-0 ml-2 flex items-center gap-0.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
                       {ep.playing}試合中
                     </span>
@@ -1036,7 +1036,7 @@ function StatCard({
 }) {
   // 進行中は赤、終了は墨、その他はグレー。差し色は赤ひとつに絞る。
   const colorMap = {
-    accent: { border: 'border-primary-200', text: 'text-primary-600', icon: 'text-primary-500', bg: 'from-primary-50/60' },
+    accent: { border: 'border-primary-200', text: 'text-gray-700', icon: 'text-primary-500', bg: 'from-primary-50/60' },
     ink: { border: 'border-gray-300', text: 'text-gray-800', icon: 'text-gray-600', bg: 'from-gray-100/60' },
     gray: { border: 'border-border-main', text: 'text-gray-900', icon: 'text-gray-400', bg: 'from-gray-50/30' },
   };

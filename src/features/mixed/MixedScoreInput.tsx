@@ -308,7 +308,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           {/* Game rule display */}
           {gameRule && (
             <div className={`px-3 py-1.5 bg-primary-50 border border-primary-200 rounded-lg ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
-              <div className="text-[11px] text-primary-700 font-medium">{gameRule}</div>
+              <div className="text-[11px] text-gray-800 font-medium">{gameRule}</div>
             </div>
           )}
 
@@ -383,7 +383,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
           <div className={`grid grid-cols-2 gap-2 ${keyboardOpen ? 'mb-2' : 'mb-3'}`}>
             <button
               onClick={() => match.team2Id && handleDEF(match.team2Id)}
-              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
             >
               <Ban size={14} />
               <span className="truncate">{team1?.teamName || 'チーム1'}</span>
@@ -391,7 +391,7 @@ export default function MixedScoreInput({ match, teams, onClose }: Props) {
             </button>
             <button
               onClick={() => match.team1Id && handleDEF(match.team1Id)}
-              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-primary-700 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-primary-50 border-2 border-primary-300 text-gray-800 rounded-xl hover:bg-primary-100 transition-all text-sm font-bold active:scale-[0.98]"
             >
               <Ban size={14} />
               <span className="truncate">{team2?.teamName || 'チーム2'}</span>

@@ -232,7 +232,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
     <>
       <button
         onClick={(e) => { e.stopPropagation(); setShowPicker(true); setLotteryResult(null); setManualRanks(new Map()); }}
-        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-primary-100 transition-colors"
+        className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-gray-700 bg-primary-50 px-1.5 py-0.5 rounded-full whitespace-nowrap hover:bg-primary-100 transition-colors"
       >
         🎲 抽選
       </button>
@@ -261,7 +261,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                 <div className="text-center mb-3">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-100 to-white rounded-full">
                     <span className="text-lg animate-spin">🎲</span>
-                    <span className="text-sm font-bold text-primary-700">抽選中...</span>
+                    <span className="text-sm font-bold text-gray-800">抽選中...</span>
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -278,7 +278,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
             {/* ルーレット結果表示 */}
             {!spinning && lotteryResult && (
               <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-4">
-                <div className="text-xs font-bold text-primary-700 mb-2 text-center">🎊 抽選結果</div>
+                <div className="text-xs font-bold text-gray-800 mb-2 text-center">🎊 抽選結果</div>
                 <div className="space-y-2">
                   {lotteryResult.sort((a, b) => a.rank - b.rank).map(r => (
                     <div key={r.teamId} className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg">
@@ -299,7 +299,7 @@ function TiebreakLotteryButton({ standing, standings, leagueId }: {
                 </button>
                 <button
                   onClick={handleLottery}
-                  className="w-full mt-2 py-2 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                  className="w-full mt-2 py-2 text-xs text-gray-700 hover:text-gray-800 transition-colors"
                 >
                   もう一度ルーレット
                 </button>
@@ -438,7 +438,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
             const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
             return {
               text: formatScoreText(match, rowTeamId),
-              color: won ? 'text-primary-700 font-bold' : 'text-red-600',
+              color: won ? 'text-gray-800 font-bold' : 'text-red-600',
               bg: won ? 'bg-primary-50 cursor-pointer' : 'bg-red-50 cursor-pointer',
             };
           };
@@ -479,7 +479,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                   ) : (
                     <button
                       onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                      className="flex items-center gap-0.5 text-[11px] text-gray-400 hover:text-primary-600 transition-colors"
+                      className="flex items-center gap-0.5 text-[11px] text-gray-400 hover:text-gray-700 transition-colors"
                     >
                       <MapPin size={10} />
                       {league.courtName || '(コート未設定)'}
@@ -646,7 +646,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
                           key={mo.matchNumber}
                           className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium
                             ${isFinished ? `${colors.badge}` :
-                              isCurrent ? 'bg-primary-200 text-primary-800 font-bold badge-blink' :
+                              isCurrent ? 'bg-primary-200 text-gray-900 font-bold badge-blink' :
                               'bg-white text-gray-400 border border-gray-200'}
                           `}
                         >

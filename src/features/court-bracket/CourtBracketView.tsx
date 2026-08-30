@@ -413,7 +413,7 @@ export default function CourtBracketView({
           {editMode ? slot.position : visibleIndex}
         </div>
         {slot.seed > 0 && (
-          <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-primary-700 text-[8px] font-bold rounded-full">
+          <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[8px] font-bold rounded-full">
             {slot.seed}
           </div>
         )}

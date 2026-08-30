@@ -114,7 +114,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'data', icon: Database, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'データ管理',
+    id: 'data', icon: Database, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'データ管理',
     description: 'ドロー会議システムとのデータ連携、選手マスタの管理、ふりがな・所属情報の整備を行うページです。通常大会・ミックスダブルス・団体戦の全形式に対応しています。',
     keyFeatures: [
       'ドロー会議システムのバックアップデータ（JSON）を一括読込',
@@ -184,7 +184,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'draw-table', icon: Trophy, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'ドロー表プレビュー・調整',
+    id: 'draw-table', icon: Trophy, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー表プレビュー・調整',
     description: 'トーナメントブラケットまたはリーグ（総当たり）形式で表示し、手動調整やExcel/JPEG出力を行います。',
     keyFeatures: [
       'トーナメント表示とリーグ（総当たり表）表示の切替',
@@ -217,7 +217,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'referee', icon: ClipboardList, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: '対戦順・音声コール',
+    id: 'referee', icon: ClipboardList, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '対戦順・音声コール',
     description: 'ドローから試合一覧を自動生成し、音声コール機能で選手呼び出しを行います。標準はブラウザ内蔵音声（Web Speech API）で、ネット接続なしでコールできます。',
     keyFeatures: [
       '1回戦の全対戦カードと2回戦以降の空枠を自動生成',
@@ -270,7 +270,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'score', icon: MonitorPlay, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'スコアボード（試合進行管理）',
+    id: 'score', icon: MonitorPlay, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'スコアボード（試合進行管理）',
     description: '試合のステータス管理・スコア入力・勝者記録を行う当日運営の中核画面です。通常大会・ミックスダブルス・団体戦で画面が自動切替されます。',
     keyFeatures: [
       'ブラケットビュー: トーナメント表上で試合を直接選択',
@@ -303,7 +303,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'court-bracket', icon: Network, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'ドロー状況',
+    id: 'court-bracket', icon: Network, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー状況',
     description: '全種目のトーナメントブラケットを一覧表示し、試合の進行状況を俯瞰的に確認できます。',
     keyFeatures: [
       '全種目のブラケットを1画面に集約表示',
@@ -347,7 +347,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'print', icon: Printer, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: '印刷（賞状）',
+    id: 'print', icon: Printer, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '印刷（賞状）',
     description: '賞状を印刷するための専用メニューです。試合や順位がまだ確定していなくても開けるので、表彰式の準備を先に進められます。',
     keyFeatures: [
       '賞状に刷るのは既定で氏名のみ（賞位・クラス名・所属は必要なときだけ追加で印刷）',
@@ -385,7 +385,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-primary-600', title: 'バックアップ・復元',
+    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'バックアップ・復元',
     description: 'Google ドライブ・GitHub・ローカルファイルでのバックアップ管理を行います。ミックスダブルス・団体戦のデータも含めて一括保全できます。',
     keyFeatures: [
       'Google ドライブ連携: OAuth認証でクラウド保存（専用フォルダ管理）',
@@ -477,7 +477,7 @@ function WorkflowOverview() {
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="w-4 h-4 text-primary-500" />
                       <span className="font-bold text-gray-900 text-sm">{ws.title}</span>
-                      <span className="text-[10px] bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full font-medium ml-auto whitespace-nowrap">{ws.label}</span>
+                      <span className="text-[10px] bg-primary-100 text-gray-700 px-2 py-0.5 rounded-full font-medium ml-auto whitespace-nowrap">{ws.label}</span>
                     </div>
                     <p className="text-xs text-gray-500 leading-relaxed">{ws.description}</p>
                     <div className="flex items-center gap-1 mt-1.5">
@@ -561,7 +561,7 @@ function FeatureSectionCard({ section, isOpen, onToggle }: { section: FeatureSec
             </h4>
             <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 space-y-1.5">
               {section.tips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-primary-800">
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-900">
                   <Lightbulb className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
                   <span>{tip}</span>
                 </div>
@@ -683,7 +683,7 @@ function TroubleshootingSection({ items, isOpen, onToggle }: { items: TroubleIte
                 <div className="text-xs text-gray-500">
                   <span className="font-semibold text-gray-600">原因: </span>{item.cause}
                 </div>
-                <div className="text-xs text-primary-700 bg-primary-50 rounded px-2 py-1.5">
+                <div className="text-xs text-gray-800 bg-primary-50 rounded px-2 py-1.5">
                   <span className="font-semibold">対処法: </span>{item.solution}
                 </div>
               </div>
@@ -737,7 +737,7 @@ export default function Manual() {
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
-            <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-primary-600 px-3 py-1.5 rounded-md font-medium transition-colors">
+            <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-gray-700 px-3 py-1.5 rounded-md font-medium transition-colors">
               全て開く
             </button>
             <button onClick={closeAll} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-md font-medium transition-colors">

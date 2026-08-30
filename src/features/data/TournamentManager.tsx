@@ -55,7 +55,7 @@ export default function TournamentManager() {
         {!isAdding && (
           <button 
             onClick={() => setIsAdding(true)}
-            className="text-sm flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium px-2 py-1 rounded bg-primary-50"
+            className="text-sm flex items-center gap-1 text-gray-700 hover:text-gray-800 font-medium px-2 py-1 rounded bg-primary-50"
           >
             <PlusCircle className="w-4 h-4" /> 新規作成
           </button>

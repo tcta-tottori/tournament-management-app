@@ -93,8 +93,8 @@ export default function CourtSchedule() {
   const statusColor: Record<string, string> = {
     waiting: 'bg-gray-100 text-gray-500',
     ready: 'bg-primary-50 text-primary-500',
-    playing: 'bg-primary-100 text-primary-600',
-    finished: 'bg-primary-50 text-primary-600',
+    playing: 'bg-primary-100 text-gray-700',
+    finished: 'bg-primary-50 text-gray-700',
     walkover: 'bg-primary-100 text-warning',
   };
 

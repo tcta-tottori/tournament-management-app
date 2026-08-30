@@ -119,7 +119,7 @@ export default function BracketTopBar({
           </span>
         </div>
         {playing > 0 && (
-          <span className="flex items-center gap-0.5 text-primary-600 font-bold">
+          <span className="flex items-center gap-0.5 text-gray-700 font-bold">
             <Timer className="w-3 h-3" />
             {playing}試合中
           </span>

@@ -432,15 +432,16 @@ export default function AppLayout() {
       {/* ===== スマホ: 全画面メニュー（ヘッダーは出したまま、その下いっぱいに開く） ===== */}
       <div className={`fullmenu fullmenu-mobile-only ${menuOpen ? 'fullmenu-open' : ''}`}>
         <div className="fullmenu-list">
-          {allTabs.map((item) => {
+          {allTabs.map((item, i) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button
                 key={item.id}
                 className={`fullmenu-item ${isActive ? 'fullmenu-item-active' : ''}`}
+                style={{ '--i': i } as React.CSSProperties}
                 onClick={() => handleMenuItemClick(item.path)}
               >
-                <item.icon className="shrink-0" style={{ width: 20, height: 20 }} />
+                <item.icon className="shrink-0" />
                 <span>{item.label}</span>
                 <ArrowRight className="fullmenu-arrow" style={{ width: 18, height: 18 }} />
               </button>
@@ -449,7 +450,10 @@ export default function AppLayout() {
         </div>
 
         {/* 下部: 操作ボタン → バージョン情報 → 協会ロゴ */}
-        <div className="fullmenu-footer">
+        <div
+          className="fullmenu-footer"
+          style={{ '--footer-delay': `${allTabs.length * 45}ms` } as React.CSSProperties}
+        >
           <div className="drawer-action-row">
             <SyncStatusIndicator />
             <button
@@ -469,8 +473,8 @@ export default function AppLayout() {
               className="header-link"
               title="鳥取県テニス協会HPを開く"
             >
-              <span>テニス協会HP</span>
               <ExternalLink className="w-3 h-3" />
+              <span>テニス協会HP</span>
             </a>
           </div>
 
@@ -486,7 +490,7 @@ export default function AppLayout() {
 
           {/* 協会ロゴ */}
           <img
-            src={`${import.meta.env.BASE_URL}logo-tcta.png`}
+            src={`${import.meta.env.BASE_URL}logo-tcta-white.png`}
             alt="鳥取市テニス協会"
             className="fullmenu-logo"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

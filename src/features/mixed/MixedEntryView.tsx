@@ -54,7 +54,7 @@ function MoveToLeagueSelect({ team, leagues, onMove }: {
     return (
       <button
         onClick={e => { e.stopPropagation(); setOpen(true); }}
-        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-primary-50 rounded-lg transition-colors"
         title="リーグ移動"
       >
         <ArrowRightLeft size={13} />
@@ -103,7 +103,7 @@ function EntryDefButtons({ status, onSetStatus, size = 'normal' }: {
         className={`${base} rounded-lg font-bold transition-all active:scale-95 ${
           status === 'entry'
             ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-200 hover:from-primary-600 hover:to-primary-700'
-            : 'bg-white text-gray-400 hover:bg-primary-50 hover:text-primary-600 border border-gray-200 hover:border-primary-300'
+            : 'bg-white text-gray-400 hover:bg-primary-50 hover:text-gray-700 border border-gray-200 hover:border-primary-300'
         }`}
       >
         Entry
@@ -196,7 +196,7 @@ export default function MixedEntryView() {
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
                 allEntry
                   ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-200 hover:from-primary-600 hover:to-primary-700'
-                  : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 border border-gray-200 hover:border-primary-300'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-gray-800 border border-gray-200 hover:border-primary-300'
               }`}
             >
               <Users size={15} />
@@ -210,13 +210,13 @@ export default function MixedEntryView() {
               {allTeams.length}ペア / {leagues.length}リーグ
             </span>
             {totalEntry > 0 && (
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-primary-700 font-bold">
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-gray-800 font-bold">
                 <CheckCircle size={12} />
                 Entry {totalEntry}
               </span>
             )}
             {totalDef > 0 && (
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-primary-600 font-bold">
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 text-gray-700 font-bold">
                 <AlertTriangle size={12} />
                 DEF {totalDef}
               </span>
@@ -280,12 +280,12 @@ export default function MixedEntryView() {
                       {league.teams.length}ペア
                     </span>
                     {entryCount > 0 && (
-                      <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-gray-700 bg-primary-100 px-1.5 py-0.5 rounded-full">
                         {entryCount}
                       </span>
                     )}
                     {defCount > 0 && (
-                      <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-gray-700 bg-primary-100 px-1.5 py-0.5 rounded-full">
                         DEF {defCount}
                       </span>
                     )}
@@ -309,7 +309,7 @@ export default function MixedEntryView() {
                   ) : (
                     <button
                       onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 transition-colors mt-0.5"
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors mt-0.5"
                     >
                       <MapPin size={11} />
                       {league.courtName || '(コート未設定)'}
@@ -322,7 +322,7 @@ export default function MixedEntryView() {
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 shrink-0 ${
                     leagueAllEntry
                       ? 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
-                      : 'bg-white text-gray-500 hover:bg-primary-50 hover:text-primary-600 border border-gray-200'
+                      : 'bg-white text-gray-500 hover:bg-primary-50 hover:text-gray-700 border border-gray-200'
                   }`}
                 >
                   <UserCheck size={12} />
@@ -359,7 +359,7 @@ export default function MixedEntryView() {
                         ) : (
                           <button
                             onClick={() => { setEditingCourtId(league.leagueId); setCourtInput(league.courtName); }}
-                            className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-primary-600 transition-colors mb-1.5 mx-auto"
+                            className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors mb-1.5 mx-auto"
                           >
                             <MapPin size={10} />
                             {league.courtName || '(コート未設定)'}
@@ -561,7 +561,7 @@ function GameRuleConfig({ leagues, tournamentInfo, updateGameRule }: {
                     const unset = teamCountGroups.find(([c]) => !gameRules[c]);
                     if (unset) updateGameRule(unset[0], preset);
                   }}
-                  className="text-[10px] px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors"
+                  className="text-[10px] px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 hover:bg-primary-50 hover:border-primary-300 hover:text-gray-800 transition-colors"
                 >
                   {preset}
                 </button>

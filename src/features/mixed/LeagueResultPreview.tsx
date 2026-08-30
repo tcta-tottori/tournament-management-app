@@ -54,7 +54,7 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
       {/* プレビュー呼び出しボタン */}
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 shadow-sm hover:shadow hover:bg-primary-100 hover:border-primary-300 transition-all active:scale-95 whitespace-nowrap shrink-0"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-gray-800 bg-primary-50 border border-primary-200 shadow-sm hover:shadow hover:bg-primary-100 hover:border-primary-300 transition-all active:scale-95 whitespace-nowrap shrink-0"
       >
         <ImageIcon size={14} className="text-primary-600 shrink-0" />
         結果画像

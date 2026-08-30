@@ -23,19 +23,19 @@ const CATEGORY_META: Record<PlacementCategory, { label: string; icon: React.Elem
 const CATEGORY_ORDER: PlacementCategory[] = ['1st', '2nd', '3rd', '4th'];
 
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  A: 'bg-primary-100 text-primary-700',
+  A: 'bg-primary-100 text-gray-800',
   B: 'bg-gray-100 text-gray-700',
   C: 'bg-gray-100 text-gray-700',
-  D: 'bg-primary-100 text-primary-700',
-  E: 'bg-primary-100 text-primary-700',
+  D: 'bg-primary-100 text-gray-800',
+  E: 'bg-primary-100 text-gray-800',
   F: 'bg-gray-100 text-gray-700',
-  G: 'bg-primary-100 text-primary-700',
+  G: 'bg-primary-100 text-gray-800',
   H: 'bg-gray-100 text-gray-700',
-  I: 'bg-primary-100 text-primary-700',
+  I: 'bg-primary-100 text-gray-800',
   J: 'bg-gray-100 text-gray-700',
   K: 'bg-gray-100 text-gray-700',
-  L: 'bg-primary-100 text-primary-700',
-  M: 'bg-primary-100 text-primary-700',
+  L: 'bg-primary-100 text-gray-800',
+  M: 'bg-primary-100 text-gray-800',
 };
 
 function getRoundLabel(round: number, total: number): string {
@@ -196,7 +196,7 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                       round === totalRounds
                         ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white'
                         : round === totalRounds - 1
-                        ? 'bg-primary-100 text-primary-700'
+                        ? 'bg-primary-100 text-gray-800'
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
@@ -280,10 +280,10 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                         <div
                           className={`flex items-center justify-center text-[10px] font-medium border-t border-gray-100 py-0.5 ${
                             match.status === 'playing'
-                              ? 'bg-primary-50 text-primary-700'
+                              ? 'bg-primary-50 text-gray-800'
                               : match.status === 'finished'
                               ? 'bg-gray-50 text-gray-500'
-                              : 'bg-primary-50/50 text-primary-600'
+                              : 'bg-primary-50/50 text-gray-700'
                           }`}
                         >
                           {match.status === 'playing' && (
@@ -452,7 +452,7 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                       round === totalRounds
                         ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-white'
                         : round === totalRounds - 1
-                        ? 'bg-primary-100 text-primary-700'
+                        ? 'bg-primary-100 text-gray-800'
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
@@ -523,10 +523,10 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                         <div
                           className={`flex items-center justify-center text-[10px] font-medium border-t border-gray-100 py-0.5 ${
                             match.status === 'playing'
-                              ? 'bg-primary-50 text-primary-700'
+                              ? 'bg-primary-50 text-gray-800'
                               : match.status === 'finished'
                               ? 'bg-gray-50 text-gray-500'
-                              : 'bg-primary-50/50 text-primary-600'
+                              : 'bg-primary-50/50 text-gray-700'
                           }`}
                         >
                           {match.status === 'playing' && (

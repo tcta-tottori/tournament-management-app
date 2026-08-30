@@ -27,6 +27,26 @@ const CHANGELOG: ChangelogEntry[] = [
     timeGroups: [
       {
         time: '—',
+        summary: '画面の見た目の調整',
+        changes: [
+          { type: 'design', text: 'メニューのアイコンを白で太く・大きくし、開いたときに上から順に出てくるようにしました' },
+          { type: 'design', text: 'メニュー下部の音声・観戦用などのボタンを、アイコン大きめ・文字小さめに整えました。協会ロゴも白抜きの画像に差し替えています' },
+          { type: 'design', text: '画面の文字を基本的に黒にし、赤はアイコンや現在地などの差し色に絞りました' },
+          { type: 'chore', text: 'データ画面の「データ管理」の見出しを削除しました（ページ名はヘッダーに出ます）' },
+        ],
+      },
+      {
+        time: '—',
+        summary: 'ドロー画面',
+        changes: [
+          { type: 'feat', text: 'クラス名をタップすると、下にクラス一覧が開いて選べるようになりました' },
+          { type: 'feat', text: 'クラスの並び順を「男子→女子」、各性別の中は「アルファベット（A・B・C…）→年齢（45・55・65…）」に統一しました' },
+          { type: 'design', text: '表示範囲の切り替え（全回戦表示／準決勝以降）を大きく中央に置きました' },
+          { type: 'design', text: 'あたりの修正・3位決定戦・名前の修正・ゲームルールの変更を、右下の編集ボタンから開くメニューにまとめました' },
+        ],
+      },
+      {
+        time: '—',
         summary: 'ヘッダーとメニュー',
         changes: [
           { type: 'design', text: 'ヘッダーの背景を協会サイトのキービジュアル（白地に赤・淡赤・白の四角が浮かぶ構図）のアニメーションにしました。四角が左から右へゆっくり流れ、ズームしながら現れて消えます' },
@@ -571,8 +591,8 @@ const CHANGELOG: ChangelogEntry[] = [
 ];
 
 const TYPE_CONFIG = {
-  feat:   { label: '新機能', icon: Sparkles,   color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-200' },
-  fix:    { label: '修正',   icon: Bug,         color: 'text-primary-600',   bg: 'bg-primary-50',   border: 'border-primary-200' },
+  feat:   { label: '新機能', icon: Sparkles,   color: 'text-gray-700', bg: 'bg-primary-50', border: 'border-primary-200' },
+  fix:    { label: '修正',   icon: Bug,         color: 'text-gray-700',   bg: 'bg-primary-50',   border: 'border-primary-200' },
   design: { label: 'デザイン', icon: Paintbrush, color: 'text-gray-600', bg: 'bg-gray-50',  border: 'border-gray-200' },
   chore:  { label: 'その他', icon: Wrench,      color: 'text-gray-500',    bg: 'bg-gray-50',    border: 'border-gray-200' },
 } as const;
@@ -666,7 +686,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-primary-700">{entry.version}</span>
+                      <span className="text-sm font-bold text-gray-800">{entry.version}</span>
                       <span className="text-[11px] text-gray-400">{entry.date}</span>
                       {entry === CHANGELOG[0] && (
                         <span className="px-1.5 py-0.5 text-[9px] font-bold text-white bg-primary-500 rounded-full uppercase tracking-wider">New</span>
@@ -700,7 +720,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
                           >
                             <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span className="text-[11px] font-mono text-gray-500 shrink-0 tabular-nums">{group.time}</span>
-                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-primary-700 font-medium' : 'text-gray-600'}`}>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${isTimeExpanded ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>
                               {group.summary}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -744,7 +764,7 @@ export default function VersionInfoModal({ open, onClose }: Props) {
             href="https://github.com/TCTA-Tottori/tournament-management-app"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5 transition-colors"
+            className="text-[11px] text-gray-700 hover:text-gray-800 font-medium flex items-center gap-0.5 transition-colors"
           >
             GitHub
             <ChevronRight className="w-3 h-3" />

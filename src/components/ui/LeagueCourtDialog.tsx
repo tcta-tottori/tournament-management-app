@@ -85,7 +85,7 @@ export default function LeagueCourtDialog({
           <div className="space-y-2">
             {blocks.map((block, bi) => (
               <div key={bi} className="border border-primary-200 bg-primary-50/40 rounded-lg p-2">
-                <div className="text-[10px] font-bold text-primary-700 mb-1.5 px-0.5">
+                <div className="text-[10px] font-bold text-gray-800 mb-1.5 px-0.5">
                   {block.length > 1
                     ? `${block[0].name}〜${block[block.length - 1].name}番コート`
                     : `${block[0].name}番コート`}

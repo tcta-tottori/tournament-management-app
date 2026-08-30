@@ -355,8 +355,8 @@ export default function ScheduleImport() {
       {importResult && (
         <div className={`p-3 rounded-lg text-sm ${
           importResult.success
-            ? 'bg-primary-50 text-primary-800 border border-primary-200'
-            : 'bg-primary-50 text-primary-800 border border-primary-200'
+            ? 'bg-primary-50 text-gray-900 border border-primary-200'
+            : 'bg-primary-50 text-gray-900 border border-primary-200'
         }`}>
           <div className="flex items-start gap-2">
             {importResult.success

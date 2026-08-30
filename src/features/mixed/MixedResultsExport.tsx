@@ -201,7 +201,7 @@ export default function MixedResultsExport() {
             </button>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 rounded-xl text-sm font-medium hover:bg-primary-50 transition-colors shadow-md"
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-50 transition-colors shadow-md"
             >
               <FileDown size={16} />
               Excel出力
@@ -369,7 +369,7 @@ export default function MixedResultsExport() {
                         <th className="px-2 py-1.5 text-left text-[10px] text-gray-500 min-w-[70px]">所属</th>
                         {league.teams.map((_, i) => (
                           <th key={i} className="px-1 py-1.5 text-center text-[10px] text-gray-500 w-16">
-                            <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-primary-700 rounded-full text-[9px] font-bold">{i + 1}</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-gray-800 rounded-full text-[9px] font-bold">{i + 1}</span>
                           </th>
                         ))}
                         <th className="px-2 py-1.5 text-center text-[10px] text-gray-500 w-12">勝敗</th>
@@ -385,7 +385,7 @@ export default function MixedResultsExport() {
                         return (
                           <tr key={team.teamId} className="border-t border-gray-100">
                             <td className="px-2 py-1">
-                              <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-primary-700 rounded-full text-[9px] font-bold">{rowIdx + 1}</span>
+                              <span className="inline-flex items-center justify-center w-5 h-5 bg-primary-100 text-gray-800 rounded-full text-[9px] font-bold">{rowIdx + 1}</span>
                             </td>
                             <td className="px-2 py-1">
                               <div className="text-[11px] font-medium text-gray-800 leading-tight">{team.male.name}</div>
@@ -406,7 +406,7 @@ export default function MixedResultsExport() {
                               const isTeam1 = match.team1Id === team.teamId;
                               const won = (isTeam1 && match.winnerId === match.team1Id) || (!isTeam1 && match.winnerId === match.team2Id);
                               return (
-                                <td key={colIdx} className={`px-1 py-1 text-center text-[10px] border-l border-gray-100 whitespace-nowrap ${won ? 'text-primary-700 font-bold bg-primary-50' : 'text-red-600 bg-red-50'}`}>
+                                <td key={colIdx} className={`px-1 py-1 text-center text-[10px] border-l border-gray-100 whitespace-nowrap ${won ? 'text-gray-800 font-bold bg-primary-50' : 'text-red-600 bg-red-50'}`}>
                                   {formatScoreText(match, team.teamId)}
                                 </td>
                               );

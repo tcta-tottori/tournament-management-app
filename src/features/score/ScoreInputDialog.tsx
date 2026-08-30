@@ -88,9 +88,9 @@ interface ScoreInputDialogProps {
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
   waiting:  { label: '待機中',   bg: 'bg-gray-100',    text: 'text-gray-600',    dot: 'bg-gray-400' },
   ready:    { label: '準備完了', bg: 'bg-gray-100',    text: 'text-gray-700',    dot: 'bg-gray-500' },
-  playing:  { label: '試合中',   bg: 'bg-primary-100',   text: 'text-primary-700',   dot: 'bg-primary-500' },
-  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
-  walkover: { label: 'W/O',     bg: 'bg-primary-100',  text: 'text-primary-700',  dot: 'bg-primary-400' },
+  playing:  { label: '試合中',   bg: 'bg-primary-100',   text: 'text-gray-800',   dot: 'bg-primary-500' },
+  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-gray-800', dot: 'bg-primary-500' },
+  walkover: { label: 'W/O',     bg: 'bg-primary-100',  text: 'text-gray-800',  dot: 'bg-primary-400' },
 };
 
 const DEFAULT_VOICE: VoiceSettings = { rate: 0.95, pitch: 1.0, volume: 1.0, repeatCount: 1 };
@@ -822,12 +822,12 @@ export default function ScoreInputDialog({
           <div className={`px-4 sm:px-6 pb-0 ${keyboardOpen ? 'pt-2' : 'pt-3'}`}>
             <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
               <BookOpen className="w-4 h-4 text-primary-600 shrink-0" />
-              <span className="text-xs font-bold text-primary-800 flex-1 min-w-0">{gameRuleText}</span>
+              <span className="text-xs font-bold text-gray-900 flex-1 min-w-0">{gameRuleText}</span>
               {onEditRules && (
                 <button
                   onClick={onEditRules}
                   title="ゲームルールを修正"
-                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-primary-700 bg-white border border-primary-300 rounded-full px-2 py-0.5 hover:bg-primary-100 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-gray-800 bg-white border border-primary-300 rounded-full px-2 py-0.5 hover:bg-primary-100 transition-colors"
                 >
                   <Pencil className="w-3 h-3" />修正
                 </button>
@@ -848,7 +848,7 @@ export default function ScoreInputDialog({
                 {/* Player 1 */}
                 <div className="text-center">
                   <p className={`font-bold text-base sm:text-lg leading-tight ${
-                    isP1Winner ? 'text-primary-600' : isP1Loser ? 'text-gray-400' : 'text-gray-900'
+                    isP1Winner ? 'text-gray-700' : isP1Loser ? 'text-gray-400' : 'text-gray-900'
                   }`}>
                     {match.player1Name || '(未定)'}
                     {isP1Winner && <Trophy className="w-4 h-4 inline ml-1 text-primary-500" />}
@@ -861,7 +861,7 @@ export default function ScoreInputDialog({
                 {/* Player 2 */}
                 <div className="text-center">
                   <p className={`font-bold text-base sm:text-lg leading-tight ${
-                    isP2Winner ? 'text-primary-600' : isP2Loser ? 'text-gray-400' : 'text-gray-900'
+                    isP2Winner ? 'text-gray-700' : isP2Loser ? 'text-gray-400' : 'text-gray-900'
                   }`}>
                     {match.player2Name || '(未定)'}
                     {isP2Winner && <Trophy className="w-4 h-4 inline ml-1 text-primary-500" />}
@@ -1049,7 +1049,7 @@ export default function ScoreInputDialog({
             {/* 自動勝者判定表示 */}
             {autoWinner && canFinish && !scoreValidationError && (
               <div className="text-center">
-                <span className="text-xs text-primary-600 font-bold">
+                <span className="text-xs text-gray-700 font-bold">
                   → {autoWinner === 1 ? match.player1Name : match.player2Name} 勝利
                   {retPlayer && (match.status === 'playing' ? ' (DEF/Ret)' : ' (DEF/W.O)')}
                 </span>

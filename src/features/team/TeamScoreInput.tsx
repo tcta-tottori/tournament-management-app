@@ -73,12 +73,12 @@ const TEAM_THEME: Record<1 | 2, TeamTheme> = {
     bgStrong: 'bg-primary-100',
     border: 'border-primary-300',
     borderStrong: 'border-primary-500',
-    text: 'text-primary-700',
-    textStrong: 'text-primary-800',
+    text: 'text-gray-800',
+    textStrong: 'text-gray-900',
     grad: 'from-primary-500 to-primary-600',
     btnBg: 'bg-white hover:bg-primary-50',
     btnBorder: 'border-primary-300',
-    btnText: 'text-primary-700',
+    btnText: 'text-gray-800',
   },
   // 2チーム目は墨（無彩色）。左右どちらのチームかを色で見分けられるよう、
   // 1チーム目の赤と濃さ・色味で対比させている。
@@ -322,7 +322,7 @@ function PlayerPickerPopup({
               </div>
               <p className="text-[10px] text-gray-400 px-1">同姓の区別が必要な場合は「山田 太郎」のように空白で区切って入力してください。</p>
               {manualIsDuplicate && (
-                <div className="text-[10px] font-bold text-primary-600 px-1">
+                <div className="text-[10px] font-bold text-gray-700 px-1">
                   「{manualTrim}」は既にこの対戦で出場済みです。同姓別人などの場合はこのまま追加できます。
                 </div>
               )}
@@ -341,7 +341,7 @@ function PlayerPickerPopup({
             <button
               type="button"
               onClick={() => commit('')}
-              className="w-full py-2 text-xs font-bold text-primary-600 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 active:scale-[0.98]"
+              className="w-full py-2 text-xs font-bold text-gray-700 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 active:scale-[0.98]"
             >
               選手名をクリア
             </button>
@@ -883,7 +883,7 @@ export default function TeamScoreInput({
                 : `${TEAM_THEME[1].bg} ${TEAM_THEME[1].border}`
             }`}>
               <div className={`font-bold text-sm truncate w-full ${
-                overallWinner === 1 ? 'text-primary-800' : overallWinner === 2 ? 'text-gray-400' : TEAM_THEME[1].textStrong
+                overallWinner === 1 ? 'text-gray-900' : overallWinner === 2 ? 'text-gray-400' : TEAM_THEME[1].textStrong
               }`}>{team1Name}</div>
               <div className="h-4 flex items-center">
                 {overallWinner === 1 && (
@@ -899,7 +899,7 @@ export default function TeamScoreInput({
                 : `${TEAM_THEME[2].bg} ${TEAM_THEME[2].border}`
             }`}>
               <div className={`font-bold text-sm truncate w-full ${
-                overallWinner === 2 ? 'text-primary-800' : overallWinner === 1 ? 'text-gray-400' : TEAM_THEME[2].textStrong
+                overallWinner === 2 ? 'text-gray-900' : overallWinner === 1 ? 'text-gray-400' : TEAM_THEME[2].textStrong
               }`}>{team2Name}</div>
               <div className="h-4 flex items-center">
                 {overallWinner === 2 && (
@@ -958,14 +958,14 @@ export default function TeamScoreInput({
                       </span>
                       <span className={`text-xs font-bold ${theme.text}`}>{MATCH_TYPE_LABELS[mt]}</span>
                       {terminated[mt] && (
-                        <span className="text-[9px] font-black text-primary-600 bg-primary-50 border border-primary-300 px-1.5 py-0.5 rounded-full tracking-wider">
+                        <span className="text-[9px] font-black text-gray-700 bg-primary-50 border border-primary-300 px-1.5 py-0.5 rounded-full tracking-wider">
                           打ち切り
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {hasScores && info.winner > 0 && !terminated[mt] && (
-                        <span className="text-[10px] font-bold text-primary-600 bg-white border border-primary-300 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-gray-700 bg-white border border-primary-300 px-2 py-0.5 rounded-full">
                           <Trophy className="w-2.5 h-2.5 inline mr-0.5" />
                           {info.winner === 1 ? team1Name : team2Name}
                         </span>
@@ -982,7 +982,7 @@ export default function TeamScoreInput({
                         className={`flex items-center gap-1 px-2 h-6 rounded-md text-[10px] font-bold border transition-colors ${
                           terminated[mt]
                             ? 'bg-primary-500 text-white border-primary-500 hover:bg-primary-600'
-                            : 'bg-white text-primary-600 border-primary-200 hover:bg-primary-50'
+                            : 'bg-white text-gray-700 border-primary-200 hover:bg-primary-50'
                         }`}
                         title="この種目を打ち切り（勝利数にカウントしない）"
                       >

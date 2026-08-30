@@ -179,7 +179,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
                 <div className="min-w-0 flex-1">
                   <span className={`text-sm ${
                     step.status === 'loading' ? 'text-gray-800 font-medium' :
-                    step.status === 'done' ? 'text-primary-700' :
+                    step.status === 'done' ? 'text-gray-800' :
                     step.status === 'error' ? 'text-red-600' :
                     'text-gray-400'
                   }`}>
@@ -197,7 +197,7 @@ export default function DriveLoadingModal({ open, title, steps, progress, result
           {result && (
             <div className={`mt-4 p-3 rounded-lg text-sm ${
               result.success
-                ? 'bg-primary-50 text-primary-800 border border-primary-200'
+                ? 'bg-primary-50 text-gray-900 border border-primary-200'
                 : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
               <div className="flex items-start gap-2">

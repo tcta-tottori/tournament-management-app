@@ -68,12 +68,12 @@ function getMatchFormat(evt: Event | undefined, round: number, totalRounds: numb
 
 const EVENT_COLORS = [
   { bg: 'bg-gray-100', text: 'text-gray-800' },
-  { bg: 'bg-primary-100', text: 'text-primary-800' },
-  { bg: 'bg-primary-100', text: 'text-primary-800' },
-  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-primary-100', text: 'text-gray-900' },
+  { bg: 'bg-primary-100', text: 'text-gray-900' },
+  { bg: 'bg-primary-100', text: 'text-gray-900' },
   { bg: 'bg-gray-100', text: 'text-gray-800' },
   { bg: 'bg-gray-100', text: 'text-gray-800' },
-  { bg: 'bg-primary-100', text: 'text-primary-800' },
+  { bg: 'bg-primary-100', text: 'text-gray-900' },
   { bg: 'bg-gray-100', text: 'text-gray-800' },
 ];
 
@@ -1046,7 +1046,7 @@ export default function ScheduleSheet() {
                 onClick={handleRegenerate}
                 disabled={isGenerating || !currentTournamentId}
                 title="ドロー表に書かれた開始時刻を基準に、時間割を作り直します"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                 {isGenerating ? '作成中...' : 'ドロー表の時刻で作り直す'}
@@ -1069,7 +1069,7 @@ export default function ScheduleSheet() {
             className={`mt-3 p-3 rounded-md text-sm ${
               statusMessage.includes('失敗') || statusMessage.includes('ありません')
                 ? 'bg-red-50 text-red-700 border border-red-200'
-                : 'bg-primary-50 text-primary-700 border border-primary-200'
+                : 'bg-primary-50 text-gray-800 border border-primary-200'
             }`}
           >
             {statusMessage}
@@ -1080,14 +1080,14 @@ export default function ScheduleSheet() {
         {swapSourceIndex != null && (() => {
           const src = importedSchedule[swapSourceIndex];
           return (
-            <div className="mt-3 p-3 rounded-md text-sm bg-primary-50 border border-primary-300 text-primary-800 flex items-center justify-between gap-2">
+            <div className="mt-3 p-3 rounded-md text-sm bg-primary-50 border border-primary-300 text-gray-900 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5">
                 <ArrowRightLeft className="w-4 h-4 shrink-0" />
                 入れ替えモード:「{src?.eventName} {roundLabelToJapanese(src?.roundLabel || '')}」の入れ替え先（他の試合カードまたは空きコマ）をタップしてください。
               </span>
               <button
                 onClick={() => setSwapSourceIndex(null)}
-                className="shrink-0 px-2.5 py-1 text-xs font-medium text-primary-700 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors"
+                className="shrink-0 px-2.5 py-1 text-xs font-medium text-gray-800 bg-white border border-primary-300 rounded-md hover:bg-primary-100 transition-colors"
               >
                 キャンセル
               </button>
@@ -1295,10 +1295,10 @@ export default function ScheduleSheet() {
                         >
                           <div className="flex items-center justify-center gap-0.5 relative z-[2]">
                             <span className="text-[10px] font-medium leading-tight truncate">{evAbbr}</span>
-                            <span className={`text-[9px] leading-tight ${isFinished ? 'text-gray-500' : isPlaying ? 'text-primary-700' : 'opacity-70'}`}>{roundLabelToJapanese(item.roundLabel)}</span>
+                            <span className={`text-[9px] leading-tight ${isFinished ? 'text-gray-500' : isPlaying ? 'text-gray-800' : 'opacity-70'}`}>{roundLabelToJapanese(item.roundLabel)}</span>
                           </div>
                           {playerLabel && (
-                            <div className={`text-[8px] leading-tight truncate relative z-[2] ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'text-gray-600/70' : isPlaying ? 'text-primary-800' : 'opacity-80'}`}>
+                            <div className={`text-[8px] leading-tight truncate relative z-[2] ${isWalkover ? 'line-through text-gray-400' : isFinished ? 'text-gray-600/70' : isPlaying ? 'text-gray-900' : 'opacity-80'}`}>
                               {playerLabel}
                             </div>
                           )}
@@ -1308,7 +1308,7 @@ export default function ScheduleSheet() {
                             </div>
                           )}
                           {isPlaying && !dbMatch?.score && (
-                            <div className="text-[7px] leading-tight font-bold text-primary-600 relative z-[2]">
+                            <div className="text-[7px] leading-tight font-bold text-gray-700 relative z-[2]">
                               試合中
                             </div>
                           )}
@@ -1341,12 +1341,12 @@ export default function ScheduleSheet() {
             <p className="text-xs text-gray-500 mb-4">
               ドロー表に書かれた開始時刻から同時進行の試合数（＝コート数）を判定し、対戦順・コート割を自動作成します。
               {detectedCourtCount != null && (
-                <span className="block mt-1 text-primary-700 font-medium">
+                <span className="block mt-1 text-gray-800 font-medium">
                   検出: {genStartTime}開始の試合が{detectedCourtCount}件 → {detectedCourtCount}面（{assignVenueCourtNames(detectedCourtCount).join('・')}番コート）
                 </span>
               )}
               {genDrawBase?.startTime && (
-                <span className="block mt-1 text-primary-700 font-medium">
+                <span className="block mt-1 text-gray-800 font-medium">
                   ドロー表の記載時刻（最早 {genDrawBase.startTime}
                   {genDrawBase.matchDuration ? ` / 1試合${genDrawBase.matchDuration}分` : ''}）を基準に配置します。
                   {genDrawBase.slotStep != null && genDrawBase.matchDuration != null
@@ -1448,7 +1448,7 @@ export default function ScheduleSheet() {
                   </button>
                   <button
                     onClick={() => { setSwapSourceIndex(actionIndex); setActionIndex(null); }}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 transition-colors"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-800 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 transition-colors"
                   >
                     <ArrowRightLeft className="w-4 h-4" />
                     入れ替え

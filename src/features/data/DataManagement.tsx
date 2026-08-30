@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Database as DatabaseIcon, ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users, Eraser, FlaskConical } from 'lucide-react';
+import { ListChecks, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertTriangle, Trophy, Calendar, MapPin, Pencil, Users, Eraser, FlaskConical } from 'lucide-react';
 import {
   getSavedClientId,
   isTokenValid as gdriveIsTokenValid,
@@ -71,7 +71,7 @@ function MixedTournamentInfoSection() {
       <div className="bg-gradient-to-r from-primary-50 to-white px-4 py-3 border-b border-primary-100">
         <div className="flex items-center gap-2">
           <Trophy className="w-5 h-5 text-primary-600" />
-          <h2 className="font-semibold text-primary-700">ミックス大会情報</h2>
+          <h2 className="font-semibold text-gray-800">ミックス大会情報</h2>
         </div>
       </div>
       <div className="p-4 space-y-3">
@@ -91,7 +91,7 @@ function MixedTournamentInfoSection() {
                 autoFocus
               />
             ) : (
-              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-primary-600 transition-colors">
+              <button onClick={() => startEdit('name')} className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-gray-700 transition-colors">
                 {tournamentInfo.name}
                 <Pencil size={10} className="opacity-40" />
               </button>
@@ -116,7 +116,7 @@ function MixedTournamentInfoSection() {
               />
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-primary-600 transition-colors">
+                <button onClick={() => startEdit('date')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-700 transition-colors">
                   {tournamentInfo.date || '(未設定)'}
                   <Pencil size={10} className="opacity-40" />
                 </button>
@@ -124,7 +124,7 @@ function MixedTournamentInfoSection() {
                   <select
                     onChange={e => { if (e.target.value) updateTournamentInfo('date', e.target.value); }}
                     defaultValue=""
-                    className="text-xs border border-primary-300 bg-primary-50 text-primary-700 rounded-lg px-2 py-1 cursor-pointer"
+                    className="text-xs border border-primary-300 bg-primary-50 text-gray-800 rounded-lg px-2 py-1 cursor-pointer"
                   >
                     <option value="" disabled>予備日を除去...</option>
                     {dateOptions.map((opt, i) => (
@@ -154,7 +154,7 @@ function MixedTournamentInfoSection() {
               />
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-primary-600 transition-colors">
+                <button onClick={() => startEdit('venue')} className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-700 transition-colors">
                   {tournamentInfo.venue || '(未設定)'}
                   <Pencil size={10} className="opacity-40" />
                 </button>
@@ -162,7 +162,7 @@ function MixedTournamentInfoSection() {
                   <select
                     onChange={e => { if (e.target.value) updateTournamentInfo('venue', e.target.value); }}
                     defaultValue=""
-                    className="text-xs border border-primary-300 bg-primary-50 text-primary-700 rounded-lg px-2 py-1 cursor-pointer"
+                    className="text-xs border border-primary-300 bg-primary-50 text-gray-800 rounded-lg px-2 py-1 cursor-pointer"
                   >
                     <option value="" disabled>予備日を除去...</option>
                     {venueOptions.map((opt, i) => (
@@ -182,7 +182,7 @@ function MixedTournamentInfoSection() {
             <div className="text-[10px] text-gray-400 font-medium">参加状況</div>
             <div className="text-sm text-gray-700">
               {allTeams.length}ペア / {leagues.length}リーグ
-              {entryCount > 0 && <span className="text-primary-600 ml-2">Entry {entryCount}</span>}
+              {entryCount > 0 && <span className="text-gray-700 ml-2">Entry {entryCount}</span>}
               {defCount > 0 && <span className="text-primary-500 ml-2">DEF {defCount}</span>}
             </div>
           </div>
@@ -191,8 +191,8 @@ function MixedTournamentInfoSection() {
         {/* ルール */}
         {tournamentInfo.rules.length > 0 && (
           <div className="mt-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
-            <div className="text-[10px] font-medium text-primary-600 mb-1">ゲームルール</div>
-            <div className="text-xs text-primary-700">
+            <div className="text-[10px] font-medium text-gray-700 mb-1">ゲームルール</div>
+            <div className="text-xs text-gray-800">
               {tournamentInfo.rules.map((r, i) => <div key={i}>{r}</div>)}
             </div>
           </div>
@@ -322,8 +322,8 @@ function TeamTournamentInfoSection() {
         {/* ルール */}
         {tournamentInfo.rules.length > 0 && (
           <div className="mt-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
-            <div className="text-[10px] font-medium text-primary-600 mb-1">ゲームルール</div>
-            <div className="text-xs text-primary-700">
+            <div className="text-[10px] font-medium text-gray-700 mb-1">ゲームルール</div>
+            <div className="text-xs text-gray-800">
               {tournamentInfo.rules.map((r, i) => <div key={i}>{r}</div>)}
             </div>
           </div>
@@ -520,18 +520,6 @@ export default function DataManagement() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-      <header className="bg-white p-4 rounded-xl card-tottori">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <DatabaseIcon className="w-6 h-6 text-primary-500" />
-            データ管理
-          </h1>
-          <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-            Google ドライブからのデータ読込、所属・ふりがなの管理を行います。
-          </p>
-        </div>
-      </header>
-
       {/* ミックス大会情報 */}
       {isMixedImported && <MixedTournamentInfoSection />}
 
@@ -560,7 +548,7 @@ export default function DataManagement() {
           <div className="flex items-center gap-2">
             {dataImportOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
             <FileSpreadsheet className="w-5 h-5 text-primary-500" />
-            <h2 className="font-semibold text-primary-600">大会データ読込</h2>
+            <h2 className="font-semibold text-gray-700">大会データ読込</h2>
           </div>
         </button>
         {dataImportOpen && (
@@ -584,7 +572,7 @@ export default function DataManagement() {
           <div className="flex items-center gap-2">
             {playerListOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
             <ListChecks className="w-5 h-5 text-primary-500" />
-            <h2 className="font-semibold text-primary-600">所属・ふりがな一覧</h2>
+            <h2 className="font-semibold text-gray-700">所属・ふりがな一覧</h2>
           </div>
         </button>
         {playerListOpen && (
@@ -651,7 +639,7 @@ export default function DataManagement() {
                 </div>
                 <button
                   onClick={() => setPendingClear({ title: item.label, message: item.message, run: item.run })}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-all shrink-0"
+                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 hover:border-primary-300 transition-all shrink-0"
                 >
                   <Trash2 className="w-3 h-3" />
                   クリア
@@ -663,7 +651,7 @@ export default function DataManagement() {
             <div className="px-5 pb-3">
               <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
                 <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" />
-                <p className="text-xs text-primary-700 font-medium">「{clearDoneLabel}」をクリアしました</p>
+                <p className="text-xs text-gray-800 font-medium">「{clearDoneLabel}」をクリアしました</p>
               </div>
             </div>
           )}
@@ -692,7 +680,7 @@ export default function DataManagement() {
           <div className="px-5 pb-3 -mt-1">
             <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
               <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" />
-              <p className="text-xs text-primary-700 font-medium">全データをリセットしました</p>
+              <p className="text-xs text-gray-800 font-medium">全データをリセットしました</p>
             </div>
           </div>
         )}

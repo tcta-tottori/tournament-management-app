@@ -235,25 +235,29 @@ export default function PublicLayout() {
       {/* 全画面メニュー（ヘッダーは出したまま、その下いっぱいに開く） */}
       <div className={`fullmenu ${menuOpen ? 'fullmenu-open' : ''}`}>
         <div className="fullmenu-list">
-          {menuItems.map((item) => {
+          {menuItems.map((item, i) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
               <button key={item.path}
                 className={`fullmenu-item ${isActive ? 'fullmenu-item-active' : ''}`}
+                style={{ '--i': i } as React.CSSProperties}
                 onClick={() => go(item.path)}>
-                <item.icon className="shrink-0" style={{ width: 20, height: 20 }} />
+                <item.icon className="shrink-0" />
                 <span>{item.label}</span>
                 <ArrowRight className="fullmenu-arrow" style={{ width: 18, height: 18 }} />
               </button>
             );
           })}
         </div>
-        <div className="fullmenu-footer">
+        <div
+          className="fullmenu-footer"
+          style={{ '--footer-delay': `${menuItems.length * 45}ms` } as React.CSSProperties}
+        >
           <div className="drawer-action-row">
             {sync.hasRoom && <SyncBadge sync={sync} />}
             <span className="text-[10px] bg-white/15 border border-white/30 rounded-full px-2.5 py-1 font-bold text-white">観戦用ページ</span>
           </div>
-          <img src={`${import.meta.env.BASE_URL}logo-tcta.png`} alt="鳥取市テニス協会"
+          <img src={`${import.meta.env.BASE_URL}logo-tcta-white.png`} alt="鳥取市テニス協会"
             className="fullmenu-logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         </div>
       </div>
@@ -330,7 +334,7 @@ function WaitingCard({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
       <button
         onClick={handleRetry}
         disabled={retrying}
-        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-60 transition-colors"
+        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-gray-800 bg-primary-50 border border-primary-200 hover:bg-primary-100 disabled:opacity-60 transition-colors"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`} />
         再読み込み
@@ -346,7 +350,7 @@ function SyncBadge({ sync }: { sync: ReturnType<typeof usePublicSync> }) {
   const Icon = connected ? Wifi : WifiOff;
   // 白地のヘッダーに合わせ、受信中だけ赤、それ以外は無彩色にする
   const color = connected
-    ? 'bg-primary-50 border-primary-200 text-primary-700'
+    ? 'bg-primary-50 border-primary-200 text-gray-800'
     : connecting ? 'bg-gray-50 border-gray-200 text-gray-600' : 'bg-white border-gray-200 text-gray-500';
   return (
     <span className={`flex items-center gap-1 text-[10px] md:text-xs rounded-full px-2 py-1 font-bold border ${color}`} title={`ルーム: ${sync.roomCode}`}>

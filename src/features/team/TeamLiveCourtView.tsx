@@ -166,9 +166,9 @@ export default function TeamLiveCourtView() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
           {[
             { icon: Users, label: '全試合数', value: totalMatches, color: 'text-gray-600 bg-gray-50 border-gray-200' },
-            { icon: Play, label: '予選リーグ', value: `${leagueFinished}/${leagueTotal}`, color: 'text-primary-700 bg-primary-50 border-primary-200' },
+            { icon: Play, label: '予選リーグ', value: `${leagueFinished}/${leagueTotal}`, color: 'text-gray-800 bg-primary-50 border-primary-200' },
             { icon: CheckCircle, label: '使用中', value: `${courtStats.occupied}`, color: 'text-gray-700 bg-gray-50 border-gray-200' },
-            { icon: Trophy, label: '決勝T', value: brackets.length > 0 ? `${bracketFinished}/${bracketTotal}` : '―', color: 'text-primary-700 bg-primary-50 border-primary-200' },
+            { icon: Trophy, label: '決勝T', value: brackets.length > 0 ? `${bracketFinished}/${bracketTotal}` : '―', color: 'text-gray-800 bg-primary-50 border-primary-200' },
           ].map(({ icon: Icon, label, value, color }) => (
             <div key={label} className={`rounded-xl border p-3 ${color}`}>
               <Icon className="w-4 h-4 mb-1 opacity-60" />
@@ -199,7 +199,7 @@ export default function TeamLiveCourtView() {
             <div key={blockIdx} className="contents">
               <div className="bg-primary-50/60 rounded-xl border border-primary-200 p-3 w-full max-w-lg">
                 <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-gray-700 bg-primary-100 px-2 py-0.5 rounded-full">
                     {block[0]}〜{block[block.length - 1]}
                   </span>
                 </div>
@@ -224,7 +224,7 @@ export default function TeamLiveCourtView() {
 
                     const isPlaying = isLeaguePlaying || isBracketPlaying;
                     const statusStyle = isPlaying
-                      ? { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-primary-800', blink: true }
+                      ? { bg: 'bg-primary-100', border: 'border-primary-400', text: 'text-gray-900', blink: true }
                       : hasActiveMatch
                         ? { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-700', blink: false }
                         : { bg: 'bg-white/80', border: 'border-gray-200', text: 'text-gray-500', blink: false };
@@ -249,7 +249,7 @@ export default function TeamLiveCourtView() {
                                 <div className="text-[7px] text-gray-400 mb-1">{info!.status.finished}/{info!.status.total}試合</div>
                                 {info!.nextMatch ? (
                                   <div className="space-y-0">
-                                    <p className="text-[7px] font-bold text-primary-600/80 mb-0.5">第{info!.nextMatch.matchNumber}試合</p>
+                                    <p className="text-[7px] font-bold text-gray-700/80 mb-0.5">第{info!.nextMatch.matchNumber}試合</p>
                                     <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team1Id)}</p>
                                     <p className="text-[6px] font-medium text-gray-400 leading-none">vs</p>
                                     <p className="text-[8px] font-bold text-gray-800 truncate">{getTeamName(info!.nextMatch.team2Id)}</p>
@@ -266,9 +266,9 @@ export default function TeamLiveCourtView() {
                               const isMultiCourt = ca.courtNames.length > 1;
                               return (
                                 <div className="flex flex-col h-full">
-                                  <p className="text-[8px] font-black text-primary-700 leading-tight">{catLabel}</p>
+                                  <p className="text-[8px] font-black text-gray-800 leading-tight">{catLabel}</p>
                                   {isMultiCourt && (
-                                    <p className="text-[6px] font-bold text-primary-600 leading-none mb-0.5">
+                                    <p className="text-[6px] font-bold text-gray-700 leading-none mb-0.5">
                                       {ca.courtNames.length}コート併用
                                     </p>
                                   )}
@@ -279,7 +279,7 @@ export default function TeamLiveCourtView() {
                                   <p className="text-[8px] font-bold text-gray-800 truncate">
                                     {bm.team2League && <span className="text-gray-400">{bm.team2League} </span>}{bm.team2Name}
                                   </p>
-                                  <p className="text-[7px] font-mono font-bold text-primary-600 mt-auto self-end">{elapsedH}:{String(elapsedM).padStart(2, '0')}</p>
+                                  <p className="text-[7px] font-mono font-bold text-gray-700 mt-auto self-end">{elapsedH}:{String(elapsedM).padStart(2, '0')}</p>
                                 </div>
                               );
                             })() : (
@@ -355,9 +355,9 @@ export default function TeamLiveCourtView() {
             const m = elapsed % 60;
             content = (
               <div>
-                <div className="text-base font-black text-primary-700 mb-1">{catLabel}</div>
+                <div className="text-base font-black text-gray-800 mb-1">{catLabel}</div>
                 {ca.courtNames.length > 1 && (
-                  <div className="mb-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-50 border border-primary-200 text-[10px] font-bold text-primary-700">
+                  <div className="mb-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-50 border border-primary-200 text-[10px] font-bold text-gray-800">
                     <MapPin className="w-3 h-3" />
                     {ca.courtNames.length}コート併用: {ca.courtNames.join('・')}
                   </div>
@@ -380,7 +380,7 @@ export default function TeamLiveCourtView() {
                   </div>
                   <div className="bg-primary-50 rounded-lg p-2 text-center">
                     <div className="text-[10px] text-gray-400">経過時間</div>
-                    <div className="text-lg font-black font-mono text-primary-700">{h}:{String(m).padStart(2, '0')}</div>
+                    <div className="text-lg font-black font-mono text-gray-800">{h}:{String(m).padStart(2, '0')}</div>
                   </div>
                 </div>
                 {/* コートを間違えた・移動したときはここから振り替える */}
@@ -390,7 +390,7 @@ export default function TeamLiveCourtView() {
                     setCourtMoveSelected(ca.courtNames.map(c => c.replace('コート', '')));
                     setSelectedCourt(null);
                   }}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary-50 border border-primary-200 text-primary-700 text-xs font-bold hover:bg-primary-100 active:scale-[0.98] transition-all"
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary-50 border border-primary-200 text-gray-800 text-xs font-bold hover:bg-primary-100 active:scale-[0.98] transition-all"
                 >
                   <MapPin className="w-3.5 h-3.5" />コートを変更
                 </button>
@@ -403,7 +403,7 @@ export default function TeamLiveCourtView() {
             .sort((a, b) => a.matchNumber - b.matchNumber);
           content = (
             <div>
-              <div className="text-xs font-bold text-primary-600 mb-1">{info.league.leagueId}リーグ</div>
+              <div className="text-xs font-bold text-gray-700 mb-1">{info.league.leagueId}リーグ</div>
               <div className="text-xs text-gray-500 mb-3">{info.status.finished}/{info.status.total}試合完了</div>
               <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
                 {leagueAllMatches.map(m => {
@@ -426,7 +426,7 @@ export default function TeamLiveCourtView() {
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-[10px] font-bold text-gray-500">第{m.matchNumber}試合</span>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          isPlaying ? 'bg-primary-200 text-primary-800'
+                          isPlaying ? 'bg-primary-200 text-gray-900'
                           : isFinished ? 'bg-gray-200 text-gray-600'
                           : 'bg-gray-100 text-gray-600'
                         }`}>

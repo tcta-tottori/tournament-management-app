@@ -1186,7 +1186,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
           <GoogleDriveIcon className="w-5 h-5" />
           <h2 className="font-semibold text-gray-800">Google ドライブ連携</h2>
           {isConnected && (
-            <span className="text-[10px] font-bold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">接続中</span>
+            <span className="text-[10px] font-bold bg-primary-100 text-gray-800 px-2 py-0.5 rounded-full">接続中</span>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -1288,7 +1288,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
         {result && (
           <div className={`p-3 rounded-lg text-sm ${
             result.success
-              ? 'bg-primary-50 text-primary-800 border border-primary-200'
+              ? 'bg-primary-50 text-gray-900 border border-primary-200'
               : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             <div className="flex items-start gap-2">
@@ -1474,7 +1474,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                       <div key={i} className="flex items-center gap-1">
                         {i > 0 && <ChevronRight className="w-2.5 h-2.5 text-gray-300" />}
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          isDone ? 'bg-primary-100 text-primary-700' :
+                          isDone ? 'bg-primary-100 text-gray-800' :
                           isCurrent ? 'bg-gray-100 text-gray-700' :
                           'bg-gray-100 text-gray-400'
                         }`}>{label}</span>
@@ -1535,7 +1535,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           {step.status === 'done' && <CheckCircle2 className="w-4 h-4 text-primary-500" />}
                           {step.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
                         </div>
-                        <span className={`text-sm ${step.status === 'loading' ? 'text-gray-800 font-medium' : step.status === 'done' ? 'text-primary-700' : step.status === 'error' ? 'text-red-600' : 'text-gray-400'}`}>
+                        <span className={`text-sm ${step.status === 'loading' ? 'text-gray-800 font-medium' : step.status === 'done' ? 'text-gray-800' : step.status === 'error' ? 'text-red-600' : 'text-gray-400'}`}>
                           {step.label}
                         </span>
                         {step.detail && <span className="text-[11px] text-gray-400 ml-auto">{step.detail}</span>}
@@ -1556,7 +1556,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                     <p className="text-[11px] text-gray-500 mt-0.5">{wizardDrawFiles.length}件のファイル</p>
                   </div>
                   {wizardListDocFiles.length > 0 && (
-                    <div className="mx-2 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-primary-50 border border-primary-200 text-[11px] text-primary-700">
+                    <div className="mx-2 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-primary-50 border border-primary-200 text-[11px] text-gray-800">
                       <ListChecks className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                       <span>
                         大会日程表を検出しました（{wizardListDocFiles.map(f => f.name.replace(/\.(xlsx?|xls)$/i, '')).join('、')}）。
@@ -1719,7 +1719,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                     : 'border-gray-200 bg-white hover:bg-gray-50'
                                 }`}
                               >
-                                <div className={`text-sm font-bold ${isActive ? 'text-primary-700' : 'text-gray-700'}`}>{sec.label}</div>
+                                <div className={`text-sm font-bold ${isActive ? 'text-gray-800' : 'text-gray-700'}`}>{sec.label}</div>
                                 <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                                   <MapPin className="w-3 h-3" />{sec.info.venue}
                                   <span className="ml-1">{sec.leagues.length}リーグ・{sec.leagues.reduce((s, l) => s + l.teams.length, 0)}チーム</span>
@@ -1741,7 +1741,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           className={`shrink-0 px-2.5 py-2 text-[11px] font-semibold border rounded-lg transition-all ${
                             officialPickerOpen
                               ? 'text-white bg-primary-600 border-primary-600'
-                              : 'text-primary-600 bg-primary-50 border-primary-200 hover:bg-primary-100'
+                              : 'text-gray-700 bg-primary-50 border-primary-200 hover:bg-primary-100'
                           }`}
                           title="大会日程表から正式名称を選ぶ">
                           {officialListLoading
@@ -1751,7 +1751,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                         <button type="button" onClick={() => {
                           const raw = wizardTournamentFileName.replace(/\.(xlsx?|xls)$/i, '');
                           setWizardEditName(cleanTournamentName(raw));
-                        }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all" title="不要な文字を自動除去">
+                        }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-gray-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all" title="不要な文字を自動除去">
                           <Sparkles className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1769,7 +1769,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                               大会日程表を読み込んでいます...
                             </div>
                           ) : officialListError ? (
-                            <div className="flex items-start gap-2 px-3 py-3 text-[11px] text-primary-700 bg-primary-50">
+                            <div className="flex items-start gap-2 px-3 py-3 text-[11px] text-gray-800 bg-primary-50">
                               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                               <span>{officialListError}</span>
                             </div>
@@ -1798,7 +1798,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                                       {t.category && <span>{t.category}</span>}
                                       {t.date && <span><Calendar className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.date}</span>}
                                       {t.venue && <span><MapPin className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{t.venue}</span>}
-                                      {t.season && <span className="text-primary-600">{t.season}</span>}
+                                      {t.season && <span className="text-gray-700">{t.season}</span>}
                                     </div>
                                   </button>
                                 ))}
@@ -1977,7 +1977,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
                           時間割ファイルを検索中...
                         </div>
                       ) : wizardScheduleListError ? (
-                        <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-primary-50 border border-primary-200 text-[12px] text-primary-700">
+                        <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-primary-50 border border-primary-200 text-[12px] text-gray-800">
                           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                           <span>{wizardScheduleListError}</span>
                         </div>
@@ -2031,7 +2031,7 @@ export default function DataSync({ onConnectionChange, onDataLoaded, onTournamen
               {wizardPhase === 'done' && wizardResult && (
                 <div className="px-5 py-4">
                   <div className={`p-3 rounded-lg text-sm ${
-                    wizardResult.success ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
+                    wizardResult.success ? 'bg-primary-50 text-gray-900 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
                   }`}>
                     <div className="flex items-start gap-2">
                       {wizardResult.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
@@ -2363,7 +2363,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
           <button
             onClick={() => excelFuriganaRef.current?.click()}
             disabled={isProcessing}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-800 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excelから読込
@@ -2402,7 +2402,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
           <button
             onClick={() => excelAffRef.current?.click()}
             disabled={isProcessing}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-800 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 transition-colors border border-primary-200"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excelから読込
@@ -2413,7 +2413,7 @@ export function FuriganaAffiliationOps({ gdriveConnected, onDataLoaded }: Furiga
       {/* 結果メッセージ */}
       {result && (
         <div className={`p-3 rounded-lg text-sm ${
-          result.success ? 'bg-primary-50 text-primary-800 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
+          result.success ? 'bg-primary-50 text-gray-900 border border-primary-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-start gap-2">
             {result.success ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}

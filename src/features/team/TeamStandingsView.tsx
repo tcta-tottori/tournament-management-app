@@ -6,12 +6,12 @@ import { calculateTeamStandings } from './teamLogic';
 /** リーグカラーパレット（Blue先頭で全ページ統一） */
 const LEAGUE_COLORS = [
   { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
-  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-primary-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
   { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
-  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-primary-700' },
-  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-primary-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
   { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
-  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-primary-700' },
+  { header: 'from-primary-500 to-primary-600', badge: 'bg-primary-100 text-gray-800' },
   { header: 'from-gray-500 to-gray-600', badge: 'bg-gray-100 text-gray-700' },
 ];
 
@@ -60,7 +60,7 @@ export default function TeamStandingsView() {
 
       {/* 未完了リーグ警告 */}
       {!allComplete && incompleteLeagues.length > 0 && (
-        <div className="flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 text-sm text-primary-700">
+        <div className="flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-lg px-4 py-2 text-sm text-gray-800">
           <AlertTriangle size={16} />
           <span>
             未完了リーグ: {incompleteLeagues.map(l => l.leagueId).join(', ')}

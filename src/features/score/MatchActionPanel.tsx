@@ -59,9 +59,9 @@ const STATUS_CONFIG: Record<
 > = {
   waiting:  { label: '待機中',   bg: 'bg-gray-100',   text: 'text-gray-600' },
   ready:    { label: '準備完了', bg: 'bg-gray-100',   text: 'text-gray-700' },
-  playing:  { label: '試合中',   bg: 'bg-primary-100',  text: 'text-primary-700' },
-  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-primary-700' },
-  walkover: { label: 'W/O',     bg: 'bg-primary-100', text: 'text-primary-700' },
+  playing:  { label: '試合中',   bg: 'bg-primary-100',  text: 'text-gray-800' },
+  finished: { label: '終了',     bg: 'bg-primary-100', text: 'text-gray-800' },
+  walkover: { label: 'W/O',     bg: 'bg-primary-100', text: 'text-gray-800' },
 };
 
 // Default voice settings used for broadcast calls
@@ -500,7 +500,7 @@ export default function MatchActionPanel({
                 <p
                   className={`font-bold text-gray-900 text-base truncate ${
                     match.winnerEntryId === match.player1EntryId && isFinished
-                      ? 'text-primary-600'
+                      ? 'text-gray-700'
                       : ''
                   }`}
                 >
@@ -525,7 +525,7 @@ export default function MatchActionPanel({
                 <p
                   className={`font-bold text-gray-900 text-base truncate ${
                     match.winnerEntryId === match.player2EntryId && isFinished
-                      ? 'text-primary-600'
+                      ? 'text-gray-700'
                       : ''
                   }`}
                 >
@@ -690,7 +690,7 @@ export default function MatchActionPanel({
 
           {/* Hint when court not assigned */}
           {!match.courtId && !isFinished && (
-            <p className="text-xs text-primary-600 mt-2">
+            <p className="text-xs text-gray-700 mt-2">
               コールするにはコートを割り当ててください
             </p>
           )}

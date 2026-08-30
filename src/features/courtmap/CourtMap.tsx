@@ -113,11 +113,11 @@ function BlockHeader({
     warning === 'red'
       ? 'bg-red-600 text-white border-red-700'
       : warning === 'yellow'
-        ? 'bg-primary-400 text-primary-900 border-primary-600'
-        : 'bg-white/70 text-primary-700 border-primary-300';
+        ? 'bg-primary-400 text-gray-900 border-primary-600'
+        : 'bg-white/70 text-gray-800 border-primary-300';
   return (
     <div className={`flex items-center justify-between gap-1 px-1 ${compact ? 'mb-1.5' : 'mb-2'}`}>
-      <div className="text-[10px] text-primary-700 font-bold leading-none">{label}</div>
+      <div className="text-[10px] text-gray-800 font-bold leading-none">{label}</div>
       {endTime ? (
         <div className={`text-[10px] font-bold border rounded px-1.5 py-0.5 leading-none ${badgeClass}`}>
           〜{endTime}
@@ -337,7 +337,7 @@ export default function CourtMap() {
     playing: {
       bg: 'bg-primary-100',
       border: 'border-primary-400',
-      text: 'text-primary-800',
+      text: 'text-gray-900',
       glow: 'shadow-[0_0_12px_rgba(198,56,52,0.3)]',
     },
     ready: {
@@ -404,9 +404,9 @@ export default function CourtMap() {
           <div className={`text-[9px] font-medium ${style.text} mt-0.5`}>{isOver ? '時間超過' : statusLabel[cs.status]}</div>
           {cs.currentMatch && (
             <div className="mt-1 pt-1 border-t border-primary-200/60 w-full space-y-0">
-              <p className="text-[9px] font-medium text-primary-800 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
-              <p className="text-[7px] text-primary-600 text-center">vs</p>
-              <p className="text-[9px] font-medium text-primary-800 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
+              <p className="text-[9px] font-medium text-gray-900 truncate text-center leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[7px] text-gray-700 text-center">vs</p>
+              <p className="text-[9px] font-medium text-gray-900 truncate text-center leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
@@ -460,9 +460,9 @@ export default function CourtMap() {
           {/* 右: 対戦情報 */}
           {cs.currentMatch && (
             <div className="flex-1 min-w-0 border-l border-primary-200/60 pl-2 space-y-0">
-              <p className="text-[10px] font-medium text-primary-800 truncate leading-tight">{cs.currentMatch.player1Name}</p>
-              <p className="text-[7px] text-primary-600">vs</p>
-              <p className="text-[10px] font-medium text-primary-800 truncate leading-tight">{cs.currentMatch.player2Name}</p>
+              <p className="text-[10px] font-medium text-gray-900 truncate leading-tight">{cs.currentMatch.player1Name}</p>
+              <p className="text-[7px] text-gray-700">vs</p>
+              <p className="text-[10px] font-medium text-gray-900 truncate leading-tight">{cs.currentMatch.player2Name}</p>
             </div>
           )}
           {!cs.currentMatch && cs.nextMatch && (
@@ -509,7 +509,7 @@ export default function CourtMap() {
             <button
               onClick={() => setBlockTimeEditorOpen(true)}
               title="ブロックごとの使用終了時刻を設定"
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-primary-50 text-primary-800 border border-primary-300 hover:bg-primary-100 transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-primary-50 text-gray-900 border border-primary-300 hover:bg-primary-100 transition-colors flex items-center gap-1.5"
             >
               <Settings className="w-4 h-4" />
               使用時刻設定
@@ -535,7 +535,7 @@ export default function CourtMap() {
             <span className="w-3 h-3 rounded-full bg-gray-300" />
             使用不可 {stats.unavailable}
           </span>
-          <span className="flex items-center gap-1.5 text-primary-700">
+          <span className="flex items-center gap-1.5 text-gray-800">
             <span className="w-3 h-3 rounded-sm border border-primary-600 bg-primary-300 animate-pulse" />
             ブロック終了2時間前
           </span>
@@ -587,7 +587,7 @@ export default function CourtMap() {
                 <div className="flex items-center">
                   <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
-                    <span className="text-sm font-bold text-primary-800 [writing-mode:vertical-rl]">本部</span>
+                    <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                   </div>
                 </div>
               </div>
@@ -614,7 +614,7 @@ export default function CourtMap() {
                       <div className="flex flex-col items-center justify-end mx-2 self-end pb-3">
                         <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm">
                           <span className="text-base">🏠</span>
-                          <span className="text-sm font-bold text-primary-800 [writing-mode:vertical-rl]">本部</span>
+                          <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                         </div>
                       </div>
                     )}
@@ -667,7 +667,7 @@ export default function CourtMap() {
                 <div className="flex items-center">
                   <div className="flex flex-col items-center gap-1 bg-primary-50 border border-primary-300 rounded-lg px-3 py-4 shadow-sm h-full justify-center">
                     <span className="text-lg">🏠</span>
-                    <span className="text-sm font-bold text-primary-800 [writing-mode:vertical-rl]">本部</span>
+                    <span className="text-sm font-bold text-gray-900 [writing-mode:vertical-rl]">本部</span>
                   </div>
                 </div>
               </div>
@@ -691,7 +691,7 @@ export default function CourtMap() {
                       <div className="flex items-center gap-3 my-3">
                         <div className="flex items-center gap-2 bg-primary-50 border border-primary-300 rounded-lg px-4 py-2 shadow-sm">
                           <span className="text-base">🏠</span>
-                          <span className="text-sm font-bold text-primary-800">本部</span>
+                          <span className="text-sm font-bold text-gray-900">本部</span>
                         </div>
                         <div className="flex-1 border-t border-dashed border-border-main" />
                         <span className="text-[10px] text-gray-500">通路</span>
@@ -769,17 +769,17 @@ export default function CourtMap() {
           >
             <div className="sticky top-0 bg-gradient-to-br from-primary-50 to-primary-100 border-b border-primary-200 px-5 py-4 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-primary-900 flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   ブロック使用終了時刻
                 </h3>
-                <p className="text-[11px] text-primary-800/80 mt-0.5">
+                <p className="text-[11px] text-gray-900/80 mt-0.5">
                   {venue.name} — 設定した時刻の2時間前で黄色、1時間前で赤く点滅します
                 </p>
               </div>
               <button
                 onClick={() => setBlockTimeEditorOpen(false)}
-                className="p-1.5 rounded-lg bg-white/60 hover:bg-white text-primary-800 transition-colors"
+                className="p-1.5 rounded-lg bg-white/60 hover:bg-white text-gray-900 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1022,7 +1022,7 @@ export default function CourtMap() {
                           {/* 上段: 種目 + 回戦 + ステータス */}
                           <div className="flex items-center gap-2 mb-2">
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              isPlaying ? 'bg-primary-200 text-primary-800'
+                              isPlaying ? 'bg-primary-200 text-gray-900'
                               : isFinished ? 'bg-gray-200 text-gray-600'
                               : 'bg-gray-200 text-gray-700'
                             }`}>

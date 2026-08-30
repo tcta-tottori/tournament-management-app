@@ -1576,11 +1576,11 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             {/* 読込概要 */}
             <div className="flex gap-3 text-center">
               <div className="flex-1 bg-primary-50 rounded-lg p-2 border border-primary-100">
-                <div className="text-lg font-bold text-primary-700">{mixedPending.leagues.length}</div>
+                <div className="text-lg font-bold text-gray-800">{mixedPending.leagues.length}</div>
                 <div className="text-[10px] text-gray-500">リーグ</div>
               </div>
               <div className="flex-1 bg-primary-50 rounded-lg p-2 border border-primary-100">
-                <div className="text-lg font-bold text-primary-700">{mixedPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
+                <div className="text-lg font-bold text-gray-800">{mixedPending.leagues.reduce((s, l) => s + l.teams.length, 0)}</div>
                 <div className="text-[10px] text-gray-500">ペア</div>
               </div>
               <div className="flex-1 bg-gray-50 rounded-lg p-2 border border-gray-100">
@@ -1592,8 +1592,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             {/* ルール */}
             {mixedPending.info.rules.length > 0 && (
               <div className="px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
-                <div className="text-[10px] font-medium text-primary-600 mb-0.5">ゲームルール</div>
-                <div className="text-[11px] text-primary-700">
+                <div className="text-[10px] font-medium text-gray-700 mb-0.5">ゲームルール</div>
+                <div className="text-[11px] text-gray-800">
                   {mixedPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
                 </div>
               </div>
@@ -1677,7 +1677,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                             : 'border-gray-200 bg-white hover:bg-gray-50'
                         }`}
                       >
-                        <div className={`text-sm font-bold ${isActive ? 'text-primary-700' : 'text-gray-700'}`}>{sec.label}</div>
+                        <div className={`text-sm font-bold ${isActive ? 'text-gray-800' : 'text-gray-700'}`}>{sec.label}</div>
                         <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                           <MapPin className="w-3 h-3" />{sec.info.venue}
                           <span className="ml-1">{sec.leagues.length}リーグ・{sec.leagues.reduce((s, l) => s + l.teams.length, 0)}チーム</span>
@@ -1754,8 +1754,8 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             {/* ルール */}
             {teamPending.info.rules.length > 0 && (
               <div className="px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
-                <div className="text-[10px] font-medium text-primary-600 mb-0.5">ゲームルール</div>
-                <div className="text-[11px] text-primary-700">
+                <div className="text-[10px] font-medium text-gray-700 mb-0.5">ゲームルール</div>
+                <div className="text-[11px] text-gray-800">
                   {teamPending.info.rules.map((r, i) => <div key={i}>{r}</div>)}
                 </div>
               </div>
@@ -1800,7 +1800,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             /* ミックス/団体戦モード: 大会Excel読込のみ */
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
             >
               <FileSpreadsheet className="w-4.5 h-4.5" />
               大会Excel読込
@@ -1809,14 +1809,14 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
               >
                 <FileSpreadsheet className="w-4.5 h-4.5" />
                 大会Excel読込
               </button>
               <button
                 onClick={() => scheduleFileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-800 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
               >
                 <CalendarClock className="w-4.5 h-4.5" />
                 時間割Excel読込
@@ -1858,7 +1858,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
       {parsedData && summary && (
         <div className="space-y-3">
           <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
-            <div className="flex items-center gap-2 text-sm font-bold text-primary-600">
+            <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
               <CheckCircle2 className="w-4 h-4" />
               データ読込成功
               <span className="text-xs font-normal text-gray-500 ml-2">
@@ -1923,7 +1923,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                     const raw = parsedData.tournamentName || parsedData.tournaments.find(t => t.id === selectedTournament)?.name || '';
                     setEditTournamentName(cleanTournamentName(raw));
                   }}
-                  className="shrink-0 px-2 py-1 text-[10px] font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
+                  className="shrink-0 px-2 py-1 text-[10px] font-medium text-gray-700 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
                   title="不要な文字を自動除去"
                 >
                   <Sparkles className="w-3 h-3 inline mr-0.5" />
@@ -2035,7 +2035,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           {confirmed ? (
-                            <span className="text-primary-600">
+                            <span className="text-gray-700">
                               <CheckCircle2 className="w-3.5 h-3.5 inline" />
                             </span>
                           ) : draw ? (
@@ -2132,7 +2132,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                       const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
                       setEditTournamentName(cleanTournamentName(raw));
                     }}
-                    className="shrink-0 px-3 py-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 active:scale-95 transition-all"
+                    className="shrink-0 px-3 py-2 text-[11px] font-semibold text-gray-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 active:scale-95 transition-all"
                     title="不要な文字を自動除去"
                   >
                     <Sparkles className="w-3.5 h-3.5 inline mr-0.5 -mt-0.5" />
@@ -2246,7 +2246,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                             {ev.isRoundRobin ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-600 border border-gray-100">リーグ</span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-primary-600 border border-primary-100">トーナメント</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-gray-700 border border-primary-100">トーナメント</span>
                             )}
                           </td>
                         </tr>
@@ -2438,7 +2438,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             // 女子は赤系
             return {
               bg: intensity >= 170 ? 'bg-primary-200' : intensity >= 140 ? 'bg-primary-100' : intensity >= 120 ? 'bg-primary-100' : 'bg-primary-50',
-              text: intensity >= 170 ? 'text-primary-900 font-semibold' : 'text-primary-800',
+              text: intensity >= 170 ? 'text-gray-900 font-semibold' : 'text-gray-900',
               border: intensity >= 170 ? 'border-primary-300' : 'border-primary-200',
               hueShift,
             };
@@ -2496,12 +2496,12 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
             <div className="border border-border-main rounded-lg overflow-hidden">
               <button
                 onClick={() => setScheduleOpen(!scheduleOpen)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100/60 transition-colors"
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-gray-700 bg-primary-50 hover:bg-primary-100/60 transition-colors"
               >
                 {scheduleOpen ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
                 <CalendarClock className="w-4.5 h-4.5 text-primary-500" />
                 時間割
-                <span className="ml-auto text-xs font-normal text-primary-600 flex items-center gap-1">
+                <span className="ml-auto text-xs font-normal text-gray-700 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
                   {scheduleItems.length}試合読込済
                 </span>
@@ -2510,19 +2510,19 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                 <div className="p-4 space-y-3 border-t border-border-main">
                   <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-bold text-primary-700">
+                      <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
                         <CheckCircle2 className="w-4 h-4" />
                         時間割読込成功
                       </div>
                       <button
                         onClick={() => setScheduleFullscreen(true)}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-primary-600 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
                       >
                         <Maximize2 className="w-3 h-3" />
                         全画面
                       </button>
                     </div>
-                    <p className="text-xs text-primary-600 mt-1">
+                    <p className="text-xs text-gray-700 mt-1">
                       {scheduleFileName && <><FileSpreadsheet className="w-3 h-3 inline mr-1" />{scheduleFileName}<br /></>}
                       {scheduleItems.length}試合 / {courtNames.length}コート / {timeSlots.length}時間枠
                     </p>
@@ -2533,7 +2533,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                       <button
                         onClick={handleGenerateSchedule}
                         disabled={isGeneratingSchedule}
-                        className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-800 disabled:opacity-50 transition-colors"
                       >
                         <Sparkles className="w-3 h-3" />
                         {isGeneratingSchedule ? '生成中...' : 'ドローから再生成'}
@@ -2633,7 +2633,7 @@ export default function DataImport({ externalTournamentExcel, externalScheduleEx
                   <button type="button" onClick={() => {
                     const raw = parsedExcel?.fileName.replace(/\.(xlsx?|xls)$/i, '') || '';
                     setEditTournamentName(cleanTournamentName(raw));
-                  }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all" title="不要な文字を自動除去">
+                  }} className="shrink-0 px-2.5 py-2 text-[11px] font-semibold text-gray-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-all" title="不要な文字を自動除去">
                     <Sparkles className="w-3.5 h-3.5" />
                   </button>
                 </div>

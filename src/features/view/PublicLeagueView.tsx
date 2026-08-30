@@ -204,7 +204,7 @@ function MixedLeagueSection({
                       <td
                         key={colIdx}
                         className={`px-1 py-2 text-center text-sm border-l border-gray-100 ${
-                          won ? 'bg-primary-50 text-primary-700 font-bold' : 'bg-red-50 text-red-600'
+                          won ? 'bg-primary-50 text-gray-800 font-bold' : 'bg-red-50 text-red-600'
                         }`}
                       >
                         {text}
@@ -362,7 +362,7 @@ function TeamLeagueSection({
                       <td
                         key={colIdx}
                         className={`px-1 py-1.5 text-center border-l border-gray-100 ${
-                          won ? 'bg-primary-50 text-primary-700' : 'bg-red-50 text-red-600'
+                          won ? 'bg-primary-50 text-gray-800' : 'bg-red-50 text-red-600'
                         }`}
                       >
                         <div className="text-sm font-bold">
@@ -377,7 +377,7 @@ function TeamLeagueSection({
                                 className={`px-0.5 rounded ${
                                   sm.winnerId
                                     ? smWon
-                                      ? 'bg-primary-200 text-primary-800'
+                                      ? 'bg-primary-200 text-gray-900'
                                       : 'bg-red-200 text-red-700'
                                     : 'bg-gray-100 text-gray-400'
                                 }`}

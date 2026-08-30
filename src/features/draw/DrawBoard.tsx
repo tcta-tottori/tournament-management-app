@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { sortEventsByClass } from '../data/eventOrder';
 import DrawRenderer from './DrawRenderer';
 import RoundRobinRenderer from './RoundRobinRenderer';
 import { exportDrawToExcel } from './DrawExporter';
@@ -71,7 +72,9 @@ function NormalDrawBoard() {
   const [viewMode, setViewMode] = useState<'tournament' | 'roundRobin'>('tournament');
   const [scoreMatch, setScoreMatch] = useState<ScoreInputMatch | null>(null);
 
-  const events = useLiveQuery(() => db.events.toArray()) || [];
+  const rawEvents = useLiveQuery(() => db.events.toArray()) || [];
+  // クラスは「男子→女子」「アルファベット→年齢」の順に並べる
+  const events = useMemo(() => sortEventsByClass(rawEvents), [rawEvents]);
   const entries = useLiveQuery(
     () => selectedEventId ? db.entries.where('eventId').equals(selectedEventId).toArray() : [],
     [selectedEventId]
@@ -492,7 +495,7 @@ function NormalDrawBoard() {
           </div>
 
           {selectedPosition !== null && (
-            <div className="bg-primary-50 border border-primary-500/30 rounded-md px-4 py-2 text-sm text-primary-600 font-medium shrink-0">
+            <div className="bg-primary-50 border border-primary-500/30 rounded-md px-4 py-2 text-sm text-gray-700 font-medium shrink-0">
               スロット #{selectedPosition} を選択中 -- 入れ替え先のスロットをタップしてください
             </div>
           )}
