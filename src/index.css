@@ -144,16 +144,109 @@
   z-index: 3;
 }
 
-/* ===== ヘッダー背景の意匠 — 右上に敷くごく淡い赤のグラデーション ===== */
-.header-accent-wash {
+/* ===========================================================
+   ヘッダー背景の意匠 — 赤と白のキューブが流れるアニメーション
+   -----------------------------------------------------------
+   協会サイトのキービジュアル（白地に赤・淡赤・白の四角がランダムに
+   浮かぶ構図）を、DOM の四角に置き換えて動かしている。
+   ひとつずつ左から右へゆっくり流れながら、拡大とともに現れて消える。
+   ヘッダーの文字を読みにくくしないよう、全体は淡く敷いている。
+   =========================================================== */
+.header-motif {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
   z-index: 1;
-  background:
-    linear-gradient(100deg, #ffffff 0%, #ffffff 55%, var(--brand-red-soft) 100%);
+  overflow: hidden;
+  /* 白地＋右側にごく淡い赤のグラデーション（従来の意匠を土台として残す） */
+  background: linear-gradient(100deg, #ffffff 0%, #ffffff 55%, var(--brand-red-soft) 100%);
+}
+
+/* 四角の集合だけを淡くする（下地のグラデーションはそのまま） */
+.header-motif-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0.62;
+}
+
+/* 四角ひとつ分。--x/--y で置き場所、--s で大きさ、--o で濃さを渡す */
+.header-motif-item {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--s);
+  height: var(--s);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: header-motif-drift var(--dur, 22s) linear var(--delay, 0s) infinite;
+}
+
+/* 左から右へゆっくり流れながら、ズームして現れて消える */
+@keyframes header-motif-drift {
+  0% {
+    transform: translate3d(-9vw, 0, 0) scale(0.5);
+    opacity: 0;
+  }
+  18% {
+    opacity: var(--o, 1);
+  }
+  78% {
+    opacity: var(--o, 1);
+  }
+  100% {
+    transform: translate3d(9vw, 0, 0) scale(1.45);
+    opacity: 0;
+  }
+}
+
+/* --- 四角のバリエーション（キービジュアルと同じ4種類＋ドット） --- */
+
+/* 赤のキューブ（右下に段差を付けて立体に見せる） */
+.header-motif-solid {
+  background: linear-gradient(135deg, #e04a46 0%, #c63834 100%);
+  box-shadow:
+    1px 1px 0 #ad2c29,
+    2px 2px 0 #9c2724,
+    3px 3px 0 #8c2220,
+    4px 5px 6px rgba(140, 34, 32, 0.18);
+}
+
+/* 白のキューブ */
+.header-motif-white {
+  background: linear-gradient(135deg, #ffffff 0%, #f4f4f4 100%);
+  box-shadow:
+    1px 1px 0 #ececec,
+    2px 2px 0 #e2e2e2,
+    3px 3px 0 #d6d6d6,
+    4px 5px 8px rgba(20, 20, 20, 0.12);
+}
+
+/* 半透明の淡い赤の板 */
+.header-motif-soft {
+  background: rgba(198, 56, 52, 0.22);
+  border: 1px solid rgba(198, 56, 52, 0.28);
+}
+
+/* 赤い線だけの四角 */
+.header-motif-outline {
+  border: 1px solid var(--brand-red);
+}
+
+/* 赤いドットのグリッド */
+.header-motif-dots {
+  background-image: radial-gradient(circle, var(--brand-red) 0.9px, transparent 0.9px);
+  background-size: 5px 5px;
+}
+
+/* 動きを減らす設定のときは静止させる（位置と濃さはそのまま活かす） */
+@media (prefers-reduced-motion: reduce) {
+  .header-motif-item {
+    animation: none;
+    opacity: var(--o, 1);
+    transform: none;
+  }
 }
 
 .header-logo {
@@ -175,6 +268,7 @@
   letter-spacing: 0.12em;
   line-height: 1.2;
   color: var(--brand-red);
+  text-shadow: 0 0 5px #fff, 0 0 10px #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,6 +283,7 @@
   color: var(--ink);
   line-height: 1.2;
   letter-spacing: 0.02em;
+  text-shadow: 0 0 6px #fff, 0 0 12px #fff;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -221,26 +316,26 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #5a5a5a;
-  background: #ffffff;
-  border: 1px solid var(--border-main);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   transition: color 0.2s, background 0.2s, border-color 0.2s;
 }
 
 .header-link:hover {
-  color: var(--brand-red);
-  background: var(--brand-red-soft);
-  border-color: #f2c7c5;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .header-version {
   font-size: 12px;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--brand-red);
   padding: 4px 14px;
   border-radius: 20px;
-  background: var(--brand-red);
-  border: 1px solid var(--brand-red);
+  background: #ffffff;
+  border: 1px solid #ffffff;
   letter-spacing: 0.08em;
 }
 
@@ -252,17 +347,30 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  color: #404040;
-  background: #ffffff;
-  border: 1px solid var(--border-main);
+  color: #ffffff;
+  background: var(--brand-red);
+  border: 1px solid var(--brand-red);
+  box-shadow: 0 1px 3px rgba(140, 34, 32, 0.25);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .header-hamburger-btn:hover {
-  color: var(--brand-red);
-  background: var(--brand-red-soft);
-  border-color: #f2c7c5;
+  background: var(--brand-red-dark);
+  border-color: var(--brand-red-dark);
+}
+
+/* 流れる表示バーの中に置く小さめのメニューボタン（スマホ用） */
+.header-hamburger-btn-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+/* 流れる表示バーの中に置くページ名。ヘッダー用の上限（46%）は狭すぎるので広げる */
+.header-page-name.info-bar-page-name {
+  max-width: 46vw;
+  text-shadow: none;
 }
 
 .header-page-name {
@@ -278,6 +386,7 @@
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.02em;
+  text-shadow: 0 0 6px #fff, 0 0 12px #fff;
 }
 .header-page-name svg {
   color: var(--brand-red);
@@ -331,7 +440,7 @@
 }
 .drawer-version-date {
   font-size: 10px;
-  color: #767676;
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -434,7 +543,7 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  color: #5a5a5a;
+  color: rgba(255, 255, 255, 0.85);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -442,8 +551,8 @@
 }
 
 .hamburger-icon-btn:hover {
-  color: var(--brand-red);
-  background: #f4f4f4;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* オーバーレイ */
@@ -462,7 +571,7 @@
   pointer-events: auto;
 }
 
-/* 左スライドドロワー — 白地 + 左端に赤のライン */
+/* 左スライドドロワー — 赤背景・白文字 */
 .hamburger-drawer {
   position: fixed;
   top: 0;
@@ -471,8 +580,8 @@
   z-index: 50;
   width: 280px;
   max-width: 80vw;
-  background: #ffffff;
-  border-right: 1px solid var(--border-main);
+  background: linear-gradient(180deg, #c63834 0%, #ad2c29 55%, #8c2220 100%);
+  border-right: none;
   box-shadow: none;
   transform: translateX(-100%);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
@@ -483,7 +592,7 @@
 
 .hamburger-drawer-open {
   transform: translateX(0);
-  box-shadow: 8px 0 32px rgba(20, 20, 20, 0.12);
+  box-shadow: 8px 0 32px rgba(20, 20, 20, 0.25);
 }
 
 .hamburger-drawer-header {
@@ -493,9 +602,9 @@
   padding: 14px 16px 10px;
   font-size: 13px;
   font-weight: 700;
-  color: #767676;
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border-main);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .hamburger-drawer-list {
@@ -512,7 +621,7 @@
   padding: 12px 14px;
   font-size: 14px;
   font-weight: 600;
-  color: #404040;
+  color: rgba(255, 255, 255, 0.92);
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -522,19 +631,20 @@
 }
 
 .hamburger-drawer-item:hover {
-  color: var(--ink);
-  background: #f4f4f4;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
+/* 現在地は白地に赤文字で反転させる */
 .hamburger-drawer-item-active {
   color: var(--brand-red) !important;
-  background: var(--brand-red-soft);
+  background: #ffffff;
   font-weight: 700;
-  box-shadow: inset 3px 0 0 0 var(--brand-red);
+  box-shadow: 0 1px 4px rgba(20, 20, 20, 0.18);
 }
 
 .hamburger-drawer-item-active:hover {
-  background: #fae3e2;
+  background: #ffffff;
 }
 
 /* ドロワー下部ロゴ */
@@ -544,7 +654,7 @@
   align-items: center;
   gap: 8px;
   padding: 20px 16px;
-  border-top: 1px solid var(--border-main);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
   flex-shrink: 0;
 }
 
@@ -552,7 +662,10 @@
   max-width: 160px;
   height: auto;
   object-fit: contain;
-  border-radius: 6px;
+  /* ロゴ画像（白地に黒文字＋赤のマーク）を白抜きにして赤地に載せる。
+     グレースケール→反転で「黒地に白文字」にし、screen 合成で黒を透かす。 */
+  filter: grayscale(1) invert(1) contrast(1.35) brightness(1.1);
+  mix-blend-mode: screen;
 }
 
 /* ===========================================================
@@ -651,6 +764,21 @@
   position: relative;
   z-index: 1;
   color: var(--brand-red);
+}
+
+/* スマホはヘッダーが無いので、先頭に大会名を流す（PCではヘッダーに出るので隠す） */
+.info-ticker-lead {
+  font-weight: 700;
+  color: var(--brand-red);
+}
+@media (min-width: 1024px) {
+  .info-ticker-lead { display: none; }
+}
+
+/* 流す項目が無いときの予備表示。スマホは先頭の大会名があるので出さない */
+.info-ticker-fallback { display: none; }
+@media (min-width: 1024px) {
+  .info-ticker-fallback { display: inline-flex; }
 }
 
 /* ティッカーエリア — 左右フェードアウト */
