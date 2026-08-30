@@ -17,6 +17,8 @@ import { resolveRequiredGames } from '../score/gameRules';
 import type { MatchFormatType } from '../../db/database';
 import { assignStandbyInOrder, matchKey } from './standbyRanking';
 import { buildLeagueCourtMap } from '../draw/leagueCourts';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
+import { isThirdPlaceMatch, THIRD_PLACE_LABEL } from '../draw/thirdPlace';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
 import GameRulesDialog from '../../components/ui/GameRulesDialog';
 import CallStatusPopup from '../../components/ui/CallStatusPopup';
@@ -59,6 +61,11 @@ function getMatchGameRuleText(evt: Event | undefined, round: number, totalRounds
 
 function getMatchFormatForRound(evt: Event | undefined, round: number, totalRounds: number): MatchFormatType {
   return resolveRoundRule(evt, round, totalRounds)?.matchFormat || 'game';
+}
+
+/** 特定の試合の回戦名（3位決定戦は決勝と同じ回戦だが別名で呼ぶ） */
+function labelForMatch(m: { matchId: string; round: number }, totalRounds: number): string {
+  return isThirdPlaceMatch(m) ? THIRD_PLACE_LABEL : getRoundName(m.round, totalRounds);
 }
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -548,7 +555,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
     };
 
     const isDoubles = useEvent?.type === 'Doubles';
-    const roundName = getRoundName(m.round, useTotalRounds);
+    const roundName = labelForMatch(m, useTotalRounds);
 
     if (isDoubles) {
       const [fallbackNameA, fallbackPairNameA] = m.player1Name.includes(' / ')
@@ -1005,7 +1012,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
         player1Name: m.player1Name,
         player2Name: m.player2Name,
         eventName: evt?.name || '',
-        roundLabel: getRoundName(m.round, evTotalRounds),
+        roundLabel: labelForMatch(m, evTotalRounds),
         callText: text,
       });
     }
@@ -1164,6 +1171,9 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
             });
           }
         }
+
+        // 勝ち上がり・3位決定戦の顔ぶれを整える
+        await refreshBracketProgress(matchEventId);
       }
     }
 
@@ -1327,7 +1337,7 @@ export default function MatchManager({ readOnly = false }: { readOnly?: boolean 
   .ba  { border: 1px solid #000; }
 </style></head><body>
 ${printableMatches.map(m => {
-      const rName = roundName(m.round);
+      const rName = isThirdPlaceMatch(m) ? THIRD_PLACE_LABEL : roundName(m.round);
       const courtObj = m.courtId ? courts.find(c => c.courtId === m.courtId) : null;
       const courtDisplay = courtObj?.name || '';
 
@@ -2460,7 +2470,7 @@ ${printableMatches.map(m => {
         const evt = events.find(e => e.eventId === sm.eventId);
         const evDraw = allDraws.get(sm.eventId);
         const evTotalRounds = evDraw ? Math.log2(evDraw.drawSize) : 1;
-        const roundName = getRoundName(sm.round, evTotalRounds);
+        const roundName = labelForMatch(sm, evTotalRounds);
         const courtName = sm.courtId ? (courtIdToName.get(sm.courtId) || '') : '';
         return (
           <CallStatusPopup
@@ -2516,7 +2526,7 @@ ${printableMatches.map(m => {
             courts={courts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
             onClose={() => setScoreDialogMatchId(null)}
             onMatchUpdate={() => {}}
-            getRoundName={(round) => getRoundName(round, evTotalRounds)}
+            getRoundName={(round) => (isThirdPlaceMatch(sm) ? THIRD_PLACE_LABEL : getRoundName(round, evTotalRounds))}
             isLeague={false}
             gameRuleText={getMatchGameRuleText(evt, sm.round, evTotalRounds)}
             onEditRules={evt ? () => openRuleEditor(evt) : undefined}
@@ -2536,7 +2546,7 @@ ${printableMatches.map(m => {
         return (
           <CourtPickDialog
             eventName={shortEventName(evt?.name || pm.eventId)}
-            roundName={getRoundName(pm.round, evTotalRounds)}
+            roundName={labelForMatch(pm, evTotalRounds)}
             player1Name={pm.player1Name}
             player2Name={pm.player2Name}
             courts={buildCourtPickList(pm.eventId)}

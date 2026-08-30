@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { findOccupyingMatch, occupiedMessage } from '../../db/courtOccupancy';
-import { propagateByes } from '../draw/rebuildMatches';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
 import { buildCallText, toSpeechText, familyName } from '../broadcast/callTextBuilder';
 import CallSettingsModal from '../broadcast/CallSettingsModal';
 import { useCallTts } from '../broadcast/useCallTts';
@@ -197,8 +197,8 @@ export default function MatchActionPanel({
         });
       }
 
-      // 次の相手がBYEだけの枠なら、そのまま更に次の回戦へ送る
-      if (eventId) await propagateByes(eventId);
+      // 次の相手がBYEだけの枠なら更に次の回戦へ送り、3位決定戦の顔ぶれも整える
+      if (eventId) await refreshBracketProgress(eventId);
 
       onMatchUpdate();
     } finally {
@@ -252,8 +252,8 @@ export default function MatchActionPanel({
       });
 
       setScoreInput('');
-      // BYEで送っていた勝ち上がりも取り消す
-      if (dbMatch) await propagateByes(dbMatch.eventId);
+      // BYEで送っていた勝ち上がりを取り消し、3位決定戦の顔ぶれも整える
+      if (dbMatch) await refreshBracketProgress(dbMatch.eventId);
 
       onMatchUpdate();
     } finally {

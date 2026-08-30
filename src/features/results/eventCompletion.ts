@@ -1,4 +1,5 @@
 import type { Draw, Match } from '../../db/database';
+import { isThirdPlaceMatch } from '../draw/thirdPlace';
 
 /** 試合が決着済み（通常終了 or 不戦勝）か */
 function isSettled(m: Match): boolean {
@@ -23,6 +24,11 @@ export function isEventComplete(draw: Draw | undefined, matches: Match[]): boole
 
   const totalRounds = Math.log2(draw.drawSize);
   if (!Number.isFinite(totalRounds) || totalRounds < 1) return false;
-  const finalMatch = matches.find(m => m.round === totalRounds);
-  return !!finalMatch && isSettled(finalMatch) && !!finalMatch.winnerEntryId;
+  const finalMatch = matches.find(m => m.round === totalRounds && !isThirdPlaceMatch(m));
+  if (!finalMatch || !isSettled(finalMatch) || !finalMatch.winnerEntryId) return false;
+
+  // 3位決定戦がある種目は、そちらも終わってから結果を出す
+  const thirdPlace = matches.find(isThirdPlaceMatch);
+  if (thirdPlace && !(isSettled(thirdPlace) && thirdPlace.winnerEntryId)) return false;
+  return true;
 }

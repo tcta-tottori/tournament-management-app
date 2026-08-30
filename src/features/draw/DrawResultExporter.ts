@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 import type { Draw, Match, Entry, Player, Event, Tournament } from '../../db/database';
 import type { FontWeight } from './resultCanvasKit';
 import { sideScoreText } from '../score/scoreDisplay';
+import { isThirdPlaceMatch } from './thirdPlace';
 import {
   COL,
   clamp,
@@ -443,6 +444,21 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const bracketBottomPad = Math.max(16, Math.ceil(centerLogo.h + 24 - spaceBelowApex));
   const bracketH = bracketTopPad + bracketBodyH + bracketBottomPad;
 
+  // ---- 3位決定戦の結果（行っている種目のみ） ----
+  const thirdPlaceText = (() => {
+    const third = matches.find(isThirdPlaceMatch);
+    if (!third?.winnerEntryId) return '';
+    const nameById = new Map<string, string>();
+    for (const info of slotMap.values()) {
+      if (info.entryId) nameById.set(info.entryId, info.name);
+    }
+    const name = nameById.get(third.winnerEntryId) || '';
+    if (!name) return '';
+    const aff = affById.get(third.winnerEntryId) || '';
+    return `3位\u3000${name}${aff ? `（${aff}）` : ''}`;
+  })();
+  const thirdPx = 13;
+
   // ---- フッター（シード一覧） ----
   const seedItems = draw.slots
     .filter(s => s.seed > 0 && !s.isBye)
@@ -451,7 +467,8 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     .filter(t => !t.endsWith('.'));
   const seedPx = 12;
   const seedLines = wrapItems(meas, 'シード　', seedItems, tableW - 24, seedPx, 2);
-  const footerH = seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4;
+  const footerH = (seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4)
+    + (thirdPlaceText ? thirdPx + 8 : 0);
 
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + headerH + bracketH + footerH + 14;
@@ -753,9 +770,13 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     );
   }
 
-  // ---- フッター（シード一覧） ----
-  if (seedLines.length > 0) {
+  // ---- フッター（3位決定戦の結果・シード一覧） ----
+  {
     let y = bracketAreaY + bracketH + 8 + seedPx / 2 + 4;
+    if (thirdPlaceText) {
+      drawText(ctx, thirdPlaceText, paddingX + 4, y, thirdPx, 'left', COL.gray700, 'bold');
+      y += thirdPx + 8;
+    }
     for (const line of seedLines) {
       drawText(ctx, line, paddingX + 4, y, seedPx, 'left', COL.gray500, 'medium');
       y += seedPx + 6;

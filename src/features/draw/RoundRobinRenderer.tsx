@@ -6,6 +6,8 @@ interface RoundRobinRendererProps {
   matchResults?: MatchResult[];
   /** 星取表のセルをタップしたときに、その対戦のスコア入力を開く（指定時のみセルがタップ可能） */
   onCellSelect?: (round: number, position: number) => void;
+  /** 選手名をタップしたときに名前の修正を開く（名前修正モード時のみ指定する） */
+  onPlayerSelect?: (entryId: string) => void;
 }
 
 /** "8-4" 形式のスコアを [自分のゲーム, 相手のゲーム] に分解（取得できなければ null） */
@@ -16,7 +18,7 @@ function parseScore(score: string | undefined | null): [number, number] | null {
   return [parseInt(m[1], 10), parseInt(m[2], 10)];
 }
 
-export default function RoundRobinRenderer({ slots, matchResults = [], onCellSelect }: RoundRobinRendererProps) {
+export default function RoundRobinRenderer({ slots, matchResults = [], onCellSelect, onPlayerSelect }: RoundRobinRendererProps) {
   // BYEを除いた実選手のみ
   const players = slots.filter(s => !s.isBye);
   const n = players.length;
@@ -155,8 +157,13 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
           <tbody>
             {players.map((player, rowIdx) => (
               <tr key={`row-${rowIdx}`}>
-                {/* 選手名セル */}
-                <td className="border-2 border-gray-900 px-3 py-3 font-medium whitespace-nowrap">
+                {/* 選手名セル（名前修正モードではタップで修正） */}
+                <td
+                  onClick={onPlayerSelect && player.entryId ? () => onPlayerSelect(player.entryId!) : undefined}
+                  className={`border-2 border-gray-900 px-3 py-3 font-medium whitespace-nowrap ${
+                    onPlayerSelect && player.entryId ? 'cursor-pointer hover:bg-amber-50' : ''
+                  }`}
+                >
                   <span className="text-gray-500 mr-2">{rowIdx + 1}</span>
                   {player.name}
                   {player.affiliation && (

@@ -8,7 +8,7 @@ import {
   buildMatchesFromDraw, findResetMatches, isLeagueEvent, rebuildEventMatches,
 } from '../draw/rebuildMatches';
 import { insertGapAt, isEmptySlot, removeGapAt, swapSlotContents } from '../draw/drawSlotOps';
-import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Trophy, Timer, Layers, Eye, EyeOff, Shuffle, ArrowDownToLine, ArrowUpToLine, Undo2, Play, Pencil, Medal, UserPen } from 'lucide-react';
 import CourtBracketView from './CourtBracketView';
 import RoundRobinRenderer from '../draw/RoundRobinRenderer';
 import ScoreInputDialog from '../score/ScoreInputDialog';
@@ -18,7 +18,9 @@ import { useStandbyMap, matchKey } from '../referee/standbyRanking';
 import CourtPickDialog from '../../components/ui/CourtPickDialog';
 import LeagueCourtDialog from '../../components/ui/LeagueCourtDialog';
 import GameRulesDialog from '../../components/ui/GameRulesDialog';
+import PlayerNameDialog, { type PlayerNameTarget } from '../../components/ui/PlayerNameDialog';
 import { buildLeagueCourtMap, freeLeagueCourts, MAX_LEAGUE_COURTS } from '../draw/leagueCourts';
+import { isThirdPlaceMatch, THIRD_PLACE_LABEL, wantsThirdPlace } from '../draw/thirdPlace';
 import EventResultPreview from '../results/EventResultPreview';
 import { isEventComplete } from '../results/eventCompletion';
 import {
@@ -268,6 +270,26 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     };
   }, [enableScoreInput, selectedMatchKey, matches, selectedEvent]);
 
+  // --- 選手名の修正（エントリー確定後でもドロー画面から直せるようにする）---
+  const [nameEditMode, setNameEditMode] = useState(false);
+  const [nameEditTarget, setNameEditTarget] = useState<PlayerNameTarget | null>(null);
+
+  /** エントリーから修正対象の選手（ダブルスは2人）を組み立てて開く */
+  const openNameEditor = useCallback((entryId: string) => {
+    const entry = entries.find(e => e.entryId === entryId);
+    if (!entry) return;
+    const targets = [entry.playerId, entry.partnerId]
+      .filter((id): id is string => !!id)
+      .map(id => players.find(p => p.playerId === id))
+      .filter((p): p is NonNullable<typeof p> => !!p);
+    if (targets.length === 0) return;
+    const slot = slots.find(sl => sl.entryId === entryId);
+    const drawNumber = slot
+      ? slots.filter(sl => !sl.isBye && sl.entryId).findIndex(sl => sl.entryId === entryId) + 1
+      : undefined;
+    setNameEditTarget({ drawNumber: drawNumber || undefined, players: targets });
+  }, [entries, players, slots]);
+
   // --- あたり修正 ---
   /** 表示に使うスロット（修正中は編集用のドラフト） */
   const viewSlots = editMode && draftSlots ? draftSlots : slots;
@@ -286,8 +308,13 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     setSelectedSlotPos(null);
   }, []);
 
-  /** 枠のタップ: 1つ目で選択、2つ目で入れ替え */
+  /** 枠のタップ: 名前修正モードでは選手名の修正、あたり修正モードでは入れ替え */
   const handleSlotSelect = useCallback((position: number) => {
+    if (nameEditMode) {
+      const slot = slots.find(s => s.position === position);
+      if (slot?.entryId) openNameEditor(slot.entryId);
+      return;
+    }
     if (selectedSlotPos == null) { setSelectedSlotPos(position); return; }
     if (selectedSlotPos === position) { setSelectedSlotPos(null); return; }
     if (draftSlots) {
@@ -295,7 +322,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       setDraftSlots(swapSlotContents(draftSlots, selectedSlotPos, position));
     }
     setSelectedSlotPos(null);
-  }, [selectedSlotPos, draftSlots]);
+  }, [selectedSlotPos, draftSlots, nameEditMode, slots, openNameEditor]);
 
   /** 直前の修正操作を取り消す */
   const undoDraft = useCallback(() => {
@@ -502,6 +529,27 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
     await enterMatchToCourt(target.id, courtId);
   };
 
+  // --- 3位決定戦 ---
+  /** この種目で3位決定戦を行うか（ドローの設定 → 無ければルール文から判定） */
+  const hasThirdPlace = useMemo(
+    () => !isRoundRobin && drawSize >= 4 && wantsThirdPlace(drawData, selectedEvent),
+    [isRoundRobin, drawSize, drawData, selectedEvent],
+  );
+
+  /** 3位決定戦の有無を切り替える（対戦表も作り直す） */
+  const toggleThirdPlace = useCallback(async () => {
+    if (!drawData?.id) return;
+    const next = !hasThirdPlace;
+    if (!next) {
+      const third = matches.find(isThirdPlaceMatch);
+      if (third && (third.score || third.winnerEntryId)) {
+        if (!confirm('3位決定戦の入力済みの結果も削除されます。よろしいですか？')) return;
+      }
+    }
+    await db.draws.update(drawData.id, { hasThirdPlace: next, updatedAt: Date.now() });
+    await rebuildEventMatches(selectedEventId);
+  }, [drawData, hasThirdPlace, matches, selectedEventId]);
+
   // --- ゲームルール編集（対戦順シートと共通のダイアログ）---
   // 取り込んだドロー表のルールが違っていたときに、その場で直せるようにする。
   const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
@@ -648,10 +696,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           </div>
         )}
 
-        {/* あたり（対戦の組み合わせ）修正 */}
-        {enableScoreInput && drawSize > 0 && !isRoundRobin && (
+        {/* あたり（対戦の組み合わせ）修正・3位決定戦・名前の修正 */}
+        {enableScoreInput && drawSize > 0 && (
           <div className="mt-1.5">
             {!editMode ? (
+              <div className="flex items-center gap-1.5 flex-wrap">
+              {!isRoundRobin && (
               <button
                 onClick={startEdit}
                 className="flex items-center gap-1 text-[10px] font-bold text-gray-600 border border-gray-200 bg-gray-50 rounded-full px-2 py-1 hover:bg-gray-100"
@@ -659,6 +709,36 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
               >
                 <Shuffle className="w-3 h-3" />あたりを修正
               </button>
+              )}
+              {/* 3位決定戦（準決勝の敗者同士）の有無 */}
+              {!isRoundRobin && drawSize >= 4 && (
+                <button
+                  onClick={() => void toggleThirdPlace()}
+                  className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
+                    hasThirdPlace
+                      ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                  }`}
+                  title="準決勝で負けた2組で3位決定戦を行う場合に追加します"
+                >
+                  <Medal className="w-3 h-3" />
+                  3位決定戦{hasThirdPlace ? 'あり' : 'なし'}
+                </button>
+              )}
+              {/* 選手名の修正（エントリー確定後でも直せる） */}
+              <button
+                onClick={() => setNameEditMode(v => !v)}
+                className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-1 border transition-colors ${
+                  nameEditMode
+                    ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+                title="氏名・ふりがな・所属を直します（エントリー確定後でも修正できます）"
+              >
+                <UserPen className="w-3 h-3" />
+                {nameEditMode ? '名前を修正中（枠をタップ）' : '名前を修正'}
+              </button>
+              </div>
             ) : (
               <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -764,6 +844,7 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             editMode={editMode}
             selectedSlotPosition={selectedSlotPos}
             onSlotSelect={handleSlotSelect}
+            nameEditMode={nameEditMode}
           />
         ) : isRoundRobin ? (
           <div className="p-3 space-y-3">
@@ -807,7 +888,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
             <RoundRobinRenderer
               slots={slots}
               matchResults={matchResults}
-              onCellSelect={enableScoreInput ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
+              onCellSelect={enableScoreInput && !nameEditMode ? (round, position) => setSelectedMatchKey(`${round}-${position}`) : undefined}
+              onPlayerSelect={enableScoreInput && nameEditMode ? openNameEditor : undefined}
             />
             {/* 対戦カード（タップでスコア入力） */}
             {rrMatches.length > 0 && (
@@ -901,12 +983,23 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           courts={courts.map(c => ({ courtId: c.courtId, name: c.name, isAvailable: c.isAvailable !== false }))}
           onClose={() => setSelectedMatchKey(null)}
           onMatchUpdate={() => {}}
-          getRoundName={(round) => getRoundName(round, totalRounds)}
+          getRoundName={(round) => (
+            isThirdPlaceMatch(selectedMatch) ? THIRD_PLACE_LABEL : getRoundName(round, totalRounds)
+          )}
           isLeague={isRoundRobin}
           gameRuleText={getGameRuleText(selectedEvent, selectedMatch.round, totalRounds)}
           onEditRules={selectedEvent ? () => setRulesDialogOpen(true) : undefined}
           requiredGames={resolveRequiredGames(getGameRuleText(selectedEvent, selectedMatch.round, totalRounds), selectedMatch.round, totalRounds)}
           matchFormat={getMatchFormat(selectedEvent, selectedMatch.round, totalRounds)}
+        />
+      )}
+
+      {/* 選手名の修正 */}
+      {nameEditTarget && (
+        <PlayerNameDialog
+          target={nameEditTarget}
+          onClose={() => setNameEditTarget(null)}
+          onSaved={() => setNameEditMode(false)}
         />
       )}
 
@@ -944,7 +1037,11 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
       {courtPickMatch && (
         <CourtPickDialog
           eventName={selectedEvent?.name || ''}
-          roundName={isRoundRobin ? 'リーグ戦' : getRoundName(courtPickMatch.round, totalRounds)}
+          roundName={
+            isRoundRobin ? 'リーグ戦'
+              : isThirdPlaceMatch(courtPickMatch) ? THIRD_PLACE_LABEL
+                : getRoundName(courtPickMatch.round, totalRounds)
+          }
           player1Name={courtPickMatch.player1Name}
           player2Name={courtPickMatch.player2Name}
           courts={courtPickList}

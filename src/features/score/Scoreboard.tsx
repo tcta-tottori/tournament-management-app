@@ -9,6 +9,7 @@ import ScoreboardLeague from './ScoreboardLeague';
 import ScoreInputDialog from './ScoreInputDialog';
 import type { ScoreInputMatch } from './ScoreInputDialog';
 import { resolveRequiredGames } from './gameRules';
+import { refreshBracketProgress } from '../draw/rebuildMatches';
 import type { Event, RoundGameRule, MatchFormatType } from '../../db/database';
 import {
   MonitorPlay,
@@ -551,6 +552,8 @@ function NormalScoreboard() {
             updatedAt: Date.now()
           });
         }
+        // 勝ち上がり・3位決定戦の顔ぶれを整える
+        await refreshBracketProgress(match.eventId);
       }
 
       setEditingMatchId(null);
