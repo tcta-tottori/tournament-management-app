@@ -685,9 +685,12 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
           )}
         </div>
 
-        {/* 表示範囲の切り替え（大きく中央）と、編集メニュー（右下） */}
+        {/* 表示範囲の切り替え（左寄せ）と、編集メニュー（右端）。
+            「3回戦以降」など文字数が変わっても右のボタンが動かないよう、
+            左のまとまりだけを伸縮させて右は固定幅で置く。 */}
         {!editMode && (canAdjustRounds || resultPreviewOpts || (enableScoreInput && drawSize > 0)) && (
-          <div className="relative mt-2 flex items-center justify-center min-h-[38px]">
+          <div className="mt-2 flex items-center justify-between gap-2 min-h-[38px]">
+            <div className="flex-1 min-w-0 flex items-center">
             {canAdjustRounds && (
               <div className="inline-flex items-center gap-0.5 rounded-full border border-gray-300 bg-white px-1 py-0.5 shadow-sm">
                 <button
@@ -720,9 +723,10 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                 </button>
               </div>
             )}
+            </div>
 
-            {/* 右下: 結果画像プレビューと編集メニュー */}
-            <div className="absolute right-0 bottom-0 flex items-center gap-1.5">
+            {/* 右端: 結果画像プレビューと編集メニュー（位置は常に固定） */}
+            <div className="shrink-0 flex items-center gap-1.5">
               {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} size="sm" />}
               {enableScoreInput && drawSize > 0 && (
                 <div className="relative">

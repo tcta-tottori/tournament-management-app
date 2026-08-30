@@ -251,15 +251,11 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* バージョンバッジ。赤い地の上なので白地に赤文字にする */
+/* バージョン表示。バッジにはせず、赤い地の上に白文字だけで出す */
 .header-version {
   font-size: 12px;
   font-weight: 800;
-  color: var(--brand-red);
-  padding: 4px 14px;
-  border-radius: 20px;
-  background: #ffffff;
-  border: 1px solid #ffffff;
+  color: #ffffff;
   letter-spacing: 0.08em;
 }
 
@@ -323,12 +319,41 @@
   padding-bottom: 4px;
 }
 
+/* ===== メニュー下部: 左=協会ロゴ / 右=バージョン ===== */
+.menu-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+/* 協会ロゴ（押すと協会HP）。白抜き版の画像をそのまま使う */
+.menu-logo-link {
+  display: block;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+.menu-logo-link:hover {
+  opacity: 0.8;
+}
+.menu-logo-link img {
+  display: block;
+  max-width: 92px;
+  height: auto;
+  object-fit: contain;
+}
+/* PCメニューを畳んだとき（アイコンのみ幅）のロゴ */
+.menu-logo-link-sm img {
+  max-width: 40px;
+}
+
 /* ===== ドロワー下部: バージョン情報（ver.と更新日） ===== */
 .drawer-version-btn {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 3px;
+  align-items: flex-end;
+  gap: 2px;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -338,7 +363,7 @@
   opacity: 0.8;
 }
 .drawer-version-date {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -534,7 +559,7 @@
 .fullmenu-footer {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(255, 255, 255, 0.2);
@@ -560,11 +585,15 @@
   gap: 6px;
 }
 
-/* 協会ロゴ（白抜き版の画像をそのまま使う） */
+/* 協会ロゴ（白抜き版の画像をそのまま使う。観戦用ページのメニューは中央に置く） */
 .fullmenu-logo {
+  align-self: center;
   max-width: 150px;
   height: auto;
   object-fit: contain;
+}
+.fullmenu-footer .menu-logo-link img {
+  max-width: 150px;
 }
 
 /* ===========================================================
