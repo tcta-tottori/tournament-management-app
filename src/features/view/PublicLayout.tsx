@@ -192,16 +192,12 @@ export default function PublicLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-main overflow-hidden">
-      {/* ヘッダー（本アプリと同一。PC=ページ名+大会名 / スマホ=大会名+メニューボタン） */}
-      <header className="header-main flex items-center gap-3 px-4 lg:px-5 h-[56px] shrink-0 z-30">
+      {/* ヘッダー（本アプリと同一。左=メニュータイトル / 右=メニューボタン） */}
+      <header className="header-main flex items-center gap-3 px-4 lg:px-5 shrink-0 z-30">
         <HeaderBackdrop />
         <div className="header-page-name min-w-0">
-          <CurrentIcon style={{ width: 16, height: 16 }} className="shrink-0" />
+          <CurrentIcon style={{ width: 18, height: 18 }} className="shrink-0" />
           <span className="truncate">{current.label}</span>
-        </div>
-        <div className="header-title-right min-w-0">
-          <p className="header-org-name">鳥取市テニス協会</p>
-          <h1 className="header-title truncate">{tournamentName || '大会運営システム'}</h1>
         </div>
         {/* メニューボタン（開くと × に変わる） */}
         <button
@@ -220,15 +216,18 @@ export default function PublicLayout() {
       <div className="info-bar flex items-center shrink-0 h-9 overflow-hidden text-xs sticky top-0 z-20">
         <div className="flex-1 overflow-hidden relative h-full info-ticker-area">
           <div className="info-ticker flex items-center h-full whitespace-nowrap">
+            {/* 大会名はヘッダーではなくここに流す */}
+            <span className="info-ticker-item info-ticker-lead">
+              <span>{tournamentName || '観戦用ページ'}</span>
+              <span className="info-ticker-dot" />
+            </span>
             {tickerItems.length > 0 ? tickerItems.map((item, i) => (
               <span key={i} className={`info-ticker-item ${item.startsWith('⚠') ? 'info-ticker-alert' : ''}`}>
                 {item.startsWith('⚠') && <AlertTriangle className="w-3 h-3" />}
                 <span>{item.startsWith('⚠') ? item.slice(2) : item}</span>
                 {i < tickerItems.length - 1 && <span className="info-ticker-dot" />}
               </span>
-            )) : (
-              <span className="info-ticker-item"><span>{tournamentName || '観戦用ページ'}</span></span>
-            )}
+            )) : null}
           </div>
         </div>
       </div>
