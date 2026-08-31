@@ -729,7 +729,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
 
             {/* 右端: 結果画像プレビューと編集メニュー（位置は常に固定） */}
             <div className="shrink-0 flex items-center gap-1.5">
-              {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} size="sm" />}
+              {/* 結果画像はアイコンのみ。右隣の編集ボタンと同じ丸ボタンで並べる */}
+              {resultPreviewOpts && <EventResultPreview opts={resultPreviewOpts} iconOnly />}
               {enableScoreInput && drawSize > 0 && (
                 <div className="relative">
                   <button

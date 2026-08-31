@@ -23,6 +23,8 @@ interface Props {
   size?: 'sm' | 'md';
   /** ボタン文言（既定: 結果画像） */
   label?: string;
+  /** アイコンだけの丸ボタンにする（ドロー画面の編集ボタンと並べる用） */
+  iconOnly?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ interface Props {
  * 団体戦の TeamBracketResultPreview と同じく、
  * プレビューを確認してから JPEG として保存できる。
  */
-export default function EventResultPreview({ opts, size = 'md', label = '結果画像' }: Props) {
+export default function EventResultPreview({ opts, size = 'md', label = '結果画像', iconOnly = false }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -135,62 +137,45 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     a.click();
   };
 
-  const btnClass = size === 'sm'
-    ? 'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 active:scale-95 transition-all whitespace-nowrap'
-    : 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:shadow hover:bg-gray-100 hover:border-gray-300 transition-all active:scale-95 whitespace-nowrap';
+  // アイコンのみ（ドロー画面）は、隣の編集ボタンと同じ丸ボタンの体裁にそろえる
+  const btnClass = iconOnly
+    ? 'flex items-center justify-center w-9 h-9 rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors active:scale-95'
+    : size === 'sm'
+      ? 'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 active:scale-95 transition-all whitespace-nowrap'
+      : 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 shadow-sm hover:shadow hover:bg-gray-100 hover:border-gray-300 transition-all active:scale-95 whitespace-nowrap';
 
   return (
     <>
-      <button onClick={(e) => { e.stopPropagation(); setIsOpen(true); }} className={btnClass}>
-        <ImageIcon size={size === 'sm' ? 12 : 14} className="text-gray-600" />
-        {label}
+      <button
+        onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
+        className={btnClass}
+        title={iconOnly ? label : undefined}
+        aria-label={iconOnly ? label : undefined}
+      >
+        <ImageIcon size={iconOnly ? 18 : size === 'sm' ? 12 : 14} className="text-gray-600" />
+        {!iconOnly && label}
       </button>
 
       {isOpen && createPortal(
         <div
-          className="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-6xl max-h-[92vh] border border-gray-100"
+            className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-6xl max-h-[92dvh] border border-gray-100"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2 min-w-0">
+            {/* 操作バー。スマホでは「見出し＋保存・閉じる」と「表示幅・ロゴ」の2段に折り返す */}
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
+              <h3 className="order-1 flex-1 min-w-0 font-bold text-gray-900 text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm shrink-0">
                   <ImageIcon size={13} />
                 </span>
                 <span className="truncate">{opts.event.name} 結果プレビュー</span>
               </h3>
-              <div className="flex items-center gap-2 shrink-0">
-                {/* 操作はこのバーに集約する（表示幅・ロゴの有無・保存・閉じる） */}
-                {!isRoundRobin && (
-                  <label className="flex items-center gap-1.5 select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
-                    表示幅
-                    <input
-                      type="range"
-                      min={BRACKET_WIDTH_MIN}
-                      max={BRACKET_WIDTH_MAX}
-                      step={0.05}
-                      value={widthScale}
-                      onChange={e => changeWidth(Number(e.target.value))}
-                      className="w-28 accent-gray-600 cursor-pointer"
-                      title="トーナメント表の横幅を調整します"
-                    />
-                    <span className="tabular-nums text-gray-500 w-9 text-right">
-                      {Math.round(widthScale * 100)}%
-                    </span>
-                  </label>
-                )}
-                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={showLogo}
-                    onChange={e => toggleLogo(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-gray-600 cursor-pointer"
-                  />
-                  協会ロゴを入れる
-                </label>
+
+              {/* 保存・閉じる（スマホでは見出しと同じ行の右端） */}
+              <div className="order-2 sm:order-3 flex items-center gap-1.5 shrink-0">
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
@@ -210,10 +195,41 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                   <X size={15} />
                 </button>
               </div>
+
+              {/* 表示幅・協会ロゴ（スマホでは2段目に丸ごと折り返す） */}
+              <div className="order-3 sm:order-2 basis-full sm:basis-auto flex flex-wrap items-center gap-x-3 gap-y-2">
+                {!isRoundRobin && (
+                  <label className="flex flex-1 sm:flex-none items-center gap-2 select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
+                    表示幅
+                    <input
+                      type="range"
+                      min={BRACKET_WIDTH_MIN}
+                      max={BRACKET_WIDTH_MAX}
+                      step={0.05}
+                      value={widthScale}
+                      onChange={e => changeWidth(Number(e.target.value))}
+                      className="flex-1 min-w-[90px] sm:flex-none sm:w-28 accent-gray-600 cursor-pointer"
+                      title="トーナメント表の横幅を調整します"
+                    />
+                    <span className="tabular-nums text-gray-500 w-9 text-right">
+                      {Math.round(widthScale * 100)}%
+                    </span>
+                  </label>
+                )}
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={showLogo}
+                    onChange={e => toggleLogo(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-gray-600 cursor-pointer"
+                  />
+                  協会ロゴを入れる
+                </label>
+              </div>
             </div>
 
             {/* 大会名の修整（画像右上に印字される文字列） */}
-            <div className="px-4 py-2.5 border-b border-gray-100 bg-white shrink-0">
+            <div className="px-3 sm:px-4 py-2.5 border-b border-gray-100 bg-white shrink-0">
               <label className="text-[10px] font-semibold text-gray-700/70 block mb-1">
                 大会名（画像に印字されます）
               </label>
@@ -246,7 +262,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
               )}
             </div>
 
-            <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
+            <div className="flex-1 overflow-auto bg-white p-2 sm:p-4 flex items-center justify-center">
               {isLoading && (
                 <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Loader2 size={32} className="animate-spin" />

@@ -1307,6 +1307,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     const rank = rankMap.get(row);
     const s = stats[row];
     const played = s.wins > 0 || s.losses > 0;
+    // 優勝（1位）のペア・選手は氏名を赤文字にする
+    const isChampion = rank === 1 && played;
 
     // 番号
     drawText(ctx, String(row + 1), gridX + 20, cy, 11, 'right', COL.gray400, 'medium');
@@ -1318,7 +1320,8 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     const nameW = Math.min(Math.max(...lines.map(t => ctx.measureText(t).width)), nameMaxW);
     const topY = cy - ((lines.length - 1) * NAME_LINE_STEP) / 2;
     lines.forEach((line, i) => {
-      drawText(ctx, line, nameX, topY + i * NAME_LINE_STEP, NAME_PX, 'left', COL.gray800, 'bold', nameMaxW);
+      drawText(ctx, line, nameX, topY + i * NAME_LINE_STEP, NAME_PX, 'left',
+        isChampion ? COL.red600 : COL.gray800, isChampion ? 'black' : 'bold', nameMaxW);
     });
     const affLines = pairAffiliationLines(p.affiliation, p.affiliationParts, lines.length);
     if (affLines.length > 0) {
@@ -1351,11 +1354,11 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
         drawText(ctx, '—', cx, cy, 12, 'center', COL.gray300, 'normal');
         continue;
       }
-      if (result.isWin) {
-        const pw = Math.min(CELL_W - 20, 56);
-        roundRect(ctx, cx - pw / 2, cy - 12, pw, 24, 12, COL.red50, COL.red200, 1);
-      }
-      drawText(ctx, result.text, cx, cy, 13, 'center', result.isWin ? COL.red600 : COL.gray500, result.isWin ? 'black' : 'medium');
+      // スコアはバッジにせず、セルそのものを塗り分ける。
+      // 勝った側は淡い赤地に赤文字、負けた側は白地にグレー文字。
+      ctx.fillStyle = result.isWin ? COL.red50 : COL.white;
+      ctx.fillRect(cellX + 1, y + 1, CELL_W - 2, ROW_H - 2);
+      drawText(ctx, result.text, cx, cy, 14, 'center', result.isWin ? COL.red600 : COL.gray500, result.isWin ? 'black' : 'bold');
     }
 
     // 勝敗
