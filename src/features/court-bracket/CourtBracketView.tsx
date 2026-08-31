@@ -51,6 +51,14 @@ interface CourtBracketViewProps {
   nameEditMode?: boolean;
 }
 
+// 結果画像（DrawResultExporter）と揃えた線・スコアの色
+/** 勝ち上がりライン・勝者スコアの赤 */
+const WIN_RED = '#c63834';
+/** 通常のトーナメント線のグレー */
+const LINE_GRAY = '#a6a6a6';
+/** 敗者スコア・注記のグレー */
+const SCORE_GRAY = '#767676';
+
 const SLOT_HEIGHT = 36;
 // ダブルスはペアを1人ずつ2行（氏名＋所属）で表示するので枠を高くする。
 const SLOT_HEIGHT_DOUBLES = 52;
@@ -225,12 +233,13 @@ export default function CourtBracketView({
       }
     }
   }
-  // 「番号 フルネーム」形式（苗字に省略しない）
-  const numberedFullName = (entryId: string | null, fullName: string): string => {
+  /** ドロー番号（枠の左に区切って出す） */
+  const numberOf = (entryId: string | null): number | null =>
+    (entryId ? entryInfo.get(entryId)?.number : null) ?? null;
+  /** フルネーム（苗字に省略しない）。番号は nameBlock 側で別の列に出す */
+  const fullNameOf = (entryId: string | null, fullName: string): string => {
     const info = entryId ? entryInfo.get(entryId) : undefined;
-    const n = info?.number;
-    const name = fullName || info?.name || '';
-    return `${n ? n + ' ' : ''}${name}`;
+    return fullName || info?.name || '';
   };
   const affiliationOf = (entryId: string | null): string =>
     (entryId ? entryInfo.get(entryId)?.affiliation : '') || '';
@@ -244,21 +253,29 @@ export default function CourtBracketView({
   const nameBlock = (
     name: string,
     affiliation: string,
-    opt: { nameCls: string; affCls: string },
+    opt: { nameCls: string; affCls: string; number?: number | null },
   ) => {
     const { names, affiliations } = isDoubles
       ? pairDisplayLines(name, affiliation)
       : { names: [name], affiliations: affiliation ? [affiliation] : [] };
     const multi = names.length > 1;
     return (
-      <div className="flex-1 flex items-center gap-1.5 min-w-0">
-        <div className="flex-1 min-w-0 leading-tight">
+      <div className="flex-1 flex items-stretch gap-1.5 min-w-0">
+        {opt.number != null && (
+          // 番号は2行に分けた選手の中央（枠の縦中央）に置き、区切り線で選手と分ける
+          <div className="shrink-0 flex items-center border-r border-gray-300 pr-1">
+            <span className="w-5 text-center text-[10px] font-mono font-bold text-gray-600">
+              {opt.number}
+            </span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0 leading-tight self-center">
           {names.map((n, i) => (
             <div key={i} className={`truncate ${opt.nameCls}`} title={n}>{n}</div>
           ))}
         </div>
         {affiliations.length > 0 && (
-          <div className={`leading-tight text-right ${multi ? 'shrink min-w-0 max-w-[46%]' : 'shrink-0'}`}>
+          <div className={`leading-tight text-right self-center ${multi ? 'shrink min-w-0 max-w-[46%]' : 'shrink-0'}`}>
             {affiliations.map((a, i) => (
               <div
                 key={i}
@@ -325,77 +342,84 @@ export default function CourtBracketView({
       const winnerIsTop = isFinished && matchResult.winnerEntryId === matchResult.player1EntryId;
       const winnerIsBottom = isFinished && matchResult.winnerEntryId === matchResult.player2EntryId;
 
-      // 勝者の線はブランド赤。線自体は点滅させない（点滅はカードのみ）。
-      const getStroke = (isWinner: boolean) => isWinner ? '#ad2c29' : isPlaying ? '#c63834' : '#a6a6a6';
-      const getWidth = (isWinner: boolean) => isWinner ? '2.5' : isPlaying ? '2' : '1';
+      // 結果画像と同じ体裁：勝ち上がりはブランド赤の太線、それ以外は細いグレー。
+      // 角は丸めず、紙のトーナメント表と同じ直角のエルボーで描く。
+      const getStroke = (isWinner: boolean) => isWinner ? WIN_RED : isPlaying ? WIN_RED : LINE_GRAY;
+      const getWidth = (isWinner: boolean) => isWinner ? '2.6' : isPlaying ? '2' : '1.4';
 
-      // 角に丸みを持たせたパスを生成（横→縦のエルボーを二次ベジェで滑らかに）。
-      const roundedElbow = (startX: number, y: number, midX: number, endY: number) => {
-        const dir = endY > y ? 1 : -1;
-        const R = Math.min(9, Math.abs(endY - y) / 2, Math.abs(midX - startX));
-        return `M ${startX} ${y} L ${midX - R} ${y} Q ${midX} ${y} ${midX} ${y + dir * R} L ${midX} ${endY}`;
-      };
+      // 横→縦の直角エルボー
+      const elbow = (startX: number, y: number, midX: number, endY: number) =>
+        `M ${startX} ${y} L ${midX} ${y} L ${midX} ${endY}`;
 
-      paths.push(<path key={`r${r}-m${m}-top`} d={roundedElbow(x, yTop, xMid, yMid)}
-        fill="none" stroke={getStroke(!!winnerIsTop)} strokeWidth={getWidth(!!winnerIsTop)}
-        strokeLinecap="round" strokeLinejoin="round" />);
-      paths.push(<path key={`r${r}-m${m}-bot`} d={roundedElbow(x, yBottom, xMid, yMid)}
-        fill="none" stroke={getStroke(!!winnerIsBottom)} strokeWidth={getWidth(!!winnerIsBottom)}
-        strokeLinecap="round" strokeLinejoin="round" />);
+      paths.push(<path key={`r${r}-m${m}-top`} d={elbow(x, yTop, xMid, yMid)}
+        fill="none" stroke={getStroke(!!winnerIsTop)} strokeWidth={getWidth(!!winnerIsTop)} />);
+      paths.push(<path key={`r${r}-m${m}-bot`} d={elbow(x, yBottom, xMid, yMid)}
+        fill="none" stroke={getStroke(!!winnerIsBottom)} strokeWidth={getWidth(!!winnerIsBottom)} />);
 
       const winnerExists = winnerIsTop || winnerIsBottom;
       paths.push(<path key={`r${r}-m${m}-conn`} d={`M ${xMid} ${yMid} L ${xNext} ${yMid}`}
-        fill="none" stroke={winnerExists ? '#ad2c29' : isPlaying ? '#c63834' : '#a6a6a6'}
-        strokeWidth={winnerExists ? '2.5' : '1'} strokeLinecap="round" />);
+        fill="none" stroke={winnerExists ? WIN_RED : isPlaying ? WIN_RED : LINE_GRAY}
+        strokeWidth={winnerExists ? '2.6' : '1.4'} />);
 
-      // 結果（スコア）を線が合流する付近に上下に並べて表示（手書きスケッチ準拠）。
-      // 上側=player1のスコアは合流点の上、下側=player2のスコアは下に配置。勝者側は赤ピル。
+      // 結果（スコア）は結果画像と同じ体裁で、合流点の右上・右下に太文字で置く。
+      // ピル（バッジ）にはせず、勝者側は赤・敗者側はグレーの文字だけで見せる。
       if (isFinished && matchResult.score) {
         const raw = matchResult.score.trim();
         // タイブレークの得点は落とした側に "6(4)" のように付き、Ret / W.O は注記として分かれる
         const parts = parseScoreParts(raw);
-        const scoreX = (xMid + xNext) / 2; // 合流後の横線の中央付近
+        const scorePx = isMobile ? 12 : 13;
+        const notePx = isMobile ? 9 : 10;
+        // 文字が次の回戦のカードに重ならないよう、右端を見て開始位置を決める
+        const estW = (val: string, px: number) => val.length * px * 0.66;
         if (parts?.hasGames) {
           const topWin = !!winnerIsTop;
           const botWin = !!winnerIsBottom;
-          // 文字数に合わせてピルを広げる（"6(4)" や "6 4" でも欠けないように）
-          const pillW = (val: string) => Math.max(20, val.length * 7.5 + 8);
-          const maxW = Math.max(pillW(parts.p1), pillW(parts.p2));
-          // 次の回戦のカードに重ならないよう、右端を少し内側に留める
-          const cx = Math.min(scoreX, xNext - 4 - maxW / 2);
-          const pill = (key: string, cy: number, val: string, win: boolean) => {
-            const w = pillW(val), h = 16;
-            return (
-              <g key={key}>
-                <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={7}
-                  fill={win ? '#ad2c29' : '#ffffff'} stroke={win ? '#ad2c29' : '#d6d6d6'} strokeWidth="1" />
-                <text x={cx} y={cy + 4.5} fill={win ? '#ffffff' : '#767676'}
-                  fontSize={val.length > 3 ? 10 : 13} fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-                  {val}
-                </text>
-              </g>
-            );
-          };
+          // タイブレークの得点（"8(4)" の "(4)"）は結果画像と同じく注記に回し、
+          // ゲーム数だけを大きく出す
+          const stripTb = (val: string) => val.replace(/\(\d+\)/g, '');
+          const p1Main = stripTb(parts.p1);
+          const p2Main = stripTb(parts.p2);
+          const w = Math.max(estW(p1Main, scorePx), estW(p2Main, scorePx));
+          const sx = Math.min(xMid + 5, xNext - 3 - w);
+          const scoreText = (key: string, y: number, val: string, win: boolean) => (
+            <text key={key} x={sx} y={y} fill={win ? WIN_RED : SCORE_GRAY}
+              fontSize={scorePx} fontWeight={win ? 800 : 700} textAnchor="start">
+              {val}
+            </text>
+          );
           // 合流点(yMid)を挟んで上に上側選手のスコア、下に下側選手のスコア
-          paths.push(pill(`sT-${r}-${m}`, yMid - 11, parts.p1, topWin));
-          paths.push(pill(`sB-${r}-${m}`, yMid + 11, parts.p2, botWin));
+          paths.push(scoreText(`sT-${r}-${m}`, yMid - 5, p1Main, topWin));
+          paths.push(scoreText(`sB-${r}-${m}`, yMid + 15, p2Main, botWin));
+
+          // タイブレークの得点・Ret / W.O は負けた側の外側にグレーの小さな文字で添える
+          const notes = [
+            ...parts.sets.map(st => (st.tb ? `(${st.tb})` : '')).filter(Boolean),
+            parts.note,
+          ].filter(Boolean) as string[];
+          if (notes.length > 0) {
+            const loserIsTop = !topWin;
+            const dir = loserIsTop ? -1 : 1;
+            const baseY = loserIsTop ? yMid - 5 : yMid + 15;
+            const nsx = Math.min(xMid + 5, xNext - 3 - Math.max(...notes.map(n => estW(n, notePx))));
+            notes.forEach((text, i) => {
+              paths.push(
+                <text key={`sN-${r}-${m}-${i}`} x={nsx} y={baseY + dir * (i + 1) * (notePx + 3)}
+                  fill={SCORE_GRAY} fontSize={notePx} fontWeight="600" textAnchor="start">
+                  {text}
+                </text>
+              );
+            });
+          }
         }
-        // Ret / W.O は棄権した側（敗者側）の横線上に表示する。
-        // スコアがある途中棄権（"4-6 Ret"）でもゲームスコアと一緒に出す。
-        const note = parts ? parts.note : raw;
-        if (note) {
-          const loserY = winnerIsTop ? yBottom : yTop; // 勝者でない側
-          const loserFeederMidX = (x + xMid) / 2;
-          const w = Math.max(26, note.length * 7 + 10);
+        // ゲームスコアが無い（"W.O" だけ等）ときは、注記を合流点の右に出す
+        const soleNote = parts?.hasGames ? '' : (parts ? parts.note : raw);
+        if (soleNote) {
           paths.push(
-            <g key={`sX-${r}-${m}`}>
-              <rect x={loserFeederMidX - w / 2} y={loserY - 8} width={w} height={16} rx={7}
-                fill="#ffffff" stroke="#e49f9c" strokeWidth="1" />
-              <text x={loserFeederMidX} y={loserY + 4} fill="#ad2c29"
-                fontSize="10" fontWeight="bold" textAnchor="middle">
-                {note}
-              </text>
-            </g>
+            <text key={`sX-${r}-${m}`}
+              x={Math.min(xMid + 5, xNext - 3 - estW(soleNote, notePx))} y={yMid + 4}
+              fill={SCORE_GRAY} fontSize={notePx} fontWeight="700" textAnchor="start">
+              {soleNote}
+            </text>
           );
         }
       }
@@ -458,22 +482,20 @@ export default function CourtBracketView({
         }`}
         style={{ left: x, top: y, width: slotW, height: slotH }}
       >
-        <div className="w-5 text-[10px] font-mono font-bold text-gray-600 border-r border-gray-300 pr-1 text-center shrink-0">
-          {editMode ? slot.position : visibleIndex}
-        </div>
-        {slot.seed > 0 && (
-          <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center bg-primary-100 text-gray-800 text-[8px] font-bold rounded-full">
-            {slot.seed}
-          </div>
-        )}
-        {isEmpty ? (
-          <div className="flex-1 truncate text-[13px] text-gray-400">空き</div>
-        ) : slot.isBye ? (
-          <div className="flex-1 truncate text-[13px] text-gray-400">BYE</div>
+        {isEmpty || slot.isBye ? (
+          <>
+            <div className="w-5 text-[10px] font-mono font-bold text-gray-600 border-r border-gray-300 pr-1 text-center shrink-0">
+              {editMode ? slot.position : visibleIndex}
+            </div>
+            <div className="flex-1 truncate text-[13px] text-gray-400 pl-1">
+              {isEmpty ? '空き' : 'BYE'}
+            </div>
+          </>
         ) : (
           nameBlock(slot.name, slot.affiliation, {
             nameCls: 'font-semibold text-gray-900 text-[13px]',
             affCls: 'text-[10px] text-gray-500',
+            number: editMode ? slot.position : visibleIndex,
           })
         )}
       </div>
@@ -483,22 +505,17 @@ export default function CourtBracketView({
   // 対戦カード（vs）用の選手1行：番号＋フルネームと所属。
   // シングルスは氏名の下に所属、ダブルスはペアを1人ずつ2行にして各行の右に所属を出す。
   const playerRow = (entryId: string | null, name: string, key: string, dim: boolean) => {
-    const full = numberedFullName(entryId, name);
+    const full = fullNameOf(entryId, name);
     const aff = affiliationOf(entryId);
+    const num = numberOf(entryId);
     const nameCls = `text-[13px] font-bold ${dim ? 'text-gray-600' : 'text-gray-900'}`;
-    if (isDoubles) {
-      return (
-        <div key={key} className="flex min-w-0">
-          {nameBlock(full || '—', aff, { nameCls, affCls: 'text-[10px] text-gray-500' })}
-        </div>
-      );
-    }
     return (
-      <div key={key} className="min-w-0 leading-tight">
-        <div className={`truncate ${nameCls}`} title={full}>
-          {full || '—'}
-        </div>
-        {aff && <div className="text-[10px] text-gray-500 truncate" title={aff}>{aff}</div>}
+      <div key={key} className="flex min-w-0">
+        {nameBlock(full || '—', aff, {
+          nameCls,
+          affCls: 'text-[10px] text-gray-500',
+          number: num,
+        })}
       </div>
     );
   };
@@ -611,12 +628,13 @@ export default function CourtBracketView({
       let content: React.ReactNode;
       if (isFinished) {
         // 勝者：番号＋フルネーム＋所属（ダブルスは1人ずつ2行）
-        const winnerFull = numberedFullName(matchResult.winnerEntryId, getWinnerName(matchResult));
+        const winnerFull = fullNameOf(matchResult.winnerEntryId, getWinnerName(matchResult));
         const winnerAff = affiliationOf(matchResult.winnerEntryId);
         content = (
-          <div className="flex items-center gap-1 w-full min-w-0 px-2">
-            {isFinal && <Trophy className="w-4 h-4 text-primary-500 shrink-0" />}
+          <div className="flex items-stretch gap-1 w-full min-w-0 px-2 py-1">
+            {isFinal && <Trophy className="w-4 h-4 text-primary-500 shrink-0 self-center" />}
             {nameBlock(winnerFull, winnerAff, {
+              number: numberOf(matchResult.winnerEntryId),
               nameCls: isFinal
                 ? 'text-[13px] font-bold text-primary-700'
                 : 'text-[12px] font-semibold text-gray-800',

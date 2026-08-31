@@ -25,7 +25,7 @@ import EventResultPreview from '../results/EventResultPreview';
 import { sortEventsByClass } from '../data/eventOrder';
 import { isEventComplete } from '../results/eventCompletion';
 import {
-  getGameRuleText, getGameRulesText, getMatchFormat, getRoundName,
+  getGameRuleText, getGameRulesText, getMatchFormat, getRoundName, getShortRoundName,
 } from '../score/roundRules';
 
 interface CourtBracketPageProps {
@@ -251,10 +251,11 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
   const manualStartRound = roundOverride?.eventId === selectedEventId ? roundOverride.value : null;
   const startRound = Math.min(manualStartRound ?? autoStartRound, maxStartRound);
   const canAdjustRounds = !isRoundRobin && drawSize > 0 && maxStartRound >= 1;
-  // 先頭の列にはその回戦の試合が並ぶので、絞り込みの表示もその回戦名にする
+  // 先頭の列にはその回戦の試合が並ぶので、絞り込みの表示もその回戦名にする。
+  // 「準々決勝以降」のような長い名前だとボタンの位置が動くので短い表記にする。
   const startRoundLabel = startRound === 0
-    ? '全回戦表示'
-    : `${getRoundName(startRound, totalRounds)}以降`;
+    ? 'ALL 1R〜'
+    : `${getShortRoundName(startRound, totalRounds)}〜`;
   const setStartRound = (value: number | null) =>
     setRoundOverride(value == null ? null : { eventId: selectedEventId, value });
 
@@ -710,7 +711,8 @@ export default function CourtBracketPage({ enableScoreInput = true }: CourtBrack
                   {startRound === 0
                     ? <Eye className="w-4 h-4 text-gray-400" />
                     : <EyeOff className="w-4 h-4 text-primary-500" />}
-                  {startRoundLabel}
+                  {/* ラベルの幅を固定して、回戦が変わってもボタンが動かないようにする */}
+                  <span className="inline-block w-[58px] text-center">{startRoundLabel}</span>
                 </button>
                 <button
                   onClick={() => setStartRound(Math.min(maxStartRound, startRound + 1))}

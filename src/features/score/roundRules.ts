@@ -16,6 +16,18 @@ export function getRoundName(round: number, totalRounds: number): string {
   return `${round}回戦`;
 }
 
+/**
+ * 表示範囲の切り替え用の短い回戦名（F / SF / QF / 3R …）。
+ * 「準々決勝以降」のように文字数が変わるとボタンの位置が動くため、
+ * 幅の変わりにくい短い表記にする。
+ */
+export function getShortRoundName(round: number, totalRounds: number): string {
+  if (round === totalRounds) return 'F';
+  if (round === totalRounds - 1) return 'SF';
+  if (round === totalRounds - 2) return 'QF';
+  return `${round}R`;
+}
+
 /** 回戦に応じたゲームルールを取得 */
 export function getGameRuleForRound(
   evt: Event | undefined, round: number, totalRounds: number,
