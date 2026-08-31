@@ -51,7 +51,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   { step: 7, icon: CalendarClock, label: '時間割', title: '時間割の自動生成', description: 'コート×時間帯のマトリックスに全試合を自動配置', timing: '試合開始前' },
   { step: 8, icon: MonitorPlay, label: 'スコア', title: 'スコア入力・試合進行', description: 'ブラケット/リーグ上で試合選択→スコア入力→勝者自動進出（2セット+STB対応）', timing: '試合中' },
   { step: 9, icon: BarChart2, label: 'ダッシュボード', title: 'ライブダッシュボード', description: '大会全体の進行状況、コートマップ、時間超過警告をリアルタイム監視', timing: '終日' },
-  { step: 10, icon: Save, label: 'バックアップ', title: 'バックアップ・結果保存', description: 'Google ドライブ・GitHub・ローカルにデータを保全、結果画像出力', timing: '大会前後' },
+  { step: 10, icon: Save, label: '設定', title: 'バックアップ・結果保存', description: '設定ページから Google ドライブ・GitHub・ローカルにデータを保全、結果画像出力', timing: '大会前後' },
 ];
 
 // ─── Feature Sections Data ──────────────────────────────────────────
@@ -71,7 +71,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
       '切断時の自動再接続（指数バックオフ）',
     ],
     operationSteps: [
-      { step: 1, title: '同期パネルを開く', description: 'ヘッダー右側のWi-Fiアイコンをタップして同期設定パネルを開きます。' },
+      { step: 1, title: '同期パネルを開く', description: 'メニューの「設定」を開き、「同期」の「同期設定を開く」から同期設定パネルを開きます。' },
       { step: 2, title: 'ルームを作成（1台目）', description: '端末名を入力し「ルームを作成」をタップ。6桁のルームコードが生成されます。' },
       { step: 3, title: 'ルームに参加（2台目以降）', description: '他の端末で同じルームコードを入力し「参加」をタップ。既存データが自動転送されます。' },
       { step: 4, title: '別端末同期の場合', description: '詳細設定で中継サーバーURL（ws://IPアドレス:8787）を入力してからルーム作成/参加します。' },
@@ -98,7 +98,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
       '観戦ページ「ライブスコア」に中継風スコアボードで即時反映',
     ],
     operationSteps: [
-      { step: 1, title: '観戦配信を開始しておく', description: 'ヘッダーの同期アイコンからルームを作成し、観戦用URLを発行しておきます（未接続だとこの端末の中だけの記録になります）。' },
+      { step: 1, title: '観戦配信を開始しておく', description: '設定ページの「同期」からルームを作成し、「観戦用ページ」のURLを配布しておきます（未接続だとこの端末の中だけの記録になります）。' },
       { step: 2, title: '試合を選ぶ', description: '対戦順・タイムテーブル・ドローのいずれかの画面で試合をタップし、スコア入力ダイアログを開きます。' },
       { step: 3, title: 'ライブスコア開始', description: 'ダイアログ内の「ライブスコア開始」をタップすると、専用のライブスコア画面に切り替わります。' },
       { step: 4, title: 'ポイントを入力', description: 'ポイントを取った選手のパネルをタップするだけです。ゲーム・セット・タイブレークは自動で進みます。' },
@@ -130,7 +130,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
       { step: 3, title: '所属・ふりがなの確認', description: '「所属・ふりがな一覧」パネルで所属タブ・ふりがなタブを切り替え、データを確認・編集します。Excel出力/入力も可能です。' },
     ],
     tips: [
-      'ふりがな同期の前に、バックアップページでGitHubトークンまたはGoogle ドライブ接続を設定してください',
+      'ふりがな同期の前に、設定ページのバックアップでGitHubトークンまたはGoogle ドライブ接続を設定してください',
       'データ読込前にバックアップを取ることを推奨します',
       '所属・ふりがな一覧のExcelインポートで一括修正が効率的です',
       'ミックスダブルス・団体戦はExcel読込と同時にリーグ対戦表が自動生成されます',
@@ -232,7 +232,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     operationSteps: [
       { step: 1, title: '試合の確認', description: 'ドロー画面で試合を生成すると、全種目の対戦順が自動表示されます。' },
       { step: 2, title: '音声コール', description: 'コールボタンでコート番号を入力→選手名・所属・コート番号を音声読み上げ。' },
-      { step: 3, title: '音声設定の調整', description: 'ヘッダーの「音声」から、エンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを調整できます。' },
+      { step: 3, title: '音声設定の調整', description: '設定ページの「音声」から、エンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを調整できます。' },
       { step: 4, title: '印刷', description: '各種目の印刷ボタンで対戦順シートを印刷します。' },
     ],
     tips: [
@@ -391,8 +391,8 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     ],
   },
   {
-    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'バックアップ・復元',
-    description: 'Google ドライブ・GitHub・ローカルファイルでのバックアップ管理を行います。ミックスダブルス・団体戦のデータも含めて一括保全できます。',
+    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'バックアップ・復元（設定ページ）',
+    description: 'メニューの「設定」ページにまとめています。Google ドライブ・GitHub・ローカルファイルでのバックアップ管理を行います。ミックスダブルス・団体戦のデータも含めて一括保全できます。',
     keyFeatures: [
       'Google ドライブ連携: OAuth認証でクラウド保存（専用フォルダ管理）',
       'GitHub連携: Personal Access Tokenでリポジトリ保存',
@@ -430,7 +430,7 @@ const FAQ_ITEMS: FAQItem[] = [
   { question: 'スコアを間違えて入力した場合は？', answer: 'テーブルビューの「リセット」ボタンで試合を待機状態に戻せます。次ラウンドへの進出も取り消されます。' },
   { question: '複数の大会を同時に管理できますか？', answer: 'ブラウザ内データベースで一度に1つの大会を管理します。切り替える場合はバックアップ→新しいデータインポートの手順で行います。' },
   { question: 'ミックスダブルス・団体戦のデータはどう管理される？', answer: '通常大会とは別にZustandストア（localStorage）で管理されます。データ管理ページでExcelを読み込むと自動的にリーグ・対戦表が生成されます。バックアップにも含まれます。' },
-  { question: '複数端末で同時に編集できますか？', answer: 'はい。ヘッダーのWi-Fiアイコンから「マルチデバイス同期」パネルを開き、ルームを作成・参加してください。同じルームの端末間でデータがリアルタイム同期されます。別端末間の同期にはWebSocket中継サーバーが必要です。' },
+  { question: '複数端末で同時に編集できますか？', answer: 'はい。メニューの「設定」から「マルチデバイス同期」パネルを開き、ルームを作成・参加してください。同じルームの端末間でデータがリアルタイム同期されます。別端末間の同期にはWebSocket中継サーバーが必要です。' },
   { question: '同期サーバーの起動方法は？', answer: 'sync-server/フォルダで「npm install」→「node server.mjs」を実行します。起動後に表示されるIPアドレスとポートを各端末の中継サーバーURLに設定してください。' },
   { question: '2セット＋STB形式のスコアはどう入力しますか？', answer: 'ゲームルールが2セット+STB形式の種目では、自動的に2セット分のスコア入力欄が表示されます。1-1の場合はタイブレークスコア（10ポイントSTB）の入力欄が追加されます。' },
 ];
@@ -582,7 +582,7 @@ function FeatureSectionCard({ section, isOpen, onToggle }: { section: FeatureSec
 
 function QuickReferencePanel() {
   const items = [
-    { icon: Wifi, label: 'マルチデバイス同期', desc: 'ヘッダーのWi-Fiアイコン' },
+    { icon: Wifi, label: 'マルチデバイス同期', desc: '設定ページの「同期」' },
     { icon: Smartphone, label: '複数端末', desc: 'ルームコードで接続' },
     { icon: MousePointerClick, label: 'ドラッグ＆ドロップ', desc: 'ドロー表の枠入替' },
     { icon: Volume2, label: '音声コール', desc: '対戦順ページのスピーカーボタン' },
@@ -595,7 +595,7 @@ function QuickReferencePanel() {
     { icon: Upload, label: 'インポート', desc: 'ファイルの読込' },
     { icon: Download, label: 'エクスポート', desc: 'ファイルの出力' },
     { icon: RefreshCw, label: 'データ同期', desc: 'クラウドデータの取得' },
-    { icon: Shield, label: 'バックアップ', desc: 'データの保全・復元' },
+    { icon: Shield, label: 'バックアップ', desc: '設定ページでデータの保全・復元' },
   ];
 
   return (

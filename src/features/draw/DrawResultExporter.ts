@@ -23,6 +23,10 @@ import {
   fitLogo,
   fontOf,
   getAssociationLogoEnabled,
+  getBracketWidthScale,
+  headerScaleOf,
+  BRACKET_WIDTH_MIN,
+  BRACKET_WIDTH_MAX,
   loadResultLogos,
   roundRect,
   drawResultFrame,
@@ -41,6 +45,11 @@ export interface ResultExportOptions {
    * 未指定なら保存済みの設定（getAssociationLogoEnabled）に従う。
    */
   showAssociationLogo?: boolean;
+  /**
+   * トーナメント表の表示幅の倍率（選手名の列と回戦の列の幅に効く）。
+   * 未指定なら保存済みの設定（getBracketWidthScale）に従う。
+   */
+  bracketWidthScale?: number;
 }
 
 // ===== 共通ヘルパー =====
@@ -310,8 +319,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
 
   // ---- 事前計測（選手名の最大幅からネーム列の幅を決める） ----
   const meas = document.createElement('canvas').getContext('2d')!;
-  const NAME_PX = 14;
-  const AFF_PX = 11.5;
+  // 選手名は縮小して見られることが多いので、はっきり読める大きさにする
+  const NAME_PX = 16;
+  const AFF_PX = 12;
   let maxNameW = 0;
   for (let p = 1; p <= drawSize; p++) {
     const s = slotMap.get(p);
@@ -326,15 +336,22 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     if (w > maxNameW) maxNameW = w;
   }
-  const NUM_W = 26;                        // ドロー番号の幅
-  const NAME_W = clamp(maxNameW + NUM_W + 16, 210, isDoubles ? 470 : 380);
+  // 表示幅の倍率（プレビューのゲージで調整できる）
+  const widthScale = clamp(
+    opts.bracketWidthScale ?? getBracketWidthScale(),
+    BRACKET_WIDTH_MIN,
+    BRACKET_WIDTH_MAX,
+  );
+  const NUM_W = 24;                        // ドロー番号の幅
+  // 選手名を大きくしたぶん横に伸びやすいので、余白と上限を詰めて相殺する
+  const NAME_W = Math.round(clamp(maxNameW + NUM_W + 10, 210, isDoubles ? 440 : 350) * widthScale);
 
   // 行の高さはドローサイズに応じて調整（大きいドローでも縦に伸びすぎないように）
   const ROW_H_BASE = halfSlots >= 24 ? 36 : halfSlots >= 16 ? 42 : 46;
   /** 氏名を2行で出すときの行送り */
   const NAME_LINE_STEP = NAME_PX + 3;
   // ダブルスは氏名が2行になるぶん、行の高さに余裕を持たせる
-  const ROW_H = isDoubles ? ROW_H_BASE + 6 : ROW_H_BASE;
+  const ROW_H = isDoubles ? ROW_H_BASE + 8 : ROW_H_BASE;
   // スコアは合流点（縦線の中央）を挟んで上下に置く。
   // 2回戦以降は上下のラインが大きく離れるため、それぞれのラインに寄せると
   // 上下のスコアが遠く離れて対戦結果として読み取りにくい。
@@ -377,7 +394,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     }
     return w;
   })();
-  const COL_W = clamp(Math.ceil(scoreTokenW) + 20, 44, 74);
+  const COL_W = Math.round(clamp(Math.ceil(scoreTokenW) + 14, 38, 60) * widthScale);
 
   // ---- 選手行の割り当て（BYE の空きを詰める） ----
   // BYE のスロットにも1行ずつ確保すると、ドロー表どおりに並べたときに
@@ -504,11 +521,14 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   // ---- 全体レイアウト ----
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
   const sidePad = 22;
 
   const contentW = NAME_W * 2 + halfRounds * COL_W * 2 + CENTER_W;
   const tableW = Math.max(contentW + sidePad * 2, 820);
+  // 画像の横幅はドローサイズで変わる。HPなどで幅をそろえて並べたときに
+  // クラス名が小さく見えないよう、表幅に比例してヘッダーを拡大する。
+  const headerScale = headerScaleOf(tableW);
+  const headerH = Math.round(110 * headerScale); // 見出し + 大会名 + 会場ロゴ
 
   // ラウンドラベル（枠上端から 37px）と優勝表示が重ならないだけの上部余白を確保する
   // 回戦ラベルは表示しないので、上部は最小限の余白でよい
@@ -591,7 +611,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     .sort((a, b) => a.seed - b.seed)
     .map(s => `${s.seed}.${slotMap.get(s.position)?.name ?? ''}`)
     .filter(t => !t.endsWith('.'));
-  const seedPx = 12;
+  const seedPx = Math.round(12 * headerScale);
   const seedLines = wrapItems(meas, 'シード　', seedItems, tableW - 24, seedPx, 2);
   const footerH = seedLines.length > 0 ? seedLines.length * (seedPx + 6) + 8 : 4;
 
@@ -620,6 +640,7 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
     headerH,
     logos,
     titleEnFallback: 'TOURNAMENT',
+    headerScale,
     // 外枠のすぐ上に横線が重なって二重線に見えるため、罫線は引かない
     headerRule: false,
   });
@@ -1143,7 +1164,6 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
 
   const paddingX = 30;
   const paddingY = 26;
-  const headerH = 110; // 見出し + 大会名 + 会場ロゴ
 
   // リーグ表は外枠そのものを表の枠として使う（枠が二重にならないように）。
   // 表の幅は外枠の幅にそろえ、余った幅は選手名の列へ回す。
@@ -1157,7 +1177,9 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   const cornerLogo = showLogo ? fitLogo(logos.tcta, NAME_W - 28, 46) : { w: 0, h: 0 };
   const HDR_H = Math.max(44, Math.ceil(cornerLogo.h + 12));
 
+  const headerScale = headerScaleOf(tableW);
   const CARD_R = 18;
+  const headerH = Math.round(110 * headerScale); // 見出し + 大会名 + 会場ロゴ
   const gridW = tableW;
   const gridH = HDR_H + n * ROW_H;
   const cardH = gridH;
@@ -1189,6 +1211,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
     headerH,
     logos,
     titleEnFallback: 'LEAGUE',
+    headerScale,
     // 外枠のすぐ上に横線が重なって二重線に見えるため、罫線は引かない
     headerRule: false,
   });

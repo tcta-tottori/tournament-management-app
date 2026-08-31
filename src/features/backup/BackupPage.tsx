@@ -141,7 +141,12 @@ function isValidBackup(data: any): boolean {
   return false;
 }
 
-export default function BackupPage() {
+interface BackupPageProps {
+  /** 設定ページの1セクションとして埋め込むとき（見出し・背景を出さない） */
+  embedded?: boolean;
+}
+
+export default function BackupPage({ embedded = false }: BackupPageProps = {}) {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -318,9 +323,10 @@ export default function BackupPage() {
   // レンダリング
   // ================================================================
   return (
-    <div className="min-h-full bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-        {/* ヘッダー */}
+    <div className={embedded ? '' : 'min-h-full bg-gradient-to-b from-gray-50 via-white to-gray-50'}>
+      <div className={embedded ? 'space-y-6' : 'p-4 md:p-6 max-w-4xl mx-auto space-y-6'}>
+        {/* ヘッダー（設定ページに埋め込むときは設定側の見出しを使う） */}
+        {!embedded && (
         <header className="relative overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl shadow-lg">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white blur-3xl" />
@@ -338,6 +344,7 @@ export default function BackupPage() {
             </div>
           </div>
         </header>
+        )}
 
         {/* 現在の大会情報カード */}
         {tournamentName && (
