@@ -168,7 +168,8 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                   pairDisplayLines(player.name, player.affiliation);
                 const rank = rankMap.get(rowIdx);
                 return (
-                  <tr key={`row-${rowIdx}`} className={rowIdx % 2 === 1 ? 'bg-gray-50/70' : ''}>
+                  // 行ごとの色分けはせず、白地で統一する（ドロー表・結果画像と同じ体裁）
+                  <tr key={`row-${rowIdx}`} className="bg-white">
                     {/* 選手名セル（名前修正モードではタップで修正） */}
                     <td
                       onClick={onPlayerSelect && player.entryId ? () => onPlayerSelect(player.entryId!) : undefined}

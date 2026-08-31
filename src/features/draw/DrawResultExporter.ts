@@ -1243,12 +1243,7 @@ export async function renderRoundRobinResultCanvas(opts: ResultExportOptions): P
   const statX = gridX + NAME_W + n * CELL_W;
   const rankX = statX + STAT_W;
 
-  // 行の縞
-  for (let row = 0; row < n; row++) {
-    if (row % 2 === 0) continue;
-    ctx.fillStyle = COL.gray50;
-    ctx.fillRect(gridX, gridY + HDR_H + row * ROW_H, gridW, ROW_H);
-  }
+  // 行ごとの色分けはせず、白地で統一する（ドロー表・画面のリーグ表と同じ体裁）
 
   // 左上（選手名列のヘッダー）に協会ロゴ。
   // 見出し行の網掛けの上に置くとロゴの周りが枠のように見えるため、
