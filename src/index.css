@@ -328,9 +328,12 @@
   width: 100%;
 }
 
-/* 協会ロゴ（押すと協会HP）。白抜き版の画像をそのまま使う */
+/* 協会ロゴ（押すと協会HP）。白抜き版の画像をそのまま使う。
+   外部リンクだと分かるよう、ロゴの右下にアイコンを重ねる。 */
 .menu-logo-link {
-  display: block;
+  --logo-link-icon: 14px;
+  position: relative;
+  display: inline-block;
   flex-shrink: 0;
   transition: opacity 0.15s ease;
 }
@@ -343,9 +346,23 @@
   height: auto;
   object-fit: contain;
 }
+.menu-logo-link .menu-logo-link-icon {
+  position: absolute;
+  /* ロゴ画像は右に約7%・下に約25%の透明余白があるので、その分を差し引いて
+     絵柄そのものの右下角に重ねる */
+  right: calc(7.4% - var(--logo-link-icon) / 2);
+  bottom: calc(24.9% - var(--logo-link-icon) / 2);
+  width: var(--logo-link-icon);
+  height: var(--logo-link-icon);
+  color: #ffffff;
+  pointer-events: none;
+}
 /* PCメニューを畳んだとき（アイコンのみ幅）のロゴ */
 .menu-logo-link-sm img {
   max-width: 40px;
+}
+.menu-logo-link-sm {
+  --logo-link-icon: 10px;
 }
 
 /* ===== ドロワー下部: バージョン情報（ver.と更新日） ===== */
@@ -562,7 +579,6 @@
   align-items: stretch;
   gap: 10px;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
   flex-shrink: 0;
 }
 

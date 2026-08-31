@@ -5,10 +5,10 @@
 // バックアップもこのページに集約する。メニューの下部は協会ロゴとバージョンだけにする。
 // =============================================================================
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Settings, Wifi, WifiOff, Loader2, AlertTriangle, Eye, Volume2,
-  ExternalLink, Copy, Check, Shield, ChevronRight,
+  Wifi, WifiOff, Loader2, AlertTriangle, Eye, Volume2,
+  ExternalLink, Copy, Check, Shield, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { useSyncStore, DEFAULT_SERVER_URL, PUBLIC_ROOM } from '../sync/syncStore';
 import SyncPanel from '../sync/SyncPanel';
@@ -18,29 +18,57 @@ import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
 import { getVoiceSettings } from '../broadcast/voiceConfig';
 
-/** セクションの共通枠（バックアップ画面と同じ体裁） */
+/**
+ * セクションの共通枠（バックアップ画面と同じ体裁）。
+ * 見出しをタップで開閉できる。既定はスマホ=閉じる／PC=開く。
+ */
 function SectionCard({
-  icon, title, description, children,
+  icon, title, description, defaultOpen, children,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  defaultOpen: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  // 画面幅が変わって既定が変わったら、それに合わせ直す
+  useEffect(() => { setOpen(defaultOpen); }, [defaultOpen]);
   return (
     <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-5 py-4 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors"
+        aria-expanded={open}
+      >
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-white text-gray-600 shrink-0">
           {icon}
         </div>
-        <div className="min-w-0">
+        <div className="flex-1 min-w-0">
           <h2 className="font-bold text-gray-800">{title}</h2>
           <p className="text-xs text-gray-500">{description}</p>
         </div>
-      </div>
-      <div className="p-5 space-y-3">{children}</div>
+        <ChevronDown
+          className={`w-5 h-5 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && <div className="px-5 pb-5 pt-1 space-y-3 border-t border-gray-100">{children}</div>}
     </section>
   );
+}
+
+/** PC（lg以上）かどうか。設定セクションの初期表示を切り替える */
+function useIsWide(): boolean {
+  const [wide, setWide] = useState(
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
 }
 
 /** 設定を開くボタン（セクション内の主ボタン） */
@@ -57,6 +85,8 @@ function OpenButton({ label, onClick }: { label: string; onClick: () => void }) 
 }
 
 export default function SettingsPage() {
+  // スマホは畳んだ状態、PCは開いた状態を既定にする
+  const sectionOpen = useIsWide();
   const [syncOpen, setSyncOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -113,26 +143,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-full bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-        {/* ヘッダー */}
-        <header className="relative overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl shadow-lg">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white blur-3xl" />
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white blur-3xl" />
-          </div>
-          <div className="relative px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm">
-                <Settings className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">設定</h1>
-                <p className="text-sm text-primary-50 mt-0.5">同期・観戦用ページ・音声・バックアップ</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
+      <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
         {/* 同期 */}
         <SectionCard
           icon={
@@ -143,6 +154,7 @@ export default function SettingsPage() {
           }
           title="同期"
           description="複数の端末で同じ大会データを共有する"
+          defaultOpen={sectionOpen}
         >
           <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700">
             <span className="flex-1">{syncText}</span>
@@ -158,6 +170,7 @@ export default function SettingsPage() {
           icon={<Eye className="w-5 h-5" />}
           title="観戦用ページ"
           description="参加者・協会HP向けの読み取り専用ページ"
+          defaultOpen={sectionOpen}
         >
           <div className="px-4 py-3 rounded-xl border border-gray-200 bg-gray-50">
             <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-1">URL</div>
@@ -193,6 +206,7 @@ export default function SettingsPage() {
           icon={<Volume2 className="w-5 h-5" />}
           title="音声（コール読み上げ）"
           description="呼び出しの声・読み上げ方法を選ぶ"
+          defaultOpen={sectionOpen}
         >
           <div className="px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700">
             {voiceText}
@@ -201,20 +215,14 @@ export default function SettingsPage() {
         </SectionCard>
 
         {/* バックアップ（バックアップ画面をそのまま取り込む） */}
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-white text-gray-600 shrink-0">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-bold text-gray-800">バックアップ</h2>
-              <p className="text-xs text-gray-500">大会データをまとめて安全に保存・復元</p>
-            </div>
-          </div>
-          <div className="p-5">
-            <BackupPage embedded />
-          </div>
-        </section>
+        <SectionCard
+          icon={<Shield className="w-5 h-5" />}
+          title="バックアップ"
+          description="大会データをまとめて安全に保存・復元"
+          defaultOpen={sectionOpen}
+        >
+          <BackupPage embedded />
+        </SectionCard>
       </div>
 
       <SyncPanel open={syncOpen} onClose={() => setSyncOpen(false)} />
