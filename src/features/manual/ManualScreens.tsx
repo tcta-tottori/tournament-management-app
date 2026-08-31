@@ -336,13 +336,13 @@ export function ResultPreviewMockup({ device }: { device: Device }) {
     <div className="rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden" style={{ width: w }}>
       <div className="px-2.5 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <span className="order-1 flex-1 min-w-0 flex items-center gap-1.5 text-[10px] font-bold text-gray-900">
-          <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-gray-500 text-white">
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-primary-600 text-white">
             <ImageIcon size={9} />
           </span>
           <span className="truncate">男子ダブルスＡ級 結果プレビュー</span>
         </span>
         <span className={`order-2 ${device === 'pc' ? 'sm:order-3' : ''} flex items-center gap-1 shrink-0`}>
-          <span className="relative flex items-center justify-center w-6 h-6 rounded bg-gray-600 text-white text-[9px]">
+          <span className="relative flex items-center justify-center w-6 h-6 rounded bg-primary-600 text-white text-[9px]">
             ⤓
             <Marker n={2} className="absolute -top-2 -right-2" />
           </span>
@@ -351,12 +351,12 @@ export function ResultPreviewMockup({ device }: { device: Device }) {
         <span className="order-3 basis-full flex items-center gap-2 text-[9px] font-medium text-gray-700">
           表示幅
           <span className="relative flex-1 h-1 rounded-full bg-gray-300">
-            <span className="absolute left-[45%] -top-[3px] w-2.5 h-2.5 rounded-full bg-gray-600" />
+            <span className="absolute left-[25%] -top-[3px] w-2.5 h-2.5 rounded-full bg-primary-600" />
             <Marker n={1} className="absolute -top-3 left-[40%]" />
           </span>
-          <span className="text-gray-500">100%</span>
+          <span className="text-gray-500">70%</span>
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-[3px] bg-gray-600 inline-block" />協会ロゴ
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-primary-600 inline-block" />協会ロゴ
           </span>
         </span>
       </div>

@@ -168,7 +168,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
             {/* 操作バー。スマホでは「見出し＋保存・閉じる」と「表示幅・ロゴ」の2段に折り返す */}
             <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
               <h3 className="order-1 flex-1 min-w-0 font-bold text-gray-900 text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm shrink-0">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-sm shrink-0">
                   <ImageIcon size={13} />
                 </span>
                 <span className="truncate">{opts.event.name} 結果プレビュー</span>
@@ -179,7 +179,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow hover:from-gray-600 hover:to-gray-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg shadow hover:from-primary-600 hover:to-primary-700 transition-colors active:scale-95"
                     title="JPEGで保存"
                     aria-label="JPEGで保存"
                   >
@@ -188,7 +188,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-primary-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   aria-label="閉じる"
                   title="閉じる"
                 >
@@ -208,7 +208,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                       step={0.05}
                       value={widthScale}
                       onChange={e => changeWidth(Number(e.target.value))}
-                      className="flex-1 min-w-[90px] sm:flex-none sm:w-28 accent-gray-600 cursor-pointer"
+                      className="flex-1 min-w-[90px] sm:flex-none sm:w-28 accent-primary-600 cursor-pointer"
                       title="トーナメント表の横幅を調整します"
                     />
                     <span className="tabular-nums text-gray-500 w-9 text-right">
@@ -221,7 +221,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                     type="checkbox"
                     checked={showLogo}
                     onChange={e => toggleLogo(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-gray-600 cursor-pointer"
+                    className="w-3.5 h-3.5 accent-primary-600 cursor-pointer"
                   />
                   協会ロゴを入れる
                 </label>
@@ -246,7 +246,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 <button
                   onClick={handleSaveName}
                   disabled={!nameDraft.trim() || nameDraft.trim() === opts.tournament.name}
-                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-gray-600 hover:bg-gray-700 disabled:opacity-40 disabled:hover:bg-gray-600 transition-colors active:scale-95"
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:hover:bg-primary-600 transition-colors active:scale-95"
                   title="大会データにも保存する"
                 >
                   {nameSaved ? <Check size={13} /> : <Save size={13} />}
@@ -265,7 +265,7 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
             <div className="flex-1 overflow-auto bg-white p-2 sm:p-4 flex items-center justify-center">
               {isLoading && (
                 <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <Loader2 size={32} className="animate-spin" />
+                  <Loader2 size={32} className="animate-spin text-primary-500" />
                   <span className="text-sm font-medium">画像を生成中...</span>
                 </div>
               )}

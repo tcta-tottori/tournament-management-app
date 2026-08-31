@@ -218,9 +218,9 @@ const BRACKET_WIDTH_KEY = 'resultImage.bracketWidthScale';
 /** 表示幅の倍率の下限・上限・既定 */
 export const BRACKET_WIDTH_MIN = 0.7;
 export const BRACKET_WIDTH_MAX = 1.6;
-export const BRACKET_WIDTH_DEFAULT = 1;
+export const BRACKET_WIDTH_DEFAULT = 0.7;
 
-/** トーナメント表の表示幅の倍率（既定: 1.0） */
+/** トーナメント表の表示幅の倍率（既定: 0.7） */
 export function getBracketWidthScale(): number {
   try {
     const raw = Number(localStorage.getItem(BRACKET_WIDTH_KEY));
