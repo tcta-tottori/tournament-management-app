@@ -129,7 +129,7 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
           >
             <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2 min-w-0">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm shrink-0">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-sm shrink-0">
                   <ImageIcon size={13} />
                 </span>
                 <span className="truncate">{categoryLabel} 結果プレビュー</span>
@@ -141,14 +141,14 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                     type="checkbox"
                     checked={showLogo}
                     onChange={e => toggleLogo(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-gray-600 cursor-pointer"
+                    className="w-3.5 h-3.5 accent-primary-600 cursor-pointer"
                   />
                   協会ロゴを入れる
                 </label>
                 {dataUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow hover:from-gray-600 hover:to-gray-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg shadow hover:from-primary-600 hover:to-primary-700 transition-colors active:scale-95"
                     title="JPEGで保存"
                     aria-label="JPEGで保存"
                   >
@@ -157,7 +157,7 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-primary-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   aria-label="閉じる"
                   title="閉じる"
                 >
@@ -184,7 +184,7 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                 <button
                   onClick={handleSaveName}
                   disabled={!nameDraft.trim() || nameDraft.trim() === opts.tournamentName}
-                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-gray-600 hover:bg-gray-700 disabled:opacity-40 disabled:hover:bg-gray-600 transition-colors active:scale-95"
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:hover:bg-primary-600 transition-colors active:scale-95"
                   title="大会データにも保存する"
                 >
                   {nameSaved ? <Check size={13} /> : <Save size={13} />}

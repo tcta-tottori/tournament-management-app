@@ -70,7 +70,7 @@ export function LeagueResultPreview({ league, standings, matches, allTeams, tour
             {/* モーダルヘッダー */}
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2 shrink-0">
               <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 min-w-0">
-                <ImageIcon size={16} className="text-gray-500 shrink-0" />
+                <ImageIcon size={16} className="text-primary-600 shrink-0" />
                 <span className="truncate">{league.leagueId.trim()}リーグ 結果プレビュー</span>
               </h3>
               <div className="flex items-center gap-2 shrink-0">

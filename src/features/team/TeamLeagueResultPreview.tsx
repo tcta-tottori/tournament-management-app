@@ -135,7 +135,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
             {/* モーダルヘッダー（無彩色グラデ） */}
             <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-gray-400 to-gray-600 text-white shadow-sm">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-sm">
                   <ImageIcon size={13} />
                 </span>
                 {leagueDivisionLabel(league.leagueId)} 予選結果プレビュー
@@ -164,7 +164,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 {currentUrl && (
                   <button
                     onClick={handleDownload}
-                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow hover:from-gray-600 hover:to-gray-700 transition-colors active:scale-95"
+                    className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg shadow hover:from-primary-600 hover:to-primary-700 transition-colors active:scale-95"
                     title={view === 'summary' ? '順位表を保存' : '総当たり表を保存'}
                     aria-label="表示中の画像を保存"
                   >
@@ -182,7 +182,7 @@ export function TeamLeagueResultPreview({ league, standings, matches, allTeams, 
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 text-primary-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   aria-label="閉じる"
                   title="閉じる"
                 >
