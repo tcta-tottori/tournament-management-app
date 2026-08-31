@@ -48,7 +48,7 @@ export default function BracketTopBar({
   canAdjustRounds = false,
   startRound = 0,
   maxStartRound = 0,
-  startRoundLabel = '全回戦表示',
+  startRoundLabel = 'ALL 1R〜',
   onStartRoundChange,
   right,
   fullBleedClass = '',
@@ -151,7 +151,8 @@ export default function BracketTopBar({
                 {startRound === 0
                   ? <Eye className="w-3 h-3 text-gray-400" />
                   : <EyeOff className="w-3 h-3 text-primary-500" />}
-                {startRoundLabel}
+                {/* ラベルの幅を固定して、回戦が変わってもボタンが動かないようにする */}
+                <span className="inline-block w-[52px] text-center">{startRoundLabel}</span>
               </button>
               <button
                 onClick={() => onStartRoundChange(Math.min(maxStartRound, startRound + 1))}

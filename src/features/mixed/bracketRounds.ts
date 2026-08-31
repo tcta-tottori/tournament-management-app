@@ -49,12 +49,22 @@ export function autoBracketStartRound(matches: RoundMatchLike[], totalRounds: nu
   return r;
 }
 
+/** 短い回戦名（F / SF / QF / ◯R）。絞り込みバーの表示に使う */
+export function getShortBracketRoundLabel(round: number, totalRounds: number): string {
+  const fromFinal = totalRounds - round;
+  if (fromFinal === 0) return 'F';
+  if (fromFinal === 1) return 'SF';
+  if (fromFinal === 2) return 'QF';
+  return `${round}R`;
+}
+
 /**
- * 絞り込みバーに出すラベル（全回戦表示 / ◯回戦以降）。
+ * 絞り込みバーに出すラベル（ALL 1R〜 / QF〜 など）。
  * startRound は隠す回戦数なので、先頭に並ぶのは startRound + 1 回戦。
+ * 「準々決勝以降」のような長い名前だと文字数でボタンが動くため短い表記にする。
  */
 export function startRoundLabel(startRound: number, totalRounds: number): string {
   return startRound === 0
-    ? '全回戦表示'
-    : `${getBracketRoundLabel(startRound + 1, totalRounds)}以降`;
+    ? 'ALL 1R〜'
+    : `${getShortBracketRoundLabel(startRound + 1, totalRounds)}〜`;
 }
