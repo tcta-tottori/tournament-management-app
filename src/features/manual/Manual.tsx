@@ -1,793 +1,516 @@
-import { useState } from 'react';
+// =============================================================================
+// マニュアル
+//
+// 画面の写し（ManualScreens）を交えて、実際の操作にそって説明する。
+// スマホ／PCで操作が変わるところは端末の切り替えで出し分ける。
+// =============================================================================
+
+import { useEffect, useState } from 'react';
 import {
-  HelpCircle, Database, Users, Dices, Trophy, ClipboardList,
-  CalendarClock, MonitorPlay, BarChart2, Save, ChevronDown, ChevronRight,
-  ArrowRight, Lightbulb, AlertTriangle, MessageCircleQuestion,
-  CheckCircle2, BookOpen, Volume2, FileSpreadsheet, Image,
-  MousePointerClick, Printer, Search, Upload, Download,
-  RefreshCw, Shield, Zap, Clock, GitBranch, LayoutGrid,
-  Wifi, Smartphone, Network, Radio,
+  HelpCircle, Database, Users, ClipboardList, CalendarClock, Network,
+  BarChart2, Radio, Printer, Settings, Image as ImageIcon, Volume2,
+  Smartphone, Monitor, ChevronDown, ChevronRight, Lightbulb, AlertTriangle,
+  MessageCircleQuestion, CheckCircle2, Wifi, Eye, Shield, Clock,
 } from 'lucide-react';
+import {
+  type Device, ScreenFigure, MenuMockup, DrawHeaderMockup, DrawCardMockup,
+  SettingsMockup, ResultPreviewMockup, MatchCardMockup,
+} from './ManualScreens';
 
-// ─── Types ──────────────────────────────────────────────────────────
+// ─── 端末ごとに言い回しが変わる文 ───────────────────────────────────
 
-type StepItem = { step: number; title: string; description: string };
-type TipItem = string;
-type FeatureItem = string;
+type DeviceText = { mobile: string; pc: string };
+const t = (v: string | DeviceText, d: Device) => (typeof v === 'string' ? v : v[d]);
+
+// ─── 当日の流れ ─────────────────────────────────────────────────────
+
+interface FlowStep {
+  step: number;
+  icon: React.ElementType;
+  title: string;
+  timing: string;
+  body: string | DeviceText;
+}
+
+const FLOW_STEPS: FlowStep[] = [
+  {
+    step: 1, icon: Database, title: '大会データを読み込む', timing: '前日〜当日の朝',
+    body: {
+      mobile: 'メニュー →「データ」。ドロー会議のバックアップ（JSON）か、ミックス・団体戦のExcelを読み込みます。読み込むと画面上部に大会名が流れます。',
+      pc: '左メニューの「データ」。ドロー会議のバックアップ（JSON）か、ミックス・団体戦のExcelを読み込みます。読み込むと画面上部に大会名が流れます。',
+    },
+  },
+  {
+    step: 2, icon: Wifi, title: '複数の端末で使うなら同期する', timing: '大会開始前',
+    body: '「設定」→「同期」でルームを作り、他の端末は同じコードで参加します。以後スコアや進行が全端末にそのまま反映されます。1台だけで運営するなら設定は不要です。',
+  },
+  {
+    step: 3, icon: Users, title: 'エントリーと欠場を確認する', timing: '受付〜開始前',
+    body: '「エントリー」で当日の欠場を反映します。棄権・不戦勝はここで処理すると、ドローにもそのまま反映されます。',
+  },
+  {
+    step: 4, icon: ClipboardList, title: '対戦順を確認して呼び出す', timing: '試合中',
+    body: {
+      mobile: '「対戦順」に次の試合が並びます。行をタップするとコート投入や音声コールができます。',
+      pc: '「対戦順」に次の試合が並びます。行を選ぶとコート投入や音声コールができます。まとめてコールする一斉呼び出しもここからです。',
+    },
+  },
+  {
+    step: 5, icon: Network, title: 'ドローでスコアを入れる', timing: '試合中',
+    body: {
+      mobile: '「ドロー」でクラスを選び、試合の枠をタップしてスコアを入力します。勝者は自動で次の回戦に進みます。',
+      pc: '「ドロー」でクラスを選び、試合の枠をクリックしてスコアを入力します。勝者は自動で次の回戦に進みます。',
+    },
+  },
+  {
+    step: 6, icon: ImageIcon, title: '結果画像を出す', timing: 'クラス終了ごと',
+    body: 'クラスの全試合が終わると、ドロー画面の上部に画像アイコンが出ます。押すとその場でプレビューでき、JPEGで保存できます。',
+  },
+  {
+    step: 7, icon: Shield, title: 'バックアップを取る', timing: '大会前後',
+    body: '「設定」→「バックアップ」から、端末にJSONで保存するか Google ドライブへ保存します。大会前日と当日の朝、終了後の3回を目安に。',
+  },
+];
+
+// ─── 機能ごとの使い方 ───────────────────────────────────────────────
 
 interface FeatureSection {
   id: string;
   icon: React.ElementType;
-  iconBg: string;    // static Tailwind class for icon background
-  iconFg: string;    // static Tailwind class for icon foreground
   title: string;
-  description: string;
-  keyFeatures: FeatureItem[];
-  operationSteps: StepItem[];
-  tips: TipItem[];
+  summary: string;
+  steps: (string | DeviceText)[];
+  tips?: string[];
 }
 
-interface FAQItem { question: string; answer: string }
-interface TroubleItem { problem: string; cause: string; solution: string }
-
-interface WorkflowStep {
-  step: number;
-  icon: React.ElementType;
-  label: string;
-  title: string;
-  description: string;
-  timing: string;
-}
-
-// ─── Workflow Data ──────────────────────────────────────────────────
-
-const WORKFLOW_STEPS: WorkflowStep[] = [
-  { step: 1, icon: Database, label: 'データ', title: 'データ準備', description: 'ドロー会議システムからデータ読込、ふりがな・所属情報を整備', timing: '大会1週間前〜前日' },
-  { step: 2, icon: Wifi, label: '同期', title: 'マルチデバイス同期', description: '複数端末で同時編集するためのルーム作成・参加（任意）', timing: '大会当日（開始前）' },
-  { step: 3, icon: Users, label: 'エントリー', title: 'エントリー確認', description: '各種目のドロー順確認、当日の欠場者を棄権(Ret)・不戦勝(DEF)処理', timing: '大会当日（受付時）' },
-  { step: 4, icon: Dices, label: '抽選', title: '抽選・ドロー生成', description: 'JTAルール準拠の自動抽選、シード配置・BYE分散・同所属分離', timing: '大会前日〜当日' },
-  { step: 5, icon: Trophy, label: 'ドロー表', title: 'ドロー表確認・調整', description: 'ブラケット/リーグ表示で確認、手動入れ替え・Excel/JPEG出力', timing: '試合開始前' },
-  { step: 6, icon: ClipboardList, label: '対戦順', title: '対戦順の生成', description: '試合一覧を自動生成、Web Speech API / VOICEVOX音声コールで選手呼出', timing: '大会当日' },
-  { step: 7, icon: CalendarClock, label: '時間割', title: '時間割の自動生成', description: 'コート×時間帯のマトリックスに全試合を自動配置', timing: '試合開始前' },
-  { step: 8, icon: MonitorPlay, label: 'スコア', title: 'スコア入力・試合進行', description: 'ブラケット/リーグ上で試合選択→スコア入力→勝者自動進出（2セット+STB対応）', timing: '試合中' },
-  { step: 9, icon: BarChart2, label: 'ダッシュボード', title: 'ライブダッシュボード', description: '大会全体の進行状況、コートマップ、時間超過警告をリアルタイム監視', timing: '終日' },
-  { step: 10, icon: Save, label: '設定', title: 'バックアップ・結果保存', description: '設定ページから Google ドライブ・GitHub・ローカルにデータを保全、結果画像出力', timing: '大会前後' },
-];
-
-// ─── Feature Sections Data ──────────────────────────────────────────
-
-const FEATURE_SECTIONS: FeatureSection[] = [
+const FEATURES: FeatureSection[] = [
   {
-    id: 'sync', icon: Wifi, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'マルチデバイス同期',
-    description: '複数の端末からエントリーや対戦成績をリアルタイムに同期編集できる機能です。受付用iPad・スコア入力用タブレットなど、役割ごとに端末を分けて同時に作業できます。',
-    keyFeatures: [
-      'ルームコード（6桁）によるかんたん接続',
-      '同一端末の複数タブ間同期（サーバー不要・BroadcastChannel）',
-      '別端末間のリアルタイム同期（WebSocket中継サーバー経由）',
-      'Dexie（IndexedDB）の変更を自動検知し即座に他端末へ配信',
-      'ミックスダブルス・団体戦データもスナップショット同期',
-      '新端末参加時にフルデータを自動転送',
-      '接続端末一覧・同期ステータスの表示',
-      '切断時の自動再接続（指数バックオフ）',
+    id: 'data', icon: Database, title: 'データ',
+    summary: '大会データの読み込み・ふりがな・所属の整備',
+    steps: [
+      'ドロー会議システムのバックアップ（JSON）を読み込むと、大会・種目・エントリー・ドローがまとめて入ります。',
+      'ミックスダブルス・団体戦は専用のExcelを読み込みます。読み込むと予選リーグと決勝トーナメントが自動で組まれます。',
+      'ふりがな・所属ふりがなは音声コールの読み上げに使います。誤読があればこの画面で直せます。',
+      'テストデータの投入や全データの削除もこの画面から行えます（削除は二重確認あり）。',
     ],
-    operationSteps: [
-      { step: 1, title: '同期パネルを開く', description: 'メニューの「設定」を開き、「同期」の「同期設定を開く」から同期設定パネルを開きます。' },
-      { step: 2, title: 'ルームを作成（1台目）', description: '端末名を入力し「ルームを作成」をタップ。6桁のルームコードが生成されます。' },
-      { step: 3, title: 'ルームに参加（2台目以降）', description: '他の端末で同じルームコードを入力し「参加」をタップ。既存データが自動転送されます。' },
-      { step: 4, title: '別端末同期の場合', description: '詳細設定で中継サーバーURL（ws://IPアドレス:8787）を入力してからルーム作成/参加します。' },
-    ],
-    tips: [
-      '同一端末の別タブ間ではサーバー設定不要で即座に同期されます',
-      '別端末間の同期にはsync-server（付属）を1台のPCで起動する必要があります',
-      '中継サーバーの起動: sync-server/ フォルダで npm install → node server.mjs',
-      'サーバー起動後に表示されるIPアドレスを各端末の中継サーバーURLに入力してください',
-      '前回のルームコードはアプリに記憶され、ワンタップで再接続できます',
+    tips: ['読み込みの前にバックアップを取っておくと、元に戻せます。'],
+  },
+  {
+    id: 'entry', icon: Users, title: 'エントリー',
+    summary: '出場者の確認・欠場（棄権／不戦勝）の処理',
+    steps: [
+      '種目ごとに出場者とドロー番号を確認します。',
+      '当日欠場は棄権にします。相手はそのまま次の回戦へ進みます。',
+      '氏名の誤りは、ドロー画面の修正メニュー →「名前の修正」からも直せます。直すと対戦表・結果画像にも反映されます。',
     ],
   },
   {
-    id: 'livescore', icon: Radio, iconBg: 'bg-red-100', iconFg: 'text-red-600', title: 'ライブスコア（観戦ページへの実況配信）',
-    description: 'テレビ中継のようなスコアテロップを、1ポイントごとに観戦用ページへリアルタイム配信する機能です。コートサイドの端末で専用画面を開き、選手名をタップするだけでポイントが進みます。',
-    keyFeatures: [
-      '対戦順・タイムテーブル・ドローのどの画面からでも開始できる',
-      '1タップ＝1ポイントの専用入力画面（コートサイド向けの大きなボタン）',
-      'ポイント／ゲーム／セット・デュース・ノーアド・タイブレークを自動計算',
-      '8ゲームマッチ（8-8タイブレーク）／2セットマッチ＋ファイナル10ポイントSTBに対応',
-      'サーブ側の表示・自動交代（タイブレーク中は1ポイント目の後、以降2ポイント毎）',
-      '規定ゲームに到達すると自動で決着し、結果が対戦表・ドローへ反映される',
-      '「1つ戻す」で誤入力を取り消し（確定済みの結果も巻き戻せる）',
-      '観戦ページ「ライブスコア」に中継風スコアボードで即時反映',
+    id: 'referee', icon: ClipboardList, title: '対戦順',
+    summary: '次に行う試合の一覧・コート投入・音声コール',
+    steps: [
+      '空きコートに入れられる試合が上に並びます。',
+      {
+        mobile: '試合をタップ →「コートに入れる」でコートを選びます。呼び出しは同じ画面の音声ボタンから。',
+        pc: '試合を選び「コートに入れる」でコートを選びます。呼び出しは同じ画面の音声ボタンから。複数試合をまとめて呼ぶ一斉コールも使えます。',
+      },
+      '読み上げの声や速さは「設定」→「音声」で変えられます。',
     ],
-    operationSteps: [
-      { step: 1, title: '観戦配信を開始しておく', description: '設定ページの「同期」からルームを作成し、「観戦用ページ」のURLを配布しておきます（未接続だとこの端末の中だけの記録になります）。' },
-      { step: 2, title: '試合を選ぶ', description: '対戦順・タイムテーブル・ドローのいずれかの画面で試合をタップし、スコア入力ダイアログを開きます。' },
-      { step: 3, title: 'ライブスコア開始', description: 'ダイアログ内の「ライブスコア開始」をタップすると、専用のライブスコア画面に切り替わります。' },
-      { step: 4, title: 'ポイントを入力', description: 'ポイントを取った選手のパネルをタップするだけです。ゲーム・セット・タイブレークは自動で進みます。' },
-      { step: 5, title: '終了', description: '規定ゲームに達すると自動で確定し、対戦表・ドローに結果が入ります。棄権等の途中終了は「◯◯勝利で確定」から確定できます。' },
+    tips: ['読み間違いがあるときは「データ」でふりがなを直してください。'],
+  },
+  {
+    id: 'schedule', icon: CalendarClock, title: 'タイムテーブル',
+    summary: 'コート×時間帯に試合を並べた予定表',
+    steps: [
+      '開始時刻と1試合の想定時間を決めると、全試合が自動で並びます。',
+      '並べ替えたあとはExcelに出して印刷・掲示できます。',
+    ],
+    tips: ['タイムテーブルは目安です。実際の進行は「対戦順」と「ドロー」で管理します。'],
+  },
+  {
+    id: 'draw', icon: Network, title: 'ドロー（試合の進行）',
+    summary: 'トーナメント表の確認・スコア入力・あたりの修正',
+    steps: [
+      '上部でクラスを切り替えます。左右の矢印か、クラス名を押して一覧から選べます。',
+      '「ALL 1R〜」の左右で表示する回戦を絞れます。決着した回戦は自動で省かれ、押すと戻せます。',
+      {
+        mobile: '対戦中の枠をタップするとスコア入力が開きます。勝者は自動で次の回戦へ進みます。',
+        pc: '対戦中の枠をクリックするとスコア入力が開きます。勝者は自動で次の回戦へ進みます。',
+      },
+      '右上の設定アイコンから「あたりの修正」「名前の修正」「ゲームルールの変更」ができます。',
+      'リーグ戦のクラスは星取表で表示され、セルから直接スコアを入れられます。',
     ],
     tips: [
-      '配信の速さは画面上部の「配信遅延」で確認できます（中継サーバーとの往復時間）',
-      '観戦者はメニューの「ライブスコア」から見られます。更新操作は不要で自動反映されます',
-      'サーブ順が入れ替わってしまった場合は「サーブ交代」で直せます',
-      'ゲーム数がずれた場合は「ゲーム修正」で現在のセットのゲーム数を直接直せます',
-      '試合が終わっても観戦ページには15分間 FINAL 表示で残ります',
-      '入力を中断したい場合は「ライブスコア配信を終了して削除」（試合結果は残ります）',
+      '勝ち上がりの線は赤、スコアは勝った側が赤・負けた側がグレーです。',
+      'ダブルスはペアを1人ずつ2行に分け、所属もその行の右に出ます。',
     ],
   },
   {
-    id: 'data', icon: Database, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'データ管理',
-    description: 'ドロー会議システムとのデータ連携、選手マスタの管理、ふりがな・所属情報の整備を行うページです。通常大会・ミックスダブルス・団体戦の全形式に対応しています。',
-    keyFeatures: [
-      'ドロー会議システムのバックアップデータ（JSON）を一括読込',
-      'ミックスダブルス・団体戦用Excelデータの読込',
-      'GitHub / Google ドライブからふりがなデータベースを自動同期',
-      'Excelファイルからのふりがな一括インポート',
-      '選手の所属・ふりがなの一覧表示・編集・エクスポート',
-      '所属ふりがな辞書の管理',
-    ],
-    operationSteps: [
-      { step: 1, title: 'ふりがなデータの同期', description: '「ふりがなデータ同期」パネルで、Google ドライブ・GitHub・Excelのいずれかから最新のふりがなデータを取得します。' },
-      { step: 2, title: 'データの読込', description: '通常大会: バックアップJSONまたはGoogle ドライブから読込。ミックス/団体戦: 専用Excelを読込。' },
-      { step: 3, title: '所属・ふりがなの確認', description: '「所属・ふりがな一覧」パネルで所属タブ・ふりがなタブを切り替え、データを確認・編集します。Excel出力/入力も可能です。' },
-    ],
-    tips: [
-      'ふりがな同期の前に、設定ページのバックアップでGitHubトークンまたはGoogle ドライブ接続を設定してください',
-      'データ読込前にバックアップを取ることを推奨します',
-      '所属・ふりがな一覧のExcelインポートで一括修正が効率的です',
-      'ミックスダブルス・団体戦はExcel読込と同時にリーグ対戦表が自動生成されます',
+    id: 'live', icon: BarChart2, title: 'ダッシュボード / ライブ配信',
+    summary: '進行状況の把握と、1ポイントごとの配信',
+    steps: [
+      'ダッシュボードでは進捗・コートの使用状況・時間超過の警告をまとめて見られます。',
+      'ライブ配信はコートサイドの端末で開き、選手名を押すだけでポイントが進みます。観戦用ページにそのまま流れます。',
     ],
   },
   {
-    id: 'entry', icon: Users, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'エントリー登録',
-    description: 'ドロー順に沿った選手のチェックイン管理と、当日の棄権・不戦勝処理を行うページです。通常大会・ミックスダブルス・団体戦で画面が自動切替されます。',
-    keyFeatures: [
-      '全種目のエントリーをドロー順で一覧表示',
-      '選手の出欠確認（チェックイン）機能',
-      '棄権(Ret)・不戦勝(DEF)への切り替えとBYE自動再配置',
-      '種目ごとの折りたたみ表示と検索フィルター',
-      'ドロー確定済み種目のロック表示（誤操作防止）',
-      'ミックスダブルス: チーム単位の出欠管理・リーグ間移動',
-      '団体戦: チームメンバーの編集・表示名変更',
-    ],
-    operationSteps: [
-      { step: 1, title: '種目の選択', description: '画面上部で種目を選択するか、全種目表示モードで一括確認します。' },
-      { step: 2, title: '出欠確認', description: '各選手の行をタップして出欠を確認します。チェックマークが付きます。' },
-      { step: 3, title: '棄権・DEF処理', description: '欠場者の「棄権」ボタンを押すとwithdrawn/DEF状態に変更され、BYEが自動再配置されます。' },
-      { step: 4, title: '確認完了', description: '全員のチェックインが完了したら「抽選」ステップに進みます。' },
-    ],
-    tips: [
-      'ドロー確定後に棄権が発生しても、BYE位置が自動再計算されます',
-      '試合生成済み種目はロックアイコンが表示されます',
-      '検索バーで素早く選手を検索できます',
-      'ミックスダブルスではチームのリーグ間移動が可能です',
+    id: 'print', icon: Printer, title: '印刷',
+    summary: '賞状・審判用紙などの印刷',
+    steps: [
+      '賞状は優勝・準優勝などの候補から選ぶか、手入力でも作れます。',
+      '大会データが無くても印刷だけは使えます。',
     ],
   },
   {
-    id: 'draw-lot', icon: Dices, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: '抽選・ドロー作成',
-    description: 'JTA（日本テニス協会）ルールに準拠した自動ドロー生成を行います。',
-    keyFeatures: [
-      'ドローサイズの自動決定（4/8/16/32/64/128）',
-      'ランキングポイント順のシード自動配置',
-      'BYEのシード対抗位置への均等分散',
-      '同所属選手の1回戦対戦回避（スワップアルゴリズム）',
-      '何度でも再抽選が可能',
+    id: 'settings', icon: Settings, title: '設定',
+    summary: '同期・観戦用ページ・音声・バックアップ',
+    steps: [
+      '同期：ルームを作る／参加する。同じルームの端末どうしでデータが揃います。',
+      '観戦用ページ：参加者・協会HP向けの読み取り専用ページ。URLをコピーして配れます。',
+      '音声：読み上げのエンジン（端末内蔵／Gemini）・声・速さを選べます。',
+      'バックアップ：端末にJSONで保存、または Google ドライブへ保存・復元します。',
     ],
-    operationSteps: [
-      { step: 1, title: '種目の選択', description: '上部のドロップダウンから対象種目を選択します。' },
-      { step: 2, title: '抽選の実行', description: '「抽選を実行する」ボタンで自動ドロー生成。結果がプレビュー表示されます。' },
-      { step: 3, title: '結果の確認', description: 'ドロー位置・シード番号・選手名・所属・ポイントを確認。同所属の1回戦対戦がないかチェック。' },
-      { step: 4, title: '確定して保存', description: '問題なければ「確定して保存」で保存。保存後もドロー表画面で手動調整可能です。' },
-    ],
-    tips: [
-      'エントリー数に応じて最適なドローサイズが自動選択されます',
-      '保存済みドローがある場合は「再抽選を実行」で何度でもやり直せます',
-      'シード数もエントリー数に応じて自動決定されます（例: 16ドロー → 最大4シード）',
-    ],
-  },
-  {
-    id: 'draw-table', icon: Trophy, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー表プレビュー・調整',
-    description: 'トーナメントブラケットまたはリーグ（総当たり）形式で表示し、手動調整やExcel/JPEG出力を行います。',
-    keyFeatures: [
-      'トーナメント表示とリーグ（総当たり表）表示の切替',
-      'ドラッグ＆ドロップ / タップ選択による1回戦枠の位置入れ替え',
-      'ドローのExcel出力（ブラケット形式）',
-      '試合結果のJPEG画像出力',
-      '試合結果のExcel出力',
-      'ドロータイプの自動検出（少人数 → リーグ自動選択）',
-      'リーグ戦は使用コート（1〜2面）をリーグ単位で割り当て、空いたら次の対戦をタップで投入',
-      'ゲームルール（回戦別・熱中症時）の修正（種目名の下のルール表示をタップ）',
-      '3位決定戦（準決勝の敗者同士）の追加。準決勝が終わると自動で組み合わせが入る',
-      'エントリー確定後の選手名・ふりがな・所属の修正（「名前を修正」→枠をタップ）',
-    ],
-    operationSteps: [
-      { step: 1, title: '種目の選択', description: '上部のドロップダウンで対象種目を選択します。' },
-      { step: 2, title: '表示モードの切替', description: '「トーナメント」/「リーグ」ボタンで切り替えます。少人数種目は自動リーグ表示。' },
-      { step: 3, title: '位置の入れ替え', description: 'PC: ドラッグ＆ドロップ。スマホ: 1枠目タップ → 入れ替え先タップ。' },
-      { step: 4, title: '3位決定戦・名前の修正', description: '「3位決定戦なし/あり」で切り替え、「名前を修正」をONにして枠をタップすると氏名・ふりがな・所属を直せます。' },
-      { step: 5, title: '変更の保存', description: '入れ替えたら「変更を保存」で保存。未保存の変更は警告表示されます。' },
-      { step: 6, title: '出力', description: '「Excel出力」でドロー表、「結果JPEG」で画像、「結果Excel」で結果入りExcelをダウンロード。' },
-    ],
-    tips: [
-      '入れ替え可能なのは1回戦の枠のみです',
-      '結果JPEG/結果Excelは大会終了後の結果発表に活用してください',
-      '参加者2〜5名かつドローサイズ8以下は自動でリーグ表示になります',
-      'リーグの「使用コート」に割り当てた面は、そのリーグの専有になり他の種目には割り当てられません',
-      '取り込んだルールが違っていたら、ドロー画面・対戦順・スコア入力のどこからでも修正できます',
-      '3位決定戦は決勝の下に表示され、終わるまで結果画像は出ません。結果画像にも決勝と同じ形式で3位決定戦を載せます',
-      '名前の修正は選手マスタごと直すため、同じ選手が出ている他の種目にも反映されます',
-    ],
-  },
-  {
-    id: 'referee', icon: ClipboardList, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '対戦順・音声コール',
-    description: 'ドローから試合一覧を自動生成し、音声コール機能で選手呼び出しを行います。標準はブラウザ内蔵音声（Web Speech API）で、ネット接続なしでコールできます。',
-    keyFeatures: [
-      '1回戦の全対戦カードと2回戦以降の空枠を自動生成',
-      'BYE対戦（不戦勝）の自動walkover処理',
-      '全種目の試合をフラットテーブルで一覧表示（種目・ゲーム数・時間・コート列）',
-      'ブラウザ内蔵音声（標準）または Gemini TTS による音声コール',
-      'ふりがなデータ・所属ふりがなを活用した正確な読み上げ',
-      '音声設定（エンジン・音声・話速・高さ）のカスタマイズ',
-      '試合順Excelインポート（リーグ戦のまとめ入れにも対応）',
-      '種目ごとの個別印刷',
-    ],
-    operationSteps: [
-      { step: 1, title: '試合の確認', description: 'ドロー画面で試合を生成すると、全種目の対戦順が自動表示されます。' },
-      { step: 2, title: '音声コール', description: 'コールボタンでコート番号を入力→選手名・所属・コート番号を音声読み上げ。' },
-      { step: 3, title: '音声設定の調整', description: '設定ページの「音声」から、エンジン（ブラウザ内蔵音声／Gemini TTS）・音声・話速・高さを調整できます。' },
-      { step: 4, title: '印刷', description: '各種目の印刷ボタンで対戦順シートを印刷します。' },
-    ],
-    tips: [
-      '音声コールはChrome（PC）+ 外部スピーカーで最も安定します',
-      'ブラウザ内蔵音声は通信不要で即座に鳴るため、会場の電波が悪くてもコールできます',
-      'ふりがな登録済みの選手は正確な読みでコールされます',
-      '所属のふりがなも設定可能（データ管理ページの所属ふりがな辞書）',
-      'Gemini TTS（より自然な声）を使う場合は、音声設定でエンジンを切り替えてください。失敗時はブラウザ内蔵音声で自動的に読み上げます',
-    ],
-  },
-  {
-    id: 'schedule-sheet', icon: CalendarClock, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'タイムテーブル',
-    description: 'コート×時刻のグリッドで全試合の時間配置を管理します。Excelインポートまたは自動生成に対応。試合ステータスがリアルタイム反映されます。',
-    keyFeatures: [
-      'コートごとのON/OFF切替',
-      '試合所要時間（分）と開始時刻の設定',
-      '全種目の自動スケジューリング（同一選手の連続回避考慮）',
-      'コート×時間帯のマトリックスビュー',
-      '試合ステータス（待機/試合中/終了/不戦勝）のリアルタイム反映',
-      '種目ごとの色分け表示（8色自動割当）',
-      'セルの手動入れ替え・編集',
-      'Excel入出力・印刷対応',
-    ],
-    operationSteps: [
-      { step: 1, title: 'コートの選択', description: '使用するコートにチェックを入れます。' },
-      { step: 2, title: 'パラメータ設定', description: '試合所要時間（デフォルト40分）と開始時刻を設定。' },
-      { step: 3, title: '自動生成またはExcel読込', description: '「自動生成」で全試合を自動配置、またはExcelインポートで既存の時間割を読み込みます。' },
-      { step: 4, title: '手動調整', description: 'セルをクリック→移動先クリックで入れ替え可能です。' },
-      { step: 5, title: '出力', description: '「Excel出力」でダウンロード、「印刷」で紙に出力。' },
-    ],
-    tips: [
-      '同一選手が複数種目にエントリーしている場合の連続対戦を可能な限り回避します',
-      '時間割はページ遷移しても保持されますが、リロードで消えます — 必ず「Excel出力」で保存してください',
-      'Excelインポートで手動作成の時間割を読み込むことも可能です',
-    ],
-  },
-  {
-    id: 'score', icon: MonitorPlay, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'スコアボード（試合進行管理）',
-    description: '試合のステータス管理・スコア入力・勝者記録を行う当日運営の中核画面です。通常大会・ミックスダブルス・団体戦で画面が自動切替されます。',
-    keyFeatures: [
-      'ブラケットビュー: トーナメント表上で試合を直接選択',
-      'リーグビュー: 総当たり表上で試合を選択',
-      'テーブルビュー: 進行中/待機中/終了済みの試合一覧',
-      '試合ステータス遷移: 待機 → 準備完了 → 試合中 → 終了',
-      '勝者の次ラウンド自動進出',
-      'ゲームマッチ（1セット） / 2セット＋スーパータイブレーク（STB）形式対応',
-      '棄権(Ret)・不戦勝(DEF)のスコア入力対応',
-      '回戦別ゲームルールの表示・自動適用',
-      'コートステータスバー・時間超過ハイライト',
-      'ミックスダブルス: 予選リーグ + 決勝トーナメント分離表示',
-      '団体戦: 3試合形式（MIX/WD/MD）のサブマッチ入力・勝敗自動判定',
-      '決勝トーナメント結果のJPEG画像出力',
-    ],
-    operationSteps: [
-      { step: 1, title: '種目の選択', description: 'ドロップダウンまたは左右矢印で種目を選択します。全種目表示モードもあります。' },
-      { step: 2, title: '表示モードの選択', description: '「ブラケット」/「テーブル」を切り替え。ブラケットで全体俯瞰、テーブルで操作効率UP。' },
-      { step: 3, title: '試合の選択', description: 'ブラケット上の対戦カードをタップ、またはテーブルの操作ボタンを使用。' },
-      { step: 4, title: 'ステータス変更', description: '「準備完了」→「試合開始」→ スコア入力 →「勝者選択」の順に操作。経過時間が自動計測されます。' },
-      { step: 5, title: 'スコア記録', description: 'ゲームマッチ: セットスコア（例: 8-2）を入力。2セット+STB: 各セットスコア＋タイブレーク（例: 6-4 4-6 [10-5]）を入力。' },
-    ],
-    tips: [
-      'ブラケットビューは大画面（PC/タブレット）での使用を推奨',
-      'リセットボタンで試合を待機状態に戻せます（次ラウンド進出も取消）',
-      'コートステータスバーで空きコートを素早く確認できます',
-      'テーブルビューで待機中の試合にコートを直接割当可能',
-      '時間超過の試合は赤色ボーダーとパルスアイコンで警告表示されます',
-      '団体戦は2勝先取で勝敗が自動判定されます',
-    ],
-  },
-  {
-    id: 'court-bracket', icon: Network, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'ドロー状況',
-    description: '全種目のトーナメントブラケットを一覧表示し、試合の進行状況を俯瞰的に確認できます。',
-    keyFeatures: [
-      '全種目のブラケットを1画面に集約表示',
-      '試合ステータスに応じた色分け（待機/進行中/終了）',
-      'コート割当済みの試合にコート名を表示',
-      '時間超過のハイライト表示',
-    ],
-    operationSteps: [
-      { step: 1, title: '確認', description: '「ドロー状況」タブを開くと全種目のブラケットが自動表示されます。' },
-      { step: 2, title: '状況把握', description: '色分けで試合進行状況を一目で把握できます。' },
-    ],
-    tips: [
-      '大型モニターに表示しておくと大会全体の状況把握に便利です',
-      'スコアボードとの併用で効率的な運営が可能です',
-    ],
-  },
-  {
-    id: 'dashboard', icon: BarChart2, iconBg: 'bg-gray-100', iconFg: 'text-gray-600', title: 'ライブダッシュボード',
-    description: '大会全体の進行状況をリアルタイムで監視するダッシュボードです。情報バーのティッカーと連動して進捗・コート状況・時間超過警告を表示します。',
-    keyFeatures: [
-      'ドーナツチャートによる全体進捗率の表示',
-      'サマリーカード: 全試合数・試合中・終了・待機中',
-      'スケジュール遅延インジケーター',
-      'テニスコートSVGによるビジュアルコートマップ（会場ブロック対応）',
-      'コートクリックで試合詳細を展開',
-      '種目別進行状況（プログレスバー+現在ラウンド名）',
-      '時間超過コートの赤色ハイライト＋パルスアイコン表示',
-      'リアルタイム自動更新（15秒間隔）',
-      '情報バーティッカーとの連動（進捗・コート・警告が流れる文字で表示）',
-    ],
-    operationSteps: [
-      { step: 1, title: 'ダッシュボードの確認', description: 'LIVEタブを開くだけで全データが自動表示されます。操作不要でリアルタイム更新。' },
-      { step: 2, title: 'コートマップの活用', description: 'コートブロックをクリックで、割り当て済み試合一覧を表示。会場ブロック使用終了時刻の設定も可能。' },
-      { step: 3, title: 'スケジュール確認', description: '遅延インジケーターで予定通りか遅延しているかを確認します。' },
-    ],
-    tips: [
-      'モニター画面に常時表示しておくのに適しています',
-      '別ウィンドウで /live にアクセスすると独立したLIVE画面を表示できます',
-      'スケジュール遅延は時間割で開始時刻を設定した試合のみ計算対象',
-      'リロード不要 — IndexedDBのリアクティブクエリで自動更新されます',
-    ],
-  },
-  {
-    id: 'print', icon: Printer, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: '印刷（賞状）',
-    description: '賞状を印刷するための専用メニューです。試合や順位がまだ確定していなくても開けるので、表彰式の準備を先に進められます。',
-    keyFeatures: [
-      '賞状に刷るのは既定で氏名のみ（賞位・クラス名・所属は必要なときだけ追加で印刷）',
-      '氏名の位置は固定で、賞位・クラス名・所属はその上に積み上がる（項目を増やしても氏名がずれない）',
-      'ダブルスは氏名を入れ替えた賞状をもう1枚自動で印刷（2人それぞれに渡せる）',
-      '大会データから選手・ペア・チームを選んで入れる「選択式」',
-      '大会データが無くても入力できる「手動入力」',
-      '決勝が終わったクラスの優勝・準優勝・第3位をまとめて入れる「入賞者を一括追加」',
-      '名前を後から書き込む用の「優勝〜第3位のひな形」',
-      '毛筆（行書・楷書・太筆）・手書き・明朝など30種類の書体から選択',
-      'PCに入れたフォントを「名前で指定」欄に入力して使うこともできる',
-      '文字の太さ（太字）と、輪郭を太らせる「太さ微調整」で毛筆の線の強さを調整',
-      '市販の賞状用紙に重ねる「文字のみ印刷」と、枠・題字ごと刷る「枠つき」の切替',
-      '用紙サイズ（A4/B4/B5・縦横）、縦書き、位置・文字サイズ・字間（詰めも可）・行間の調整',
-      '画面右にプレビューを常時表示。印刷ボタンは右下に固定',
-      'プレビューに賞状用紙の下地（題字・本文・日付・主催者）を薄く表示して位置合わせ',
-      '実際の賞状用紙を撮った写真を下地に敷くこともできる',
-      '印刷と同じ見た目のプレビュー（印字範囲のガイド付き）',
-      '書式と印刷リストは端末に保存され、次に開いたときも残る',
-    ],
-    operationSteps: [
-      { step: 1, title: '賞状に入れる人を決める', description: '上の一覧から選ぶか、「手動で追加」で直接入力します。ダブルスは氏名の間を全角スペースで区切ります（例: 岸本 健悟　安田 彰汰）。賞位・クラス名は一覧で見分けるための情報で、既定では印刷されません。' },
-      { step: 2, title: '書体・レイアウトを合わせる', description: '「書式設定」を開いてフォントと用紙を選び、「氏名の上下位置」「左右位置」「文字サイズ」を賞状用紙に合わせます。名前が長くて収まらないときは「字間」をマイナスにして詰めます。' },
-      { step: 3, title: 'プレビューで確認', description: '印刷リストの行をタップすると、その賞状が右のプレビューに表示されます。濃い文字が実際に刷られる部分、薄い文字は賞状用紙にすでに刷り込まれている部分の目安です。' },
-      { step: 4, title: '印刷する', description: 'チェックの付いた賞状だけが印刷されます。右上の「◯枚を印刷」から印刷画面を開きます。' },
-    ],
-    tips: [
-      'まず1枚だけ試し刷りして、上下位置・左右位置を微調整してから本番を刷ってください',
-      '書式設定の「用紙の写真」に実際の賞状用紙の写真を入れると、それを下地にして位置を合わせられます。用紙の外側が写らないよう切り抜くと正確です',
-      '薄い下地（題字・本文・日付・主催者）は書式設定の欄で内容を変えられます。印刷には出ません',
-      'ダブルスの行には「×2」と出ます。氏名を入れ替えた分も刷られるので、2人それぞれに渡せます（書式設定で解除できます）',
-      '賞位やクラス名も刷りたいときは、書式設定の「印刷する項目」でチェックを入れてください。氏名の上に足されるだけで、氏名の位置は変わりません',
-      '行の⇄ボタンでペアの順番だけを入れ替えられます',
-      '賞状用紙に重ねて刷るときは「文字のみ印刷」のままにします',
-      '毛筆フォントはインターネットから読み込みます。オフラインのときは端末の明朝体で印刷されます',
-      '「PCのフォント」はWindowsのHG行書体・HG正楷書体などを使います（入っていない端末では游明朝になります）',
-      'もっと本格的な筆字にしたいときは、無料の「衡山毛筆フォント行書」（opentype.jp で配布・商用可・JIS第2水準まで収録）を印刷用のPCに入れると「PCのフォント」から選べます。人名の異体字も出ます',
-      '一覧に無いフォントは「名前で指定」欄にフォント名をそのまま入力すれば使えます（そのPCにインストールされている必要があります）',
-      '毛筆フォントは太さ違いが配信されていないものが多いので、もっと太くしたいときは「太さ微調整」で輪郭を太らせてください',
-      '書式を触りすぎて分からなくなったら「既定に戻す」で標準の設定に戻せます',
-    ],
-  },
-  {
-    id: 'backup', icon: Save, iconBg: 'bg-primary-100', iconFg: 'text-gray-700', title: 'バックアップ・復元（設定ページ）',
-    description: 'メニューの「設定」ページにまとめています。Google ドライブ・GitHub・ローカルファイルでのバックアップ管理を行います。ミックスダブルス・団体戦のデータも含めて一括保全できます。',
-    keyFeatures: [
-      'Google ドライブ連携: OAuth認証でクラウド保存（専用フォルダ管理）',
-      'GitHub連携: Personal Access Tokenでリポジトリ保存',
-      'ローカルJSON: オフラインでもエクスポート/インポート可能',
-      'ミックスダブルス・団体戦のZustandデータも含めたフルバックアップ',
-      '全データ削除（二重確認あり）',
-      'バックアップ一覧表示（日時・サイズ付き）',
-    ],
-    operationSteps: [
-      { step: 1, title: 'バックアップ先の選択', description: 'タブで「Google ドライブ」「ローカル JSON」を切替。' },
-      { step: 2, title: 'Google ドライブの場合', description: '初回はクライアントIDを入力してOAuth認証。接続後「バックアップ保存」で保存。' },
-      { step: 3, title: '復元', description: 'バックアップ一覧から「復元」を選択。現在のデータは全て上書きされます。' },
-      { step: 5, title: 'ローカル保存', description: '「エクスポート」でJSONダウンロード。「インポート」でアップロード復元。' },
-    ],
-    tips: [
-      '大会前日と当日の朝に必ずバックアップを取ってください',
-      '重要な操作の前にもバックアップを推奨',
-      '復元時は現在のデータもバックアップしてから実行してください',
-      'Google ドライブが最も推奨のバックアップ先です',
-    ],
+    tips: ['復元すると今のデータは上書きされます。先に今のデータを保存してから実行してください。'],
   },
 ];
 
-// ─── FAQ Data ───────────────────────────────────────────────────────
+// ─── 困ったとき ─────────────────────────────────────────────────────
 
-const FAQ_ITEMS: FAQItem[] = [
-  { question: 'ドロー会議システムとの連携方法は？', answer: '「データ管理」ページの「データ読込」パネルで、バックアップJSONファイルをインポートするか、Google ドライブから直接読み込みます。ふりがなは「ふりがなデータ同期」パネルで同期できます。' },
-  { question: '当日に選手が棄権した場合は？', answer: '「エントリー」ページで該当選手の「棄権」ボタンを押してください。BYEの位置が自動的に再計算されます。' },
-  { question: '抽選をやり直したい場合は？', answer: '「抽選」ページで「再抽選を実行」をクリックするだけです。何度でもやり直せます。' },
-  { question: 'ドロー表の位置を手動で変更できますか？', answer: 'はい。PCはドラッグ＆ドロップ、スマホは2回タップで位置入れ替え可能です。1回戦の枠のみ対象です。' },
-  { question: 'リーグ戦（総当たり）は対応していますか？', answer: 'はい。参加者2〜5名かつドローサイズ8以下は自動リーグ表示になります。手動切替も可能です。' },
-  { question: '音声コールが動作しません', answer: 'Chrome（PC版）での使用を推奨します。ブラウザの音声合成設定が有効か確認し、外部スピーカーに接続してください。VOICEVOXを使う場合はローカルサーバーが起動しているか確認してください。' },
-  { question: '時間割が保存されません', answer: '時間割データはページ遷移しても保持されますが、ブラウザリロードで消えます。必ず「Excel出力」で保存してください。' },
-  { question: 'データが消えてしまった場合は？', answer: 'バックアップを取っていれば「バックアップ」ページから復元できます。Google ドライブ・ローカルJSONのいずれかから復元してください。' },
-  { question: 'スコアを間違えて入力した場合は？', answer: 'テーブルビューの「リセット」ボタンで試合を待機状態に戻せます。次ラウンドへの進出も取り消されます。' },
-  { question: '複数の大会を同時に管理できますか？', answer: 'ブラウザ内データベースで一度に1つの大会を管理します。切り替える場合はバックアップ→新しいデータインポートの手順で行います。' },
-  { question: 'ミックスダブルス・団体戦のデータはどう管理される？', answer: '通常大会とは別にZustandストア（localStorage）で管理されます。データ管理ページでExcelを読み込むと自動的にリーグ・対戦表が生成されます。バックアップにも含まれます。' },
-  { question: '複数端末で同時に編集できますか？', answer: 'はい。メニューの「設定」から「マルチデバイス同期」パネルを開き、ルームを作成・参加してください。同じルームの端末間でデータがリアルタイム同期されます。別端末間の同期にはWebSocket中継サーバーが必要です。' },
-  { question: '同期サーバーの起動方法は？', answer: 'sync-server/フォルダで「npm install」→「node server.mjs」を実行します。起動後に表示されるIPアドレスとポートを各端末の中継サーバーURLに設定してください。' },
-  { question: '2セット＋STB形式のスコアはどう入力しますか？', answer: 'ゲームルールが2セット+STB形式の種目では、自動的に2セット分のスコア入力欄が表示されます。1-1の場合はタイブレークスコア（10ポイントSTB）の入力欄が追加されます。' },
+const TROUBLES: { problem: string; solution: string }[] = [
+  { problem: 'メニューに「抽選」「ドロー表」が出てこない', solution: 'ミックスダブルス・団体戦の種目があるときだけ出ます。個人戦は「ドロー」で進行します。' },
+  { problem: 'クラスを切り替えても何も表示されない', solution: 'そのクラスのドローがまだありません。「データ」で読み込むか、ミックス・団体戦は「抽選」から作成してください。' },
+  { problem: 'スコアを入れても次の回戦に進まない', solution: '勝者が未確定のままになっていないか確認してください。スコア入力画面で勝者を選び直せます。' },
+  { problem: '結果画像のアイコンが出ない', solution: 'そのクラスの全試合が終わると出ます。途中の状態では表示されません。' },
+  { problem: '音声が鳴らない・読み間違える', solution: '端末の音量とマナーモードを確認してください。読みは「データ」のふりがなで直せます。' },
+  { problem: '他の端末に反映されない', solution: '「設定」→「同期」で、両方の端末が同じルームコードに接続されているか確認してください。' },
+  { problem: 'データが消えた', solution: 'ブラウザの履歴消去やシークレットモードだとデータが残りません。通常のブラウザで使い、こまめにバックアップを取ってください。' },
 ];
 
-// ─── Troubleshooting Data ───────────────────────────────────────────
-
-const TROUBLE_ITEMS: TroubleItem[] = [
-  { problem: 'ドロー会議のデータ読込でエラーが発生', cause: 'バックアップファイルの形式が異なる、またはファイルが破損', solution: 'ドロー会議システムで最新のバックアップを再取得し、正しいJSONファイルを選択してください。' },
-  { problem: 'ふりがな同期で「トークンが設定されていません」と表示', cause: 'バックアップページでGitHubトークンまたはGoogle ドライブ接続が未設定', solution: '先に「バックアップ」ページで接続を設定してください。' },
-  { problem: '抽選で「有効エントリー数: 0組」と表示', cause: '種目にエントリーが未登録、または全員withdrawn', solution: '「エントリー」ページで該当種目を確認してください。' },
-  { problem: 'ドロー表で「表示できるドローが存在しません」', cause: '対象種目の抽選が未実行', solution: '「抽選」ページで対象種目の抽選を実行・保存してください。' },
-  { problem: 'スコア入力後、勝者が次ラウンドに反映されない', cause: '次ラウンドの試合データが未生成の可能性', solution: '対戦順ページで全ラウンド分の試合枠が作成されているか確認してください。' },
-  { problem: '音声コールで選手名が正しく読まれない', cause: 'ふりがなデータが未登録', solution: '「データ管理」ページでふりがなデータを同期するか、手動修正してください。' },
-  { problem: 'Google ドライブのバックアップ一覧が表示されない', cause: 'OAuthトークンの有効期限切れ', solution: 'バックアップページの「再接続」ボタンでOAuth認証をやり直してください。' },
-  { problem: 'ブラウザを閉じたらデータが消えた', cause: 'キャッシュクリアまたはシークレットモードでIndexedDBが消去', solution: '通常モードで使用し、定期的にバックアップを取ってください。' },
-  { problem: 'マルチデバイス同期で接続できない', cause: '中継サーバーが起動していない、またはURLが間違っている', solution: 'sync-server/でnode server.mjsが起動しているか確認し、表示されたIPアドレスとポートを正確に入力してください。同一Wi-Fiネットワーク上にあることも確認してください。' },
-  { problem: '同期中にデータが二重になる', cause: '同じデータが複数端末から同時に作成された', solution: '初回接続時にフルスナップショットが転送されます。問題が続く場合は一度同期を停止し、1台のデータを正とした上で再接続してください。' },
-  { problem: '決勝トーナメントに旧データが残っている', cause: 'リーグ順位変更後にブラケットが自動再生成されていない', solution: 'Ver 2.1以降は順位ハッシュによる自動再生成が実装されています。アプリを最新版に更新してください。' },
+const FAQS: { q: string; a: string | DeviceText }[] = [
+  { q: '当日の欠場はどう処理しますか？', a: '「エントリー」で棄権にします。相手はそのまま次の回戦に進みます。' },
+  { q: 'あたり（組み合わせ）を入れ替えたい', a: {
+    mobile: 'ドロー画面の設定アイコン →「あたりの修正」。入れ替えたい枠を2つタップすると入れ替わります。保存するまで反映されません。',
+    pc: 'ドロー画面の設定アイコン →「あたりの修正」。入れ替えたい枠を2つクリックすると入れ替わります。保存するまで反映されません。',
+  } },
+  { q: '選手名を間違えて登録した', a: 'ドロー画面の設定アイコン →「名前の修正」で直せます。対戦表・結果画像にも反映されます。' },
+  { q: '観戦用ページは誰でも見られますか？', a: 'URLを知っている人が見られます。読み取り専用なので、見た人が結果を変えることはできません。' },
+  { q: '結果画像の横幅を変えたい', a: 'プレビュー上部の「表示幅」を動かすと、トーナメント表の横幅が変わります。設定は次回も引き継がれます。' },
+  { q: '大会をもう1つ管理したい', a: '一度に扱えるのは1大会です。先に今の大会をバックアップしてから、新しいデータを読み込んでください。' },
 ];
 
-// ─── Sub Components ─────────────────────────────────────────────────
+// ─── 部品 ───────────────────────────────────────────────────────────
 
-function WorkflowOverview() {
+function SectionTitle({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub?: string }) {
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-4">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <ArrowRight className="w-5 h-5" />
-          大会運営の流れ
-        </h2>
-        <p className="text-sm text-white/80 mt-0.5">大会の準備から当日運営、結果出力までの全体フロー</p>
+    <div className="flex items-center gap-2.5 mb-3">
+      <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-100 text-primary-600 shrink-0">
+        <Icon className="w-5 h-5" />
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-gray-900">{title}</h2>
+        {sub && <p className="text-xs text-gray-500">{sub}</p>}
       </div>
-      <div className="p-5">
-        <div className="relative">
-          {WORKFLOW_STEPS.map((ws, idx) => {
-            const Icon = ws.icon;
-            return (
-              <div key={ws.step} className="flex gap-4 relative">
-                {/* Timeline line */}
-                {idx < WORKFLOW_STEPS.length - 1 && (
-                  <div className="absolute left-[19px] top-10 w-0.5 h-[calc(100%-16px)] bg-gradient-to-b from-primary-300 to-primary-100" />
-                )}
-                {/* Step circle */}
-                <div className="shrink-0 w-10 h-10 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold shadow-md z-10">
-                  {ws.step}
-                </div>
-                {/* Content */}
-                <div className={`flex-1 pb-6 ${idx === WORKFLOW_STEPS.length - 1 ? 'pb-0' : ''}`}>
-                  <div className="bg-gray-50 rounded-lg border border-gray-100 p-3 hover:border-primary-200 hover:bg-primary-50/30 transition-colors">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon className="w-4 h-4 text-primary-500" />
-                      <span className="font-bold text-gray-900 text-sm">{ws.title}</span>
-                      <span className="text-[10px] bg-primary-100 text-gray-700 px-2 py-0.5 rounded-full font-medium ml-auto whitespace-nowrap">{ws.label}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 leading-relaxed">{ws.description}</p>
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <Clock className="w-3 h-3 text-gray-400" />
-                      <span className="text-[10px] text-gray-400 font-medium">{ws.timing}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FeatureSectionCard({ section, isOpen, onToggle }: { section: FeatureSection; isOpen: boolean; onToggle: () => void }) {
-  const Icon = section.icon;
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
-      >
-        {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
-        <div className={`w-9 h-9 rounded-lg ${section.iconBg} flex items-center justify-center shrink-0`}>
-          <Icon className={`w-5 h-5 ${section.iconFg}`} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="font-bold text-gray-900">{section.title}</span>
-          {!isOpen && <p className="text-xs text-gray-400 truncate mt-0.5">{section.description}</p>}
-        </div>
-      </button>
-
-      {isOpen && (
-        <div className="px-5 pb-5 space-y-5">
-          {/* Description */}
-          <p className="text-sm text-gray-600 leading-relaxed pl-[52px]">{section.description}</p>
-
-          {/* Key Features */}
-          <div className="pl-[52px]">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5" />
-              主な機能
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-              {section.keyFeatures.map((f, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <CheckCircle2 className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
-                  <span>{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Operation Steps */}
-          <div className="pl-[52px]">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5" />
-              操作手順
-            </h4>
-            <div className="space-y-2">
-              {section.operationSteps.map((s) => (
-                <div key={s.step} className="flex gap-3 items-start">
-                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary-500 text-white text-xs font-bold flex items-center justify-center">{s.step}</span>
-                  <div>
-                    <span className="text-sm font-semibold text-gray-800">{s.title}</span>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{s.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tips */}
-          <div className="pl-[52px]">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Lightbulb className="w-3.5 h-3.5" />
-              ポイント・注意点
-            </h4>
-            <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 space-y-1.5">
-              {section.tips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm text-gray-900">
-                  <Lightbulb className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
-                  <span>{tip}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function QuickReferencePanel() {
-  const items = [
-    { icon: Wifi, label: 'マルチデバイス同期', desc: '設定ページの「同期」' },
-    { icon: Smartphone, label: '複数端末', desc: 'ルームコードで接続' },
-    { icon: MousePointerClick, label: 'ドラッグ＆ドロップ', desc: 'ドロー表の枠入替' },
-    { icon: Volume2, label: '音声コール', desc: '対戦順ページのスピーカーボタン' },
-    { icon: Printer, label: '印刷', desc: '各ページの印刷ボタン' },
-    { icon: Search, label: '検索', desc: 'エントリー・所属の検索バー' },
-    { icon: FileSpreadsheet, label: 'Excel入出力', desc: '緑ボタンでインポート/エクスポート' },
-    { icon: Image, label: 'JPEG出力', desc: '結果画像出力（白背景・水色テーマ）' },
-    { icon: GitBranch, label: 'トーナメント', desc: 'ブラケット表示モード' },
-    { icon: LayoutGrid, label: 'リーグ', desc: '総当たり表示モード' },
-    { icon: Upload, label: 'インポート', desc: 'ファイルの読込' },
-    { icon: Download, label: 'エクスポート', desc: 'ファイルの出力' },
-    { icon: RefreshCw, label: 'データ同期', desc: 'クラウドデータの取得' },
-    { icon: Shield, label: 'バックアップ', desc: '設定ページでデータの保全・復元' },
-  ];
-
+function Accordion({
+  icon: Icon, title, summary, open, onToggle, children,
+}: {
+  icon: React.ElementType; title: string; summary: string;
+  open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      <div className="bg-gradient-to-r from-gray-700 to-gray-800 px-5 py-3">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">
-          <Zap className="w-4 h-4" />
-          クイックリファレンス
-        </h2>
-      </div>
-      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-        {items.map((item, i) => {
-          const Icon = item.icon;
-          return (
-            <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
-              <Icon className="w-4 h-4 text-primary-500 shrink-0" />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-gray-800 truncate">{item.label}</div>
-                <div className="text-[10px] text-gray-400 truncate">{item.desc}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function FAQSection({ items, isOpen, onToggle }: { items: FAQItem[]; isOpen: boolean; onToggle: () => void }) {
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
-        {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
-        <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-          <MessageCircleQuestion className="w-5 h-5 text-gray-600" />
-        </div>
-        <div>
-          <span className="font-bold text-gray-900">よくある質問 (FAQ)</span>
-          <span className="text-xs text-gray-400 ml-2">{items.length}件</span>
-        </div>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+        <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 shrink-0">
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-bold text-gray-900 text-sm">{title}</span>
+          <span className="block text-[11px] text-gray-500 truncate">{summary}</span>
+        </span>
+        {open
+          ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
       </button>
-      {isOpen && (
-        <div className="px-5 pb-5 pl-[68px] space-y-2">
-          {items.map((item, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="w-full text-left px-4 py-3 flex items-center gap-2 hover:bg-gray-50/50 transition-colors"
-              >
-                <span className="text-gray-500 font-bold text-sm shrink-0">Q.</span>
-                <span className="text-sm font-medium text-gray-800 flex-1">{item.question}</span>
-                {openIdx === i ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-              </button>
-              {openIdx === i && (
-                <div className="px-4 pb-3 flex gap-2">
-                  <span className="text-primary-500 font-bold text-sm shrink-0">A.</span>
-                  <p className="text-sm text-gray-600 leading-relaxed">{item.answer}</p>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {open && <div className="px-4 pb-4 pt-1 border-t border-gray-100">{children}</div>}
     </div>
   );
 }
 
-function TroubleshootingSection({ items, isOpen, onToggle }: { items: TroubleItem[]; isOpen: boolean; onToggle: () => void }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-border-main overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
-        {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
-        <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-          <AlertTriangle className="w-5 h-5 text-red-600" />
-        </div>
-        <div>
-          <span className="font-bold text-gray-900">トラブルシューティング</span>
-          <span className="text-xs text-gray-400 ml-2">{items.length}件</span>
-        </div>
-      </button>
-      {isOpen && (
-        <div className="px-5 pb-5 pl-[68px] space-y-3">
-          {items.map((item, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-3 space-y-2">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <span className="text-sm font-semibold text-gray-800">{item.problem}</span>
-              </div>
-              <div className="ml-6 space-y-1">
-                <div className="text-xs text-gray-500">
-                  <span className="font-semibold text-gray-600">原因: </span>{item.cause}
-                </div>
-                <div className="text-xs text-gray-800 bg-primary-50 rounded px-2 py-1.5">
-                  <span className="font-semibold">対処法: </span>{item.solution}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Component ─────────────────────────────────────────────────
+// ─── 本体 ───────────────────────────────────────────────────────────
 
 export default function Manual() {
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
-  const [showFaq, setShowFaq] = useState(false);
-  const [showTrouble, setShowTrouble] = useState(false);
+  // 端末の切り替え。初期値は今見ている画面の幅で決める。
+  const [device, setDevice] = useState<Device>(
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches ? 'pc' : 'mobile'
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setDevice(mq.matches ? 'pc' : 'mobile');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
-  const toggleSection = (id: string) => {
-    setOpenSections(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const [openFeature, setOpenFeature] = useState<string | null>('draw');
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const openAll = () => {
-    setOpenSections(new Set(FEATURE_SECTIONS.map(s => s.id)));
-    setShowFaq(true);
-    setShowTrouble(true);
-  };
-  const closeAll = () => {
-    setOpenSections(new Set());
-    setShowFaq(false);
-    setShowTrouble(false);
-  };
+  const isPc = device === 'pc';
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-6 max-w-4xl mx-auto space-y-5">
-      {/* Header */}
-      <header className="bg-white p-5 rounded-xl shadow-sm border border-border-main">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <HelpCircle className="w-6 h-6 text-primary-500" />
-              操作マニュアル
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              大会運営システムの使い方を確認できます。セクションをクリックして詳細を表示してください。
+    <div className="min-h-full bg-gradient-to-b from-gray-50 via-white to-gray-50">
+      <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-6">
+
+        {/* 見出し＋端末の切り替え */}
+        <header className="relative overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl shadow-lg">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white blur-3xl" />
+          </div>
+          <div className="relative px-4 py-4 md:px-6 md:py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm shrink-0">
+                <HelpCircle className="w-6 h-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">マニュアル</h1>
+                <p className="text-[11px] md:text-sm text-primary-50 mt-0.5">実際の画面にそって、当日の使い方を説明します</p>
+              </div>
+            </div>
+            {/* 端末の切り替え */}
+            <div className="mt-3 inline-flex rounded-full bg-white/15 p-0.5 border border-white/25">
+              {([
+                { id: 'mobile' as const, label: 'スマホ', icon: Smartphone },
+                { id: 'pc' as const, label: 'パソコン', icon: Monitor },
+              ]).map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setDevice(o.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors ${
+                    device === o.id ? 'bg-white text-primary-700 shadow-sm' : 'text-white/85 hover:text-white'
+                  }`}
+                >
+                  <o.icon className="w-3.5 h-3.5" />
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-primary-50/90 mt-1.5">
+              {isPc ? 'パソコンでの操作を表示しています。' : 'スマホでの操作を表示しています。'}
             </p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <button onClick={openAll} className="text-xs bg-primary-50 hover:bg-primary-100 text-gray-700 px-3 py-1.5 rounded-md font-medium transition-colors">
-              全て開く
-            </button>
-            <button onClick={closeAll} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-md font-medium transition-colors">
-              全て閉じる
-            </button>
+        </header>
+
+        {/* 1. まずはこれだけ */}
+        <section>
+          <SectionTitle icon={CheckCircle2} title="まずはこれだけ" sub="この3つができれば大会は回せます" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { n: 1, icon: Database, title: 'データを読み込む', text: t({ mobile: 'メニュー →「データ」', pc: '左メニューの「データ」' }, device) },
+              { n: 2, icon: Network, title: 'ドローで進行する', text: t({ mobile: '枠をタップしてスコア入力', pc: '枠をクリックしてスコア入力' }, device) },
+              { n: 3, icon: ImageIcon, title: '結果画像を出す', text: 'クラス終了で画像アイコンが出ます' },
+            ].map(c => (
+              <div key={c.n} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-600 text-white text-[11px] font-black">{c.n}</span>
+                  <c.icon className="w-4 h-4 text-primary-500" />
+                  <span className="font-bold text-gray-900 text-sm">{c.title}</span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">{c.text}</p>
+              </div>
+            ))}
           </div>
-        </div>
-      </header>
+        </section>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto space-y-4">
-        {/* Workflow */}
-        <WorkflowOverview />
+        {/* 2. 画面の見かた */}
+        <section>
+          <SectionTitle
+            icon={Eye}
+            title="画面の見かた"
+            sub={isPc ? 'パソコンの画面で説明します' : 'スマホの画面で説明します'}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <ScreenFigure
+              title={isPc ? 'メニュー（画面の左に出たままになります）' : 'メニュー（右上の三本線で開きます）'}
+              points={[
+                { n: 1, text: isPc ? '「‹|」を押すとアイコンだけの細いメニューになります。もう一度押すと戻ります。' : '三本線を押すと画面いっぱいにメニューが開きます。もう一度押すと閉じます。' },
+                { n: 2, text: '同期・観戦用ページ・音声・バックアップは「設定」にまとまっています。' },
+                { n: 3, text: '協会ロゴを押すと鳥取市テニス協会のホームページが開きます（右下のアイコンが目印）。' },
+              ]}
+            >
+              <MenuMockup device={device} />
+            </ScreenFigure>
 
-        {/* Quick Reference */}
-        <QuickReferencePanel />
+            <ScreenFigure
+              title="ドロー画面の上部"
+              points={[
+                { n: 1, text: 'クラス名。左右の矢印で切り替え、名前を押すと一覧から選べます。' },
+                { n: 2, text: 'そのクラスの進み具合（終わった試合数）。' },
+                { n: 3, text: '表示する回戦。「ALL 1R〜」から右で先の回戦だけに絞れます。押すと自動に戻ります。' },
+                { n: 4, text: '結果画像。クラスの全試合が終わると出ます。' },
+                { n: 5, text: 'あたり・名前・ゲームルールの修正メニュー。' },
+              ]}
+            >
+              <DrawHeaderMockup />
+            </ScreenFigure>
 
-        {/* Feature Sections */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 px-1">
-            <BookOpen className="w-4 h-4" />
-            機能別ガイド
-          </h2>
-          {FEATURE_SECTIONS.map(section => (
-            <FeatureSectionCard
-              key={section.id}
-              section={section}
-              isOpen={openSections.has(section.id)}
-              onToggle={() => toggleSection(section.id)}
-            />
-          ))}
-        </div>
+            <ScreenFigure
+              title="ドロー表の枠の見かた"
+              points={[
+                { n: 1, text: 'ドロー番号（ペアの真ん中に区切って出ます）。' },
+                { n: 2, text: 'ダブルスはペアを1人ずつ2行で表示します。' },
+                { n: 3, text: '所属。2人で違うときはそれぞれの行に出ます。' },
+                { n: 4, text: 'スコア。勝った側が赤、負けた側がグレーです。' },
+                { n: 5, text: '勝ち上がりの線は赤くなり、勝者が次の回戦へ進みます。' },
+              ]}
+            >
+              <DrawCardMockup />
+            </ScreenFigure>
 
-        {/* FAQ */}
-        <FAQSection items={FAQ_ITEMS} isOpen={showFaq} onToggle={() => setShowFaq(!showFaq)} />
+            <ScreenFigure
+              title={isPc ? '試合中の枠（クリックでスコア入力）' : '試合中の枠（タップでスコア入力）'}
+              points={[
+                { n: 1, text: '入っているコート番号。試合中は枠が点滅します。' },
+                { n: 2, text: t({ mobile: '枠をタップするとスコア入力が開きます。', pc: '枠をクリックするとスコア入力が開きます。' }, device) },
+              ]}
+            >
+              <MatchCardMockup device={device} />
+            </ScreenFigure>
 
-        {/* Troubleshooting */}
-        <TroubleshootingSection items={TROUBLE_ITEMS} isOpen={showTrouble} onToggle={() => setShowTrouble(!showTrouble)} />
+            <ScreenFigure
+              title={isPc ? '設定ページ（開いた状態で表示されます）' : '設定ページ（畳んだ状態で表示されます）'}
+              points={[
+                { n: 1, text: isPc ? '見出しを押すと畳めます。' : '見出しを押すと開きます。使う項目だけ開いてください。' },
+              ]}
+            >
+              <SettingsMockup device={device} />
+            </ScreenFigure>
+
+            <ScreenFigure
+              title="結果画像のプレビュー"
+              points={[
+                { n: 1, text: '表示幅でトーナメント表の横幅を調整できます（リーグ戦では出ません）。' },
+                { n: 2, text: '保存ボタンでJPEGとして端末に保存します。' },
+              ]}
+            >
+              <ResultPreviewMockup device={device} />
+            </ScreenFigure>
+          </div>
+        </section>
+
+        {/* 3. 当日の流れ */}
+        <section>
+          <SectionTitle icon={Clock} title="大会当日の流れ" sub="上から順に進めれば運営できます" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            {FLOW_STEPS.map((s, i) => (
+              <div key={s.step} className="flex gap-3 relative">
+                {i < FLOW_STEPS.length - 1 && (
+                  <div className="absolute left-[15px] top-9 w-0.5 h-[calc(100%-20px)] bg-primary-100" />
+                )}
+                <span className="shrink-0 w-8 h-8 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-bold z-10">
+                  {s.step}
+                </span>
+                <div className={`flex-1 min-w-0 ${i === FLOW_STEPS.length - 1 ? 'pb-0' : 'pb-4'}`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <s.icon className="w-4 h-4 text-primary-500 shrink-0" />
+                    <span className="font-bold text-gray-900 text-sm">{s.title}</span>
+                    <span className="text-[10px] text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{s.timing}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed mt-1">{t(s.body, device)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 4. 機能ごとの使い方 */}
+        <section>
+          <SectionTitle icon={ClipboardList} title="画面ごとの使い方" sub="見出しを押すと開きます" />
+          <div className="space-y-2">
+            {FEATURES.map(f => (
+              <Accordion
+                key={f.id}
+                icon={f.icon}
+                title={f.title}
+                summary={f.summary}
+                open={openFeature === f.id}
+                onToggle={() => setOpenFeature(openFeature === f.id ? null : f.id)}
+              >
+                <ol className="space-y-2 mt-2">
+                  {f.steps.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-[13px] text-gray-700 leading-relaxed">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                        {i + 1}
+                      </span>
+                      <span>{t(s, device)}</span>
+                    </li>
+                  ))}
+                </ol>
+                {f.tips && f.tips.length > 0 && (
+                  <div className="mt-3 rounded-lg bg-primary-50 border border-primary-100 px-3 py-2">
+                    {f.tips.map((tip, i) => (
+                      <p key={i} className="flex items-start gap-1.5 text-[12px] text-gray-700 leading-relaxed">
+                        <Lightbulb className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />
+                        <span>{tip}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </Accordion>
+            ))}
+          </div>
+        </section>
+
+        {/* 5. 困ったとき */}
+        <section>
+          <SectionTitle icon={AlertTriangle} title="困ったとき" sub="よくあるつまずきと直し方" />
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+            {TROUBLES.map((tr, i) => (
+              <div key={i} className="px-4 py-3">
+                <p className="flex items-start gap-2 text-[13px] font-bold text-gray-900">
+                  <AlertTriangle className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
+                  {tr.problem}
+                </p>
+                <p className="text-[12px] text-gray-600 leading-relaxed mt-1 pl-6">{tr.solution}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 6. よくある質問 */}
+        <section>
+          <SectionTitle icon={MessageCircleQuestion} title="よくある質問" />
+          <div className="space-y-2">
+            {FAQS.map((f, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex-1 text-[13px] font-bold text-gray-900">{f.q}</span>
+                  {openFaq === i
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+                </button>
+                {openFaq === i && (
+                  <p className="px-4 pb-3 text-[12px] text-gray-600 leading-relaxed border-t border-gray-100 pt-2">
+                    {t(f.a, device)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 音声・配信の補足 */}
+        <section className="bg-white rounded-xl border border-gray-200 p-4">
+          <SectionTitle icon={Volume2} title="音声コールと配信について" />
+          <ul className="space-y-1.5 text-[12px] text-gray-600 leading-relaxed">
+            <li className="flex gap-2"><Radio className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />ライブ配信はコートサイドの端末で開き、選手名を押すだけでポイントが進みます。</li>
+            <li className="flex gap-2"><Volume2 className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />読み上げは端末内蔵の音声が既定です。より自然な声にしたいときは「設定」→「音声」で切り替えます。</li>
+            <li className="flex gap-2"><Wifi className="w-3.5 h-3.5 text-primary-500 shrink-0 mt-0.5" />同期していないと、他の端末や観戦用ページには反映されません。</li>
+          </ul>
+        </section>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-gradient-to-r from-primary-500/10 to-primary-500/5 rounded-xl p-4 text-center text-xs text-gray-500 border border-primary-100">
-        大会運営システム Ver 2.2 — 鳥取市テニス協会
-      </footer>
     </div>
   );
 }

@@ -62,8 +62,12 @@ const SCORE_GRAY = '#767676';
 const SLOT_HEIGHT = 36;
 // ダブルスはペアを1人ずつ2行（氏名＋所属）で表示するので枠を高くする。
 const SLOT_HEIGHT_DOUBLES = 52;
-const Y_SPACING = 64;
-const Y_SPACING_DOUBLES = 80;
+/**
+ * 先頭列に並べる枠どうしの余白。
+ * 全回戦表示でも回戦を隠したときでも同じ余白で並ぶよう、
+ * 「枠の高さ＋この値」を共通の行ピッチとして使う。
+ */
+const LEAF_GAP = 16;
 const OFFSET_Y = 40;
 // vs表示（両者確定）のカードは氏名＋所属を上下2段で表示するため背が高い。
 // コート番号を左側に大きく表示し、氏名・所属も読みやすい大きさにするため背を高くする。
@@ -99,10 +103,11 @@ export default function CourtBracketView({
 }: CourtBracketViewProps) {
   const isMobile = useIsMobile();
   const isDoubles = eventType === 'Doubles';
-  // ダブルスはペアを1人ずつ2行で書くため、枠・間隔・カード高さを1段大きくする。
+  // ダブルスはペアを1人ずつ2行で書くため、枠・カード高さを1段大きくする。
   const slotH = isDoubles ? SLOT_HEIGHT_DOUBLES : SLOT_HEIGHT;
-  const ySpacing = isDoubles ? Y_SPACING_DOUBLES : Y_SPACING;
   const cardHVs = isDoubles ? CARD_H_VS_DOUBLES : CARD_H_VS;
+  // 選手の枠が等間隔で並ぶ行ピッチ（全回戦表示・回戦を隠したときで共通）
+  const ySpacing = slotH + LEAF_GAP;
   // 所属を省略せず表示しつつ、幅は最適化（広すぎない）
   const slotW = isDoubles ? (isMobile ? 220 : 285) : (isMobile ? 185 : 205);
   const xSpacing = isMobile ? 56 : 78;
@@ -190,9 +195,13 @@ export default function CourtBracketView({
       }
     }
   } else {
-    // 隠した回戦の分だけ縦に詰める。先頭列は対戦カード（背の高いvs表示）に
-    // なりうるので、カード高さ分の間隔を確保する。
-    const LEAF_SPACING = cardHVs + 16;
+    // 隠した回戦の分だけ縦に詰める。全回戦表示と同じ間隔で並べたいので、
+    // 先頭列に背の高い vs 表示のカードが無いときは同じ行ピッチを使う。
+    // （vs 表示があるときだけ、重ならないようカード高さ分の間隔にする）
+    const leafHasVsCard = matchResults.some(m =>
+      m.round === leafRound && m.player1Name && m.player2Name
+      && m.status !== 'finished' && m.status !== 'walkover');
+    const LEAF_SPACING = (leafHasVsCard ? cardHVs : slotH) + LEAF_GAP;
     for (let i = 0; i < leafCount; i++) {
       // 上半分と下半分の間に軽い区切りを入れる
       if (i > 0 && i === leafCount / 2) nextCompactY += LEAF_SPACING * 0.4;
@@ -367,8 +376,8 @@ export default function CourtBracketView({
         const raw = matchResult.score.trim();
         // タイブレークの得点は落とした側に "6(4)" のように付き、Ret / W.O は注記として分かれる
         const parts = parseScoreParts(raw);
-        const scorePx = isMobile ? 16 : 18;
-        const notePx = isMobile ? 10 : 11;
+        const scorePx = isMobile ? 20 : 22;
+        const notePx = isMobile ? 11 : 12;
         // 文字が次の回戦のカードに重ならないよう、右端を見て開始位置を決める
         const estW = (val: string, px: number) => val.length * px * 0.66;
         if (parts?.hasGames) {
@@ -383,7 +392,7 @@ export default function CourtBracketView({
           const sx = Math.min(xMid + 5, xNext - 3 - w);
           const scoreText = (key: string, y: number, val: string, win: boolean) => (
             <text key={key} x={sx} y={y} fill={win ? WIN_RED : SCORE_GRAY}
-              fontSize={scorePx} fontWeight={win ? 800 : 700} textAnchor="start">
+              fontSize={scorePx} fontWeight={win ? 900 : 800} textAnchor="start">
               {val}
             </text>
           );
@@ -406,7 +415,7 @@ export default function CourtBracketView({
             notes.forEach((text, i) => {
               paths.push(
                 <text key={`sN-${r}-${m}-${i}`} x={nsx} y={baseY + dir * (i + 1) * (notePx + 3)}
-                  fill={SCORE_GRAY} fontSize={notePx} fontWeight="600" textAnchor="start">
+                  fill={SCORE_GRAY} fontSize={notePx} fontWeight="700" textAnchor="start">
                   {text}
                 </text>
               );

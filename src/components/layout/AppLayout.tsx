@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Database, Users, Dices, Trophy, Swords,
   ClipboardList, CalendarClock, BarChart2,
-  HelpCircle, Settings,
+  HelpCircle, Settings, ExternalLink,
   AlertTriangle, Network, Menu, X,
   PanelLeftClose, PanelLeftOpen, Radio, Printer, ArrowRight
 } from 'lucide-react';
@@ -331,7 +331,7 @@ export default function AppLayout() {
         </nav>
 
         {/* フッター：左下に協会ロゴ（押すと協会HP）・右下にバージョン */}
-        <div className="border-t border-white/20 px-2.5 py-2.5 shrink-0">
+        <div className="px-2.5 py-2.5 shrink-0">
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-2">
               <AssociationLogoLink className="menu-logo-link menu-logo-link-sm" />
@@ -488,6 +488,8 @@ function AssociationLogoLink({ className = '' }: { className?: string }) {
         alt="鳥取市テニス協会"
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
       />
+      {/* 外部リンクだと分かるよう、ロゴの右下に小さく重ねる */}
+      <ExternalLink className="menu-logo-link-icon" strokeWidth={2.5} />
     </a>
   );
 }
