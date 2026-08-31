@@ -367,8 +367,8 @@ export default function CourtBracketView({
         const raw = matchResult.score.trim();
         // タイブレークの得点は落とした側に "6(4)" のように付き、Ret / W.O は注記として分かれる
         const parts = parseScoreParts(raw);
-        const scorePx = isMobile ? 12 : 13;
-        const notePx = isMobile ? 9 : 10;
+        const scorePx = isMobile ? 16 : 18;
+        const notePx = isMobile ? 10 : 11;
         // 文字が次の回戦のカードに重ならないよう、右端を見て開始位置を決める
         const estW = (val: string, px: number) => val.length * px * 0.66;
         if (parts?.hasGames) {
@@ -388,8 +388,10 @@ export default function CourtBracketView({
             </text>
           );
           // 合流点(yMid)を挟んで上に上側選手のスコア、下に下側選手のスコア
-          paths.push(scoreText(`sT-${r}-${m}`, yMid - 5, p1Main, topWin));
-          paths.push(scoreText(`sB-${r}-${m}`, yMid + 15, p2Main, botWin));
+          const topBaseY = yMid - 5;
+          const botBaseY = yMid + scorePx + 3;
+          paths.push(scoreText(`sT-${r}-${m}`, topBaseY, p1Main, topWin));
+          paths.push(scoreText(`sB-${r}-${m}`, botBaseY, p2Main, botWin));
 
           // タイブレークの得点・Ret / W.O は負けた側の外側にグレーの小さな文字で添える
           const notes = [
@@ -399,7 +401,7 @@ export default function CourtBracketView({
           if (notes.length > 0) {
             const loserIsTop = !topWin;
             const dir = loserIsTop ? -1 : 1;
-            const baseY = loserIsTop ? yMid - 5 : yMid + 15;
+            const baseY = loserIsTop ? topBaseY - (scorePx - notePx) : botBaseY;
             const nsx = Math.min(xMid + 5, xNext - 3 - Math.max(...notes.map(n => estW(n, notePx))));
             notes.forEach((text, i) => {
               paths.push(

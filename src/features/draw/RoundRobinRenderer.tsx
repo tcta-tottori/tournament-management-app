@@ -178,7 +178,10 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-gray-400 tabular-nums">{rowIdx + 1}</span>
-                        <span className="font-bold text-gray-800 leading-tight">
+                        {/* 優勝（1位）のペア・選手は赤文字にする */}
+                        <span className={`font-bold leading-tight ${
+                          allFinished && rank === 1 ? 'text-red-600' : 'text-gray-800'
+                        }`}>
                           {nameLines.map((line, i) => <div key={i}>{line}</div>)}
                         </span>
                         {affLines.length > 0 && (
@@ -197,8 +200,9 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                         <td
                           key={`cell-${rowIdx}-${colIdx}`}
                           onClick={clickable ? () => onCellSelect!(cell.match!.round, cell.match!.position) : undefined}
+                          // 結果画像と同じ体裁：勝った側は淡い赤地、負けた側は白地
                           className={`border-t border-l border-gray-200 px-2 py-2.5 text-center relative ${
-                            isSelf ? 'bg-gray-100' : ''
+                            isSelf ? 'bg-gray-100' : cell.text ? (cell.isWin ? 'bg-red-50' : 'bg-white') : ''
                           } ${clickable ? 'cursor-pointer hover:bg-primary-50' : ''}`}
                         >
                           {isSelf ? (
@@ -207,13 +211,10 @@ export default function RoundRobinRenderer({ slots, matchResults = [], onCellSel
                               <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d1d5db" strokeWidth="1.2" />
                             </svg>
                           ) : cell.text ? (
-                            cell.isWin ? (
-                              <span className="inline-block rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[13px] font-bold text-red-600">
-                                {cell.text}
-                              </span>
-                            ) : (
-                              <span className="text-[13px] text-gray-500">{cell.text}</span>
-                            )
+                            // バッジにはせず、勝者=赤・敗者=グレーの文字だけで見せる
+                            <span className={`text-[14px] font-bold ${cell.isWin ? 'text-red-600' : 'text-gray-500'}`}>
+                              {cell.text}
+                            </span>
                           ) : clickable ? (
                             <span className="text-[10px] text-gray-300">入力</span>
                           ) : (
