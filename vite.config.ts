@@ -43,22 +43,37 @@ export default defineConfig({
           },
         ],
       },
-      includeAssets: ['logo.png'],
+      includeAssets: [
+        'favicon.ico',
+        'favicon-96.png',
+        'apple-touch-icon.png',
+        'logo.png',
+      ],
       manifest: {
         name: '大会運営統合Webアプリケーション',
         short_name: '大会運営アプリ',
         description: '鳥取県テニス協会 大会運営統合Webアプリケーション',
         theme_color: '#ffffff',
+        background_color: '#ffffff',
         icons: [
           {
-            src: 'logo.png',
+            src: 'icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            src: 'logo.png',
+            src: 'icon-512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            // Android のアダプティブアイコン用（中央80%の安全領域に収めた白背景版）
+            src: 'icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       }
