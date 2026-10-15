@@ -1,6 +1,7 @@
 import type {
   MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding,
-  PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry, TournamentInfo
+  PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry, TournamentInfo,
+  BracketLayout, ConsolationSource
 } from './types';
 
 /** 3チームリーグの対戦順（①-② ②-③ ①-③） */
@@ -311,9 +312,10 @@ export function distributeToSlots<T>(entries: T[], drawSize: number): (T | null)
  */
 export function generateAllBrackets(
   standings: Map<string, LeagueStanding[]>,
-  _allTeams: MixedTeam[],
+  allTeams: MixedTeam[],
   leagues: MixedLeague[],
-  bracketOrders?: TournamentInfo['bracketOrders']
+  bracketOrders?: TournamentInfo['bracketOrders'],
+  bracketLayouts?: TournamentInfo['bracketLayouts'],
 ): PlacementBracket[] {
   const leagueIds = leagues.map(l => l.leagueId.trim());
   const maxTeamsInLeague = leagues.reduce((max, l) => Math.max(max, l.teams.length), 0);
@@ -326,12 +328,16 @@ export function generateAllBrackets(
   ];
   // 3ペアリーグのみの大会では4位トーナメントは開催されない
   const categories = allCategories.filter(c =>
-    c.rank <= maxTeamsInLeague || (bracketOrders?.[c.cat as '2nd' | '3rd' | '4th']?.length ?? 0) > 0
+    c.rank <= maxTeamsInLeague
+    || (bracketOrders?.[c.cat as '2nd' | '3rd' | '4th']?.length ?? 0) > 0
+    || !!bracketLayouts?.[c.cat]
   );
 
   const brackets: PlacementBracket[] = [];
 
   for (const { cat, label, rank } of categories) {
+    // Excel のトーナメント表から形（BYE位置・試合番号・コンソレーション）が読めていればそれに従う
+    const layout = bracketLayouts?.[cat];
     // 全チームをリーグID→チーム情報のマップとして収集
     const teamByLeague = new Map<string, { teamId: string; teamName: string; leagueId: string }[]>();
     for (const lid of leagues.map(l => l.leagueId)) {
@@ -357,14 +363,20 @@ export function generateAllBrackets(
         }
       }
       const entryCount = Math.max(teamsForBracket.length, leagueIds.length);
-      const drawSize = Math.max(4, nextPowerOf2(entryCount));
       // BYE位置だけ決めておき、チームは抽選で配置する
-      const layout = drawSize === 16 && entryCount === 13
-        ? DEFAULT_1ST_LAYOUT_13   // 従来のドロー表通りの配置を維持
-        : distributeToSlots(leagueIds.slice(0, entryCount), drawSize);
-      const byePositions = layout.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0);
+      let slotLayout: (string | null)[];
+      if (layout) {
+        slotLayout = layout.slots;
+      } else {
+        const size = Math.max(4, nextPowerOf2(entryCount));
+        slotLayout = size === 16 && entryCount === 13
+          ? DEFAULT_1ST_LAYOUT_13   // 従来のドロー表通りの配置を維持
+          : distributeToSlots(leagueIds.slice(0, entryCount), size);
+      }
+      const drawSize = slotLayout.length;
+      const byePositions = slotLayout.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0);
       const matches = generateBracketMatchesWithSlots(cat, drawSize, Array(drawSize).fill(null));
-      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches, byePositions });
+      brackets.push(applyLayout({ category: cat, label, drawSize, teams: teamsForBracket, matches, byePositions }, layout));
       continue;
     }
 
@@ -372,7 +384,9 @@ export function generateAllBrackets(
     const orderEntries = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
     const defaultMap = BRACKET_SLOT_MAP[cat];
     let slotCodes: (string | null)[];
-    if (orderEntries && orderEntries.length > 0) {
+    if (layout) {
+      slotCodes = layout.slots;
+    } else if (orderEntries && orderEntries.length > 0) {
       slotCodes = distributeToSlots(orderEntries, Math.max(4, nextPowerOf2(orderEntries.length)));
     } else if (defaultMap && slotMapFitsLeagues(defaultMap, leagueIds)) {
       slotCodes = defaultMap;
@@ -408,14 +422,110 @@ export function generateAllBrackets(
     const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
       .map((t, i) => ({ ...t, seedPosition: i + 1 }));
     const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
-    brackets.push({
+    brackets.push(applyLayout({
       category: cat, label, drawSize, teams: teamsForBracket, matches,
       slotLeagueIds: slotCodes,
       byePositions: slotCodes.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0),
-    });
+    }, layout));
   }
 
-  return brackets;
+  return brackets.map(b => finalizeBracket(b, allTeams));
+}
+
+/** Excel から読んだ試合番号・コンソレーションの定義をブラケットに持たせる */
+function applyLayout(bracket: PlacementBracket, layout: BracketLayout | undefined): PlacementBracket {
+  if (!layout) return bracket;
+  return { ...bracket, matchNumbers: layout.matchNumbers, consolation: layout.consolation };
+}
+
+// =============================================
+// コンソレーション
+//
+// 「❶敗者-❷敗者」「❽勝者-❸敗者」のように、本戦（またはコンソレ）の
+// 試合結果から出場ペアが決まる。結果が入る・直るたびに組み直す。
+// =============================================
+
+/** コンソレーションの試合ID */
+export function consolationMatchId(category: PlacementCategory, number: number): string {
+  return `bracket-${category}-C${number}`;
+}
+
+/** 試合番号を丸数字にする（1 → ❶） */
+export function blackCircled(n: number): string {
+  if (n >= 1 && n <= 10) return String.fromCodePoint(0x2776 + n - 1);
+  if (n >= 11 && n <= 20) return String.fromCodePoint(0x24EB + n - 11);
+  return `#${n}`;
+}
+
+/** 出場元の表記（例: 「❶敗者」） */
+export function consolationSourceLabel(src: ConsolationSource): string {
+  return `${blackCircled(src.number)}${src.result === 'winner' ? '勝者' : '敗者'}`;
+}
+
+/**
+ * 試合番号の付与とコンソレーション試合の生成・組み直しを行う。
+ * 本戦を組み直した（抽選・ドロー編集）あとや、スコアが入るたびに呼ぶ。
+ */
+export function finalizeBracket(bracket: PlacementBracket, allTeams: MixedTeam[]): PlacementBracket {
+  const numbers = bracket.matchNumbers;
+  const defs = bracket.consolation;
+  if (!numbers && !defs?.length) return bracket;
+
+  const main = bracket.matches
+    .filter(m => !m.isConsolation)
+    .map(m => {
+      const n = numbers?.[m.matchId];
+      return n && m.matchNumber !== n ? { ...m, matchNumber: n } : m;
+    });
+  if (!defs?.length) return { ...bracket, matches: main };
+
+  const existing = new Map(bracket.matches.filter(m => m.isConsolation).map(m => [m.matchId, m]));
+  const byNumber = new Map<number, BracketMatch>();
+  for (const m of main) if (m.matchNumber) byNumber.set(m.matchNumber, m);
+
+  const resolve = (src: ConsolationSource): string | null => {
+    const m = byNumber.get(src.number);
+    if (!m || m.status !== 'finished' || !m.winnerId || m.isBye) return null;
+    if (src.result === 'winner') return m.winnerId;
+    return m.winnerId === m.team1Id ? m.team2Id : m.team1Id;
+  };
+  const teamOf = (id: string | null) => (id ? allTeams.find(t => t.teamId === id) : undefined);
+
+  const consolationMatches: BracketMatch[] = [];
+  for (const def of defs) {
+    const matchId = consolationMatchId(bracket.category, def.number);
+    const prev = existing.get(matchId);
+    const t1 = resolve(def.source1);
+    const t2 = resolve(def.source2);
+    const t1Data = teamOf(t1);
+    const t2Data = teamOf(t2);
+    const base: BracketMatch = prev ?? {
+      matchId, category: bracket.category, round: 0, position: def.number,
+      team1Id: null, team2Id: null, team1Name: '', team2Name: '', team1League: '', team2League: '',
+      score1: null, score2: null, tiebreakScore: null, winnerId: null,
+      status: 'waiting', isBye: false, nextMatchId: null, nextSlot: null,
+      isConsolation: true, matchNumber: def.number,
+    };
+    const changed = base.team1Id !== t1 || base.team2Id !== t2;
+    let m: BracketMatch = base;
+    if (changed) {
+      // 出場ペアが変わったら（前の試合のスコア修正など）結果をやり直す
+      m = {
+        ...base,
+        team1Id: t1, team2Id: t2,
+        team1Name: t1Data?.teamName ?? '', team2Name: t2Data?.teamName ?? '',
+        team1League: t1Data?.leagueId ?? '', team2League: t2Data?.leagueId ?? '',
+        score1: null, score2: null, tiebreakScore: null, winnerId: null,
+        status: t1 && t2 ? 'ready' : 'waiting',
+      };
+    } else if (m.status === 'waiting' && t1 && t2) {
+      m = { ...m, status: 'ready' };
+    }
+    consolationMatches.push(m);
+    byNumber.set(def.number, m);
+  }
+
+  return { ...bracket, matches: [...main, ...consolationMatches] };
 }
 
 /**

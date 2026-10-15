@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X, Printer, Settings2, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
-import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
+import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP, blackCircled } from './mixedLogic';
+import ConsolationList from './ConsolationList';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useCallTts } from '../broadcast/useCallTts';
 import CallPreviewDialog, { toCourtCallName } from './CallPreviewDialog';
@@ -273,6 +274,7 @@ export default function MixedBracketView() {
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
   const getRoundLabel = (round: number, totalRounds: number): string => {
+    if (round === 0) return 'コンソレーション';
     const fromFinal = totalRounds - round;
     if (fromFinal === 0) return '決勝';
     if (fromFinal === 1) return '準決勝';
@@ -614,6 +616,17 @@ export default function MixedBracketView() {
           allTeams={useMixedStore.getState().allTeams}
           courtAssignments={bracketCourtAssignments}
           startRound={drawEditMode ? 0 : startRound}
+        />
+      )}
+
+      {/* コンソレーション（Excel のトーナメント表に記載がある場合） */}
+      {currentBracket && (
+        <ConsolationList
+          bracket={currentBracket}
+          allTeams={useMixedStore.getState().allTeams}
+          courtAssignments={bracketCourtAssignments}
+          onMatchClick={openScoreEditor}
+          onCourtClick={openCourtAssign}
         />
       )}
 
@@ -1573,6 +1586,12 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
 
                 return (
                   <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
+                    {/* 要項の試合番号（❶ など）。コンソレーションの「❶敗者」と対応させるため表示する */}
+                    {match.matchNumber && (
+                      <span className="absolute -top-2 -left-2 z-[2] text-base leading-none text-primary-500 bg-white rounded-full">
+                        {blackCircled(match.matchNumber)}
+                      </span>
+                    )}
                     <div
                       onClick={() => onMatchClick(match)}
                       className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all

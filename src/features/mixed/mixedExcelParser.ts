@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { MixedLeague, MixedTeam, MixedPlayer, LeagueMatchScore, MatchOrderEntry, TournamentInfo } from './types';
+import { parseBracketLayouts } from './bracketLayoutParser';
 
 /** 全角英数字を半角に、全角スペースを半角スペースに変換 */
 function toHalfWidth(s: string): string {
@@ -728,6 +729,8 @@ export function parseMixedExcel(file: ArrayBuffer): {
     const bws = wb.Sheets[bracketSheetName];
     const bdata = XLSX.utils.sheet_to_json<unknown[]>(bws, { header: 1 });
     info.bracketOrders = parseBracketOrders(bdata);
+    // BYE位置・試合番号・コンソレーションまで読めた場合はトーナメント表の形をそのまま使う
+    info.bracketLayouts = parseBracketLayouts(bws);
   }
 
   // リストシートがあるか判定

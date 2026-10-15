@@ -4,6 +4,8 @@ import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { autoBracketStartRound, startRoundLabel } from '../mixed/bracketRounds';
+import ConsolationList from '../mixed/ConsolationList';
+import { blackCircled } from '../mixed/mixedLogic';
 import type {
   PlacementCategory,
   PlacementBracket,
@@ -39,6 +41,7 @@ const LEAGUE_BADGE_COLORS: Record<string, string> = {
 };
 
 function getRoundLabel(round: number, total: number): string {
+  if (round === 0) return 'コンソレーション';
   if (round === total) return '決勝';
   if (round === total - 1) return '準決勝';
   if (round === total - 2) return '準々決勝';
@@ -54,6 +57,7 @@ export default function PublicBracketView() {
   const mixedImported = useMixedStore(s => s.isImported);
   const teamImported = useTeamStore(s => s.isImported);
   const mixedBrackets = useMixedStore(s => s.brackets);
+  const mixedAllTeams = useMixedStore(s => s.allTeams);
   const teamBrackets = useTeamStore(s => s.brackets);
   const [selectedCategory, setSelectedCategory] = useState<PlacementCategory>('1st');
   // 表示回戦の手動指定（null = 自動: 決着済みの回戦を省略）。クラスごとに保持する。
@@ -113,7 +117,10 @@ export default function PublicBracketView() {
       />
       <div className="mt-3">
         {mixedImported ? (
-          <MixedBracketDisplay bracket={bracket as PlacementBracket} startRound={startRound} />
+          <div className="space-y-3">
+            <MixedBracketDisplay bracket={bracket as PlacementBracket} startRound={startRound} />
+            <ConsolationList bracket={bracket as PlacementBracket} allTeams={mixedAllTeams} />
+          </div>
         ) : (
           <TeamBracketDisplay bracket={bracket as TeamPlacementBracket} startRound={startRound} />
         )}
@@ -261,6 +268,12 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                       width: MATCH_WIDTH,
                     }}
                   >
+                    {/* 要項の試合番号（コンソレーションの「❶敗者」と対応） */}
+                    {match.matchNumber && (
+                      <span className="absolute -top-2 -left-2 z-[2] text-base leading-none text-primary-500 bg-white rounded-full">
+                        {blackCircled(match.matchNumber)}
+                      </span>
+                    )}
                     <div
                       className={`rounded-lg border-2 overflow-hidden ${
                         match.status === 'playing'
@@ -273,9 +286,9 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                       }`}
                       style={{ height: MATCH_HEIGHT }}
                     >
-                      <MixedSlot match={match} slot="team1" isWinner={w1} isLoser={match.winnerId !== null && !w1} />
+                      <MixedSlot match={match} slot="team1" isWinner={w1} isLoser={match.winnerId !== null && !w1} isByeSlot={match.round === 1 && !!bracket.byePositions?.includes((match.position - 1) * 2 + 0)} />
                       <div className="border-t border-gray-100" />
-                      <MixedSlot match={match} slot="team2" isWinner={w2} isLoser={match.winnerId !== null && !w2} />
+                      <MixedSlot match={match} slot="team2" isWinner={w2} isLoser={match.winnerId !== null && !w2} isByeSlot={match.round === 1 && !!bracket.byePositions?.includes((match.position - 1) * 2 + 1)} />
                       {match.team1Id && match.team2Id && (
                         <div
                           className={`flex items-center justify-center text-[10px] font-medium border-t border-gray-100 py-0.5 ${
@@ -314,11 +327,14 @@ function MixedSlot({
   slot,
   isWinner,
   isLoser,
+  isByeSlot = false,
 }: {
   match: BracketMatch;
   slot: 'team1' | 'team2';
   isWinner: boolean;
   isLoser: boolean;
+  /** 抽選前でも BYE と分かっている枠 */
+  isByeSlot?: boolean;
 }) {
   const teamId = slot === 'team1' ? match.team1Id : match.team2Id;
   const name = slot === 'team1' ? match.team1Name : match.team2Name;
@@ -359,7 +375,7 @@ function MixedSlot({
           isWinner ? 'font-bold text-primary-800' : 'text-gray-700'
         }`}
       >
-        {teamId || name ? name || '―' : <span className="text-gray-300 text-xs">未配置</span>}
+        {teamId || name ? name || '―' : <span className="text-gray-300 text-xs">{isByeSlot ? 'BYE' : '未配置'}</span>}
       </span>
       {defLabel ? (
         <span className={`font-mono font-bold text-xs shrink-0 ${defLabel === 'W.O' ? 'text-gray-400' : 'text-red-500'}`}>

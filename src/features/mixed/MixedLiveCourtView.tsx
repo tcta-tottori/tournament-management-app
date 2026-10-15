@@ -222,7 +222,7 @@ export default function MixedLiveCourtView() {
                       const bm = brackets.flatMap(b => b.matches).find(m => m.matchId === matchId);
                       const bCat = brackets.find(b => b.matches.some(m => m.matchId === matchId));
                       const catLabel = bCat?.category === '1st' ? '1位T' : bCat?.category === '2nd' ? '2位T' : bCat?.category === '3rd' ? '3位T' : '4・5位T';
-                      if (bm) bracketMatchData = { matchId, bm, ca, catLabel };
+                      if (bm) bracketMatchData = { matchId, bm, ca, catLabel: bm.isConsolation ? `${catLabel}コンソレ` : catLabel };
                     }
 
                     const isPlaying = isLeaguePlaying || isBracketPlaying;
@@ -360,7 +360,7 @@ export default function MixedLiveCourtView() {
             const m = elapsed % 60;
             content = (
               <div>
-                <div className="text-base font-black text-gray-800 mb-3">{catLabel}</div>
+                <div className="text-base font-black text-gray-800 mb-3">{catLabel}{bm.isConsolation && ' コンソレーション'}</div>
                 <div className="bg-gray-50 rounded-xl p-3 mb-3">
                   <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
                     <span className="font-mono text-gray-500">{t1?.pairNumber}</span>

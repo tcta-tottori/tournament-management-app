@@ -5,7 +5,12 @@ import type {
   PlacementBracket, PlacementCategory, BracketMatch,
   MixedPhase, TournamentInfo, ExcelSheetData
 } from './types';
-import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches } from './mixedLogic';
+import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches, finalizeBracket } from './mixedLogic';
+
+/** 試合結果・ドローが変わったあと、試合番号とコンソレーションの出場ペアを組み直す */
+function withConsolation(brackets: PlacementBracket[], allTeams: MixedTeam[]): PlacementBracket[] {
+  return brackets.map(b => finalizeBracket(b, allTeams));
+}
 
 interface MixedState {
   // Data
@@ -210,13 +215,13 @@ export const useMixedStore = create<MixedState>()(
       generateBrackets: () => {
         const { leagues, leagueMatches, allTeams, tournamentInfo, rankOverrides } = get();
         const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
-        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders, tournamentInfo?.bracketLayouts);
         set({ brackets, currentPhase: 'tournament' });
       },
 
       updateBracketScore: (matchId, score1, score2, overrideWinnerId, tiebreakScore) => {
         set(state => ({
-          brackets: state.brackets.map(b => ({
+          brackets: withConsolation(state.brackets.map(b => ({
             ...b,
             matches: b.matches.map(m => {
               if (m.matchId !== matchId) return m;
@@ -226,7 +231,7 @@ export const useMixedStore = create<MixedState>()(
               const tb = tiebreakScore !== undefined ? tiebreakScore : null;
               return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
             }),
-          })),
+          })), state.allTeams),
         }));
       },
 
@@ -298,7 +303,7 @@ export const useMixedStore = create<MixedState>()(
               }),
             };
           });
-          return { brackets: newBrackets };
+          return { brackets: withConsolation(newBrackets, state.allTeams) };
         });
       },
 
@@ -526,7 +531,7 @@ export const useMixedStore = create<MixedState>()(
           }
 
           const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };
+          newBrackets[bracketIdx] = finalizeBracket({ ...bracket, teams: reorderedTeams, matches }, state.allTeams);
           return { brackets: newBrackets };
         });
       },
@@ -607,7 +612,7 @@ export const useMixedStore = create<MixedState>()(
           const allBracketTeams = [...assignedTeams, ...unassignedTeams];
 
           const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: allBracketTeams, matches };
+          newBrackets[bracketIdx] = finalizeBracket({ ...bracket, teams: allBracketTeams, matches }, state.allTeams);
           return { brackets: newBrackets };
         });
       },
@@ -627,7 +632,7 @@ export const useMixedStore = create<MixedState>()(
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
 
-        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders, get().tournamentInfo?.bracketLayouts);
         set({ brackets, bracketCourtAssignments: {} });
       },
 
@@ -644,7 +649,7 @@ export const useMixedStore = create<MixedState>()(
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
 
-        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders, tournamentInfo?.bracketLayouts);
 
         // 実際に試合が進行中/完了のブラケットは維持する（'ready'だけでは保護しない）
         // 全カテゴリ（1位/2位/3位/4位）に適用

@@ -29,6 +29,7 @@ const CATEGORY_COLORS: Record<PlacementCategory, string> = {
 };
 
 function getRoundLabel(round: number, totalRounds: number): string {
+  if (round === 0) return 'コンソレーション';
   const fromFinal = totalRounds - round;
   if (fromFinal === 0) return '決勝';
   if (fromFinal === 1) return '準決勝';
@@ -145,7 +146,8 @@ export default function MixedWaitingList() {
       const totalRounds = Math.log2(bracket.drawSize);
       for (const match of bracket.matches) {
         if (match.status === 'ready' && match.team1Id && match.team2Id && !match.isBye) {
-          const priority = match.round * 1000 + match.position;
+          // コンソレーションは1回戦の後に並べる
+          const priority = (match.isConsolation ? 1.5 : match.round) * 1000 + match.position;
           result.push({ match, category: bracket.category, totalRounds, priority });
         }
       }

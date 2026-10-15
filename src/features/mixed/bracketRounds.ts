@@ -19,6 +19,7 @@ export interface RoundMatchLike {
 
 /** 回戦名（決勝 / 準決勝 / 準々決勝 / ◯回戦） */
 export function getBracketRoundLabel(round: number, totalRounds: number): string {
+  if (round === 0) return 'コンソレーション';
   const fromFinal = totalRounds - round;
   if (fromFinal === 0) return '決勝';
   if (fromFinal === 1) return '準決勝';
