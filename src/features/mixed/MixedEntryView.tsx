@@ -1,4 +1,5 @@
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import MixedImportView from './MixedImportView';
 import { MapPin, Pencil, ArrowRightLeft, UserCheck, Users, CheckCircle, AlertTriangle, Search, X, Settings } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -270,7 +271,7 @@ export default function MixedEntryView() {
             <div key={league.leagueId} className={`bg-white rounded-xl shadow-sm border overflow-hidden ${colors.border}`}>
               {/* リーグヘッダー — スマホ用 */}
               <div className={`sm:hidden flex items-center gap-2.5 px-3 py-3 bg-gradient-to-r ${colors.light} border-b ${colors.border}`}>
-                <span className={`w-10 h-10 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-base font-bold rounded-xl flex items-center justify-center shadow-lg shrink-0`}>
+                <span className="w-10 h-10 text-base font-bold rounded-xl flex items-center justify-center shadow-lg shrink-0" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                   {league.leagueId.trim()}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -337,7 +338,7 @@ export default function MixedEntryView() {
                     <tr>
                       {/* リーグ名+コート列 */}
                       <td className={`border border-gray-200 px-3 py-3 align-middle text-center bg-gradient-to-b ${colors.light}`} style={{ minWidth: 120 }}>
-                        <div className={`w-12 h-12 mx-auto bg-gradient-to-br ${colors.from} ${colors.to} text-white text-xl font-bold rounded-xl flex items-center justify-center shadow-lg mb-1.5`}>
+                        <div className="w-12 h-12 mx-auto text-xl font-bold rounded-xl flex items-center justify-center shadow-lg mb-1.5" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                           {league.leagueId.trim()}
                         </div>
                         <div className="font-bold text-sm text-gray-700 mb-1">{league.leagueId.trim()} リーグ</div>

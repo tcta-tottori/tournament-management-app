@@ -1,21 +1,12 @@
 import { useState, useMemo } from 'react';
 import { ClipboardList, Printer, Volume2, VolumeX, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useCallTts } from '../broadcast/useCallTts';
 import CallPreviewDialog from './CallPreviewDialog';
 import { bracketMatchRoundLabel, isConsolation } from './consolation';
 
-/** リーグバッジの色 */
-const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-primary-100 text-gray-800', 'B': 'bg-gray-100 text-gray-700',
-  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-gray-800',
-  'E': 'bg-primary-100 text-gray-800', 'F': 'bg-gray-100 text-gray-700',
-  'G': 'bg-primary-100 text-gray-800', 'H': 'bg-gray-100 text-gray-700',
-  'I': 'bg-primary-100 text-gray-800', 'J': 'bg-gray-100 text-gray-700',
-  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-gray-800',
-  'M': 'bg-primary-100 text-gray-800',
-};
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント', '2nd': '2位トーナメント', '3rd': '3位トーナメント', '4th': '4・5位トーナメント',
@@ -99,6 +90,7 @@ interface WaitingMatch {
 }
 
 export default function MixedWaitingList() {
+  const totalLeagues = useMixedStore(s => s.leagues.length);
   const { brackets, allTeams, leagues, tournamentInfo, assignBracketMatchToCourt, bracketCourtAssignments } = useMixedStore();
   const { speak, stop, isSpeaking } = useCallTts();
   const [speakingMatchId, setSpeakingMatchId] = useState<string | null>(null);
@@ -228,7 +220,7 @@ export default function MixedWaitingList() {
                 { team: team2, league: match.team2League },
               ].map((side, idx) => (
                 <div key={idx} className={`flex items-center gap-2 ${idx === 0 ? 'pb-1.5 border-b border-gray-100 mb-1.5' : ''}`}>
-                  <span className={`w-6 h-6 rounded text-[10px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[side.league?.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`w-6 h-6 rounded text-[10px] font-bold flex items-center justify-center shrink-0`} style={leagueBadgeStyle(side.league, totalLeagues)}>
                     {side.league}
                   </span>
                   {side.team ? (

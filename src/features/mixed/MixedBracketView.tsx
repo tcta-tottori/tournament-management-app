@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, Medal, Award, Users, Shuffle, RotateCcw, Ban, Save, Volume2, X, Printer, Settings2, MapPin } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import { BRACKET_SLOT_MAP as DEFAULT_BRACKET_SLOT_MAP } from './mixedLogic';
 import type { PlacementCategory, BracketMatch, PlacementBracket, MixedTeam } from './types';
 import { useCallTts } from '../broadcast/useCallTts';
@@ -45,16 +46,6 @@ function getWinningGamesFromRules(rules: string[]): number {
   return 6;
 }
 
-/** リーグバッジの色（エントリーページと統一） */
-const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  'A': 'bg-primary-100 text-gray-800', 'B': 'bg-gray-100 text-gray-700',
-  'C': 'bg-gray-100 text-gray-700', 'D': 'bg-primary-100 text-gray-800',
-  'E': 'bg-primary-100 text-gray-800', 'F': 'bg-gray-100 text-gray-700',
-  'G': 'bg-primary-100 text-gray-800', 'H': 'bg-gray-100 text-gray-700',
-  'I': 'bg-primary-100 text-gray-800', 'J': 'bg-gray-100 text-gray-700',
-  'K': 'bg-gray-100 text-gray-700', 'L': 'bg-primary-100 text-gray-800',
-  'M': 'bg-primary-100 text-gray-800',
-};
 
 const CATEGORY_TABS: { id: PlacementCategory; label: string; icon: React.ElementType; color: string }[] = [
   { id: '1st', label: '1位', icon: Trophy, color: 'from-primary-500 to-primary-600' },
@@ -932,6 +923,7 @@ export default function MixedBracketView() {
 
 /** ドロー編集パネル: 1回戦の対戦順を手動で修正 */
 function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
+  const totalLeagues = useMixedStore(s => s.leagues.length);
   const { rebuildBracketFromSlots, regenerateBrackets } = useMixedStore();
   const allTeams = useMixedStore(s => s.allTeams);
   const hasProgress = bracket.matches.some(m => !m.isBye && (m.status === 'finished' || m.status === 'playing'));
@@ -1028,7 +1020,7 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                 >
                   <span className="w-5 text-center text-[10px] text-gray-400 font-mono shrink-0">{idx + 1}</span>
                   {slot.teamId && slot.league ? (
-                    <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0`} style={leagueBadgeStyle(slot.league, totalLeagues)}>
                       {slot.league}
                     </span>
                   ) : <span className="w-5 shrink-0" />}
@@ -1323,6 +1315,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
   /** 表示を始める回戦（0=1回戦から。1以上で前の回戦を隠して詰めて表示する） */
   startRound?: number;
 }) {
+  const totalLeagues = useMixedStore(s => s.leagues.length);
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
 
@@ -1487,7 +1480,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
           )}
           {slot.league ? (() => {
             const badge = getLeagueBadge(slot.teamId, slot.league);
-            return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'} ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{badge}</span>;
+            return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'}`} style={leagueBadgeStyle(slot.league, totalLeagues)}>{badge}</span>;
           })() : !slot.slotNum ? <span className="w-5 shrink-0 mr-1.5" /> : null}
           <div className="flex-1 min-w-0">
             {teamData ? (
@@ -1660,7 +1653,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                           <span className="text-sm text-primary-500 shrink-0 w-5 text-center">{byeSlotNum}</span>
                         )}
                         {winnerLeague && (
-                          <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'}`}>
+                          <span className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0`} style={leagueBadgeStyle(winnerLeague, totalLeagues)}>
                             {winnerLeague}
                           </span>
                         )}

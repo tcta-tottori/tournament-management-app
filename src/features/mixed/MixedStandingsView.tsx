@@ -1,5 +1,6 @@
 import { Trophy, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import { calculateLeagueStandings } from './mixedLogic';
 
 export default function MixedStandingsView() {
@@ -85,7 +86,7 @@ export default function MixedStandingsView() {
               {/* カードヘッダー */}
               <div className={`px-4 py-3 flex items-center justify-between ${isComplete ? 'bg-gradient-to-r from-primary-50 to-white' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white ${isComplete ? 'bg-gradient-to-br from-primary-500 to-primary-600' : 'bg-gray-400'}`}>
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                     {league.leagueId.trim()}
                   </span>
                   <span className="font-bold text-gray-700">{league.leagueId.trim()}リーグ</span>
