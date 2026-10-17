@@ -7,7 +7,7 @@ import MixedScoreInput from './MixedScoreInput';
 import { LeagueResultPreview } from './LeagueResultPreview';
 import type { LeagueMatchScore, LeagueStanding } from './types';
 import { GameRatioCell } from './GameRatioCell';
-import { leagueColor } from './leagueColors';
+import { leagueColor, leagueBadgeStyle } from './leagueColors';
 
 
 
@@ -452,7 +452,7 @@ function AllLeaguesView({ onEditMatch }: { onEditMatch: (m: LeagueMatchScore) =>
               )}
               {/* リーグヘッダー */}
               <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r ${colors.light} border-b ${colors.border}`}>
-                <span className={`w-8 h-8 bg-gradient-to-br ${colors.from} ${colors.to} text-white text-sm font-bold rounded-lg flex items-center justify-center shadow shrink-0`}>
+                <span className="w-8 h-8 text-sm font-bold rounded-lg flex items-center justify-center shadow shrink-0" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                   {league.leagueId.trim()}
                 </span>
                 <div className="min-w-0 flex-1">

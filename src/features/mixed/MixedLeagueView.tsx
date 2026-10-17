@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Circle, Play, MapPin, Pencil, Maximize2, X, BookOpen, FlaskConical, ArrowRightLeft, Download } from 'lucide-react';
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import type { LeagueMatchScore } from './types';
 import { calculateLeagueStandings } from './mixedLogic';
 import MixedScoreInput from './MixedScoreInput';
@@ -287,9 +288,7 @@ export default function MixedLeagueView() {
                   }
                 `}
               >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                  ${isActive ? 'bg-white/20' : isComplete ? `${colors.badge}` : 'bg-gray-100 text-gray-500'}
-                `}>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                   {isComplete ? <Check size={12} /> : league.leagueId.trim()}
                 </div>
                 <span className="flex-1 text-left font-medium">{league.leagueId.trim()}リーグ</span>
@@ -313,7 +312,7 @@ export default function MixedLeagueView() {
           <div className={`bg-gradient-to-r ${_lc.header} text-white px-4 py-3`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-lg font-bold">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow" style={leagueBadgeStyle(selectedLeague.leagueId, leagues.length)}>
                   {selectedLeague.leagueId.trim()}
                 </div>
                 <div>

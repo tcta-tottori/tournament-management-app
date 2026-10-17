@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Trophy, Medal, Award, Users, Info } from 'lucide-react';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
+import { leagueBadgeStyle } from '../mixed/leagueColors';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { autoBracketStartRound, startRoundLabel } from '../mixed/bracketRounds';
 import type {
@@ -22,21 +23,6 @@ const CATEGORY_META: Record<PlacementCategory, { label: string; icon: React.Elem
 };
 const CATEGORY_ORDER: PlacementCategory[] = ['1st', '2nd', '3rd', '4th'];
 
-const LEAGUE_BADGE_COLORS: Record<string, string> = {
-  A: 'bg-primary-100 text-gray-800',
-  B: 'bg-gray-100 text-gray-700',
-  C: 'bg-gray-100 text-gray-700',
-  D: 'bg-primary-100 text-gray-800',
-  E: 'bg-primary-100 text-gray-800',
-  F: 'bg-gray-100 text-gray-700',
-  G: 'bg-primary-100 text-gray-800',
-  H: 'bg-gray-100 text-gray-700',
-  I: 'bg-primary-100 text-gray-800',
-  J: 'bg-gray-100 text-gray-700',
-  K: 'bg-gray-100 text-gray-700',
-  L: 'bg-primary-100 text-gray-800',
-  M: 'bg-primary-100 text-gray-800',
-};
 
 function getRoundLabel(round: number, total: number): string {
   if (round === total) return '決勝';
@@ -127,6 +113,7 @@ export default function PublicBracketView() {
 // =========================================================================
 
 function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBracket; startRound?: number }) {
+  const totalLeagues = useMixedStore(s => s.leagues.length);
   const allTeams = useMixedStore(s => s.allTeams);
 
   const totalRounds = Math.max(1, Math.log2(bracket.drawSize));
@@ -227,9 +214,7 @@ function MixedBracketDisplay({ bracket, startRound = 0 }: { bracket: PlacementBr
                       >
                         {winnerLeague && (
                           <span
-                            className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
-                              LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'
-                            }`}
+                            className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0`} style={leagueBadgeStyle(winnerLeague, totalLeagues)}
                           >
                             {winnerLeague}
                           </span>
@@ -320,6 +305,7 @@ function MixedSlot({
   isWinner: boolean;
   isLoser: boolean;
 }) {
+  const totalLeagues = useMixedStore(s => s.leagues.length);
   const teamId = slot === 'team1' ? match.team1Id : match.team2Id;
   const name = slot === 'team1' ? match.team1Name : match.team2Name;
   const league = slot === 'team1' ? match.team1League : match.team2League;
@@ -347,9 +333,7 @@ function MixedSlot({
     >
       {league && (
         <span
-          className={`shrink-0 rounded text-[9px] font-bold flex items-center justify-center w-5 h-5 ${
-            LEAGUE_BADGE_COLORS[league.trim()] || 'bg-gray-100 text-gray-600'
-          }`}
+          className={`shrink-0 rounded text-[9px] font-bold flex items-center justify-center w-5 h-5`} style={leagueBadgeStyle(league, totalLeagues)}
         >
           {league}
         </span>
@@ -386,6 +370,7 @@ function MixedSlot({
 // =========================================================================
 
 function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacementBracket; startRound?: number }) {
+  const totalLeagues = useTeamStore(s => s.leagues.length);
   const totalRounds = Math.max(1, Math.log2(bracket.drawSize));
   // 決着済みの前半の回戦を隠し、残りを詰めて描画する（最低2列は残す）
   const hiddenRounds = Math.min(Math.max(Math.floor(startRound), 0), Math.max(0, totalRounds - 1));
@@ -478,9 +463,7 @@ function TeamBracketDisplay({ bracket, startRound = 0 }: { bracket: TeamPlacemen
                       <div className="flex items-center gap-1.5 px-2 rounded-lg border border-gray-200 bg-white h-12">
                         {winnerLeague && (
                           <span
-                            className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
-                              LEAGUE_BADGE_COLORS[winnerLeague.trim()] || 'bg-gray-100 text-gray-600'
-                            }`}
+                            className={`w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center shrink-0`} style={leagueBadgeStyle(winnerLeague, totalLeagues)}
                           >
                             {winnerLeague}
                           </span>
@@ -561,6 +544,7 @@ function TeamSlot({
   slot: 'team1' | 'team2';
   isWinner: boolean;
 }) {
+  const totalLeagues = useTeamStore(s => s.leagues.length);
   const teamId = slot === 'team1' ? match.team1Id : match.team2Id;
   const name = slot === 'team1' ? match.team1Name : match.team2Name;
   const league = slot === 'team1' ? match.team1League : match.team2League;
@@ -575,9 +559,7 @@ function TeamSlot({
     >
       {league && (
         <span
-          className={`shrink-0 rounded text-[9px] font-bold flex items-center justify-center w-5 h-5 ${
-            LEAGUE_BADGE_COLORS[league.trim()] || 'bg-gray-100 text-gray-600'
-          }`}
+          className={`shrink-0 rounded text-[9px] font-bold flex items-center justify-center w-5 h-5`} style={leagueBadgeStyle(league, totalLeagues)}
         >
           {league}
         </span>

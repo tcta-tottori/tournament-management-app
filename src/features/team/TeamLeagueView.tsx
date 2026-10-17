@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Circle, Play, MapPin, X, Trophy, Info, Settings2, ArrowUp, ArrowDown, HelpCircle, Sparkles, BarChart3, ListOrdered, Layers, Pencil } from 'lucide-react';
 import CourtChangeDialog from '../../components/ui/CourtChangeDialog';
 import { useTeamStore } from './teamStore';
+import { leagueTextColor } from '../mixed/leagueColors';
 import type { TeamLeagueMatch, TeamLeagueStanding, TiebreakRuleId, TeamEntry } from './types';
 import { calculateTeamStandings, getMatchTypeOrder, MATCH_TYPE_SHORT, TIEBREAK_RULE_LABELS, getDisplayName, familyName, resolveClubPromotionStatus, listClubPromotionOptions } from './teamLogic';
 import { findMembersByTeamName } from './clubExcelParser';
@@ -124,11 +125,6 @@ const LEAGUE_COLORS = [LEAGUE_NEUTRAL];
 
 const getColor = (i: number) => LEAGUE_COLORS[i % LEAGUE_COLORS.length];
 
-/** タブドット用ソリッドカラー（無彩色の濃淡で並び順だけ分かるようにする） */
-const LEAGUE_SOLID_COLORS = [
-  '#262626', '#404040', '#5a5a5a', '#767676',
-  '#8f8f8f', '#a6a6a6', '#bdbdbd', '#d6d6d6',
-];
 
 /** チーム名を最大6文字に制限（6文字超は5文字+...） */
 function truncTeamName(name: string, max = 6): string {
@@ -646,7 +642,7 @@ export default function TeamLeagueView() {
             const total = lm.length;
             const complete = done === total && total > 0;
             const isSelected = !showAll && l.leagueId === selectedLeague.leagueId;
-            const solidColor = LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length];
+            const solidColor = leagueTextColor(i, leagues.length);
             return (
               <button
                 key={l.leagueId}

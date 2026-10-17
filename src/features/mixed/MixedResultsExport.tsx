@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FileDown, Trophy, Medal, Award, Users, Printer, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useMixedStore } from './mixedStore';
+import { leagueBadgeStyle } from './leagueColors';
 import { calculateLeagueStandings } from './mixedLogic';
 import type { PlacementCategory, LeagueMatchScore } from './types';
 import { GameRatioCell } from './GameRatioCell';
@@ -237,7 +238,7 @@ export default function MixedResultsExport() {
                 return (
                   <div key={league.leagueId} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="w-6 h-6 bg-gradient-to-br from-primary-500 to-primary-600 rounded text-white text-xs font-bold flex items-center justify-center">
+                      <span className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                         {league.leagueId.trim()}
                       </span>
                       <span className="text-sm font-bold text-gray-700">{league.leagueId.trim()}リーグ</span>
@@ -350,7 +351,7 @@ export default function MixedResultsExport() {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-white border-b border-primary-100">
                   <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-700 text-white text-sm font-bold rounded-lg flex items-center justify-center">
+                    <span className="w-8 h-8 text-sm font-bold rounded-lg flex items-center justify-center" style={leagueBadgeStyle(league.leagueId, leagues.length)}>
                       {league.leagueId.trim()}
                     </span>
                     <div>

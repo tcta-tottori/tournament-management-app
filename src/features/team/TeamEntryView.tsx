@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, X, Users, Sparkles, Plus, Trash2, Edit3, UserCircle2, Layers, Upload } from 'lucide-react';
 import { useTeamStore } from './teamStore';
+import { leagueTextColor } from '../mixed/leagueColors';
 import type { TeamEntry, TeamLeague, TeamMember } from './types';
 import { getDisplayName } from './teamLogic';
 import { parseClubExcel, normalizeTeamName } from './clubExcelParser';
@@ -358,11 +359,6 @@ function LeagueSection({
   );
 }
 
-/** LEAGUE_COLORSのソリッドカラー（タブドット用） */
-const LEAGUE_SOLID_COLORS = [
-  '#767676', '#c63834', '#8b5cf6', '#f43f5e',
-  '#c63834', '#06b6d4', '#84cc16', '#d946ef',
-];
 
 /** メインコンポーネント */
 export default function TeamEntryView() {
@@ -449,7 +445,7 @@ export default function TeamEntryView() {
             const entryCount = l.teams.filter(t => t.status === 'entry').length;
             const total = l.teams.length;
             const complete = entryCount === total && total > 0;
-            const solidColor = LEAGUE_SOLID_COLORS[i % LEAGUE_SOLID_COLORS.length];
+            const solidColor = leagueTextColor(i, leagues.length);
             return (
               <button
                 key={l.leagueId}

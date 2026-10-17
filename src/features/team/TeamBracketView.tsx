@@ -9,6 +9,7 @@ import TeamScoreInput from './TeamScoreInput';
 import { useTeamCallStore } from './teamCallStore';
 import { useCallTts } from '../broadcast/useCallTts';
 import { TeamBracketResultPreview } from './TeamBracketResultPreview';
+import { leagueBadgeStyle } from '../mixed/leagueColors';
 
 const CATEGORY_LABELS: Record<PlacementCategory, string> = {
   '1st': '1位トーナメント',
@@ -45,22 +46,6 @@ const CATEGORY_CONFIG: Record<PlacementCategory, { grad: string; bg: string; tex
   '4th': { grad: 'from-gray-400 to-gray-500', bg: 'bg-gray-50', text: 'text-gray-700', icon: Sparkles },
 };
 
-/**
- * リーグ別の色パレット（TeamLeagueView の LEAGUE_SOLID_COLORS と対応）。
- * インデックス順にリーグへ割り当てる。
- */
-const LEAGUE_BADGE_STYLES = [
-  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
-  { bg: 'bg-primary-100', text: 'text-gray-800', border: 'border-primary-200' },
-  { bg: 'bg-gray-100',  text: 'text-gray-700',  border: 'border-gray-200' },
-  { bg: 'bg-primary-100',    text: 'text-gray-800',    border: 'border-primary-200' },
-  { bg: 'bg-primary-100',   text: 'text-gray-800',   border: 'border-primary-200' },
-  { bg: 'bg-gray-100',    text: 'text-gray-700',    border: 'border-gray-200' },
-  { bg: 'bg-primary-100',    text: 'text-gray-800',    border: 'border-primary-200' },
-  { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' },
-];
-
-const FALLBACK_LEAGUE_STYLE = { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' };
 
 /** 種目カラー（予選リーグと統一） */
 const MATCH_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -126,16 +111,8 @@ export default function TeamBracketView() {
 
   const currentBracket = brackets.find(b => b.category === selectedBracketCategory);
 
-  /** リーグID → 色スタイル のマッピング（store の leagues の順序で割り当て） */
-  const leagueStyleMap = useMemo(() => {
-    const map: Record<string, typeof LEAGUE_BADGE_STYLES[number]> = {};
-    leagues.forEach((l, i) => {
-      map[l.leagueId] = LEAGUE_BADGE_STYLES[i % LEAGUE_BADGE_STYLES.length];
-    });
-    return map;
-  }, [leagues]);
-  const getLeagueStyle = (leagueId: string | null | undefined) =>
-    (leagueId && leagueStyleMap[leagueId]) || FALLBACK_LEAGUE_STYLE;
+  /** リーグバッジの配色（リーグ数に応じて赤→紫の虹色） */
+  const getLeagueStyle = (leagueId: string | null | undefined) => leagueBadgeStyle(leagueId, leagues.length);
 
   // 全ブラケットから対戦待ち（ready）試合を収集（控えリスト用）
   const waitingMatches = useMemo(() => {
@@ -606,7 +583,7 @@ export default function TeamBracketView() {
                                 <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - 24, width: MATCH_WIDTH, zIndex: 1 }}>
                                   <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-gray-200 bg-white/80">
                                     {byeLeague && (
-                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${byeStyle.bg} ${byeStyle.text} text-[9px] font-black shrink-0`}>
+                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-[9px] font-black shrink-0`} style={byeStyle}>
                                         {byeLeague}
                                       </span>
                                     )}
@@ -672,7 +649,7 @@ export default function TeamBracketView() {
                                     {match.team1League && (() => {
                                       const s = getLeagueStyle(match.team1League);
                                       return (
-                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${s.bg} ${s.text} text-[9px] font-black shrink-0`}>
+                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-[9px] font-black shrink-0`} style={s}>
                                           {match.team1League}
                                         </span>
                                       );
@@ -699,7 +676,7 @@ export default function TeamBracketView() {
                                     {match.team2League && (() => {
                                       const s = getLeagueStyle(match.team2League);
                                       return (
-                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${s.bg} ${s.text} text-[9px] font-black shrink-0`}>
+                                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-[9px] font-black shrink-0`} style={s}>
                                           {match.team2League}
                                         </span>
                                       );
@@ -1143,15 +1120,7 @@ function TeamWaitingList({
   customLabels?: Partial<Record<PlacementCategory, string>>;
 }) {
   const leagues = useTeamStore(s => s.leagues);
-  const leagueStyleMap = useMemo(() => {
-    const map: Record<string, typeof LEAGUE_BADGE_STYLES[number]> = {};
-    leagues.forEach((l, i) => {
-      map[l.leagueId] = LEAGUE_BADGE_STYLES[i % LEAGUE_BADGE_STYLES.length];
-    });
-    return map;
-  }, [leagues]);
-  const getLeagueStyle = (leagueId: string | null | undefined) =>
-    (leagueId && leagueStyleMap[leagueId]) || FALLBACK_LEAGUE_STYLE;
+  const getLeagueStyle = (leagueId: string | null | undefined) => leagueBadgeStyle(leagueId, leagues.length);
 
   if (waitingMatches.length === 0) {
     return (
@@ -1188,14 +1157,14 @@ function TeamWaitingList({
             <div className="px-3 py-2 bg-white">
               <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
                 {match.team1League && (
-                  <span className={`w-5 h-5 rounded-md ${s1.bg} ${s1.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team1League}</span>
+                  <span className={`w-5 h-5 rounded-md text-[9px] font-black flex items-center justify-center shrink-0`} style={s1}>{match.team1League}</span>
                 )}
                 <span className="truncate flex-1">{match.team1Name}</span>
               </div>
               <div className="text-[9px] text-gray-300 font-black pl-6.5 my-0.5">VS</div>
               <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
                 {match.team2League && (
-                  <span className={`w-5 h-5 rounded-md ${s2.bg} ${s2.text} text-[9px] font-black flex items-center justify-center shrink-0`}>{match.team2League}</span>
+                  <span className={`w-5 h-5 rounded-md text-[9px] font-black flex items-center justify-center shrink-0`} style={s2}>{match.team2League}</span>
                 )}
                 <span className="truncate flex-1">{match.team2Name}</span>
               </div>
