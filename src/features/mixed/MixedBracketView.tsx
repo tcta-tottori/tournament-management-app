@@ -11,6 +11,7 @@ import MixedBracketResultPreview from './MixedBracketResultPreview';
 import BracketTopBar from '../../components/ui/BracketTopBar';
 import { useVisualViewport } from '../../components/ui/useVisualViewport';
 import { autoBracketStartRound, startRoundLabel } from './bracketRounds';
+import { blackCircled, bracketMatchRoundLabel, isConsolation, resolveByePositions } from './consolation';
 
 /**
  * ゲームルールの表示用テキストを整形する。
@@ -217,7 +218,7 @@ function printRefereeSheet(
 }
 
 export default function MixedBracketView() {
-  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, rebuildBracketFromSlots, tournamentInfo, leagues, updateBracketGameRule } = useMixedStore();
+  const { brackets, selectedBracketCategory, setSelectedBracketCategory, updateBracketScore, advanceWinner, rebuildBracketFromSlots, setBracketConsolation, tournamentInfo, leagues, updateBracketGameRule } = useMixedStore();
   const [editingMatch, setEditingMatch] = useState<BracketMatch | null>(null);
   const [score1Input, setScore1Input] = useState('');
   const [score2Input, setScore2Input] = useState('');
@@ -491,6 +492,25 @@ export default function MixedBracketView() {
         fullBleedClass="-mx-2 sm:-mx-4 -mt-2 sm:-mt-4"
         right={(
           <div className="flex items-center gap-1.5">
+            {/* コンソレーション（敗者同士の試合）の有無 */}
+            {currentBracket && (
+              <button
+                onClick={() => {
+                  const next = !currentBracket.consolation;
+                  const played = currentBracket.matches.some(m => isConsolation(m) && (m.status === 'finished' || m.status === 'playing'));
+                  if (!next && played && !window.confirm('コンソレの結果が消えます。コンソレなしにしますか？')) return;
+                  setBracketConsolation(currentBracket.category, next);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm active:scale-95 transition-all whitespace-nowrap ${
+                  currentBracket.consolation
+                    ? 'bg-primary-500 text-white border border-primary-500'
+                    : 'text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                }`}
+                title="各山の敗者同士の試合（コンソレーション）を入れる／外す"
+              >
+                コンソレ{currentBracket.consolation ? 'あり' : 'なし'}
+              </button>
+            )}
             {/* ドロー編集（クラスカード内に配置） */}
             <button
               onClick={() => setDrawEditMode(!drawEditMode)}
@@ -813,7 +833,7 @@ export default function MixedBracketView() {
                   || '';
                 // 日付から予備日を除去
                 const dateStr = (tournamentInfo?.date || '').split(/予備日[：:]?/)[0].trim();
-                printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', getRoundLabel(editingMatch.round, Math.log2(currentBracket?.drawSize || 16)), gr, { date: dateStr, name: tournamentInfo?.name || '' });
+                printRefereeSheet(editingMatch, at, tournamentInfo?.name || '', currentBracket?.label || '', bracketMatchRoundLabel(editingMatch, Math.log2(currentBracket?.drawSize || 16)), gr, { date: dateStr, name: tournamentInfo?.name || '' });
               }} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 text-xs hover:bg-gray-100 active:scale-[0.98] transition-all">
                 印刷
               </button>
@@ -884,7 +904,7 @@ export default function MixedBracketView() {
         const ct2 = useMixedStore.getState().allTeams.find(t => t.teamId === callMatch.team2Id);
         if (!ct1 || !ct2) return null;
         const totalR = Math.log2(currentBracket.drawSize);
-        const rl = getRoundLabel(callMatch.round, totalR);
+        const rl = bracketMatchRoundLabel(callMatch, totalR);
         return (
           <CallPreviewDialog
             match={callMatch}
@@ -912,24 +932,26 @@ export default function MixedBracketView() {
 
 /** ドロー編集パネル: 1回戦の対戦順を手動で修正 */
 function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
-  const { rebuildBracketFromSlots } = useMixedStore();
+  const { rebuildBracketFromSlots, regenerateBrackets } = useMixedStore();
   const allTeams = useMixedStore(s => s.allTeams);
+  const hasProgress = bracket.matches.some(m => !m.isBye && (m.status === 'finished' || m.status === 'playing'));
 
   // 1回戦の16スロット（BYE=null含む）を構築
   const r1Matches = bracket.matches.filter(m => m.round === 1).sort((a, b) => a.position - b.position);
   const slots: { teamId: string | null; teamName: string; league: string; isBye: boolean }[] = [];
+  // BYEかどうかはドロー表の形（byePositions）で決める。予選が終わる前はチームが空なので名前では判定できない
+  const byeSet = resolveByePositions(bracket);
   for (const m of r1Matches) {
-    const t1Bye = !m.team1Id && (m.team2Name === 'BYE' || m.isBye);
-    const t2Bye = !m.team2Id && (m.team1Name === 'BYE' || m.isBye);
+    const base = (m.position - 1) * 2;
     slots.push({
-      teamId: m.team1Id || (m.team1Name === 'BYE' ? null : null),
+      teamId: m.team1Id || null,
       teamName: m.team1Name, league: m.team1League,
-      isBye: t1Bye || m.team1Name === 'BYE',
+      isBye: !m.team1Id && byeSet.has(base),
     });
     slots.push({
       teamId: m.team2Id || null,
       teamName: m.team2Name, league: m.team2League,
-      isBye: t2Bye || m.team2Name === 'BYE',
+      isBye: !m.team2Id && byeSet.has(base + 1),
     });
   }
 
@@ -941,9 +963,16 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
     const temp = newSlots[fromIdx];
     newSlots[fromIdx] = newSlots[toIdx];
     newSlots[toIdx] = temp;
-    // 16スロット配列を直接渡してブラケットを再構築
+    // 16スロット配列を直接渡してブラケットを再構築。
+    // BYEを動かした場合もドロー表の形として残す（コンソレの組合せもここから決まる）
     const slotArray: (string | null)[] = newSlots.map(s => s.isBye ? null : s.teamId);
-    rebuildBracketFromSlots(bracket.category, slotArray);
+    const byes = new Set(newSlots.map((s, i) => (s.isBye ? i : -1)).filter(i => i >= 0));
+    let leagueMap: (string | null)[] | undefined;
+    if (bracket.slotLeagueIds && bracket.slotLeagueIds.length === newSlots.length) {
+      leagueMap = [...bracket.slotLeagueIds];
+      [leagueMap[fromIdx], leagueMap[toIdx]] = [leagueMap[toIdx], leagueMap[fromIdx]];
+    }
+    rebuildBracketFromSlots(bracket.category, slotArray, byes, leagueMap);
   };
 
   return (
@@ -952,8 +981,20 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
           <RotateCcw size={16} className="text-gray-600" />
           ドロー編集
-          <span className="text-[10px] font-normal text-gray-500">（スロットをタップして入れ替え）</span>
+          <span className="text-[10px] font-normal text-gray-500">（スロットをタップして入れ替え。BYEも動かせます）</span>
         </h3>
+        {!hasProgress && (
+          <button
+            onClick={() => {
+              if (window.confirm('予選リーグの順位とドロー表の形から、順位別トーナメントを作り直します。\n（試合が始まっているクラスはそのまま残します。1位トーナメントの抽選はやり直しになります）')) {
+                regenerateBrackets();
+              }
+            }}
+            className="mt-2 px-3 py-1.5 text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100"
+          >
+            ドロー表の形で作り直す
+          </button>
+        )}
       </div>
       <div className="p-4">
         <div className="space-y-0.5">
@@ -981,7 +1022,7 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
                     isSelected ? 'bg-gray-100 border-2 border-gray-400 ring-2 ring-gray-200' :
                     dragIdx !== null ? 'bg-primary-50 border border-primary-200 hover:bg-primary-100 cursor-pointer' :
-                    slot.isBye || slot.teamName === 'BYE' ? 'bg-gray-50 border border-gray-200 text-gray-400' :
+                    slot.isBye ? 'bg-gray-50 border border-gray-200 text-gray-400' :
                     'bg-white border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
@@ -993,8 +1034,10 @@ function DrawEditPanel({ bracket }: { bracket: PlacementBracket }) {
                   ) : <span className="w-5 shrink-0" />}
                   {teamData ? (
                     <span className="font-bold text-gray-800">{teamData.teamName}</span>
-                  ) : slot.teamName === 'BYE' || slot.isBye ? (
+                  ) : slot.isBye ? (
                     <span className="text-gray-400 italic">BYE</span>
+                  ) : bracket.slotLeagueIds?.[idx] ? (
+                    <span className="text-gray-500">{bracket.slotLeagueIds[idx]}リーグ（未確定）</span>
                   ) : (
                     <span className="text-gray-400">―</span>
                   )}
@@ -1366,6 +1409,13 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
   const getPlaceholderInfo = (match: BracketMatch, slot: 'team1' | 'team2'): { text: string; leagueId?: string; rank?: string } | null => {
     const id = slot === 'team1' ? match.team1Id : match.team2Id;
     if (id) return null; // 既に配置済み
+    // コンソレ: どの試合の勝者／敗者が入るかを表示
+    if (isConsolation(match)) {
+      const src = slot === 'team1' ? match.team1Src : match.team2Src;
+      if (!src) return null;
+      const no = bracket.matches.find(m => m.matchId === src.matchId)?.matchNo;
+      return { text: `${no !== undefined ? blackCircled(no) : ''}${src.result === 'winner' ? '勝者' : '敗者'}` };
+    }
     // 1回戦のみプレースホルダー表示
     if (match.round !== 1) return null;
     const pos = match.position;
@@ -1410,6 +1460,136 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
   const r1count = matchesByRound[0]?.length || 0;
   const svgHeight = r1count * GRID_UNIT + 36;
   const boardWidth = (MATCH_WIDTH + ROUND_GAP) * visibleRounds;
+
+  const consolationMatches = bracket.matches.filter(isConsolation).sort((a, b) => a.position - b.position);
+
+  /** 試合カード（本戦・コンソレ共通） */
+  const renderMatchCard = (match: BracketMatch) => {
+    const ph1 = getPlaceholderInfo(match, 'team1');
+    const ph2 = getPlaceholderInfo(match, 'team2');
+    const ca = courtAssignments[match.matchId];
+    const isPlaying = !!ca;
+    const elapsedMs = ca ? now - ca.startedAt : 0;
+    const elapsedMin = Math.floor(elapsedMs / 60000);
+    const elapsedStr = `${Math.floor(elapsedMin / 60)}:${String(elapsedMin % 60).padStart(2, '0')}`;
+    const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null; defLabel?: string }) => {
+      // teamIdから探す。なければnameから逆引き
+      let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
+      if (!teamData && slot.name && slot.league) {
+        teamData = allTeams.find(t => t.teamName === slot.name && t.leagueId === slot.league.trim()) || null;
+      }
+      return (
+        <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
+          ${slot.isWinner ? 'bg-primary-50 font-bold text-primary-800' : 'bg-white text-gray-700'}
+        `} style={{ height: SLOT_HEIGHT }}>
+          {slot.slotNum && (
+            <span className="text-sm text-primary-500 shrink-0 mr-1 w-5 text-center">{slot.slotNum}</span>
+          )}
+          {slot.league ? (() => {
+            const badge = getLeagueBadge(slot.teamId, slot.league);
+            return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'} ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{badge}</span>;
+          })() : !slot.slotNum ? <span className="w-5 shrink-0 mr-1.5" /> : null}
+          <div className="flex-1 min-w-0">
+            {teamData ? (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{teamData.pairNumber}</span>
+                <div className="shrink-0" style={{ width: 95 }}>
+                  <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                  <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
+                </div>
+                <div className="w-px h-7 bg-gray-200 shrink-0" />
+                <div className="flex-1 min-w-0 text-center">
+                  <div className="text-[11px] text-gray-400 truncate">{teamData.male.affiliation}</div>
+                  <div className="text-[11px] text-gray-400 truncate">{teamData.female.affiliation}</div>
+                </div>
+              </div>
+            ) : slot.ph?.leagueId ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
+                <span className="text-[10px] text-gray-400">{slot.ph.rank}位</span>
+              </span>
+            ) : slot.ph ? <span className="text-[10px] text-gray-400">{slot.ph.text}</span>
+            : slot.name ? <span className="text-[11px] truncate">{slot.name}</span>
+            : <span className="text-[10px] text-gray-400">―</span>}
+          </div>
+          {slot.defLabel ? (
+            <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.defLabel === 'W.O' ? 'text-gray-400' : 'text-red-500'}`}>
+              {slot.defLabel}
+            </span>
+          ) : slot.score !== null && (
+            <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-primary-600' : 'text-gray-500'}`}>
+              {slot.score}
+              {slot.isLoser && slot.tiebreakScore != null && (
+                <span className="text-[9px] text-gray-500 align-super ml-0.5">({slot.tiebreakScore})</span>
+              )}
+            </span>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div
+        onClick={() => onMatchClick(match)}
+        className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all
+          ${isPlaying ? 'border-primary-400 shadow-md bracket-playing-blink' :
+            match.status === 'finished' ? 'border-primary-300 shadow-sm' :
+            match.team1Id && match.team2Id ? 'border-gray-300 hover:shadow-md' :
+            'border-gray-200 hover:border-gray-300'}
+        `}
+        style={{ height: MATCH_HEIGHT }}
+      >
+        {(() => {
+          // 棄権判定
+          const s1 = match.score1 ?? 0; const s2 = match.score2 ?? 0;
+          const mW1 = match.winnerId === match.team1Id && match.winnerId != null;
+          const mW2 = match.winnerId === match.team2Id && match.winnerId != null;
+          let def1 = ''; let def2 = '';
+          if (match.winnerId && match.status === 'finished') {
+            if (s1 === 0 && s2 === 0) { if (mW1) def2 = 'W.O'; else if (mW2) def1 = 'W.O'; }
+            else if ((mW1 && s1 < s2) || (mW2 && s2 < s1)) { if (mW1) def2 = 'Ret'; else if (mW2) def1 = 'Ret'; }
+          }
+          return (<>
+            {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: mW1, isLoser: match.winnerId !== null && !mW1, tiebreakScore: match.tiebreakScore, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1'), defLabel: def1 || undefined })}
+            {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: mW2, isLoser: match.winnerId !== null && !mW2, tiebreakScore: match.tiebreakScore, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2'), defLabel: def2 || undefined })}
+          </>);
+        })()}
+        {/* 枠内ステータスバー（左端にドロー表の試合番号 ❶❷…） */}
+        {((match.team1Id && match.team2Id) || match.matchNo !== undefined || isConsolation(match)) && (
+          <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
+            ${isPlaying ? 'bg-primary-50 text-gray-800' :
+              match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
+              match.team1Id && match.team2Id ? 'bg-primary-50/50 text-gray-700' : 'bg-white text-gray-400'}
+          `} style={{ height: STATUS_HEIGHT }}>
+            {match.matchNo !== undefined && !isConsolation(match) && (
+              <span className="shrink-0 mr-1.5 text-[13px] leading-none text-gray-700">{blackCircled(match.matchNo)}</span>
+            )}
+            {!(match.team1Id && match.team2Id) ? (
+              <span className="mx-auto text-gray-400">対戦待ち</span>
+            ) : isPlaying ? (
+              <>
+                {/* コート表示をタップするとコートを変更・解除できる */}
+                <button
+                  onClick={e => { if (onCourtClick) { e.stopPropagation(); onCourtClick(match); } }}
+                  className="flex items-center gap-1 shrink-0 rounded px-1 -ml-1 hover:bg-primary-100 transition-colors"
+                  title={onCourtClick ? 'コートを変更する' : undefined}
+                >
+                  <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                  <span className="font-bold text-gray-800">{ca.courtName.replace('コート', '')}コート</span>
+                  {onCourtClick && <MapPin size={9} className="text-primary-500" />}
+                </button>
+                <span className="ml-auto font-mono text-gray-700">{elapsedStr}</span>
+              </>
+            ) : match.status === 'finished' ? (
+              <span className="mx-auto text-gray-400">完了</span>
+            ) : (
+              <span className="mx-auto flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-primary-400" />控え中</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={`bg-white shadow-sm border border-gray-200 p-2 sm:p-4 overflow-x-auto ${compact ? 'rounded-b-xl' : 'rounded-xl'}`}>
@@ -1459,16 +1639,7 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
 
               {roundMatches.map((match, matchIdx) => {
                 const centerY = getMatchY(roundIdx, matchIdx);
-                const ph1 = getPlaceholderInfo(match, 'team1');
-                const ph2 = getPlaceholderInfo(match, 'team2');
                 const isBye = match.isBye;
-                const ca = courtAssignments[match.matchId];
-                const isPlaying = !!ca;
-                const elapsedMs = ca ? now - ca.startedAt : 0;
-                const elapsedMin = Math.floor(elapsedMs / 60000);
-                const elapsedH = Math.floor(elapsedMin / 60);
-                const elapsedM = elapsedMin % 60;
-                const elapsedStr = `${elapsedH}:${String(elapsedM).padStart(2, '0')}`;
 
                 // BYEマッチ: 勝者を通常マッチと同じスタイルで表示
                 if (isBye) {
@@ -1515,118 +1686,9 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
                 }
 
                 // 通常マッチ
-                const renderSlot = (slot: { teamId: string | null; name: string; league: string; score: number | null; isWinner: boolean; isLoser: boolean; tiebreakScore: number | null; ph: ReturnType<typeof getPlaceholderInfo>; isTop: boolean; slotNum: string | null; defLabel?: string }) => {
-                  // teamIdから探す。なければnameから逆引き
-                  let teamData = slot.teamId ? allTeams.find(t => t.teamId === slot.teamId) : null;
-                  if (!teamData && slot.name && slot.league) {
-                    teamData = allTeams.find(t => t.teamName === slot.name && t.leagueId === slot.league.trim()) || null;
-                  }
-                  return (
-                    <div className={`flex items-center px-2 text-xs ${slot.isTop ? 'border-b border-gray-100' : ''}
-                      ${slot.isWinner ? 'bg-primary-50 font-bold text-primary-800' : 'bg-white text-gray-700'}
-                    `} style={{ height: SLOT_HEIGHT }}>
-                      {slot.slotNum && (
-                        <span className="text-sm text-primary-500 shrink-0 mr-1 w-5 text-center">{slot.slotNum}</span>
-                      )}
-                      {slot.league ? (() => {
-                        const badge = getLeagueBadge(slot.teamId, slot.league);
-                        return <span className={`shrink-0 mr-1.5 rounded text-[9px] font-bold flex items-center justify-center ${badge.length > 1 ? 'w-7 h-5 text-[8px]' : 'w-5 h-5'} ${LEAGUE_BADGE_COLORS[slot.league.trim()] || 'bg-gray-100 text-gray-600'}`}>{badge}</span>;
-                      })() : !slot.slotNum ? <span className="w-5 shrink-0 mr-1.5" /> : null}
-                      <div className="flex-1 min-w-0">
-                        {teamData ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-gray-400 font-mono shrink-0 w-4 text-center">{teamData.pairNumber}</span>
-                            <div className="shrink-0" style={{ width: 95 }}>
-                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.male.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                              <div className="text-sm font-bold text-gray-800 leading-tight"><span className="inline-block w-[5em] text-justify" style={{ textAlignLast: 'justify' }}>{teamData.female.name.replace(/[\s\u3000]+/g, '')}</span></div>
-                            </div>
-                            <div className="w-px h-7 bg-gray-200 shrink-0" />
-                            <div className="flex-1 min-w-0 text-center">
-                              <div className="text-[11px] text-gray-400 truncate">{teamData.male.affiliation}</div>
-                              <div className="text-[11px] text-gray-400 truncate">{teamData.female.affiliation}</div>
-                            </div>
-                          </div>
-                        ) : slot.ph?.leagueId ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{slot.ph.leagueId}</span>
-                            <span className="text-[10px] text-gray-400">{slot.ph.rank}位</span>
-                          </span>
-                        ) : slot.ph ? <span className="text-[10px] text-gray-400">{slot.ph.text}</span>
-                        : slot.name ? <span className="text-[11px] truncate">{slot.name}</span>
-                        : <span className="text-[10px] text-gray-400">―</span>}
-                      </div>
-                      {slot.defLabel ? (
-                        <span className={`font-mono font-bold ml-1 text-sm shrink-0 ${slot.defLabel === 'W.O' ? 'text-gray-400' : 'text-red-500'}`}>
-                          {slot.defLabel}
-                        </span>
-                      ) : slot.score !== null && (
-                        <span className={`font-mono font-bold ml-1 text-base shrink-0 ${slot.isWinner ? 'text-primary-600' : 'text-gray-500'}`}>
-                          {slot.score}
-                          {slot.isLoser && slot.tiebreakScore != null && (
-                            <span className="text-[9px] text-gray-500 align-super ml-0.5">({slot.tiebreakScore})</span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  );
-                };
-
                 return (
                   <div key={match.matchId} className="absolute" style={{ left: colX, top: centerY - MATCH_HEIGHT / 2, width: MATCH_WIDTH, zIndex: 1 }}>
-                    <div
-                      onClick={() => onMatchClick(match)}
-                      className={`rounded-lg border-2 overflow-hidden cursor-pointer transition-all
-                        ${isPlaying ? 'border-primary-400 shadow-md bracket-playing-blink' :
-                          match.status === 'finished' ? 'border-primary-300 shadow-sm' :
-                          match.team1Id && match.team2Id ? 'border-gray-300 hover:shadow-md' :
-                          'border-gray-200 hover:border-gray-300'}
-                      `}
-                      style={{ height: MATCH_HEIGHT }}
-                    >
-                      {(() => {
-                        // 棄権判定
-                        const s1 = match.score1 ?? 0; const s2 = match.score2 ?? 0;
-                        const mW1 = match.winnerId === match.team1Id && match.winnerId != null;
-                        const mW2 = match.winnerId === match.team2Id && match.winnerId != null;
-                        let def1 = ''; let def2 = '';
-                        if (match.winnerId && match.status === 'finished') {
-                          if (s1 === 0 && s2 === 0) { if (mW1) def2 = 'W.O'; else if (mW2) def1 = 'W.O'; }
-                          else if ((mW1 && s1 < s2) || (mW2 && s2 < s1)) { if (mW1) def2 = 'Ret'; else if (mW2) def1 = 'Ret'; }
-                        }
-                        return (<>
-                          {renderSlot({ teamId: match.team1Id, name: match.team1Name, league: match.team1League, score: match.score1, isWinner: mW1, isLoser: match.winnerId !== null && !mW1, tiebreakScore: match.tiebreakScore, ph: ph1, isTop: true, slotNum: getSlotNumber(match, 'team1'), defLabel: def1 || undefined })}
-                          {renderSlot({ teamId: match.team2Id, name: match.team2Name, league: match.team2League, score: match.score2, isWinner: mW2, isLoser: match.winnerId !== null && !mW2, tiebreakScore: match.tiebreakScore, ph: ph2, isTop: false, slotNum: getSlotNumber(match, 'team2'), defLabel: def2 || undefined })}
-                        </>);
-                      })()}
-                      {/* 枠内ステータスバー */}
-                      {match.team1Id && match.team2Id && (
-                        <div className={`flex items-center text-[10px] font-medium border-t border-gray-100 px-2
-                          ${isPlaying ? 'bg-primary-50 text-gray-800' :
-                            match.status === 'finished' ? 'bg-gray-50 text-gray-500' :
-                            'bg-primary-50/50 text-gray-700'}
-                        `} style={{ height: STATUS_HEIGHT }}>
-                          {isPlaying ? (
-                            <>
-                              {/* コート表示をタップするとコートを変更・解除できる */}
-                              <button
-                                onClick={e => { if (onCourtClick) { e.stopPropagation(); onCourtClick(match); } }}
-                                className="flex items-center gap-1 shrink-0 rounded px-1 -ml-1 hover:bg-primary-100 transition-colors"
-                                title={onCourtClick ? 'コートを変更する' : undefined}
-                              >
-                                <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
-                                <span className="font-bold text-gray-800">{ca.courtName.replace('コート', '')}コート</span>
-                                {onCourtClick && <MapPin size={9} className="text-primary-500" />}
-                              </button>
-                              <span className="ml-auto font-mono text-gray-700">{elapsedStr}</span>
-                            </>
-                          ) : match.status === 'finished' ? (
-                            <span className="mx-auto text-gray-400">完了</span>
-                          ) : (
-                            <span className="mx-auto flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-primary-400" />控え中</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    {renderMatchCard(match)}
                   </div>
                 );
               })}
@@ -1634,6 +1696,27 @@ function BracketDisplay({ bracket, onMatchClick, onCourtClick, getRoundLabel, al
           );
         })}
       </div>
+
+      {/* コンソレーション（敗者同士の試合） */}
+      {consolationMatches.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-dashed border-gray-200">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">コンソレーション</span>
+            <span className="text-[10px] text-gray-400">各山の敗者同士の試合（敗者復活戦ではありません）</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-3">
+            {consolationMatches.map(m => (
+              <div key={m.matchId} style={{ width: MATCH_WIDTH }}>
+                <div className="text-[11px] font-bold text-gray-600 mb-1">
+                  {m.matchNo !== undefined && <span className="mr-1 text-[13px]">{blackCircled(m.matchNo)}</span>}
+                  {m.consolationLabel}
+                </div>
+                <div style={{ height: MATCH_HEIGHT }}>{renderMatchCard(m)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 点滅アニメーション */}
       <style>{`

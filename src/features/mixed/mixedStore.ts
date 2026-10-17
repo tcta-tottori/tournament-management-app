@@ -6,6 +6,13 @@ import type {
   MixedPhase, TournamentInfo, ExcelSheetData
 } from './types';
 import { calculateLeagueStandings, generateAllBrackets, regenerateLeagueMatches } from './mixedLogic';
+import { applyConsolation, isConsolation, rulesMentionConsolation, syncAllConsolation } from './consolation';
+
+/** コンソレを行うか（明示設定 → ルール文の記載） */
+function consolationEnabled(info: TournamentInfo | null | undefined): boolean {
+  if (info?.consolation !== undefined) return info.consolation;
+  return rulesMentionConsolation(info?.rules) || /コンソレ/.test(info?.bracketGameRule ?? '');
+}
 
 interface MixedState {
   // Data
@@ -68,7 +75,10 @@ interface MixedState {
   shuffleBracketSeeds: (category: PlacementCategory, newOrder: string[]) => void;
 
   // Rebuild bracket from raw 16-slot array (null=BYE or unassigned)
-  rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>) => void;
+  rebuildBracketFromSlots: (category: PlacementCategory, slots: (string | null)[], byePositions?: Set<number>, slotLeagueIds?: (string | null)[]) => void;
+
+  /** コンソレーション（敗者同士の試合）の有無を切り替える */
+  setBracketConsolation: (category: PlacementCategory, enabled: boolean) => void;
 
   // Auto-populate non-1st brackets from league standings
   autoPopulateBrackets: () => void;
@@ -210,13 +220,13 @@ export const useMixedStore = create<MixedState>()(
       generateBrackets: () => {
         const { leagues, leagueMatches, allTeams, tournamentInfo, rankOverrides } = get();
         const standings = calculateLeagueStandings(leagues, leagueMatches, rankOverrides);
-        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(standings, allTeams, leagues, tournamentInfo?.bracketOrders, { consolation: consolationEnabled(tournamentInfo) });
         set({ brackets, currentPhase: 'tournament' });
       },
 
       updateBracketScore: (matchId, score1, score2, overrideWinnerId, tiebreakScore) => {
         set(state => ({
-          brackets: state.brackets.map(b => ({
+          brackets: syncAllConsolation(state.brackets.map(b => ({
             ...b,
             matches: b.matches.map(m => {
               if (m.matchId !== matchId) return m;
@@ -226,7 +236,7 @@ export const useMixedStore = create<MixedState>()(
               const tb = tiebreakScore !== undefined ? tiebreakScore : null;
               return { ...m, score1, score2, tiebreakScore: tb, winnerId, status: 'finished' as const };
             }),
-          })),
+          }))),
         }));
       },
 
@@ -298,7 +308,7 @@ export const useMixedStore = create<MixedState>()(
               }),
             };
           });
-          return { brackets: newBrackets };
+          return { brackets: syncAllConsolation(newBrackets) };
         });
       },
 
@@ -526,12 +536,12 @@ export const useMixedStore = create<MixedState>()(
           }
 
           const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: reorderedTeams, matches };
+          newBrackets[bracketIdx] = applyConsolation({ ...bracket, teams: reorderedTeams, matches }, !!bracket.consolation);
           return { brackets: newBrackets };
         });
       },
 
-      rebuildBracketFromSlots: (category, slotsArray, byePositions) => {
+      rebuildBracketFromSlots: (category, slotsArray, byePositions, slotLeagueIds) => {
         set(state => {
           const bracketIdx = state.brackets.findIndex(b => b.category === category);
           if (bracketIdx === -1) return state;
@@ -607,8 +617,33 @@ export const useMixedStore = create<MixedState>()(
           const allBracketTeams = [...assignedTeams, ...unassignedTeams];
 
           const newBrackets = [...state.brackets];
-          newBrackets[bracketIdx] = { ...bracket, teams: allBracketTeams, matches };
+          // ドロー編集でBYEを動かしたときは、その形をBYE位置として残す（コンソレの組合せもここから決まる）
+          const nextBracket: PlacementBracket = {
+            ...bracket, teams: allBracketTeams, matches,
+            ...(byePositions ? { byePositions: [...byePositions].sort((a, b) => a - b) } : {}),
+            ...(slotLeagueIds ? { slotLeagueIds } : {}),
+          };
+          newBrackets[bracketIdx] = applyConsolation(nextBracket, !!bracket.consolation);
           return { brackets: newBrackets };
+        });
+      },
+
+      setBracketConsolation: (category, enabled) => {
+        set(state => {
+          const removed = new Set<string>();
+          const brackets = state.brackets.map(b => {
+            if (b.category !== category) return b;
+            if (!enabled) b.matches.filter(isConsolation).forEach(m => removed.add(m.matchId));
+            return applyConsolation(b, enabled);
+          });
+          const bracketCourtAssignments = Object.fromEntries(
+            Object.entries(state.bracketCourtAssignments).filter(([mid]) => !removed.has(mid)),
+          );
+          return {
+            brackets,
+            bracketCourtAssignments,
+            tournamentInfo: state.tournamentInfo ? { ...state.tournamentInfo, consolation: enabled } : state.tournamentInfo,
+          };
         });
       },
 
@@ -627,7 +662,7 @@ export const useMixedStore = create<MixedState>()(
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
 
-        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders);
+        const brackets = generateAllBrackets(completedStandings, allTeams, leagues, get().tournamentInfo?.bracketOrders, { consolation: consolationEnabled(get().tournamentInfo) });
         set({ brackets, bracketCourtAssignments: {} });
       },
 
@@ -644,7 +679,7 @@ export const useMixedStore = create<MixedState>()(
           completedStandings.set(leagueId, isCompleted ? stds : []);
         }
 
-        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders);
+        const newBrackets = generateAllBrackets(completedStandings, allTeams, leagues, tournamentInfo?.bracketOrders, { consolation: consolationEnabled(tournamentInfo) });
 
         // 実際に試合が進行中/完了のブラケットは維持する（'ready'だけでは保護しない）
         // 全カテゴリ（1位/2位/3位/4位）に適用
@@ -722,13 +757,24 @@ export const useMixedStore = create<MixedState>()(
     }),
     {
       name: 'mixed-tournament-storage',
-      version: 4,
+      version: 5,
       migrate: (persisted: any, version: number) => {
         const state = { ...persisted };
         if (version < 2) {
           state.rankOverrides = state.rankOverrides ?? {};
           state.bracketCourtAssignments = state.bracketCourtAssignments ?? {};
           state.rawExcelSheets = state.rawExcelSheets ?? [];
+        }
+        if (version >= 4 && version < 5) {
+          // v5: 順位別トーナメントの形（BYE位置）をドロー表通りに直し、コンソレを追加。
+          // まだ1試合も行っていなければ作り直させる（進行中の大会は手を付けない）
+          const brackets: any[] = state.brackets ?? [];
+          const started = brackets.some(b => (b.matches ?? []).some((m: any) => !m.isBye && (m.status === 'finished' || m.status === 'playing')));
+          if (!started) {
+            state.lastStandingsHash = '';
+            state.brackets = [];
+            state.bracketCourtAssignments = {};
+          }
         }
         if (version < 4) {
           // v4: 旧ブラケット・コート割当・順位ハッシュを完全クリアして再生成させる

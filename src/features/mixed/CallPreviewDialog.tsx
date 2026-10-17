@@ -60,7 +60,8 @@ export function buildCallText(
 
   const parts: string[] = [
     '試合のコールをします。',
-    `${catLabel}、${roundLabel}。`,
+    // コンソレの試合番号（❽など）は読み上げられないので「コンソレーション」と読む
+    `${catLabel}、${/コンソレ/.test(roundLabel) ? 'コンソレーション' : roundLabel}。`,
     `${team1.pairNumber}番、${t1MaleName}さん、${t1MaleAff}、${t1FemaleName}さん、${t1FemaleAff}。`,
     `${team2.pairNumber}番、${t2MaleName}さん、${t2MaleAff}、${t2FemaleName}さん、${t2FemaleAff}。`,
   ];

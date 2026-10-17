@@ -4,6 +4,7 @@ import { useMixedStore } from './mixedStore';
 import type { BracketMatch, PlacementCategory, MixedTeam } from './types';
 import { useCallTts } from '../broadcast/useCallTts';
 import CallPreviewDialog from './CallPreviewDialog';
+import { bracketMatchRoundLabel, isConsolation } from './consolation';
 
 /** リーグバッジの色 */
 const LEAGUE_BADGE_COLORS: Record<string, string> = {
@@ -27,14 +28,6 @@ const CATEGORY_COLORS: Record<PlacementCategory, string> = {
   '3rd': 'bg-primary-100 text-gray-800 border-primary-300',
   '4th': 'bg-gray-100 text-gray-600 border-gray-300',
 };
-
-function getRoundLabel(round: number, totalRounds: number): string {
-  const fromFinal = totalRounds - round;
-  if (fromFinal === 0) return '決勝';
-  if (fromFinal === 1) return '準決勝';
-  if (fromFinal === 2) return '準々決勝';
-  return `${round}回戦`;
-}
 
 /** 審判用紙を印刷 */
 function printRefereeSheet(
@@ -145,7 +138,10 @@ export default function MixedWaitingList() {
       const totalRounds = Math.log2(bracket.drawSize);
       for (const match of bracket.matches) {
         if (match.status === 'ready' && match.team1Id && match.team2Id && !match.isBye) {
-          const priority = match.round * 1000 + match.position;
+          // コンソレは出どころの回戦の後に並べる
+          const priority = isConsolation(match)
+            ? (match.consolationAfterRound ?? 1) * 1000 + 500 + match.position
+            : match.round * 1000 + match.position;
           result.push({ match, category: bracket.category, totalRounds, priority });
         }
       }
@@ -178,7 +174,7 @@ export default function MixedWaitingList() {
 
   const handlePrint = (wm: WaitingMatch) => {
     const catLabel = CATEGORY_LABELS[wm.category];
-    const roundLabel = getRoundLabel(wm.match.round, wm.totalRounds);
+    const roundLabel = bracketMatchRoundLabel(wm.match, wm.totalRounds);
     printRefereeSheet(wm.match, allTeams, tournamentInfo?.name || '', catLabel, roundLabel, '');
   };
 
@@ -211,7 +207,7 @@ export default function MixedWaitingList() {
         const { match, category, totalRounds } = wm;
         const team1 = allTeams.find(t => t.teamId === match.team1Id);
         const team2 = allTeams.find(t => t.teamId === match.team2Id);
-        const roundLabel = getRoundLabel(match.round, totalRounds);
+        const roundLabel = bracketMatchRoundLabel(match, totalRounds);
         const isSpeakingThis = speakingMatchId === match.matchId;
 
         return (
@@ -283,7 +279,7 @@ export default function MixedWaitingList() {
         const t1 = allTeams.find(t => t.teamId === courtAssignWm.match.team1Id);
         const t2 = allTeams.find(t => t.teamId === courtAssignWm.match.team2Id);
         const catLabel = CATEGORY_LABELS[courtAssignWm.category];
-        const roundLabel = getRoundLabel(courtAssignWm.match.round, courtAssignWm.totalRounds);
+        const roundLabel = bracketMatchRoundLabel(courtAssignWm.match, courtAssignWm.totalRounds);
         return (
           <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={() => setCourtAssignWm(null)}>
             <div className="min-h-full flex items-start justify-center py-[10vh] px-4">
@@ -334,7 +330,7 @@ export default function MixedWaitingList() {
         const team2 = allTeams.find(t => t.teamId === previewMatch.match.team2Id);
         if (!team1 || !team2) return null;
         const time = selectedTime[previewMatch.match.matchId] || '';
-        const roundLabel = getRoundLabel(previewMatch.match.round, previewMatch.totalRounds);
+        const roundLabel = bracketMatchRoundLabel(previewMatch.match, previewMatch.totalRounds);
         return (
           <CallPreviewDialog
             match={previewMatch.match}
