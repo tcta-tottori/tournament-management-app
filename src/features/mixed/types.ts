@@ -85,6 +85,23 @@ export interface BracketMatch {
   isBye: boolean;
   nextMatchId: string | null;
   nextSlot: 'team1' | 'team2' | null;
+  /** 試合番号（ドロー表の❶❷…。準決勝より前の実試合に振る） */
+  matchNo?: number;
+  /** 'consolation' = コンソレーション（敗者同士の試合）。本戦は未設定 */
+  kind?: 'consolation';
+  /** コンソレの対戦相手の出どころ（どの試合の勝者／敗者か） */
+  team1Src?: BracketSlotSource;
+  team2Src?: BracketSlotSource;
+  /** コンソレ: 表示用の見出し（例: "❶敗者-❷敗者"） */
+  consolationLabel?: string;
+  /** コンソレ: 出どころの試合が終わる回戦（控えリストの並び順に使う） */
+  consolationAfterRound?: number;
+}
+
+/** コンソレの枠に入るチームの出どころ */
+export interface BracketSlotSource {
+  matchId: string;
+  result: 'winner' | 'loser';
 }
 
 /** トーナメントブラケット */
@@ -98,6 +115,8 @@ export interface PlacementBracket {
   slotLeagueIds?: (string | null)[];
   /** BYEとなるスロット位置（0始まり） */
   byePositions?: number[];
+  /** コンソレーション（敗者同士の試合）を行うか */
+  consolation?: boolean;
 }
 
 /** フェーズ */
@@ -119,6 +138,8 @@ export interface TournamentInfo {
     '3rd'?: string[];
     '4th'?: string[];
   };
+  /** 順位別トーナメントでコンソレーションを行うか（未設定ならルール文から判定） */
+  consolation?: boolean;
 }
 
 /** Excelシート生データ（ビューア用） */

@@ -1,3 +1,4 @@
+import { applyConsolation } from './consolation';
 import type {
   MixedLeague, MixedTeam, LeagueMatchScore, LeagueStanding,
   PlacementBracket, PlacementCategory, BracketMatch, MatchOrderEntry, TournamentInfo
@@ -252,6 +253,48 @@ export const BRACKET_SLOT_MAP: Record<string, (string | null)[]> = {
 const DEFAULT_1ST_LAYOUT_13: (string | null)[] =
   Array.from({ length: 16 }, (_, i) => ([1, 9, 15].includes(i) ? null : ''));
 
+/**
+ * ペア数ごとのドロー表の形（BYE位置, 0始まり）。
+ * 並び順だけではどこにBYEが入るか決まらないため、実際のドロー表の形をクラス別に持つ。
+ *
+ * 11ペア・16ドロー（11リーグ A〜K）:
+ *   1位・2位: ①-② / (③-④)-⑤ ‖ ⑥-(⑦-⑧) / (⑨-⑩)-⑪   → 左5・右6
+ *   3位    : A-(B-I) / (H-K)-C ‖ E-(G-D) / F-J         → 左6・右5
+ */
+const BRACKET_LAYOUTS: Record<number, Partial<Record<PlacementCategory, number[]>>> = {
+  11: {
+    '1st': [1, 3, 7, 9, 15],
+    '2nd': [1, 3, 7, 9, 15],
+    '3rd': [1, 7, 9, 13, 15],
+  },
+};
+
+/** 11リーグ（A〜K）大会のドロー表の並び順（Excel から読めなかったときの既定） */
+const DEFAULT_ORDERS_11: Partial<Record<PlacementCategory, string[]>> = {
+  '2nd': ['G', 'F', 'H', 'K', 'I', 'J', 'A', 'B', 'D', 'E', 'C'],
+  '3rd': ['A', 'B', 'I', 'H', 'K', 'C', 'E', 'G', 'D', 'F', 'J'],
+};
+
+/** ペア数とクラスからBYE位置を決める（既知の形がなければ均等に散らす） */
+export function layoutByePositions(category: PlacementCategory, entryCount: number, drawSize: number): number[] {
+  const known = BRACKET_LAYOUTS[entryCount]?.[category];
+  if (known && drawSize === 16) return known;
+  const probe = distributeToSlots(Array.from({ length: entryCount }, (_, i) => i), drawSize);
+  return probe.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0);
+}
+
+/** 並び順を、BYE以外の枠へ上から順に入れる */
+function placeIntoLayout<T>(entries: T[], drawSize: number, byes: number[]): (T | null)[] {
+  const byeSet = new Set(byes);
+  const slots: (T | null)[] = Array(drawSize).fill(null);
+  let k = 0;
+  for (let i = 0; i < drawSize && k < entries.length; i++) {
+    if (byeSet.has(i)) continue;
+    slots[i] = entries[k++];
+  }
+  return slots;
+}
+
 /** 既定スロットマップ（A〜M・13リーグ）が今回の大会構成に使えるか判定 */
 function slotMapFitsLeagues(slotMap: (string | null)[], leagueIds: string[]): boolean {
   const ids = new Set(leagueIds);
@@ -313,8 +356,10 @@ export function generateAllBrackets(
   standings: Map<string, LeagueStanding[]>,
   _allTeams: MixedTeam[],
   leagues: MixedLeague[],
-  bracketOrders?: TournamentInfo['bracketOrders']
+  bracketOrders?: TournamentInfo['bracketOrders'],
+  options?: { consolation?: boolean }
 ): PlacementBracket[] {
+  const withConsolation = (b: PlacementBracket) => applyConsolation(b, !!options?.consolation);
   const leagueIds = leagues.map(l => l.leagueId.trim());
   const maxTeamsInLeague = leagues.reduce((max, l) => Math.max(max, l.teams.length), 0);
 
@@ -359,12 +404,11 @@ export function generateAllBrackets(
       const entryCount = Math.max(teamsForBracket.length, leagueIds.length);
       const drawSize = Math.max(4, nextPowerOf2(entryCount));
       // BYE位置だけ決めておき、チームは抽選で配置する
-      const layout = drawSize === 16 && entryCount === 13
-        ? DEFAULT_1ST_LAYOUT_13   // 従来のドロー表通りの配置を維持
-        : distributeToSlots(leagueIds.slice(0, entryCount), drawSize);
-      const byePositions = layout.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0);
+      const byePositions = drawSize === 16 && entryCount === 13
+        ? DEFAULT_1ST_LAYOUT_13.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0)   // 従来のドロー表通りの配置を維持
+        : layoutByePositions(cat, entryCount, drawSize);
       const matches = generateBracketMatchesWithSlots(cat, drawSize, Array(drawSize).fill(null));
-      brackets.push({ category: cat, label, drawSize, teams: teamsForBracket, matches, byePositions });
+      brackets.push(withConsolation({ category: cat, label, drawSize, teams: teamsForBracket, matches, byePositions }));
       continue;
     }
 
@@ -372,10 +416,14 @@ export function generateAllBrackets(
     const orderEntries = bracketOrders?.[cat as '2nd' | '3rd' | '4th'];
     const defaultMap = BRACKET_SLOT_MAP[cat];
     let slotCodes: (string | null)[];
+    const default11 = DEFAULT_ORDERS_11[cat];
     if (orderEntries && orderEntries.length > 0) {
-      slotCodes = distributeToSlots(orderEntries, Math.max(4, nextPowerOf2(orderEntries.length)));
+      const size = Math.max(4, nextPowerOf2(orderEntries.length));
+      slotCodes = placeIntoLayout(orderEntries, size, layoutByePositions(cat, orderEntries.length, size));
     } else if (defaultMap && slotMapFitsLeagues(defaultMap, leagueIds)) {
       slotCodes = defaultMap;
+    } else if (default11 && slotMapFitsLeagues(default11, leagueIds)) {
+      slotCodes = placeIntoLayout(default11, 16, layoutByePositions(cat, 11, 16));
     } else {
       const codes = leagueIds.flatMap(lid => (teamByLeague.get(lid) || []).map(() => lid));
       slotCodes = distributeToSlots(codes, Math.max(4, nextPowerOf2(codes.length || leagueIds.length)));
@@ -408,11 +456,11 @@ export function generateAllBrackets(
     const teamsForBracket = slots.filter((s): s is NonNullable<typeof s> => s !== null)
       .map((t, i) => ({ ...t, seedPosition: i + 1 }));
     const matches = generateBracketMatchesWithSlots(cat, drawSize, slots);
-    brackets.push({
+    brackets.push(withConsolation({
       category: cat, label, drawSize, teams: teamsForBracket, matches,
       slotLeagueIds: slotCodes,
       byePositions: slotCodes.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0),
-    });
+    }));
   }
 
   return brackets;
