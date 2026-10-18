@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { useMixedStore } from '../mixed/mixedStore';
 import { useTeamStore } from '../team/teamStore';
 import { calculateLeagueStandings } from '../mixed/mixedLogic';
@@ -6,7 +6,7 @@ import { calculateTeamStandings, MATCH_TYPE_SHORT } from '../team/teamLogic';
 import type { LeagueMatchScore, MixedLeague, LeagueStanding } from '../mixed/types';
 import type { TeamLeagueMatch, TeamLeague, TeamLeagueStanding } from '../team/types';
 import { MapPin, Info } from 'lucide-react';
-import { leagueColor } from '../mixed/leagueColors';
+import { leagueColor, leagueBadgeStyle } from '../mixed/leagueColors';
 
 // =========================================================================
 // 左側固定列（# ＋ 選手名/所属）の寸法
@@ -77,6 +77,7 @@ function PublicMixedLeagueView() {
           key={league.leagueId}
           league={league}
           index={idx}
+          leagueCount={leagues.length}
           matches={leagueMatches.filter(m => m.leagueId === league.leagueId)}
           standings={allStandings.get(league.leagueId) || []}
         />
@@ -88,11 +89,13 @@ function PublicMixedLeagueView() {
 function MixedLeagueSection({
   league,
   index,
+  leagueCount,
   matches,
   standings,
 }: {
   league: MixedLeague;
   index: number;
+  leagueCount: number;
   matches: LeagueMatchScore[];
   standings: LeagueStanding[];
 }) {
@@ -116,6 +119,7 @@ function MixedLeagueSection({
         finished={finished}
         total={total}
         colors={colors}
+        badgeStyle={leagueBadgeStyle(league.leagueId, leagueCount)}
       />
 
       {/* 対戦結果マトリクス（選手名/所属は左固定、スコア以降は横スクロール） */}
@@ -256,6 +260,7 @@ function PublicTeamLeagueView() {
           key={league.leagueId}
           league={league}
           index={idx}
+          leagueCount={leagues.length}
           matches={leagueMatches.filter(m => m.leagueId === league.leagueId)}
           standings={allStandings.get(league.leagueId) || []}
         />
@@ -267,11 +272,13 @@ function PublicTeamLeagueView() {
 function TeamLeagueSection({
   league,
   index,
+  leagueCount,
   matches,
   standings,
 }: {
   league: TeamLeague;
   index: number;
+  leagueCount: number;
   matches: TeamLeagueMatch[];
   standings: TeamLeagueStanding[];
 }) {
@@ -295,6 +302,7 @@ function TeamLeagueSection({
         finished={finished}
         total={total}
         colors={colors}
+        badgeStyle={leagueBadgeStyle(league.leagueId, leagueCount)}
       />
 
       {/* 対戦結果（チーム名は左固定、スコア以降は横スクロール） */}
@@ -419,17 +427,20 @@ function LeagueHeaderCard({
   finished,
   total,
   colors,
+  badgeStyle,
 }: {
   title: string;
   court: string;
   finished: number;
   total: number;
   colors: ReturnType<typeof leagueColor>;
+  /** リーグ記号バッジの配色（リーグ数に応じた虹色） */
+  badgeStyle: CSSProperties;
 }) {
   return (
     <div className={`bg-gradient-to-r ${colors.from} ${colors.to} text-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap`}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-lg font-bold">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow" style={badgeStyle}>
           {title.replace('リーグ', '').trim()}
         </div>
         <div>
