@@ -34,3 +34,8 @@ export function buildResultFileName(tournamentName: string | undefined, label: s
   const body = sanitize(label);
   return (tn ? `${tn}_${body}` : body) + '.jpg';
 }
+
+/** 決勝トーナメントの結果画像ファイル名（順位区分のみ。例: 1位トーナメント.jpg） */
+export function buildBracketResultFileName(label: string): string {
+  return sanitize(label) + '.jpg';
+}

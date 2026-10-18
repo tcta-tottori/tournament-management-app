@@ -44,11 +44,10 @@ function compactName(name: string): string {
   return name.replace(/[\s\u3000]+/g, '');
 }
 
-/** 結果画像のファイル名 */
+/** 結果画像のファイル名（順位区分のみ。例: 1位トーナメント.jpg） */
 export function buildMixedBracketResultFileName(o: MixedBracketResultOptions): string {
   const cat = MIXED_CATEGORY_LABELS[o.bracket.category] || o.bracket.category;
-  const name = (o.tournamentName || '').replace(/[\\/:*?"<>|]/g, '').trim();
-  return `${[name, cat, '結果'].filter(Boolean).join('_')}.jpg`;
+  return `${cat.replace(/[\\/:*?"<>|]/g, '').trim()}.jpg`;
 }
 
 /** ミックス大会の決勝トーナメント結果画像を生成する */
