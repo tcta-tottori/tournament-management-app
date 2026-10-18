@@ -7,6 +7,7 @@
 // =============================================
 
 import type { BracketMatch, MixedTeam, PlacementBracket } from './types';
+import { blackCircled, isConsolation } from './consolation';
 import {
   COL, drawLine, drawResultFrame, drawResultHeader, drawText, fontOf,
   fitLogo, getAssociationLogoEnabled, loadResultLogos, roundRect,
@@ -55,7 +56,9 @@ export async function generateMixedBracketResultDataUrl(
   o: MixedBracketResultOptions,
 ): Promise<string> {
   const { bracket, allTeams, tournamentName, venue } = o;
-  const matches = bracket.matches;
+  // 本戦とコンソレーション（敗者同士の試合・round=0）を分けて描く
+  const matches = bracket.matches.filter(m => !isConsolation(m));
+  const consolationMatches = bracket.matches.filter(isConsolation).sort((a, b) => a.position - b.position);
   if (matches.length === 0) throw new Error('No matches');
 
   const logos = await loadResultLogos();
@@ -110,7 +113,21 @@ export async function generateMixedBracketResultDataUrl(
   // 協会ロゴ（ブラケット枠内の右下に配置）
   const tcta = showLogo ? fitLogo(logos.tcta, Math.min(440, tableW * 0.5), 96) : { w: 0, h: 0 };
 
-  const bracketH = r1Count * gridUnit + bracketTopPad + 14;
+  // ---- コンソレーション欄（本戦の下に、ラベル付きのカードを横に並べる） ----
+  const consTitleH = 44;
+  const consLabelH = 24;
+  const consGapX = 24;
+  const consGapY = 18;
+  const consPerRow = Math.max(1, Math.floor((tableW - bracketSidePad * 2 + consGapX) / (matchW + consGapX)));
+  const consRows = Math.ceil(consolationMatches.length / consPerRow);
+  const consH = consolationMatches.length > 0
+    ? consTitleH + consRows * (consLabelH + matchH) + (consRows - 1) * consGapY + 20
+      // 協会ロゴは枠の右下に置くので、カードと重ならないよう下に余白を取る
+      + (showLogo ? tcta.h + 4 : 0)
+    : 0;
+
+  const mainH = r1Count * gridUnit + bracketTopPad + 14;
+  const bracketH = mainH + consH;
   const totalW = tableW + paddingX * 2;
   const totalH = paddingY + 12 + headerH + bracketH;
 
@@ -228,14 +245,18 @@ export async function generateMixedBracketResultDataUrl(
   const drawPairRow = (
     cx: number, rowY: number, round: number, cardW: number,
     teamId: string | null, league: string, score: number | null,
-    isWinner: boolean, tiebreak: number | null, defLabel?: string,
+    isWinner: boolean, tiebreak: number | null, defLabel?: string, placeholder?: string,
   ) => {
     if (isWinner) {
       ctx.fillStyle = COL.winRow;
       ctx.fillRect(cx + 6, rowY + 2, cardW - 12, rowH - 4);
     }
     const t = teamId ? allTeams.find(tm => tm.teamId === teamId) : null;
-    if (!t) return;
+    if (!t) {
+      // まだ決まっていない枠（コンソレの「❷敗者」など）は出どころを薄く表示する
+      if (placeholder) drawText(ctx, placeholder, cx + 14, rowY + rowH / 2, 12, 'left', COL.gray400, 'medium', cardW - 28);
+      return;
+    }
 
     // リーグバッジ
     const badgeLabel = (league || t.leagueId || '').trim() || '-';
@@ -296,11 +317,14 @@ export async function generateMixedBracketResultDataUrl(
   };
 
   // ---- マッチカード ----
-  const drawMatchCard = (ri: number, mi: number, match: BracketMatch) => {
-    const cx = getRoundX(ri);
-    const cardW = roundW(ri);
-    const cyCenter = getMatchY(ri, mi);
-    const round = ri + 1;
+  const drawMatchCard = (ri: number, mi: number, match: BracketMatch) =>
+    drawCard(getRoundX(ri), getMatchY(ri, mi), roundW(ri), ri + 1, match);
+
+  /** 試合カードを描く（round=1 はフルネーム＋所属、それ以外は姓のみ） */
+  const drawCard = (
+    cx: number, cyCenter: number, cardW: number, round: number, match: BracketMatch,
+    placeholders?: [string, string],
+  ) => {
 
     // BYE: 勝ち上がったペアだけを1行で表示する
     if (match.isBye) {
@@ -348,16 +372,45 @@ export async function generateMixedBracketResultDataUrl(
     const isWO = def1 === 'W.O' || def2 === 'W.O';
 
     drawPairRow(cx, cy, round, cardW, match.team1Id, match.team1League || '',
-      isWO && win1 ? null : match.score1, win1, match.tiebreakScore, def1 || undefined);
+      isWO && win1 ? null : match.score1, win1, match.tiebreakScore, def1 || undefined, placeholders?.[0]);
     drawLine(ctx, cx + 8, cy + rowH, cx + cardW - 8, cy + rowH, COL.gray100, 1);
     drawPairRow(cx, cy + rowH, round, cardW, match.team2Id, match.team2League || '',
-      isWO && win2 ? null : match.score2, win2, match.tiebreakScore, def2 || undefined);
+      isWO && win2 ? null : match.score2, win2, match.tiebreakScore, def2 || undefined, placeholders?.[1]);
   };
 
   for (let ri = 0; ri < roundMatches.length; ri++) {
     for (let mi = 0; mi < roundMatches[ri].length; mi++) {
       drawMatchCard(ri, mi, roundMatches[ri][mi]);
     }
+  }
+
+  // ---- コンソレーション ----
+  if (consolationMatches.length > 0) {
+    const consTop = bracketAreaY + mainH;
+    drawLine(ctx, paddingX + bracketSidePad, consTop, paddingX + tableW - bracketSidePad, consTop, COL.gray200, 1);
+
+    // 見出し（ラウンドラベルと同じ白抜きのピル）
+    const title = 'コンソレーション';
+    ctx.font = fontOf('bold', 12);
+    const titleW = ctx.measureText(title).width + 24;
+    const titleX = paddingX + bracketSidePad;
+    const titleY = consTop + 14;
+    roundRect(ctx, titleX, titleY, titleW, 22, 11, COL.white, COL.gray300, 1);
+    drawText(ctx, title, titleX + titleW / 2, titleY + 12, 12, 'center', COL.gray700, 'bold');
+
+    const rowW = consPerRow * matchW + (consPerRow - 1) * consGapX;
+    const startX = paddingX + Math.max(bracketSidePad, (tableW - rowW) / 2);
+    consolationMatches.forEach((m, i) => {
+      const col = i % consPerRow;
+      const row = Math.floor(i / consPerRow);
+      const x = startX + col * (matchW + consGapX);
+      const y = consTop + consTitleH + row * (consLabelH + matchH + consGapY);
+      // 試合番号と組合せ（例: ❽ ❷敗者-❸敗者）
+      const label = `${m.matchNo !== undefined ? `${blackCircled(m.matchNo)} ` : ''}${m.consolationLabel ?? ''}`;
+      drawText(ctx, label, x + 2, y + consLabelH / 2, 12, 'left', COL.gray700, 'bold', matchW);
+      const [ph1 = '', ph2 = ''] = (m.consolationLabel ?? '').split('-');
+      drawCard(x, y + consLabelH + matchH / 2, matchW, 1, m, [ph1, ph2]);
+    });
   }
 
   // ---- 協会ロゴ（ブラケット枠内の右下） ----
