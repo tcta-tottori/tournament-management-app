@@ -118,7 +118,6 @@ function MixedLeagueSection({
         court={league.courtName}
         finished={finished}
         total={total}
-        colors={colors}
         badgeStyle={leagueBadgeStyle(league.leagueId, leagueCount)}
       />
 
@@ -301,7 +300,6 @@ function TeamLeagueSection({
         court={league.courtName}
         finished={finished}
         total={total}
-        colors={colors}
         badgeStyle={leagueBadgeStyle(league.leagueId, leagueCount)}
       />
 
@@ -426,19 +424,17 @@ function LeagueHeaderCard({
   court,
   finished,
   total,
-  colors,
   badgeStyle,
 }: {
   title: string;
   court: string;
   finished: number;
   total: number;
-  colors: ReturnType<typeof leagueColor>;
   /** リーグ記号バッジの配色（リーグ数に応じた虹色） */
   badgeStyle: CSSProperties;
 }) {
   return (
-    <div className={`bg-gradient-to-r ${colors.from} ${colors.to} text-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap`}>
+    <div className="bg-white border border-gray-200 text-gray-800 rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow" style={badgeStyle}>
           {title.replace('リーグ', '').trim()}
@@ -446,7 +442,7 @@ function LeagueHeaderCard({
         <div>
           <h2 className="text-lg font-bold leading-tight">{title}</h2>
           {court && (
-            <p className="text-[11px] text-white/80 flex items-center gap-1 mt-0.5">
+            <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
               <MapPin className="w-3 h-3" />
               {court}
             </p>
@@ -457,9 +453,9 @@ function LeagueHeaderCard({
         <div className="text-sm font-bold">
           {finished}/{total} 完了
         </div>
-        <div className="w-24 h-1.5 bg-white/20 rounded-full overflow-hidden mt-1">
+        <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden mt-1">
           <div
-            className="h-full bg-white rounded-full transition-all"
+            className="h-full bg-primary-500 rounded-full transition-all"
             style={{ width: `${total > 0 ? (finished / total) * 100 : 0}%` }}
           />
         </div>
