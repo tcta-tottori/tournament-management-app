@@ -37,6 +37,8 @@ export interface MixedBracketResultOptions {
    * 未指定なら保存済みの設定に従う。
    */
   layout?: MixedBracketLayout;
+  /** 優勝者として表示する名前（トーナメント表形式のみ。空なら苗字を自動表示） */
+  championName?: string;
 }
 
 export type MixedBracketLayout = 'card' | 'chart';
@@ -547,6 +549,7 @@ async function generateChartDataUrl(o: MixedBracketResultOptions): Promise<strin
   const chart = await renderTournamentResultCanvas({
     ...toDrawResultData(o),
     showAssociationLogo: o.showAssociationLogo,
+    championName: o.championName,
   });
 
   const cons = o.bracket.matches.filter(isConsolation).sort((a, b) => a.position - b.position);

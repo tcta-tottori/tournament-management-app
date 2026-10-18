@@ -50,6 +50,8 @@ export interface ResultExportOptions {
    * 未指定なら保存済みの設定（getBracketWidthScale）に従う。
    */
   bracketWidthScale?: number;
+  /** 優勝者として表示する名前（空なら氏名から苗字を自動で出す） */
+  championName?: string;
 }
 
 // ===== 共通ヘルパー =====
@@ -488,7 +490,9 @@ export async function renderTournamentResultCanvas(opts: ResultExportOptions): P
   const finalScoreText = finalScore.main;
 
   // 優勝ペアは苗字のみの1行（例:「岸本・安田」）。所属もその下に「A・B」の1行で置く。
-  const champLines = champName ? [isDoubles ? surnameLabel(champName) : champName] : [];
+  const champLines = champName
+    ? [opts.championName?.trim() || (isDoubles ? surnameLabel(champName) : champName)]
+    : [];
   const champAffLines = joinedAffiliation(champAff, champAffParts);
   const CHAMP_LINE_STEP = CHAMP_NAME_PX + 3;
   const CHAMP_AFF_PX = 12;
