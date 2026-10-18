@@ -11,6 +11,9 @@ import {
 import type { MixedBracketLayout, MixedBracketResultOptions } from './exportMixedBracketResultJpeg';
 import { getAssociationLogoEnabled, setAssociationLogoEnabled } from '../draw/resultCanvasKit';
 import { useMixedStore } from './mixedStore';
+import { isConsolation } from './consolation';
+import { ChampionNameField } from '../draw/ChampionNameField';
+import { useChampionName } from '../draw/useChampionName';
 
 interface Props {
   opts: MixedBracketResultOptions;
@@ -44,6 +47,17 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
     setAssociationLogoEnabled(next);
   };
 
+  // 優勝者の表示名（トーナメント表形式で中央に出る名前）。優勝ペアごとに保存する
+  const champId = useMemo(() => {
+    const main = opts.bracket.matches.filter(m => !isConsolation(m));
+    const last = Math.max(0, ...main.map(m => m.round));
+    return main.find(m => m.round === last)?.winnerId ?? null;
+  }, [opts.bracket.matches]);
+  const champion = useChampionName(
+    champId ? `mixed:${opts.tournamentName}:${opts.bracket.category}:${champId}` : null,
+    isOpen,
+  );
+
   const changeLayout = (next: MixedBracketLayout) => {
     setLayout(next);
     setMixedBracketLayout(next);
@@ -72,7 +86,8 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
     tournamentName: appliedName.trim() || opts.tournamentName,
     showAssociationLogo: showLogo,
     layout,
-  }), [opts, appliedName, showLogo, layout]);
+    championName: champion.championName,
+  }), [opts, appliedName, showLogo, layout, champion.championName]);
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -219,6 +234,10 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                 入力するとプレビューに反映されます。「保存」で大会データにも反映され、他の出力でも同じ名称になります。
               </p>
             </div>
+
+            {layout === 'chart' && champId && (
+              <ChampionNameField draft={champion.draft} onChange={champion.setDraft} />
+            )}
 
             <div className="flex-1 overflow-auto bg-white p-4 flex items-center justify-center">
               {isLoading && (

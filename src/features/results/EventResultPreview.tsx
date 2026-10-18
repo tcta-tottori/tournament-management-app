@@ -15,6 +15,9 @@ import {
   BRACKET_WIDTH_MAX,
 } from '../draw/resultCanvasKit';
 import { db } from '../../db/database';
+import { isThirdPlaceMatch } from '../draw/thirdPlace';
+import { ChampionNameField } from '../draw/ChampionNameField';
+import { useChampionName } from '../draw/useChampionName';
 
 interface Props {
   /** 描画に必要な大会・種目・ドロー・試合データ */
@@ -53,6 +56,18 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     setAssociationLogoEnabled(next);
   };
 
+  // 優勝者の表示名（トーナメント表の中央に出る名前）。種目・優勝者ごとに保存する
+  const champId = useMemo(() => {
+    if (isRoundRobin) return null;
+    const main = opts.matches.filter(m => !isThirdPlaceMatch(m));
+    const last = Math.max(0, ...main.map(m => m.round));
+    return main.find(m => m.round === last)?.winnerEntryId ?? null;
+  }, [isRoundRobin, opts.matches]);
+  const champion = useChampionName(
+    champId ? `${opts.tournament.tournamentId}:${opts.event.eventId}:${champId}` : null,
+    isOpen,
+  );
+
   const changeWidth = (next: number) => {
     setWidthScale(next);
     setBracketWidthScale(next);
@@ -83,7 +98,8 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
     tournament: { ...opts.tournament, name: appliedName.trim() || opts.tournament.name },
     showAssociationLogo: showLogo,
     bracketWidthScale: widthScale,
-  }), [opts, appliedName, showLogo, widthScale]);
+    championName: champion.championName,
+  }), [opts, appliedName, showLogo, widthScale, champion.championName]);
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -261,6 +277,8 @@ export default function EventResultPreview({ opts, size = 'md', label = '結果�
                 </p>
               )}
             </div>
+
+            {champId && <ChampionNameField draft={champion.draft} onChange={champion.setDraft} />}
 
             <div className="flex-1 overflow-auto bg-white p-2 sm:p-4 flex items-center justify-center">
               {isLoading && (
