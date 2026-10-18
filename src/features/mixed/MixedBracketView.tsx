@@ -1061,7 +1061,19 @@ function RouletteDrawPanel({ bracket, onRebuild }: {
 }) {
   const [spinning, setSpinning] = useState(false);
   const [currentHighlight, setCurrentHighlight] = useState(-1);
-  const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(new Map());
+  // 抽選結果は配置するたびにブラケットへ反映済みなので、途中で別ページへ移動して
+  // 戻ってきたときはブラケットの1回戦から配置状況を復元する
+  const [assignedSlots, setAssignedSlots] = useState<Map<number, string>>(() => {
+    const teamIds = new Set(bracket.teams.map(t => t.teamId));
+    const restored = new Map<number, string>();
+    for (const m of bracket.matches) {
+      if (m.round !== 1) continue;
+      const base = (m.position - 1) * 2;
+      if (m.team1Id && teamIds.has(m.team1Id)) restored.set(base, m.team1Id);
+      if (m.team2Id && teamIds.has(m.team2Id)) restored.set(base + 1, m.team2Id);
+    }
+    return restored;
+  });
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [drawComplete, setDrawComplete] = useState(false);
   const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
