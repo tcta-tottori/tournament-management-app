@@ -4,9 +4,11 @@ import { Check, Download, ImageIcon, Loader2, Save, X } from 'lucide-react';
 import {
   generateMixedBracketResultDataUrl,
   buildMixedBracketResultFileName,
+  getMixedBracketLayout,
+  setMixedBracketLayout,
   MIXED_CATEGORY_LABELS,
 } from './exportMixedBracketResultJpeg';
-import type { MixedBracketResultOptions } from './exportMixedBracketResultJpeg';
+import type { MixedBracketLayout, MixedBracketResultOptions } from './exportMixedBracketResultJpeg';
 import { getAssociationLogoEnabled, setAssociationLogoEnabled } from '../draw/resultCanvasKit';
 import { useMixedStore } from './mixedStore';
 
@@ -28,6 +30,8 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
   const [error, setError] = useState<string | null>(null);
   // 協会ロゴを入れるかどうか（設定は次回以降も保持する）
   const [showLogo, setShowLogo] = useState(getAssociationLogoEnabled);
+  // カード形式／トーナメント表形式（設定は次回以降も保持する）
+  const [layout, setLayout] = useState<MixedBracketLayout>(getMixedBracketLayout);
   // 画像に印字する大会名（この場で修整できる）
   const [nameDraft, setNameDraft] = useState(opts.tournamentName);
   const [appliedName, setAppliedName] = useState(opts.tournamentName);
@@ -38,6 +42,11 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
   const toggleLogo = (next: boolean) => {
     setShowLogo(next);
     setAssociationLogoEnabled(next);
+  };
+
+  const changeLayout = (next: MixedBracketLayout) => {
+    setLayout(next);
+    setMixedBracketLayout(next);
   };
 
   // 開いた時点の大会名を初期値にする（保存後に入力欄が巻き戻らないよう1回だけ）
@@ -62,7 +71,8 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
     ...opts,
     tournamentName: appliedName.trim() || opts.tournamentName,
     showAssociationLogo: showLogo,
-  }), [opts, appliedName, showLogo]);
+    layout,
+  }), [opts, appliedName, showLogo, layout]);
 
   // 開くたびに最新データで再生成する
   useEffect(() => {
@@ -135,7 +145,21 @@ export default function MixedBracketResultPreview({ opts, size = 'sm', label = '
                 <span className="truncate">{categoryLabel} 結果プレビュー</span>
               </h3>
               <div className="flex items-center gap-2 shrink-0">
-                {/* 操作はこのバーに集約する（ロゴの有無・保存・閉じる） */}
+                {/* 操作はこのバーに集約する（形式・ロゴの有無・保存・閉じる） */}
+                <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5" role="group" aria-label="画像の形式">
+                  {([['card', 'カード'], ['chart', 'トーナメント表']] as const).map(([value, text]) => (
+                    <button
+                      key={value}
+                      onClick={() => changeLayout(value)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition-colors ${
+                        layout === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      aria-pressed={layout === value}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
                 <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-gray-700 whitespace-nowrap">
                   <input
                     type="checkbox"
