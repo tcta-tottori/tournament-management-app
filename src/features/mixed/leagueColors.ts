@@ -46,21 +46,18 @@ export const MAX_LEAGUE_COUNT = 19;
 /**
  * 虹色の基準色（OKLCH: 明度, 彩度, 色相）。赤 → 紫。
  * 色相を単純に等分すると橙〜茶の範囲が間延びするため、虹の各色を基準点として
- * 置き、その間を等間隔に補間する。黄色は暗くすると濁るので明るめにし、文字を濃色にする。
+ * 置き、その間を等間隔に補間する。文字は白で統一するため、黄色系は少し濃いめにして読みやすくする。
  */
 const RAINBOW_STOPS: [number, number, number][] = [
   [0.60, 0.20, 25],   // 赤
-  [0.69, 0.17, 55],   // 橙
-  [0.80, 0.16, 92],   // 黄
+  [0.66, 0.17, 55],   // 橙
+  [0.70, 0.15, 88],   // 黄
   [0.64, 0.18, 145],  // 緑
   [0.64, 0.12, 205],  // 水色
   [0.57, 0.17, 255],  // 青
   [0.52, 0.19, 282],  // 藍
   [0.55, 0.20, 312],  // 紫
 ];
-
-/** この明度以上の背景色では文字を濃色にする */
-const DARK_TEXT_LIGHTNESS = 0.72;
 
 /** 0〜1 の位置に対応する虹色を求める */
 function rainbowAt(t: number): [number, number, number] {
@@ -108,9 +105,10 @@ const FALLBACK_BADGE_STYLE: CSSProperties = { backgroundColor: '#f3f4f6', color:
 export function leagueBadgeStyle(leagueId: string | undefined | null, leagueCount: number): CSSProperties {
   const index = leagueLetterIndex(leagueId);
   if (index < 0 || index >= MAX_LEAGUE_COUNT) return FALLBACK_BADGE_STYLE;
-  const [l] = leagueBadgeLch(index, leagueCount);
   return {
     backgroundColor: leagueBadgeColor(index, leagueCount),
-    color: l >= DARK_TEXT_LIGHTNESS ? '#3f3a1e' : '#fff',
+    color: '#fff',
+    // 黄色など明るめの背景でも白文字が読めるよう、ごく薄い影を付ける
+    textShadow: '0 1px 1px rgba(0, 0, 0, 0.25)',
   };
 }
